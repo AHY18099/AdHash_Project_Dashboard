@@ -1,0 +1,537 @@
+{
+  "projects": [
+    {
+      "id": "adhash",
+      "name": "AdHash",
+      "description": "AdHash Technology Solutions",
+      "color": "#3b82f6",
+      "apps": [],
+      "servers": [
+        {
+          "name": "Adhash - Web",
+          "url": "https://adhashtech.com/",
+          "type": "web"
+        }
+      ],
+      "domains": ["adhashtech.com"],
+      "sslCerts": ["adhashtech.com"],
+      "apis": [
+        {
+          "name": "AdHash Website",
+          "url": "https://adhashtech.com/",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "id": "wavedin",
+      "name": "WavedIn",
+      "description": "Event Management Platform",
+      "color": "#8b5cf6",
+      "apps": [
+        {
+          "name": "WavedIn",
+          "playStore": "com.waivedin",
+          "appStore": "id6451483729"
+        }
+      ],
+      "servers": [
+        {
+          "name": "WavedIn - Mobile API",
+          "url": "https://mobileliveapi.wavedin.app/",
+          "type": "api"
+        },
+        {
+          "name": "WavedIn - Super Admin",
+          "url": "https://superadmin.wavedin.app/",
+          "type": "admin"
+        }
+      ],
+      "domains": ["wavedin.app", "mobileliveapi.wavedin.app", "superadmin.wavedin.app"],
+      "sslCerts": ["superadmin.wavedin.app", "market.wavedin.app", "mobileliveapi.wavedin.app"],
+      "apis": [
+        {
+          "name": "WavedIn App Login",
+          "url": "https://mobileliveapi.wavedin.app/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "name": "WavedIn SuperAdmin UI",
+          "url": "https://superadmin.wavedin.app/",
+          "method": "GET"
+        },
+        {
+          "name": "WavedIn Market Web",
+          "url": "https://market.wavedin.app/",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "id": "algomax",
+      "name": "Algomax",
+      "description": "Trading & Investment Platform",
+      "color": "#10b981",
+      "apps": [
+        {
+          "name": "AlgoMax",
+          "playStore": "com.algomax",
+          "appStore": "id6498886667"
+        }
+      ],
+      "servers": [
+        {
+          "name": "Algomax - GoPocket",
+          "url": "https://gopocket.algomax.co/",
+          "type": "web"
+        }
+      ],
+      "domains": ["algomax.co", "gopocket.algomax.co"],
+      "sslCerts": ["prosky.algomax.co", "gopocket.algomax.co"],
+      "apis": [
+        {
+          "name": "Algomax ProSky Web",
+          "url": "https://prosky.algomax.co",
+          "method": "GET"
+        },
+        {
+          "name": "Algomax GoPocket Web",
+          "url": "https://gopocket.algomax.co",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "id": "autochecker",
+      "name": "AutoChecker",
+      "description": "Automotive Parts Verification",
+      "color": "#f59e0b",
+      "apps": [
+        {
+          "name": "AutoChecker",
+          "playStore": "com.autochecker",
+          "appStore": null
+        }
+      ],
+      "servers": [
+        {
+          "name": "AutoChecker - Auto Search",
+          "url": "http://20.7.146.191:3000/",
+          "type": "service"
+        },
+        {
+          "name": "AutoChecker - Manual Search",
+          "url": "http://20.15.121.70:3000/",
+          "type": "service"
+        },
+        {
+          "name": "AutoChecker - PartSouq",
+          "url": "http://20.62.109.239:3000/",
+          "type": "service"
+        },
+        {
+          "name": "AutoChecker - Admin",
+          "url": "https://manage.autochecker.com/",
+          "type": "admin"
+        },
+        {
+          "name": "AutoChecker - Admin API",
+          "url": "https://manageadminapi.autochecker.com/",
+          "type": "api"
+        },
+        {
+          "name": "AutoChecker - Mobile API",
+          "url": "https://managemobileapi.autochecker.com/",
+          "type": "api"
+        },
+        {
+          "name": "AutoChecker - eBay API",
+          "url": "https://ebaydev.autochecker.com/",
+          "type": "api"
+        }
+      ],
+      "domains": ["autochecker.com", "manage.autochecker.com", "manageadminapi.autochecker.com", "managemobileapi.autochecker.com", "ebaydev.autochecker.com"],
+      "sslCerts": ["manageadminapi.autochecker.com", "ebaydev.autochecker.com", "managemobileapi.autochecker.com", "manage.autochecker.com"],
+      "apis": [
+        {
+          "name": "AutoChecker Login UI",
+          "url": "https://manage.autochecker.com/",
+          "method": "GET"
+        },
+        {
+          "name": "AutoChecker Admin Login",
+          "url": "https://manageadminapi.autochecker.com/adminapi/auth/login",
+          "method": "POST"
+        },
+        {
+          "name": "AutoChecker App Login",
+          "url": "https://managemobileapi.autochecker.com/api/auth/login",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "id": "autoevantage",
+      "name": "Auto eVantage",
+      "description": "Automotive eCommerce Platform",
+      "color": "#0ea5e9",
+      "apps": [
+        {
+          "name": "Auto eVantage",
+          "playStore": "com.autochecker.autoevantage",
+          "appStore": "id1234567890"
+        }
+      ],
+      "servers": [],
+      "domains": [],
+      "sslCerts": [],
+      "apis": []
+    },
+    {
+      "id": "sparkme",
+      "name": "Spark me",
+      "description": "Social Analytics Platform",
+      "color": "#ec4899",
+      "apps": [
+        {
+          "name": "Spark Me",
+          "playStore": "com.adhash.sparkme",
+          "appStore": "id1578660405"
+        }
+      ],
+      "servers": [
+        {
+          "name": "Synctag - API",
+          "url": "https://spark.synctag.com/",
+          "type": "api"
+        }
+      ],
+      "domains": ["synctag.com", "spark.synctag.com"],
+      "sslCerts": ["spark.synctag.com", "sparkanalytics.synctag.com"],
+      "apis": [
+        {
+          "name": "Sparkme App Login",
+          "url": "https://spark.synctag.com/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "name": "Sparkme Web Login UI",
+          "url": "https://sparkanalytics.synctag.com/",
+          "method": "GET"
+        },
+        {
+          "name": "Sparkme Web Login",
+          "url": "https://spark.synctag.com/analyticsapi/auth/login",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "id": "humee",
+      "name": "Humee",
+      "description": "Healthcare Management System",
+      "color": "#06b6d4",
+      "apps": [],
+      "servers": [
+        {
+          "name": "Humee - Admin",
+          "url": "https://humee.com/",
+          "type": "admin"
+        },
+        {
+          "name": "Humee - API",
+          "url": "https://api.humee.com/",
+          "type": "api"
+        }
+      ],
+      "domains": ["humee.com", "humee.io", "api.humee.com", "dashboard.humee.com", "participant.humee.com", "cpa.humee.com", "apiparticipant.humee.com"],
+      "sslCerts": ["humee.com", "api.humee.com", "dashboard.humee.com"],
+      "apis": [
+        {
+          "name": "Humee Admin Web UI",
+          "url": "https://www.humee.com/",
+          "method": "GET"
+        },
+        {
+          "name": "Humee Dashboard Web UI",
+          "url": "https://dashboard.humee.com/",
+          "method": "GET"
+        },
+        {
+          "name": "Humee Dashboard Login Check",
+          "url": "https://api.humee.com/api/users/beforeLogincheckUser",
+          "method": "POST"
+        },
+        {
+          "name": "Humee Dashboard Login OTP",
+          "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyB6Fk4wRtuKFPL_2BToGZuGP7bOGUH08lQ",
+          "method": "POST"
+        },
+        {
+          "name": "Humee Dashboard Login",
+          "url": "https://api.humee.com/api/users/login",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "id": "metcalf",
+      "name": "Metcalf",
+      "description": "AI Solutions Platform",
+      "color": "#84cc16",
+      "apps": [],
+      "servers": [
+        {
+          "name": "Metcalf - Web",
+          "url": "https://metcalf.ai/",
+          "type": "web"
+        }
+      ],
+      "domains": ["metcalf.ai"],
+      "sslCerts": ["metcalf.ai"],
+      "apis": [
+        {
+          "name": "Metcalf UI",
+          "url": "https://metcalf.ai/",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "id": "aisignpro",
+      "name": "AiSign Pro",
+      "description": "Digital Signature Platform",
+      "color": "#6366f1",
+      "apps": [],
+      "servers": [
+        {
+          "name": "AiSignPro - API",
+          "url": "https://api.aisignpro.com/",
+          "type": "api"
+        },
+        {
+          "name": "AiSignPro - Admin",
+          "url": "https://admin.aisignpro.com/",
+          "type": "admin"
+        }
+      ],
+      "domains": ["aisignpro.com", "api.aisignpro.com", "admin.aisignpro.com", "cpa.aisignpro.com", "participant.aisignpro.com"],
+      "sslCerts": ["api.aisignpro.com", "admin.aisignpro.com", "cpa.aisignpro.com", "participant.aisignpro.com"],
+      "apis": [
+        {
+          "name": "AiSignPro SuperAdmin UI",
+          "url": "https://admin.aisignpro.com/",
+          "method": "GET"
+        },
+        {
+          "name": "AiSignPro SuperAdmin Check User",
+          "url": "https://api.aisignpro.com/api/user/userExists",
+          "method": "POST"
+        },
+        {
+          "name": "AiSignPro SuperAdmin OTP",
+          "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik",
+          "method": "POST"
+        },
+        {
+          "name": "AiSignPro SuperAdmin Login",
+          "url": "https://api.aisignpro.com/api/user/login",
+          "method": "POST"
+        },
+        {
+          "name": "AiSignPro DDP Admin Check User",
+          "url": "https://api.aisignpro.com/api/user/userExists",
+          "method": "POST"
+        },
+        {
+          "name": "AiSignPro DDP Admin OTP",
+          "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik",
+          "method": "POST"
+        },
+        {
+          "name": "AiSignPro DDP Admin Login",
+          "url": "https://api.aisignpro.com/api/user/login",
+          "method": "POST"
+        },
+        {
+          "name": "AiSignPro Accountant Check User",
+          "url": "https://api.aisignpro.com/api/user/userExists",
+          "method": "POST"
+        },
+        {
+          "name": "AiSignPro Accountant OTP",
+          "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik",
+          "method": "POST"
+        },
+        {
+          "name": "AiSignPro Accountant Login",
+          "url": "https://api.aisignpro.com/api/user/login",
+          "method": "POST"
+        },
+        {
+          "name": "AiSignPro CPA UI",
+          "url": "https://cpa.aisignpro.com/",
+          "method": "GET"
+        },
+        {
+          "name": "AiSignPro CPA Check User",
+          "url": "https://api.aisignpro.com/api/user/userExists",
+          "method": "POST"
+        },
+        {
+          "name": "AiSignPro CPA OTP",
+          "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik",
+          "method": "POST"
+        },
+        {
+          "name": "AiSignPro CPA Login",
+          "url": "https://api.aisignpro.com/api/user/login",
+          "method": "POST"
+        },
+        {
+          "name": "AiSignPro Participant UI",
+          "url": "https://participant.aisignpro.com/",
+          "method": "GET"
+        },
+        {
+          "name": "AiSignPro Participant Check User",
+          "url": "https://api.aisignpro.com/api/user/userExists",
+          "method": "POST"
+        },
+        {
+          "name": "AiSignPro Participant OTP",
+          "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik",
+          "method": "POST"
+        },
+        {
+          "name": "AiSignPro Participant Login",
+          "url": "https://api.aisignpro.com/api/user/login",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "id": "zapcrm",
+      "name": "ZapCRM",
+      "description": "Customer Relationship Management (Secure & Social)",
+      "color": "#ef4444",
+      "apps": [],
+      "servers": [
+        {
+          "name": "Zapcrm - API",
+          "url": "https://api.zapcrm.io/",
+          "type": "api"
+        },
+        {
+          "name": "Zapcrm - Admin",
+          "url": "https://zapcrm.io/",
+          "type": "admin"
+        },
+        {
+          "name": "Zapcrm - Secure",
+          "url": "https://secure.zapcrm.io/",
+          "type": "web"
+        },
+        {
+          "name": "Zapcrm - Social",
+          "url": "https://social.zapcrm.io/",
+          "type": "web"
+        }
+      ],
+      "domains": ["zapcrm.io", "api.zapcrm.io", "secure.zapcrm.io", "social.zapcrm.io"],
+      "sslCerts": ["zapcrm.io", "api.zapcrm.io"],
+      "apis": [
+        {
+          "name": "ZapCRM UI",
+          "url": "https://zapcrm.io/",
+          "method": "GET"
+        },
+        {
+          "name": "Secure ZapCRM UI",
+          "url": "https://secure.zapcrm.io/",
+          "method": "GET"
+        },
+        {
+          "name": "Social ZapCRM UI",
+          "url": "https://social.zapcrm.io/",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "id": "leadzapcrm",
+      "name": "LeadZapCRM",
+      "description": "Lead Management System",
+      "color": "#f97316",
+      "apps": [],
+      "servers": [
+        {
+          "name": "Zapcrm - Lead",
+          "url": "https://lead.zapcrm.io/",
+          "type": "web"
+        }
+      ],
+      "domains": ["lead.zapcrm.io"],
+      "sslCerts": ["lead.zapcrm.io"],
+      "apis": [
+        {
+          "name": "Lead ZapCRM UI",
+          "url": "https://lead.zapcrm.io/",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "id": "zapai",
+      "name": "ZapAI",
+      "description": "AI-Powered Automation",
+      "color": "#a855f7",
+      "apps": [],
+      "servers": [
+        {
+          "name": "Zapai - Web",
+          "url": "https://www.zapai.us/",
+          "type": "web"
+        }
+      ],
+      "domains": ["zapai.us", "www.zapai.us"],
+      "sslCerts": ["www.zapai.us"],
+      "apis": [
+        {
+          "name": "ZapAI UI",
+          "url": "https://zapai.us/",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "id": "smc",
+      "name": "SMC",
+      "description": "Send Movie Clips Platform",
+      "color": "#14b8a6",
+      "apps": [],
+      "servers": [
+        {
+          "name": "SMC - API",
+          "url": "https://api.sendmovieclips.com/",
+          "type": "api"
+        }
+      ],
+      "domains": ["sendmovieclips.com", "api.sendmovieclips.com"],
+      "sslCerts": ["api.sendmovieclips.com"],
+      "apis": []
+    },
+    {
+      "id": "synctrade",
+      "name": "SyncTrade",
+      "description": "Trading Synchronization Platform",
+      "color": "#0ea5e9",
+      "apps": [],
+      "servers": [],
+      "domains": ["synctrade.ai"],
+      "sslCerts": [],
+      "apis": []
+    }
+  ]
+}
+

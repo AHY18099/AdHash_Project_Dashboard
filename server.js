@@ -1,7 +1,6 @@
 const express = require('express');
-const { exec } = require('child_process');
-const axios = require('axios');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = 7777;
@@ -9,103 +8,34 @@ const PORT = 7777;
 // Parse JSON bodies
 app.use(express.json());
 
-// Project-wise server organization
-const projects = {
-    'AutoChecker': {
-        name: 'AutoChecker',
-        icon: '🚗',
-        servers: [
-            { name: 'Auto Search', url: 'http://20.7.146.191:3000/' },
-            { name: 'Manual Search', url: 'http://20.15.121.70:3000/' },
-            { name: 'PartSouq', url: 'http://20.62.109.239:3000/' },
-            { name: 'Admin', url: 'https://manage.autochecker.com/' },
-            { name: 'Admin API', url: 'https://manageadminapi.autochecker.com/' },
-            { name: 'Mobile API', url: 'https://managemobileapi.autochecker.com/' },
-            { name: 'eBay API', url: 'https://ebaydev.autochecker.com/' }
-        ]
-    },
-    'WavedIn': {
-        name: 'WavedIn',
-        icon: '🌊',
-        servers: [
-            { name: 'Mobile API', url: 'https://mobileliveapi.wavedin.app/' },
-            { name: 'Super Admin', url: 'https://superadmin.wavedin.app/' }
-        ]
-    },
-    'Zapai': {
-        name: 'Zapai/ZapCRM',
-        icon: '⚡',
-        servers: [
-            { name: 'Zapai Web', url: 'https://www.zapai.us/' },
-            { name: 'ZapCRM Admin', url: 'https://zapcrm.io/' },
-            { name: 'ZapCRM Lead', url: 'https://lead.zapcrm.io/' },
-            { name: 'ZapCRM API', url: 'https://api.zapcrm.io/' }
-        ]
-    },
-    'Algomax': {
-        name: 'Algomax',
-        icon: '📊',
-        servers: [
-            { name: 'GoPocket', url: 'https://gopocket.algomax.co/' }
-        ]
-    },
-    'SMC': {
-        name: 'SMC',
-        icon: '🎬',
-        servers: [
-            { name: 'API', url: 'https://api.sendmovieclips.com/' }
-        ]
-    },
-    'Metcalf': {
-        name: 'Metcalf',
-        icon: '🤖',
-        servers: [
-            { name: 'Web', url: 'https://metcalf.ai/' }
-        ]
-    },
-    'AdHash': {
-        name: 'AdHash',
-        icon: '🚀',
-        servers: [
-            { name: 'Web', url: 'https://adhashtech.com/' }
-        ]
-    },
-    'Humee': {
-        name: 'Humee',
-        icon: '💼',
-        servers: [
-            { name: 'Admin', url: 'https://humee.com/' },
-            { name: 'API', url: 'https://api.humee.com/' }
-        ]
-    },
-    'AiSignPro': {
-        name: 'AiSignPro',
-        icon: '✍️',
-        servers: [
-            { name: 'Admin', url: 'https://admin.aisignpro.com/' },
-            { name: 'API', url: 'https://api.aisignpro.com/' }
-        ]
-    },
-    'Synctag': {
-        name: 'Synctag',
-        icon: '🔗',
-        servers: [
-            { name: 'API', url: 'https://spark.synctag.com/' }
-        ]
+// Store test execution status
+let testRunning = false;
+let testResults = null;
+let testLogs = [];
+let currentSuite = null;
+let testProcessPid = null;
+
+// Store server logs
+const serverLogs = [];
+const MAX_LOGS = 100;
+
+// Helper function to log messages to array
+function logToArray(level, message) {
+    const logEntry = {
+        timestamp: new Date().toISOString(),
+        level: level,
+        message: message
+    };
+    serverLogs.push(logEntry);
+
+    // Keep only last MAX_LOGS entries
+    if (serverLogs.length > MAX_LOGS) {
+        serverLogs.shift();
     }
-};
 
-// Flatten servers for backward compatibility
-const servers = Object.values(projects).flatMap(project =>
-    project.servers.map(server => ({
-        ...server,
-        name: `${project.name} - ${server.name}`,
-        project: project.name
-    }))
-);
-
-// Store SSE clients
-let clients = [];
+    // Also log to console
+    console.log(`[${level.toUpperCase()}] ${message}`);
+}
 
 // API endpoint to get test suite counts WITHOUT running tests
 app.get('/api/test-counts', (req, res) => {
@@ -206,8 +136,11 @@ app.get('/api/test-status', (req, res) => {
     }
 
     res.json({
+        status: testRunning ? 'running' : (testResults ? 'completed' : 'idle'),
         running: testRunning,
-        hasResults: testResults !== null
+        hasResults: testResults !== null,
+        currentSuite: currentSuite,
+        results: testResults
     });
 });
 
@@ -456,11 +389,27 @@ app.get('/api/embedded-report/:suite', (req, res) => {
 
 // Helper function to add log
 function addLog(message, type = 'info') {
-    testLogs.push({
+    const logEntry = {
         message,
         type,
         timestamp: new Date().toISOString()
+    };
+
+    // Add to testLogs for backward compatibility
+    testLogs.push(logEntry);
+
+    // Also add to serverLogs so it appears in the UI
+    serverLogs.push({
+        timestamp: logEntry.timestamp,
+        level: type,
+        message: message
     });
+
+    // Keep only last MAX_LOGS entries in serverLogs
+    if (serverLogs.length > MAX_LOGS) {
+        serverLogs.shift();
+    }
+
     console.log(`[${type.toUpperCase()}] ${message}`);
 }
 
@@ -590,29 +539,34 @@ app.post('/api/run-tests', (req, res) => {
         console.log(output);
 
         // Parse output to detect which suite is running
-        if (output.includes('App Status')) {
-            currentSuite = '📱 App Status Verification';
-            addLog('Starting App Status Verification tests...', 'running');
-        } else if (output.includes('Server Health')) {
-            currentSuite = '🖥️ Server Health Monitoring';
-            addLog('Starting Server Health Monitoring tests...', 'running');
-        } else if (output.includes('SSL') || output.includes('Certificate')) {
-            currentSuite = '🔒 SSL Certificate Monitoring';
-            addLog('Starting SSL Certificate Monitoring tests...', 'running');
-        } else if (output.includes('API Test')) {
-            currentSuite = '🌐 API Endpoint Testing';
-            addLog('Starting API Endpoint Testing tests...', 'running');
-        } else if (output.includes('Domain Report') || output.includes('Domain Expiry')) {
-            currentSuite = '🌐 Domain Expiry Monitoring';
-            addLog('Starting Domain Expiry Monitoring tests...', 'running');
+        if (output.includes('Step 1/5') || output.includes('App Status')) {
+            currentSuite = 'app-status';
+            addLog('🚀 Starting App Status Verification tests...', 'running');
+        } else if (output.includes('Step 2/5') || output.includes('Server Health')) {
+            currentSuite = 'server-health';
+            addLog('🚀 Starting Server Health Monitoring tests...', 'running');
+        } else if (output.includes('Step 3/5') || output.includes('SSL') || output.includes('Certificate')) {
+            currentSuite = 'ssl-cert';
+            addLog('🚀 Starting SSL Certificate Monitoring tests...', 'running');
+        } else if (output.includes('Step 4/5') || output.includes('API Test')) {
+            currentSuite = 'api-test';
+            addLog('🚀 Starting API Endpoint Testing tests...', 'running');
+        } else if (output.includes('Step 5/5') || output.includes('Domain Report') || output.includes('Domain Expiry')) {
+            currentSuite = 'domain-report';
+            addLog('🚀 Starting Domain Expiry Monitoring tests...', 'running');
+        }
+
+        // Log npm install progress
+        if (output.includes('npm install') || output.includes('added') || output.includes('packages')) {
+            addLog(`📦 Installing dependencies (using cache)...`, 'info');
         }
 
         // Log test progress
-        if (output.includes('PASS') || output.includes('✓')) {
+        if (output.includes('PASS') || output.includes('✓') || output.includes('✅')) {
             addLog(`✅ ${output.trim()}`, 'success');
-        } else if (output.includes('FAIL') || output.includes('✗')) {
+        } else if (output.includes('FAIL') || output.includes('✗') || output.includes('❌')) {
             addLog(`❌ ${output.trim()}`, 'error');
-        } else if (output.trim().length > 0 && !output.includes('[')) {
+        } else if (output.trim().length > 0 && !output.includes('[') && !output.includes('npm WARN')) {
             addLog(output.trim(), 'info');
         }
     });
@@ -698,10 +652,815 @@ app.post('/api/run-tests', (req, res) => {
     });
 });
 
-// Main route - serve index.html directly (no redirect)
+// API endpoint to get all projects
+app.get('/api/projects', (req, res) => {
+    try {
+        const projectMappingPath = path.join(__dirname, 'config', 'project-mapping.json');
+        if (!fs.existsSync(projectMappingPath)) {
+            return res.status(404).json({ error: 'Project mapping not found' });
+        }
+
+        const projectData = JSON.parse(fs.readFileSync(projectMappingPath, 'utf8'));
+        res.json(projectData);
+    } catch (error) {
+        console.error('Error loading projects:', error);
+        res.status(500).json({ error: 'Failed to load projects' });
+    }
+});
+
+// API endpoint to get a specific project
+app.get('/api/project/:id', (req, res) => {
+    try {
+        const projectMappingPath = path.join(__dirname, 'config', 'project-mapping.json');
+        if (!fs.existsSync(projectMappingPath)) {
+            return res.status(404).json({ error: 'Project mapping not found' });
+        }
+
+        const projectData = JSON.parse(fs.readFileSync(projectMappingPath, 'utf8'));
+        const project = projectData.projects.find(p => p.id === req.params.id);
+
+        if (!project) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        res.json(project);
+    } catch (error) {
+        console.error('Error loading project:', error);
+        res.status(500).json({ error: 'Failed to load project' });
+    }
+});
+
+// API endpoint to get server logs
+app.get('/api/logs', (req, res) => {
+    try {
+        // Return last 50 logs
+        const recentLogs = serverLogs.slice(-50);
+        res.json(recentLogs);
+    } catch (error) {
+        console.error('Error fetching logs:', error);
+        res.status(500).json({ error: 'Failed to fetch logs' });
+    }
+});
+
+// API endpoint to get project details
+app.get('/api/project/:id', (req, res) => {
+    try {
+        const projectId = req.params.id;
+        const projectMapping = JSON.parse(fs.readFileSync(path.join(__dirname, 'config', 'project-mapping.json'), 'utf8'));
+        const project = projectMapping.projects.find(p => p.id === projectId);
+
+        if (!project) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        res.json(project);
+    } catch (error) {
+        console.error('Error fetching project details:', error);
+        res.status(500).json({ error: 'Failed to fetch project details' });
+    }
+});
+
+// Load project mapping
+function getProjectMapping() {
+    try {
+        const mappingPath = path.join(__dirname, 'config', 'project-mapping.json');
+        const data = fs.readFileSync(mappingPath, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('Error loading project mapping:', error);
+        return { projects: [] };
+    }
+}
+
+// Helper functions to get test results
+function getAppTestResults(projectId) {
+    try {
+        // Get project configuration
+        const mapping = getProjectMapping();
+        const project = mapping.projects.find(p => p.id === projectId);
+
+        if (!project || !project.apps || project.apps.length === 0) {
+            return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+        }
+
+        // Parse the actual HTML report
+        const reportPath = path.join(__dirname, 'Adhash_App_Status', 'custom-reports', 'Unified_App_Verification_Report.html');
+
+        if (!fs.existsSync(reportPath)) {
+            console.log('App Status report not found:', reportPath);
+            return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+        }
+
+        const html = fs.readFileSync(reportPath, 'utf8');
+
+        // Extract individual test results from the table
+        // Count tests for this project's apps only
+        let total = 0;
+        let passed = 0;
+        let failed = 0;
+
+        const testDetails = [];
+
+        // Each app has 2 tests (Play Store + App Store)
+        project.apps.forEach(app => {
+            const appName = app.name;
+            const escapedName = appName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+            // Generate URLs from package IDs
+            const playStoreUrl = app.playStore ? `https://play.google.com/store/apps/details?id=${app.playStore}` : (app.playStoreUrl || '#');
+            const appStoreUrl = app.appStore ? `https://apps.apple.com/app/${app.appStore}` : (app.appStoreUrl || '#');
+
+            // Look for test rows containing this app name
+            // Pattern: <tr><td>number</td><td><strong>AppName</strong></td><td><span class="platform-text">Play Store</span></td>...<span class="status-badge status-pass/fail">
+            // More specific pattern to avoid overlapping matches
+            const playStorePattern = new RegExp(`<tr>\\s*<td>\\d+</td>\\s*<td><strong>${escapedName}</strong></td>\\s*<td><span class="platform-text">Play Store</span></td>[\\s\\S]*?<span class="status-badge status-(pass|fail)">`, 'gi');
+            const appStorePattern = new RegExp(`<tr>\\s*<td>\\d+</td>\\s*<td><strong>${escapedName}</strong></td>\\s*<td><span class="platform-text">App Store</span></td>[\\s\\S]*?<span class="status-badge status-(pass|fail)">`, 'gi');
+
+            const playStoreMatches = [...html.matchAll(playStorePattern)];
+            const appStoreMatches = [...html.matchAll(appStorePattern)];
+
+            playStoreMatches.forEach(match => {
+                total++;
+                const status = match[1];
+                if (status === 'pass') {
+                    passed++;
+                    testDetails.push({
+                        name: `${appName} - Play Store`,
+                        platform: 'Play Store',
+                        url: playStoreUrl,
+                        status: 'passed',
+                        type: 'app'
+                    });
+                } else {
+                    failed++;
+                    testDetails.push({
+                        name: `${appName} - Play Store`,
+                        platform: 'Play Store',
+                        url: playStoreUrl,
+                        status: 'failed',
+                        type: 'app'
+                    });
+                }
+            });
+
+            appStoreMatches.forEach(match => {
+                total++;
+                const status = match[1];
+                if (status === 'pass') {
+                    passed++;
+                    testDetails.push({
+                        name: `${appName} - App Store`,
+                        platform: 'App Store',
+                        url: appStoreUrl,
+                        status: 'passed',
+                        type: 'app'
+                    });
+                } else {
+                    failed++;
+                    testDetails.push({
+                        name: `${appName} - App Store`,
+                        platform: 'App Store',
+                        url: appStoreUrl,
+                        status: 'failed',
+                        type: 'app'
+                    });
+                }
+            });
+        });
+
+        return {
+            total: total,
+            passed: passed,
+            failed: failed,
+            warning: 0,
+            tests: testDetails
+        };
+    } catch (error) {
+        console.error('Error getting app test results:', error);
+        return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+    }
+}
+
+function getServerTestResults(projectId) {
+    try {
+        // Get project configuration
+        const mapping = getProjectMapping();
+        const project = mapping.projects.find(p => p.id === projectId);
+
+        if (!project || !project.servers || project.servers.length === 0) {
+            return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+        }
+
+        // Find the latest server health report
+        const reportsDir = path.join(__dirname, 'Adhash_AllProjects_Server', 'reports');
+
+        if (!fs.existsSync(reportsDir)) {
+            console.log('Server reports directory not found:', reportsDir);
+            return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+        }
+
+        const files = fs.readdirSync(reportsDir).filter(f => f.startsWith('server-health-report-') && f.endsWith('.html'));
+
+        if (files.length === 0) {
+            console.log('No server health reports found');
+            return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+        }
+
+        // Get the most recent report
+        const latestReport = files.sort().reverse()[0];
+        const reportPath = path.join(reportsDir, latestReport);
+        const html = fs.readFileSync(reportPath, 'utf8');
+
+        // Count servers for this project only
+        let total = 0;
+        let passed = 0;
+        let failed = 0;
+        let warning = 0;
+        const testDetails = [];
+
+        project.servers.forEach(server => {
+            const serverName = server.name;
+
+            // Look for server cards in the HTML
+            // Pattern: <div class="server-card active/inactive">...<div class="server-name">ServerName</div>
+            const escapedName = serverName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const serverPattern = new RegExp(`<div class="server-card (active|inactive)"[\\s\\S]{0,500}?<div class="server-name">${escapedName}`, 'i');
+            const match = html.match(serverPattern);
+
+            if (match) {
+                total++;
+                const cardStatus = match[1].toLowerCase();
+
+                if (cardStatus === 'inactive') {
+                    // Down server (🚨)
+                    failed++;
+                    testDetails.push({
+                        name: serverName,
+                        url: server.url || '#',
+                        type: server.type || 'Server',
+                        status: 'failed'
+                    });
+                } else {
+                    // Active server - check icon to determine if healthy or unhealthy
+                    const iconPattern = new RegExp(`<div class="server-card active"[\\s\\S]{0,500}?<div class="server-name">${escapedName}[\\s\\S]{0,200}?<span class="server-icon">([^<]+)</span>`, 'i');
+                    const iconMatch = html.match(iconPattern);
+
+                    if (iconMatch && iconMatch[1].includes('⚠️')) {
+                        warning++; // Unhealthy
+                        testDetails.push({
+                            name: serverName,
+                            url: server.url || '#',
+                            type: server.type || 'Server',
+                            status: 'warning'
+                        });
+                    } else {
+                        passed++; // Healthy (✅)
+                        testDetails.push({
+                            name: serverName,
+                            url: server.url || '#',
+                            type: server.type || 'Server',
+                            status: 'passed'
+                        });
+                    }
+                }
+            }
+        });
+
+        return {
+            total: total,
+            passed: passed,
+            failed: failed,
+            warning: warning,
+            tests: testDetails
+        };
+    } catch (error) {
+        console.error('Error getting server test results:', error);
+        return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+    }
+}
+
+function getSSLTestResults(projectId) {
+    try {
+        // Get project configuration
+        const mapping = getProjectMapping();
+        const project = mapping.projects.find(p => p.id === projectId);
+
+        if (!project || !project.sslCerts || project.sslCerts.length === 0) {
+            return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+        }
+
+        // Find the latest SSL certificate report
+        const reportsDir = path.join(__dirname, 'AdHash-Projects-Certificate-Expiry-Test', 'reports');
+
+        if (!fs.existsSync(reportsDir)) {
+            console.log('SSL reports directory not found:', reportsDir);
+            return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+        }
+
+        const files = fs.readdirSync(reportsDir).filter(f => f.startsWith('certificate-report-') && f.endsWith('.html'));
+
+        if (files.length === 0) {
+            console.log('No SSL certificate reports found');
+            return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+        }
+
+        // Get the most recent report
+        const latestReport = files.sort().reverse()[0];
+        const reportPath = path.join(reportsDir, latestReport);
+        const html = fs.readFileSync(reportPath, 'utf8');
+
+        // Count SSL certificates for this project only
+        let total = 0;
+        let passed = 0;
+        let failed = 0;
+        let warning = 0;
+        const testDetails = [];
+
+        project.sslCerts.forEach(domain => {
+            // Look for certificate rows in the table
+            // Pattern: <tr class='row-ok/row-failed/row-warning'>...(up to 500 chars)...https://domain.com/
+            const escapedDomain = domain.replace(/\./g, '\\.');
+            const certPattern = new RegExp(`<tr class='(row-ok|row-failed|row-warning)'[^>]*>[\\s\\S]{0,500}?https?://${escapedDomain}/?<`, 'i');
+            const match = html.match(certPattern);
+
+            if (match) {
+                total++;
+                const rowClass = match[1].toLowerCase();
+
+                // Check if certificate has days remaining (to distinguish warning from actual failure)
+                // Pattern: <td>XX days</td> or <td>Expired</td>
+                const daysPattern = new RegExp(`<tr class='${match[1]}'[^>]*>[\\s\\S]{0,500}?https?://${escapedDomain}/?<[\\s\\S]{0,200}?<td>([^<]+)</td>`, 'i');
+                const daysMatch = html.match(daysPattern);
+
+                let isExpired = false;
+                let daysRemaining = null;
+                if (daysMatch && daysMatch[1]) {
+                    const daysText = daysMatch[1].trim().toLowerCase();
+                    isExpired = daysText.includes('expired') || daysText === '0 days' || daysText === 'invalid';
+
+                    // Extract numeric days remaining
+                    const numMatch = daysText.match(/(\d+)\s*days?/);
+                    if (numMatch) {
+                        daysRemaining = parseInt(numMatch[1], 10);
+                    }
+                }
+
+                if (rowClass === 'row-ok') {
+                    passed++;
+                    testDetails.push({
+                        name: domain,
+                        url: `https://${domain}`,
+                        status: 'passed',
+                        type: 'ssl',
+                        daysRemaining: daysRemaining || 90
+                    });
+                } else if (rowClass === 'row-failed' || rowClass === 'row-warning') {
+                    // SSL Certificate threshold: < 30 days = warning, expired = failed, >= 30 days = passed
+                    if (isExpired) {
+                        failed++;
+                        testDetails.push({
+                            name: domain,
+                            url: `https://${domain}`,
+                            status: 'failed',
+                            type: 'ssl',
+                            daysRemaining: 0
+                        });
+                    } else if (daysRemaining !== null && daysRemaining < 30) {
+                        // Only mark as warning if less than 30 days
+                        warning++;
+                        testDetails.push({
+                            name: domain,
+                            url: `https://${domain}`,
+                            status: 'warning',
+                            type: 'ssl',
+                            daysRemaining: daysRemaining
+                        });
+                    } else {
+                        // >= 30 days should be passed, not warning
+                        passed++;
+                        testDetails.push({
+                            name: domain,
+                            url: `https://${domain}`,
+                            status: 'passed',
+                            type: 'ssl',
+                            daysRemaining: daysRemaining || 30
+                        });
+                    }
+                }
+            }
+        });
+
+        return {
+            total: total,
+            passed: passed,
+            failed: failed,
+            warning: warning,
+            tests: testDetails
+        };
+    } catch (error) {
+        console.error('Error getting SSL test results:', error);
+        return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+    }
+}
+
+function getDomainTestResults(projectId) {
+    try {
+        // Get project configuration
+        const mapping = getProjectMapping();
+        const project = mapping.projects.find(p => p.id === projectId);
+
+        if (!project || !project.domains || project.domains.length === 0) {
+            return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+        }
+
+        // Parse the domain report
+        const reportPath = path.join(__dirname, 'AdHash_Domain_Report', 'godaddy', 'report.html');
+
+        if (!fs.existsSync(reportPath)) {
+            console.log('Domain report not found:', reportPath);
+            return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+        }
+
+        const html = fs.readFileSync(reportPath, 'utf8');
+
+        // Count domains for this project only
+        let total = 0;
+        let passed = 0;
+        let failed = 0;
+        let warning = 0;
+        const testDetails = [];
+
+        // Filter to get only main/root domains (exclude subdomains)
+        // A main domain has exactly 2 parts (e.g., "autochecker.com", "humee.io")
+        // Subdomains have 3+ parts (e.g., "manage.autochecker.com", "api.humee.com")
+        const mainDomains = project.domains.filter(domain => {
+            const parts = domain.split('.');
+            // Main domain: 2 parts (domain.tld) or special cases like co.uk (3 parts)
+            // For simplicity, we'll check if it's in the HTML report
+            return parts.length === 2 || (parts.length === 3 && ['co', 'com', 'org', 'net'].includes(parts[1]));
+        });
+
+        console.log(`🔍 Searching for ${mainDomains.length} main domains (filtered from ${project.domains.length} total) for project: ${projectId}`);
+        if (mainDomains.length < project.domains.length) {
+            const subdomains = project.domains.filter(d => !mainDomains.includes(d));
+            console.log(`   ℹ️ Skipping ${subdomains.length} subdomains: ${subdomains.join(', ')}`);
+        }
+
+        mainDomains.forEach((domain, index) => {
+            console.log(`   [${index + 1}/${mainDomains.length}] Looking for domain: ${domain}`);
+
+            // Look for domain cards in the HTML
+            // Pattern: <div class="domain-url">domain.com</div>...<div class="days-remaining...">XX days remaining...</div>
+            // Updated to handle: class="days-remaining warning" and emoji at the end
+            const escapedDomain = domain.replace(/\./g, '\\.');
+            const domainPattern = new RegExp(`<div class="domain-url">${escapedDomain}</div>[\\s\\S]{0,500}?<div class="days-remaining[^"]*"[^>]*>\\s*(\\d+)\\s*days remaining`, 'i');
+            const match = html.match(domainPattern);
+
+            if (match) {
+                console.log(`   ✅ Found domain: ${domain} (${match[1]} days remaining)`);
+                total++;
+                const daysRemaining = parseInt(match[1], 10);
+
+                // Domain expiry threshold: < 90 days = warning, >= 90 days = passed
+                if (daysRemaining < 90) {
+                    warning++;
+                    testDetails.push({
+                        name: domain,
+                        url: `https://${domain}`,
+                        status: 'warning',
+                        type: 'domain',
+                        daysRemaining: daysRemaining
+                    });
+                } else {
+                    passed++;
+                    testDetails.push({
+                        name: domain,
+                        url: `https://${domain}`,
+                        status: 'passed',
+                        type: 'domain',
+                        daysRemaining: daysRemaining
+                    });
+                }
+            } else {
+                console.log(`   ❌ Domain NOT found in report: ${domain}`);
+            }
+        });
+
+        console.log(`📊 Domain Results for ${projectId}: Total=${total}, Passed=${passed}, Warning=${warning}, Failed=${failed}`);
+
+        return {
+            total: total,
+            passed: passed,
+            failed: failed,
+            warning: warning,
+            tests: testDetails
+        };
+    } catch (error) {
+        console.error('Error getting domain test results:', error);
+        return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+    }
+}
+
+function getAPITestResults(projectId) {
+    try {
+        // Get project configuration
+        const mapping = getProjectMapping();
+        const project = mapping.projects.find(p => p.id === projectId);
+
+        if (!project || !project.apis || project.apis.length === 0) {
+            console.log(`⚠️ No APIs configured for project: ${projectId}`);
+            return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+        }
+
+        console.log(`📊 Fetching API test results for ${projectId} (${project.apis.length} APIs configured)`);
+
+        // Find the latest API test report
+        const reportsDir = path.join(__dirname, 'AdHash-API-Test', 'simple-reports');
+
+        if (!fs.existsSync(reportsDir)) {
+            console.log('⚠️ API reports directory not found:', reportsDir);
+            return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+        }
+
+        const files = fs.readdirSync(reportsDir).filter(f => f.startsWith('AdHash_API_Simple_Report_') && f.endsWith('.html'));
+
+        if (files.length === 0) {
+            console.log('⚠️ No API test reports found');
+            return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+        }
+
+        // Get the most recent report
+        const latestReport = files.sort().reverse()[0];
+        const reportPath = path.join(reportsDir, latestReport);
+        console.log(`📄 Reading API report: ${latestReport}`);
+        const html = fs.readFileSync(reportPath, 'utf8');
+
+        // Count API tests for this project only
+        let total = 0;
+        let passed = 0;
+        let failed = 0;
+        const testDetails = [];
+
+        project.apis.forEach((api, index) => {
+            const apiUrl = api.url;
+            const apiName = api.name || apiUrl;
+
+            console.log(`🔍 [${index + 1}/${project.apis.length}] Searching for API: ${apiName}`);
+            console.log(`   URL: ${apiUrl}`);
+
+            // Look for API test rows in the table by URL
+            // Use a more specific pattern that matches the exact URL in the href attribute
+            const escapedUrl = apiUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+            // Match the specific row containing this exact URL
+            // Pattern: <td class="url"><a href="EXACT_URL" ... followed by status column
+            const apiPattern = new RegExp(`<td[^>]*class="url"[^>]*>\\s*<a\\s+href="${escapedUrl}"[^>]*>.*?</a>\\s*</td>\\s*<td[^>]*class="(status-ok|status-fail)"[^>]*>`, 'i');
+            const match = html.match(apiPattern);
+
+            if (match) {
+                console.log(`   ✅ Found match! Status: ${match[1]}`);
+                total++;
+                const status = match[1].toLowerCase();
+
+                // Extract request and response data from the details row
+                // Find the row with this URL, then find the next details-row
+                const rowPattern = new RegExp(`<tr>[\\s\\S]*?<td[^>]*class="url"[^>]*>\\s*<a\\s+href="${escapedUrl}"[^>]*>[\\s\\S]*?</tr>`, 'i');
+                const rowMatch = html.match(rowPattern);
+
+                let detailsMatch = null;
+                if (rowMatch) {
+                    // Get the position after the matched row
+                    const rowEndIndex = html.indexOf(rowMatch[0]) + rowMatch[0].length;
+                    const remainingHtml = html.substring(rowEndIndex, rowEndIndex + 20000); // Increased to 20000 to handle long response bodies
+
+                    // Find the next details-row - look for the api-details div
+                    // Match the entire api-details section by finding the opening div and then everything until </td></tr>
+                    const detailsPattern = /<tr[^>]*class="details-row"[^>]*>[\s\S]*?<div[^>]*class="api-details"[^>]*>([\s\S]*?)<\/div>\s*<\/td>\s*<\/tr>/i;
+
+                    // Alternative: Find api-details div and capture until we find </div> followed by </td>
+                    const apiDetailsStart = remainingHtml.indexOf('<div class="api-details">');
+                    if (apiDetailsStart !== -1) {
+                        // Find the closing </td></tr> after api-details
+                        const tdCloseIndex = remainingHtml.indexOf('</td>', apiDetailsStart);
+                        if (tdCloseIndex !== -1) {
+                            // Extract everything between <div class="api-details"> and </div> before </td>
+                            const apiDetailsSection = remainingHtml.substring(apiDetailsStart, tdCloseIndex);
+                            // Find the content inside api-details div
+                            const contentStart = apiDetailsSection.indexOf('>') + 1;
+                            const contentEnd = apiDetailsSection.lastIndexOf('</div>');
+                            if (contentStart > 0 && contentEnd > contentStart) {
+                                const detailsContent = apiDetailsSection.substring(contentStart, contentEnd);
+                                detailsMatch = [apiDetailsSection, detailsContent];
+                            }
+                        }
+                    }
+
+                    if (detailsMatch) {
+                        console.log(`   📦 Found details section for ${apiName}`);
+                        console.log(`   📦 Details content length: ${detailsMatch[1].length} chars`);
+                        // Log a sample of the content
+                        const sample = detailsMatch[1].substring(0, 200).replace(/\s+/g, ' ');
+                        console.log(`   📦 Details sample: ${sample}...`);
+                    } else {
+                        console.log(`   ⚠️ No details section found for ${apiName}`);
+                        // Try to find if there's a details-row at all
+                        if (remainingHtml.includes('details-row')) {
+                            console.log(`   ℹ️ Found 'details-row' text but pattern didn't match`);
+                            // Show what we found
+                            const detailsRowIndex = remainingHtml.indexOf('details-row');
+                            const snippet = remainingHtml.substring(detailsRowIndex, detailsRowIndex + 300);
+                            console.log(`   ℹ️ Snippet: ${snippet.substring(0, 200).replace(/\s+/g, ' ')}...`);
+                        }
+                    }
+                }
+
+                let requestBody = null;
+                let responseBody = null;
+                let responseCode = null;
+                let method = api.method || 'GET';
+
+                if (detailsMatch) {
+                    const detailsContent = detailsMatch[1];
+
+                    // Extract method and status code
+                    const methodMatch = detailsContent.match(/<span[^>]*class="method-badge method-(get|post|put|delete|patch)"[^>]*>(GET|POST|PUT|DELETE|PATCH)<\/span>/i);
+                    if (methodMatch) {
+                        method = methodMatch[2];
+                    }
+
+                    const statusCodeMatch = detailsContent.match(/<span[^>]*class="status-code[^"]*"[^>]*>Status:\s*(\d+)<\/span>/i);
+                    if (statusCodeMatch) {
+                        responseCode = statusCodeMatch[1];
+                    }
+
+                    // Extract request body
+                    console.log(`   🔍 Looking for Request Body in details...`);
+                    // Use a simpler, more robust regex that captures everything between the divs
+                    const requestMatch = detailsContent.match(/<div[^>]*class="detail-label"[^>]*>\s*Request Body\s*<\/div>\s*<div[^>]*class="detail-value"[^>]*>([\s\S]*?)<\/div>/i);
+                    if (requestMatch) {
+                        console.log(`   ✅ Found Request Body match!`);
+                        try {
+                            // Decode HTML entities, Unicode escapes, and trim whitespace
+                            let requestText = requestMatch[1]
+                                .replace(/&quot;/g, '"')
+                                .replace(/&lt;/g, '<')
+                                .replace(/&gt;/g, '>')
+                                .replace(/&amp;/g, '&')
+                                .replace(/\\u003d/g, '=')  // Handle \u003d (=)
+                                .replace(/\\u003c/g, '<')  // Handle \u003c (<)
+                                .replace(/\\u003e/g, '>')  // Handle \u003e (>)
+                                .trim();
+                            console.log(`   📝 Request text (first 200 chars): ${requestText.substring(0, 200)}`);
+                            if (requestText && requestText !== 'N/A' && requestText.length > 0) {
+                                try {
+                                    requestBody = JSON.parse(requestText);
+                                    console.log(`   ✅ Parsed request body as JSON`);
+                                } catch (jsonError) {
+                                    // If not valid JSON, store as string
+                                    requestBody = requestText;
+                                    console.log(`   ✅ Stored request body as string (${requestText.length} chars)`);
+                                }
+                            }
+                        } catch (e) {
+                            console.log(`   ❌ Error processing request body: ${e.message}`);
+                        }
+                    } else {
+                        console.log(`   ⚠️ Request Body pattern did not match`);
+                        // Try to find if "Request Body" text exists
+                        if (detailsContent.includes('Request Body')) {
+                            console.log(`   ℹ️ Found "Request Body" text in details`);
+                            // Show a snippet around "Request Body"
+                            const idx = detailsContent.indexOf('Request Body');
+                            const snippet = detailsContent.substring(Math.max(0, idx - 50), Math.min(detailsContent.length, idx + 300));
+                            console.log(`   📝 Snippet: ${snippet.replace(/\s+/g, ' ').substring(0, 200)}`);
+                        }
+                    }
+
+                    // Extract response body
+                    console.log(`   🔍 Looking for Response Body in details...`);
+                    // Use a simpler, more robust regex that captures everything between the divs
+                    const responseMatch = detailsContent.match(/<div[^>]*class="detail-label"[^>]*>\s*Response Body\s*<\/div>\s*<div[^>]*class="detail-value"[^>]*>([\s\S]*?)<\/div>/i);
+                    if (responseMatch) {
+                        console.log(`   ✅ Found Response Body match!`);
+                        try {
+                            // Decode HTML entities, Unicode escapes, and trim whitespace
+                            let responseText = responseMatch[1]
+                                .replace(/&quot;/g, '"')
+                                .replace(/&lt;/g, '<')
+                                .replace(/&gt;/g, '>')
+                                .replace(/&amp;/g, '&')
+                                .replace(/\\u003d/g, '=')  // Handle \u003d (=)
+                                .replace(/\\u003c/g, '<')  // Handle \u003c (<)
+                                .replace(/\\u003e/g, '>')  // Handle \u003e (>)
+                                .trim();
+                            console.log(`   📝 Response text (first 200 chars): ${responseText.substring(0, 200)}`);
+                            if (responseText && responseText !== 'N/A' && responseText.length > 0) {
+                                try {
+                                    // Try to parse as JSON
+                                    responseBody = JSON.parse(responseText);
+                                    console.log(`   ✅ Parsed response body as JSON`);
+                                } catch (jsonError) {
+                                    // If not valid JSON, store as string (truncate if too long)
+                                    responseBody = responseText.length > 500 ? responseText.substring(0, 500) + '...' : responseText;
+                                    console.log(`   ✅ Stored response body as string (${responseBody.length} chars)`);
+                                }
+                            }
+                        } catch (e) {
+                            console.log(`   ❌ Error processing response body: ${e.message}`);
+                        }
+                    } else {
+                        console.log(`   ⚠️ Response Body pattern did not match`);
+                        // Try to find if "Response Body" text exists
+                        if (detailsContent.includes('Response Body')) {
+                            console.log(`   ℹ️ Found "Response Body" text in details`);
+                            // Show a snippet around "Response Body"
+                            const idx = detailsContent.indexOf('Response Body');
+                            const snippet = detailsContent.substring(Math.max(0, idx - 50), Math.min(detailsContent.length, idx + 300));
+                            console.log(`   📝 Snippet: ${snippet.replace(/\s+/g, ' ').substring(0, 200)}`);
+                        }
+                    }
+                }
+
+                if (status === 'status-ok') {
+                    passed++;
+                    testDetails.push({
+                        name: apiName,
+                        method: method,
+                        url: apiUrl,
+                        status: 'passed',
+                        type: 'api',
+                        responseCode: responseCode || '200',
+                        requestBody: requestBody,
+                        responseBody: responseBody
+                    });
+                } else if (status === 'status-fail') {
+                    failed++;
+                    testDetails.push({
+                        name: apiName,
+                        method: method,
+                        url: apiUrl,
+                        status: 'failed',
+                        type: 'api',
+                        responseCode: responseCode || '500',
+                        requestBody: requestBody,
+                        responseBody: responseBody
+                    });
+                }
+            } else {
+                // If no match found, log for debugging
+                console.log(`   ❌ No match found for API: ${apiName}`);
+                console.log(`   URL: ${apiUrl}`);
+            }
+        });
+
+        console.log(`📊 API Results for ${projectId}: Total=${total}, Passed=${passed}, Failed=${failed}, Tests=${testDetails.length}`);
+
+        return {
+            total: total,
+            passed: passed,
+            failed: failed,
+            warning: 0,
+            tests: testDetails
+        };
+    } catch (error) {
+        console.error('Error getting API test results:', error);
+        return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+    }
+}
+
+// API endpoint to get test results for a project
+app.get('/api/project/:id/test-results', (req, res) => {
+    try {
+        const projectId = req.params.id;
+        console.log(`📊 Fetching test results for project: ${projectId}`);
+
+        const results = {
+            apps: getAppTestResults(projectId),
+            servers: getServerTestResults(projectId),
+            ssl: getSSLTestResults(projectId),
+            domains: getDomainTestResults(projectId),
+            apis: getAPITestResults(projectId)
+        };
+
+        console.log(`✅ Test results for ${projectId}:`, JSON.stringify(results, null, 2));
+        res.json(results);
+    } catch (error) {
+        console.error('❌ Error fetching test results:', error);
+        res.status(500).json({ error: 'Failed to fetch test results', message: error.message });
+    }
+});
+
+// Main route - serve project dashboard
 app.get('/', (req, res) => {
-    // Reset test running state on server start
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.sendFile(path.join(__dirname, 'public', 'project-dashboard.html'));
+});
+
+// Legacy dashboard route
+app.get('/dashboard.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
 // Serve static files with no-cache headers (MUST be last to not override API routes)
@@ -729,5 +1488,9 @@ app.listen(PORT, () => {
     console.log(`📈 Playwright Report: http://localhost:${PORT}/playwright-report`);
     console.log(`🔧 API Summary: http://localhost:${PORT}/api/test-summary`);
     console.log('\n✨ Press Ctrl+C to stop the server\n');
+
+    // Log server startup
+    logToArray('info', `Server started successfully on port ${PORT}`);
+    logToArray('info', 'Project dashboard available at http://localhost:' + PORT);
 });
 
