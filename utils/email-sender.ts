@@ -18,9 +18,30 @@ interface TestSummary {
   failedSuites: number;
   totalDuration: string;
   timestamp: string;
-  failedTests?: Array<{
+  suiteDetails?: Array<{
     repository: string;
+    displayName: string;
+    icon: string;
+    status: 'success' | 'failed' | 'error';
+    passed: number;
+    failed: number;
+    warnings?: number;
+    total: number;
     error?: string;
+    failedItems?: Array<{
+      name: string;
+      url?: string;
+      status?: string;
+      error?: string;
+      responseMsg?: string;
+    }>;
+    warningItems?: Array<{
+      name: string;
+      url?: string;
+      status?: string;
+      error?: string;
+      responseMsg?: string;
+    }>;
   }>;
 }
 
@@ -145,6 +166,46 @@ export async function sendTestReport(
         </div>
     </div>
 
+    ${summary.suiteDetails && summary.suiteDetails.length > 0 ? `
+    <div class="info">
+        <h3>📊 Test Suites Executed:</h3>
+        ${summary.suiteDetails.map(suite => `
+            <div style="background: ${suite.status === 'success' ? '#f0fdf4' : suite.status === 'error' ? '#fef2f2' : '#fff7ed'};
+                        padding: 15px;
+                        border-radius: 8px;
+                        margin-bottom: 15px;
+                        border-left: 4px solid ${suite.status === 'success' ? '#10b981' : suite.status === 'error' ? '#ef4444' : '#f59e0b'};">
+                <h4 style="margin: 0 0 10px 0; color: #333;">
+                    ${suite.icon} ${suite.displayName}
+                    <span style="float: right; font-size: 14px; font-weight: normal;">
+                        ${suite.status === 'success' ? '✅ PASSED' : suite.status === 'error' ? '❌ FAILED' : '⚠️ WARNING'}
+                    </span>
+                </h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin-bottom: 10px;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 20px; font-weight: bold; color: #10b981;">✓ ${suite.passed}</div>
+                        <div style="font-size: 12px; color: #666;">Passed</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 20px; font-weight: bold; color: #ef4444;">✗ ${suite.failed}</div>
+                        <div style="font-size: 12px; color: #666;">Failed</div>
+                    </div>
+                    ${suite.warnings !== undefined ? `
+                    <div style="text-align: center;">
+                        <div style="font-size: 20px; font-weight: bold; color: #f59e0b;">⚠ ${suite.warnings}</div>
+                        <div style="font-size: 12px; color: #666;">Warnings</div>
+                    </div>
+                    ` : ''}
+                    <div style="text-align: center;">
+                        <div style="font-size: 20px; font-weight: bold; color: #6366f1;">∑ ${suite.total}</div>
+                        <div style="font-size: 12px; color: #666;">Total</div>
+                    </div>
+                </div>
+                ${suite.error ? `<p style="color: #ef4444; font-size: 13px; margin: 5px 0 0 0;"><strong>Error:</strong> ${suite.error}</p>` : ''}
+            </div>
+        `).join('')}
+    </div>
+    ` : `
     <div class="info">
         <h3>📊 Test Suites Executed:</h3>
         <ul>
@@ -154,6 +215,7 @@ export async function sendTestReport(
             <li>🌐 <strong>API Endpoint Testing</strong> - 41 API endpoints</li>
         </ul>
     </div>
+    `}
 
     <div class="info">
         <h3>📎 Attached Report:</h3>
@@ -166,17 +228,83 @@ export async function sendTestReport(
         </ul>
     </div>
 
-    ${summary.failedTests && summary.failedTests.length > 0 ? `
+    ${summary.suiteDetails && summary.suiteDetails.some(s => s.failedItems && s.failedItems.length > 0) ? `
     <div class="info" style="background: #ffebee; border-left: 4px solid #ef4444;">
-        <h3>❌ Failed Test Suites:</h3>
-        <ul>
-            ${summary.failedTests.map(test => `
-                <li>
-                    <strong>${test.repository}</strong>
-                    ${test.error ? `<br><span style="color: #666; font-size: 14px;">Error: ${test.error}</span>` : ''}
-                </li>
-            `).join('')}
-        </ul>
+        <h3>❌ Failed Tests - Detailed Information:</h3>
+        ${summary.suiteDetails.filter(suite => suite.failedItems && suite.failedItems.length > 0).map(suite => `
+            <div style="margin-bottom: 25px;">
+                <h4 style="color: #ef4444; margin-bottom: 15px;">${suite.icon} ${suite.displayName}</h4>
+                <div style="margin-left: 15px;">
+                    ${suite.failedItems!.map((item, index) => `
+                        <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #fecaca;">
+                            <div style="font-weight: 600; color: #dc2626; margin-bottom: 5px;">
+                                ${index + 1}. ${item.name}
+                            </div>
+                            ${item.url ? `
+                                <div style="font-size: 13px; color: #666; margin-bottom: 4px;">
+                                    <strong>🔗 URL:</strong> <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 3px;">${item.url}</code>
+                                </div>
+                            ` : ''}
+                            ${item.status ? `
+                                <div style="font-size: 13px; color: #666; margin-bottom: 4px;">
+                                    <strong>📊 Status:</strong> <span style="color: #dc2626;">${item.status}</span>
+                                </div>
+                            ` : ''}
+                            ${item.error ? `
+                                <div style="font-size: 13px; color: #666; margin-bottom: 4px;">
+                                    <strong>⚠️ Error:</strong> ${item.error}
+                                </div>
+                            ` : ''}
+                            ${item.responseMsg ? `
+                                <div style="font-size: 13px; color: #666;">
+                                    <strong>💬 Response:</strong> ${item.responseMsg}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('')}
+    </div>
+    ` : ''}
+
+    ${summary.suiteDetails && summary.suiteDetails.some(s => s.warningItems && s.warningItems.length > 0) ? `
+    <div class="info" style="background: #fffbeb; border-left: 4px solid #f59e0b;">
+        <h3>⚠️ Warnings - Items Requiring Attention:</h3>
+        ${summary.suiteDetails.filter(suite => suite.warningItems && suite.warningItems.length > 0).map(suite => `
+            <div style="margin-bottom: 25px;">
+                <h4 style="color: #d97706; margin-bottom: 15px;">${suite.icon} ${suite.displayName}</h4>
+                <div style="margin-left: 15px;">
+                    ${suite.warningItems!.map((item, index) => `
+                        <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #fde68a;">
+                            <div style="font-weight: 600; color: #d97706; margin-bottom: 5px;">
+                                ${index + 1}. ${item.name}
+                            </div>
+                            ${item.url ? `
+                                <div style="font-size: 13px; color: #666; margin-bottom: 4px;">
+                                    <strong>🔗 URL:</strong> <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 3px;">${item.url}</code>
+                                </div>
+                            ` : ''}
+                            ${item.status ? `
+                                <div style="font-size: 13px; color: #666; margin-bottom: 4px;">
+                                    <strong>📊 Status:</strong> <span style="color: #d97706;">${item.status}</span>
+                                </div>
+                            ` : ''}
+                            ${item.error ? `
+                                <div style="font-size: 13px; color: #666; margin-bottom: 4px;">
+                                    <strong>⚠️ Message:</strong> ${item.error}
+                                </div>
+                            ` : ''}
+                            ${item.responseMsg ? `
+                                <div style="font-size: 13px; color: #666;">
+                                    <strong>💬 Response:</strong> ${item.responseMsg}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('')}
     </div>
     ` : ''}
 
