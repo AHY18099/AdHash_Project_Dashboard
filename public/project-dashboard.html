@@ -2990,7 +2990,7 @@
                                 </div>
                                 <div class="detail-info-item">
                                     <span class="detail-info-label">Platform</span>
-                                    <span class="detail-info-value">${test.platform || 'Play Store'}</span>
+                                    <span class="detail-info-value">${(test.platform || 'PLAY STORE').toUpperCase()}</span>
                                 </div>
                             </div>
                         </div>
@@ -3002,19 +3002,20 @@
                                        test.status.toLowerCase() === 'warning' ? 'status-warning' : 'status-failed';
 
                     // Determine server health status
-                    const isActive = test.status.toLowerCase() === 'passed';
-                    const isHealthy = test.responseTime && test.responseTime < 3000;
+                    // 'passed' = healthy, 'warning' = active but unhealthy (404 etc), 'failed' = down/inactive
+                    const isActive = test.status.toLowerCase() === 'passed' || test.status.toLowerCase() === 'warning';
+                    const isHealthy = test.status.toLowerCase() === 'passed';
 
                     let healthStatusText = '';
                     let healthColor = '#6b7280';
                     if (isActive && isHealthy) {
-                        healthStatusText = 'Active & Healthy';
+                        healthStatusText = 'ACTIVE & HEALTHY';
                         healthColor = '#10b981'; // green
                     } else if (isActive && !isHealthy) {
-                        healthStatusText = 'Active & Unhealthy';
+                        healthStatusText = 'ACTIVE & UNHEALTHY';
                         healthColor = '#f97316'; // orange
                     } else {
-                        healthStatusText = 'Inactive';
+                        healthStatusText = 'INACTIVE';
                         healthColor = '#ef4444'; // red
                     }
 
@@ -3033,7 +3034,7 @@
                                 </div>
                                 <div class="detail-info-item">
                                     <span class="detail-info-label">Platform</span>
-                                    <span class="detail-info-value">${test.type || 'service'}</span>
+                                    <span class="detail-info-value">${(test.type || 'SERVICE').toUpperCase()}</span>
                                 </div>
                                 <div class="detail-info-item">
                                     <span class="detail-info-label">Health Status</span>
@@ -3085,12 +3086,25 @@
                     const statusClass = test.status.toLowerCase() === 'passed' ? 'status-passed' :
                                        test.status.toLowerCase() === 'warning' ? 'status-warning' : 'status-failed';
 
-                    // Use the expiry date from the test object (already formatted) or calculate it
-                    let expiryDate = test.expiryDate;
-                    if (!expiryDate && test.daysRemaining) {
-                        expiryDate = calculateExpiryDate(test.daysRemaining);
-                    } else if (!expiryDate) {
-                        expiryDate = 'N/A';
+                    // Use the IST date if available, otherwise format the UTC date
+                    let expiryDateDisplay = 'N/A';
+                    if (test.expiryDateIST) {
+                        expiryDateDisplay = test.expiryDateIST + ' IST';
+                    } else if (test.expiryDate) {
+                        // Format UTC date to readable format
+                        try {
+                            const date = new Date(test.expiryDate);
+                            expiryDateDisplay = date.toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                timeZone: 'UTC'
+                            }) + ' UTC';
+                        } catch (e) {
+                            expiryDateDisplay = test.expiryDate;
+                        }
                     }
 
                     return `
@@ -3111,7 +3125,7 @@
                                 <div class="detail-info-item">
                                     <span class="detail-info-label">Expiry Date</span>
                                     <span class="detail-info-value">
-                                        <span class="expiry-date-badge">📅 ${expiryDate}</span>
+                                        <span class="expiry-date-badge">📅 ${expiryDateDisplay}</span>
                                     </span>
                                 </div>
                             </div>

@@ -902,7 +902,9 @@ function getServerTestResults(projectId) {
                     });
                 } else {
                     // Active server - check icon to determine if healthy or unhealthy
-                    const iconPattern = new RegExp(`<div class="server-card active"[\\s\\S]{0,500}?<div class="server-name">${escapedName}[\\s\\S]{0,200}?<span class="server-icon">([^<]+)</span>`, 'i');
+                    // The icon appears BEFORE the server name in the HTML structure
+                    // Match exact server name by including the closing </div> tag
+                    const iconPattern = new RegExp(`<div class="server-card active"[\\s\\S]{0,200}?<span class="server-icon">([^<]+)</span>[\\s\\S]{0,200}?<div class="server-name">${escapedName}</div>`, 'i');
                     const iconMatch = html.match(iconPattern);
 
                     if (iconMatch && iconMatch[1].includes('⚠️')) {
@@ -1110,16 +1112,24 @@ function getDomainTestResults(projectId) {
             console.log(`   [${index + 1}/${mainDomains.length}] Looking for domain: ${domain}`);
 
             // Look for domain cards in the HTML
-            // Pattern: <div class="domain-url">domain.com</div>...<div class="days-remaining...">XX days remaining...</div>
-            // Updated to handle: class="days-remaining warning" and emoji at the end
+            // Pattern: <div class="domain-url">domain.com</div>...<div class="expiry-date">...</div>...<div class="expiry-date-ist">...</div>...<div class="days-remaining...">XX days remaining...</div>
             const escapedDomain = domain.replace(/\./g, '\\.');
-            const domainPattern = new RegExp(`<div class="domain-url">${escapedDomain}</div>[\\s\\S]{0,500}?<div class="days-remaining[^"]*"[^>]*>\\s*(\\d+)\\s*days remaining`, 'i');
+            const domainPattern = new RegExp(
+                `<div class="domain-url">${escapedDomain}</div>[\\s\\S]{0,800}?` +
+                `<div class="expiry-date">([^<]+)</div>[\\s\\S]{0,200}?` +
+                `(?:<div class="expiry-date-ist">([^<]+)</div>[\\s\\S]{0,200}?)?` +
+                `<div class="days-remaining[^"]*"[^>]*>\\s*(\\d+)\\s*days remaining`,
+                'i'
+            );
             const match = html.match(domainPattern);
 
             if (match) {
-                console.log(`   ✅ Found domain: ${domain} (${match[1]} days remaining)`);
+                const expiryDateUTC = match[1].trim();
+                const expiryDateIST = match[2] ? match[2].trim() : null;
+                const daysRemaining = parseInt(match[3], 10);
+
+                console.log(`   ✅ Found domain: ${domain} (${daysRemaining} days remaining, expires: ${expiryDateIST || expiryDateUTC})`);
                 total++;
-                const daysRemaining = parseInt(match[1], 10);
 
                 // Domain expiry threshold: < 90 days = warning, >= 90 days = passed
                 if (daysRemaining < 90) {
@@ -1129,7 +1139,9 @@ function getDomainTestResults(projectId) {
                         url: `https://${domain}`,
                         status: 'warning',
                         type: 'domain',
-                        daysRemaining: daysRemaining
+                        daysRemaining: daysRemaining,
+                        expiryDate: expiryDateUTC,
+                        expiryDateIST: expiryDateIST
                     });
                 } else {
                     passed++;
@@ -1138,7 +1150,9 @@ function getDomainTestResults(projectId) {
                         url: `https://${domain}`,
                         status: 'passed',
                         type: 'domain',
-                        daysRemaining: daysRemaining
+                        daysRemaining: daysRemaining,
+                        expiryDate: expiryDateUTC,
+                        expiryDateIST: expiryDateIST
                     });
                 }
             } else {
