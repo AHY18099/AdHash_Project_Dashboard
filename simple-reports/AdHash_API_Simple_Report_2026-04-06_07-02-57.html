@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AdHash API Test Report</title>
+    <meta charset="UTF-8">
+    <style>
+body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
+.container { max-width: 1100px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+.header { text-align: center; margin-bottom: 20px; }
+.title { color: #333; font-size: 24px; margin-bottom: 5px; }
+.timestamp { color: #666; font-size: 14px; text-decoration: underline; }
+.stats { display: flex; justify-content: center; gap: 20px; margin: 25px 0; }
+.stat-box { text-align: center; padding: 15px 30px; border-radius: 8px; min-width: 100px; border: 1px solid #e0e0e0; }
+.stat-number { font-size: 32px; font-weight: bold; }
+.stat-label { font-size: 12px; color: #666; margin-top: 5px; }
+.total { background-color: #e3f2fd; } .total .stat-number { color: #1976d2; }
+.passed { background-color: #e8f5e9; } .passed .stat-number, .passed .stat-label { color: #4caf50; }
+.failed { background-color: #ffebee; } .failed .stat-number, .failed .stat-label { color: #f44336; }
+.success-rate { text-align: center; margin: 20px 0; }
+.success-rate-number { font-size: 42px; font-weight: bold; color: #f44336; }
+.success-rate-label { font-size: 14px; color: #666; }
+.status-banner { text-align: center; margin: 20px 0; padding: 12px; border-radius: 6px; font-size: 16px; font-weight: bold; }
+.status-banner.success { background-color: #4caf50; color: white; }
+.status-banner.failed { background-color: #f44336; color: white; }
+.status-banner.warning { background-color: #ff9800; color: white; }
+.table-container { margin: 25px 0; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background-color: #455a64; color: white; padding: 10px 8px; text-align: left; font-weight: 600; }
+td { padding: 10px 8px; border-bottom: 1px solid #e0e0e0; vertical-align: middle; }
+tr:hover { background-color: #f5f5f5; }
+.sno { width: 50px; text-align: center; }
+.expand-col { width: 40px; text-align: center; }
+.url a { color: #1976d2; text-decoration: none; word-break: break-all; }
+.url a:hover { text-decoration: underline; }
+.status-ok { color: #4caf50; font-weight: bold; }
+.status-fail { color: #f44336; font-weight: bold; }
+.status-skip { color: #ff9800; font-weight: bold; }
+.expand-btn { cursor: pointer; background: #e0e0e0; border: none; border-radius: 4px; padding: 5px 10px; font-size: 12px; }
+.expand-btn:hover { background: #bdbdbd; }
+.details-row { display: none; }
+.details-row.show { display: table-row; }
+.details-cell { background-color: #fafafa; padding: 15px !important; }
+.api-details { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.detail-box { background: white; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; }
+.detail-label { font-weight: bold; color: #455a64; margin-bottom: 5px; font-size: 11px; text-transform: uppercase; }
+.detail-value { font-family: 'Consolas', monospace; font-size: 12px; word-break: break-all; max-height: 150px; overflow-y: auto; white-space: pre-wrap; }
+.method-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; margin-right: 5px; }
+.method-get { background: #e3f2fd; color: #1976d2; }
+.method-post { background: #fff3e0; color: #f57c00; }
+.status-code { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; }
+.status-2xx { background: #e8f5e9; color: #388e3c; }
+.status-4xx { background: #fff3e0; color: #f57c00; }
+.status-5xx { background: #ffebee; color: #d32f2f; }
+.function-tag { background: #e8eaf6; color: #3f51b5; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+.footer { text-align: center; margin-top: 20px; color: #999; font-size: 11px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">🎯 AdHash API Test Report</h1>
+            <p class="timestamp">06/04/2026 16:33:21 IST</p>
+        </div>
+        <div class="stats">
+            <div class="stat-box total"><div class="stat-number">41</div><div class="stat-label">Total Tests</div></div>
+            <div class="stat-box passed"><div class="stat-number">✓ 28</div><div class="stat-label">Passed</div></div>
+            <div class="stat-box failed"><div class="stat-number">✗ 13</div><div class="stat-label">Failed</div></div>
+        </div>
+        <div class="success-rate"><div class="success-rate-number">68.3%</div><div class="success-rate-label">Success Rate</div></div>
+        <div class="status-banner failed">✗ TESTS FAILED</div>
+        <div class="table-container">
+            <table>
+                <thead><tr><th class="sno">S.No</th><th>Project Name</th><th>Function</th><th>Website URL</th><th>Status</th><th class="expand-col"></th></tr></thead>
+                <tbody>
+<tr>
+  <td class="sno">1</td>
+  <td>AiSignPro</td>
+  <td><span class="function-tag">SuperAdmin Login UI</span></td>
+  <td class="url"><a href="https://admin.aisignpro.com/" target="_blank">https://admin.aisignpro.com/</a></td>
+  <td class="status-fail">✗ Failed</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-1')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-1">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-5xx">Status: 0</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Error Message</div>
+        <div class="detail-value" style="color: #d32f2f;">HTTP GET request failed: admin.aisignpro.com</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">2</td>
+  <td>AiSignPro SuperAdmin</td>
+  <td><span class="function-tag">Login Number</span></td>
+  <td class="url"><a href="https://api.aisignpro.com/api/user/userExists" target="_blank">https://api.aisignpro.com/api/user/userExists</a></td>
+  <td class="status-fail">✗ Failed</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-2')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-2">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-5xx">Status: 0</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Error Message</div>
+        <div class="detail-value" style="color: #d32f2f;">HTTP POST request failed: api.aisignpro.com</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;key&quot; : &quot;fUjZB3a/IJyX6AyCgxVZ4r+mOOJSBWMIR1JBrMqkopiPOE+zUbMgVXNfVffuPIHBM+oYhZUbxG8IEFoCA1VIusbDZ0iWfiMl7DxmmvO3XWo=&quot;}</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">3</td>
+  <td>AiSignPro</td>
+  <td><span class="function-tag">SuperAdmin Login</span></td>
+  <td class="url"><a href="https://api.aisignpro.com/api/user/login" target="_blank">https://api.aisignpro.com/api/user/login</a></td>
+  <td class="status-fail">✗ Failed</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-3')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-3">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-5xx">Status: 0</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Error Message</div>
+        <div class="detail-value" style="color: #d32f2f;">HTTP POST request failed: api.aisignpro.com</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;key&quot; : &quot;UolFVSl619gADNtaLskiYQhzCJ4ARYCdvE95I5cA6GCGUlVImhrFmv62BN2OfozsXZE5CxD8J/m6gjTJfY0i769gz73TVFeOmz/QH7apgFYF/DC8sFJUU8UXlbIWJwhV&quot;}</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">4</td>
+  <td>AiSignPro DDP Admin</td>
+  <td><span class="function-tag">Login Number</span></td>
+  <td class="url"><a href="https://api.aisignpro.com/api/user/userExists" target="_blank">https://api.aisignpro.com/api/user/userExists</a></td>
+  <td class="status-fail">✗ Failed</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-4')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-4">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-5xx">Status: 0</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Error Message</div>
+        <div class="detail-value" style="color: #d32f2f;">HTTP POST request failed: api.aisignpro.com</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;key&quot; : &quot;fUjZB3a/IJyX6AyCgxVZ4r+mOOJSBWMIR1JBrMqkophcVRCpKiN7DhiHyWrv+9B2uFx8dgH0honioLEXw6gaKskdJPf9Z3sE2mNzSVEB5Z0=&quot;}</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">5</td>
+  <td>AiSignPro DDP</td>
+  <td><span class="function-tag">Admin Login</span></td>
+  <td class="url"><a href="https://api.aisignpro.com/api/user/login" target="_blank">https://api.aisignpro.com/api/user/login</a></td>
+  <td class="status-fail">✗ Failed</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-5')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-5">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-5xx">Status: 0</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Error Message</div>
+        <div class="detail-value" style="color: #d32f2f;">HTTP POST request failed: api.aisignpro.com</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;key&quot; : &quot;YfSrZl14SyT3q3EpHR7DPHyRC8dnzRVKGYLb8tmtvLxQ6lJS++PAHec1mN6SEerkjIKfdbtivRxj3BctpwgqPeMPKLawS99q7k3kDx8qdEOtYEm/PtDIG+Hxfz1wK61M&quot;}</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">6</td>
+  <td>AiSignPro Accountant Admin</td>
+  <td><span class="function-tag">Login Number</span></td>
+  <td class="url"><a href="https://api.aisignpro.com/api/user/userExists" target="_blank">https://api.aisignpro.com/api/user/userExists</a></td>
+  <td class="status-fail">✗ Failed</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-6')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-6">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-5xx">Status: 0</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Error Message</div>
+        <div class="detail-value" style="color: #d32f2f;">HTTP POST request failed: api.aisignpro.com</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;key&quot; : &quot;fUjZB3a/IJyX6AyCgxVZ4r+mOOJSBWMIR1JBrMqkopjmpuDLCvhBDDmAX35a/cv+lIQUArLwTq3oPioihA+Eyz4hn8aJ9MG1SdNtuoznGaI=&quot;}</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">7</td>
+  <td>AiSignPro Accountant</td>
+  <td><span class="function-tag">Admin Login</span></td>
+  <td class="url"><a href="https://api.aisignpro.com/api/user/login" target="_blank">https://api.aisignpro.com/api/user/login</a></td>
+  <td class="status-fail">✗ Failed</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-7')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-7">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-5xx">Status: 0</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Error Message</div>
+        <div class="detail-value" style="color: #d32f2f;">HTTP POST request failed: api.aisignpro.com</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;key&quot; : &quot;4+BIJiBYlIqi7flceFSKm7HC5g8Sfgj9zrwy18U+55zlP44ttmvZBwnTaKUjFiS4AFgFoh7MQBK7ZoTzNHuFKwv+LsRDDRxSf9wTqSZd03MBqz9mGBb3uD0VQpRhtnbf&quot;}</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">8</td>
+  <td>AiSignPro CPA</td>
+  <td><span class="function-tag">Login UI</span></td>
+  <td class="url"><a href="https://cpa.aisignpro.com/" target="_blank">https://cpa.aisignpro.com/</a></td>
+  <td class="status-fail">✗ Failed</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-8')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-8">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-5xx">Status: 0</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Error Message</div>
+        <div class="detail-value" style="color: #d32f2f;">HTTP GET request failed: cpa.aisignpro.com</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">9</td>
+  <td>AiSignPro CPA</td>
+  <td><span class="function-tag">Login Number</span></td>
+  <td class="url"><a href="https://api.aisignpro.com/api/user/userExists" target="_blank">https://api.aisignpro.com/api/user/userExists</a></td>
+  <td class="status-fail">✗ Failed</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-9')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-9">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-5xx">Status: 0</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Error Message</div>
+        <div class="detail-value" style="color: #d32f2f;">HTTP POST request failed: api.aisignpro.com</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;key&quot; : &quot;fUjZB3a/IJyX6AyCgxVZ4pop+Mu29uTqwJQ7zpvAo1NFyc7kh7n5T9A7n8UxHr5UDccVDAfHiZwP1AznUSLAdk8M20OTpqPmk8+Ztg7sQUg=&quot;}</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">10</td>
+  <td>AiSignPro CPA</td>
+  <td><span class="function-tag">Login</span></td>
+  <td class="url"><a href="https://api.aisignpro.com/api/user/login" target="_blank">https://api.aisignpro.com/api/user/login</a></td>
+  <td class="status-fail">✗ Failed</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-10')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-10">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-5xx">Status: 0</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Error Message</div>
+        <div class="detail-value" style="color: #d32f2f;">HTTP POST request failed: api.aisignpro.com</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;key&quot; : &quot;zWnxj6lfy0D7gDyaQxeKeHisOe40qa4LDTWD8GOqqMsQPHx1QGlrQyMclLK1Udt3VoIVYWbgOympTcy6BoSct3ZdfZeZnGSQmBrgFrNyOUUsqEWS0gTxMGfzTIPQfExO&quot;}</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">11</td>
+  <td>AiSignPro Participant</td>
+  <td><span class="function-tag">Login UI</span></td>
+  <td class="url"><a href="https://participant.aisignpro.com/" target="_blank">https://participant.aisignpro.com/</a></td>
+  <td class="status-fail">✗ Failed</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-11')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-11">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-5xx">Status: 0</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Error Message</div>
+        <div class="detail-value" style="color: #d32f2f;">HTTP GET request failed: participant.aisignpro.com</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">12</td>
+  <td>AiSignPro Participant</td>
+  <td><span class="function-tag">Login Number</span></td>
+  <td class="url"><a href="https://api.aisignpro.com/api/user/userExists" target="_blank">https://api.aisignpro.com/api/user/userExists</a></td>
+  <td class="status-fail">✗ Failed</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-12')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-12">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-5xx">Status: 0</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Error Message</div>
+        <div class="detail-value" style="color: #d32f2f;">HTTP POST request failed: api.aisignpro.com</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;key&quot; : &quot;fUjZB3a/IJyX6AyCgxVZ4ptoOU69xEJf2qVsBQ7VAYAdP8ENeeaWWo48LSri6l0JuNeUW8Q/Ih0osGhb3r99lnzG3ix9JGzE8qvlQA+0hUs=&quot;}</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">13</td>
+  <td>AiSignPro Participant</td>
+  <td><span class="function-tag">Login</span></td>
+  <td class="url"><a href="https://api.aisignpro.com/api/user/login" target="_blank">https://api.aisignpro.com/api/user/login</a></td>
+  <td class="status-fail">✗ Failed</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-13')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-13">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-5xx">Status: 0</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Error Message</div>
+        <div class="detail-value" style="color: #d32f2f;">HTTP POST request failed: api.aisignpro.com</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;key&quot; : &quot;Rvy06w8KodBbMGFiqM6pSf7DEqBcLV5Bh4w8qs7JYvibfkz/30fvl5qIlc2kP/gs3Msl7u08McNuW+7bwHlmCSNwpPrTEcwZ5IlZAtV1PuQb5rop2gbZNuLXEZXqhtdJ&quot;}</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">14</td>
+  <td>AdHash</td>
+  <td><span class="function-tag">Website</span></td>
+  <td class="url"><a href="https://adhashtech.com/" target="_blank">https://adhashtech.com/</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-14')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-14">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+
+  
+&lt;!-- Mirrored from html.xpressbuddy.com/techco/index_software_company.html by HTTrack Website Copier/3.x [XR&amp;CO'2014], Thu, 09 May 2024 12:03:44 GMT --&gt;
+&lt;head&gt;
+ 
+    &lt;meta charset=&quot;utf-8&quot;&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1, shrink-to-fit=no&quot;&gt;
+    &lt;meta http-equiv=&quot;x-ua-compatible&quot; content=&quot;ie=edge&quot;&gt;
+    &lt;meta name=&quot;thumbnail&quot; content=&quot;assets/images/Techco_page_thumbnail_2.webp&quot;&gt;
+    &lt;meta name=&quot;description&quot; content=&quot;Ad-Hash Technolabs Pvt Ltd – IT Solutions &amp; Technology, Business Consulting, Software Company &quot;&gt;
+    &lt;meta name=&quot;keywords&quot; content=&quot;Bootstrap Site Template&quot;&gt;
+    &lt;meta name=&quot;author&quot; content=&quot;Webrock&quot;&gt;
+
+    &lt;title&gt;Ad-Hash Technolabs Pvt Ltd&lt;/title&gt;
+    &lt;link rel=&quot;shortcut icon&quot; href=&quot;assets\images\site_logo\favicon.ico&quot;&gt;
+
+    &lt;!-- Fraimwork - CSS Include --&gt;
+    &lt;script src=&quot;/cdn-cgi/scripts/7d0fa10a/cloudflare-static/rocket-loader.min.js&quot; data-cf-settings=&quot;fdad8ee98af11234d5ccb8a8-|49&quot;&gt;&lt;/script&gt;&lt;link rel=&quot;preload&quot; href=&quot;assets/css/bootstrap.min.css&quot; as=&quot;style&quot; onload=&quot;this.onload=null;this.rel='stylesheet'&quot;&gt;
+
+    &lt;!-- Icon - CSS Include --&gt;
+    &lt;script src=&quot;/cdn-cgi/scripts/7d0fa10a/cloudflare-static/rocket-loader.min.js&quot; data-cf-settings=&quot;fdad8ee98af11234d5ccb8a8-|49&quot;&gt;&lt;/script&gt;&lt;link rel=&quot;preload&quot; href=&quot;assets/css/fontawesome.css&quot; as=&quot;style&quot; onload=&quot;this.onload=null;this.rel='stylesheet'&quot;&gt;
+
+    &lt;!-- Animation - CSS Include --&gt;
+    &lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;assets/css/animate.min.css&quot;&gt;
+
+    &lt;!-- Carousel - CSS Include --&gt;
+    &lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;assets/css/swiper-bundle.min.css&quot;&gt;
+
+    &lt;!-- Video &amp; Image Popup - CSS Include --&gt;
+    &lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;assets/css/magnific-popup.min.css&quot;&gt;
+
+    &lt;!-- Counter - CSS Include --&gt;
+    &lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;assets/css/odometer.min.css&quot;&gt;
+
+    &lt;!-- Custom - CSS Include --&gt;
+    &lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; hre... [truncated]</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">15</td>
+  <td>AutoChecker</td>
+  <td><span class="function-tag">Login UI</span></td>
+  <td class="url"><a href="https://manage.autochecker.com/" target="_blank">https://manage.autochecker.com/</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-15')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-15">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+
+&lt;head&gt;
+    &lt;!-- &lt;meta charset=&quot;utf-8&quot;&gt; --&gt;
+    &lt;meta charset=&quot;UTF-8&quot;&gt;
+    &lt;title&gt;AutoChecker&lt;/title&gt;
+    &lt;base href=&quot;/&quot;&gt;
+
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+    &lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;&quot;&gt;
+    &lt;meta http-equiv=&quot;Cache-control&quot; content=&quot;public&quot;&gt;
+    &lt;meta http-equiv=&quot;Cache-control&quot; content=&quot;no-cache&quot;&gt;
+    &lt;meta http-equiv=&quot;Cache-control&quot; content=&quot;no-store&quot;&gt;
+    &lt;!-- &lt;meta http-equiv=&quot;Content-Security-Policy&quot;
+    content=&quot;default-src 'self' 'unsafe-inline'; img-src https://* 'self' data:;&quot;&gt; --&gt;
+    &lt;!-- &lt;link rel=&quot;icon&quot; type=&quot;image/x-icon&quot; href=&quot;favicon.ico&quot;&gt; --&gt;
+    &lt;link rel=&quot;icon&quot; type=&quot;image/x-icon&quot; sizes=&quot;16x16&quot; href=&quot;./assets/images/favicon.ico&quot;&gt;
+    &lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.gstatic.com&quot;&gt;
+    &lt;link href=&quot;https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&amp;amp;display=swap&quot; rel=&quot;stylesheet&quot;&gt;
+    &lt;link href=&quot;https://fonts.googleapis.com/icon?family=Material+Icons&quot; rel=&quot;stylesheet&quot;&gt;
+    &lt;!-- &lt;script src=&quot;https://cdn.ckeditor.com/4.25.0/full-all/ckeditor.js&quot;&gt;&lt;/script&gt; --&gt;
+    &lt;script src=&quot;https://cdn.ckeditor.com/4.20.1/full-all/ckeditor.js&quot;&gt;&lt;/script&gt;
+    &lt;!-- &lt;script src=&quot;http://example.com/ckeditor/plugins/exportpdf&quot;&gt;&lt;/script&gt; --&gt;
+    &lt;!-- &lt;script src=&quot;https://cdn.ckeditor.com/ckeditor5/40.0.3/full-all/ckeditor.js&quot;&gt;&lt;/script&gt; --&gt;
+    &lt;!-- &lt;script&gt; CKEDITOR.config.forcePasteAsPlainText = true; &lt;/script&gt; --&gt;
+    &lt;link rel=&quot;stylesheet&quot; href=&quot;https://fonts.googleapis.com/css?family=Noto+Sans&quot;&gt;
+&lt;link rel=&quot;stylesheet&quot; href=&quot;styles.css&quot;&gt;&lt;/head&gt;
+
+&lt;body class=&quot;mat-typography vertical-collpsed&quot; data-layout=&quot;horizontal&quot; data-topbar=&quot;dark&quot; data-layout-size=&quot;boxed&quot;&gt;
+     
+    &lt;app-root&gt;
+    &lt;/app-root&gt;
+  
+    &lt;!-- &lt;script&gt;
+  document.addEventListener('contextmenu', event =&gt; event.preventDefault());
+ 
+ document.onkeydown = function (e) {
+
+     // disable F12 key
+     if(e.keyCode == 123) {
+         return false;... [truncated]</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">16</td>
+  <td>AutoChecker</td>
+  <td><span class="function-tag">Admin Login</span></td>
+  <td class="url"><a href="https://manageadminapi.autochecker.com/adminapi/auth/login" target="_blank">https://manageadminapi.autochecker.com/adminapi/auth/login</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-16')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-16">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-2xx">Status: 201</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;key&quot;:&quot;qYkPMqAmQziJ2/ha1YnKS6xxJOJ7gynA4+DtvRPHnPpm3mrqpgjLhZRUg1446ixEOcORY30MpQ8o0h+Kf9cyVqxk/I5LMYc9qhLtyAWZcco=&quot;}</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">{&quot;Key&quot;:&quot;rnRy7NNWZrjAQd9Xf6pgMNi/mF3kl34T+Ej9+2F6uAQJLPXC0N8YrWJlFIfhPQwP9qW8ESdZRpEnu780lehAYP+Vbj7wgQCl++2wE3e0gH6brusa2LJzotXNToxWpKXivkch/cONhWpk9qhp5ZHj/uBfnoE2HC/7aQXCWQXRDioePdjCieL96C0v6b4YjHLe2JYUpSd2UNDAA4LIu0zuk6rO5sPWaSIPUNY9APwZsZBNShzP/pMLHo1GCoQdCDtXB6FCmxU/zyEF37ZV3CBXRmH3pxgR0MnECd+v/oP0+UkJ+sB5clxsB4m1h0qM57XfHN3lXDcjT3uP5CnjYlJThm3dFPNOVi8k4Gnp8+kReswWl2q4Tv8ojn0qP/EDbLkuO6/FB/Brf4rdF7wtu8ZxKoEEUIx/hMWHk8irJoGIC9m7wIkQWXHelmJVboDz9vlrqFf7FWjer5YZQs3Bxh+gC+hn2WW7uapQ94IyaN/5E6UdbIJme6c1DKoQMdd0tuML8bWV79WRd5/hqOXljvBatCDUwjbgHX/PNoA5oDQcwzwPYlGpr5yw4PVD2+pzojgPQi8/zl+fz2HwJOGQZgA3GO1omJBxYXYfYBoFvS/F5sfFUSPPwt6OoombhGHfjVGntknzFTeQIdaE1EvdEBwHOrcboVMJoXbYlZjN3ShLOEygyJHkQsJHyvRtsNPRSF8fcCwPTJQ9FU8r4y5wchcIF4hg9eITX+JB8wj6tjr6K1nEGvvUvWa2WwrfxY0RsW7LCkdRHj43tgZj1pWMlPVtGnjmd+8uGt17E9uSjFWitOac9fSN44ilY+AYMwlsBIlHNI5nrF6PM7xReiRRwO3h4lIde7NONKrsr8acNbxhw2nEVQcKbfCJc6BpzrzcDGfWqtvbF1KQg/7xT5CFBWepKUMpvU146o8j8do3PxG92WTE8chBdF7j5Th75HsO7Th7hpsx6kX3aw2tII4wkga1jO0hzUBDUqKpz/JbV4eZUgkzb0U0dE/WBS7blLh2T1NrWajOk14s7+a2/VzyB8T9UqXfnnS6oSN7WMXugCWsqudtuc1seeNfJxaJLYCzEVE6Gvj5xCwx4oO42QwN73a3l5wfneENz37oBdhNJ9B/WQg998saJXuMqgsRE87xL5KBTGKAlecr8oXdpe7b0UqIJjsrDyR8ZVPChxwqCJMuZejaocynuQDfm0YsHp70ML9Qx71mO/fKv9LDOKI9lefMAojcTUNgVFMafUiIBn6cb4r+Re4sREiVRXx5iLQax10SkTFdTbYPf7ePGY6FemKUsC6Ev1xjgTDt9ppaIYw8zPCInP23KAhCosnzX6KMcJnFpqmalBo5zNAcN+IKMZDMdZceBN4JReeWsiRSmwIqWW78u91Qq8LGIQXZMFPSRSJXUacpBFmyWreU82kingCE4O4q7CTWJGKBGheHWGIc1L/dk7h2gUIx1SJeNFvIFy0DEqzKd4d3M/uSmP4PKg+dOt5zZHpGEd7vN7/LhBo5rCo6gJBnS5L4VtRn2KZqtNJ1hbmKPW8CEGByEgAjYLrweZk2EhsMqPOVcM6eYgHFCcNWUOw5m4YBgGESJUP4mG6ffBbPwCt+BG0s/wemTiWA/+iVZ/qImBiB5nYGLw5erhC1pWvk5oMmuFaNpaZlV35R9s2PIOuSMwi8shJl+M4HStyClbvPy+6rO1vbH+mF4mtgaiKHTP7TTWyZiLEeSS3N&quot;}</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">17</td>
+  <td>AutoChecker App</td>
+  <td><span class="function-tag">Login</span></td>
+  <td class="url"><a href="https://managemobileapi.autochecker.com/api/auth/login" target="_blank">https://managemobileapi.autochecker.com/api/auth/login</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-17')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-17">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-2xx">Status: 201</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value"> {&quot;key&quot;:&quot;o7obaAPl8Rin1yQil/fPLmfZDWV31ERB6O+us/ZdZlwAmt3brpIPLVi8W2ASbZ9dzes3tBTEjYwcayoLQ316BQ\u003d\u003d&quot;}</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">3jl6A7Vl/F8VT0Ki94ulYZxQgnbYwzV7ccQWcfEjRhsDNeoElNw8BlnuSoPqsvECwm64ezRzTJyiUywua3UxZfr5v3yoYMqtL6yS2iHVHNO85TKoupsUfOSovjDQ1h7jNee0h7RWx8d6DUsPUn/XoSpOim+FhK/HqNqSRqu5qCe3fOA8w4AmDxkWJLOl+vBdzKAS6yILbSX17U7Y5tnZg5+2F7wC12H+EryYcfipNuYiiCsi8fMIt+O/pRTEP+bInPiLr5rKQbKnJHeNmSNClqBxLA701AcURj6E1iFREWV8CGjwVH9AODTG7inpA8v20S7z5koE3AExD1LJl4O3TlQu2iTvMYTxtMphNoaak1ZoLjWOHmtvsvjBckXLZZEEGQdiEGJjSEeWSuNjYY+lv0KcoRG2WhqER5iM0k+trbuVNzxqF4nRRgo4cxWybxicp2cK0JWMltED1xOgjAxLQkXR1ldpCb40WepCPQisrn1izGI6w4F2tV4M5kgrd32Jd7yejeqI1YlzqMLttfPqsn6VgBwJS7/+jCggxEdgtZWXjLvKPFdb2QCWDB6+FErlSnLgQl1ua467m/HNLm3Yb1R3Sobl6O82u2qOZCz8G3D/GGNyaiyddsRpPjTShrSWidOMVy0AGpQt9YOigkrgGxnNPV5QuLPINj/79LfNV9tTPdRGu3o7SZ3PCJj8w2nMUveRMK0xpGH+y1xUr9AN4A==</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">18</td>
+  <td>Wavedin App</td>
+  <td><span class="function-tag">Login</span></td>
+  <td class="url"><a href="https://mobileliveapi.wavedin.app/api/auth/login" target="_blank">https://mobileliveapi.wavedin.app/api/auth/login</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-18')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-18">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-2xx">Status: 201</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;key&quot;:&quot;Z6bJc+TJLSyk2k2zcjRDzB1b2SUMLqPMDJ7onRlphDDf9wwCF941EGsE928j/4PLQs6wcVXsDfQsyKWO6thxZvIflmVvWtgGAe2UT/c5on37m45Ge5BUDL3PnbKo774KRf4q1kM8GoJxF5nVeqF8C5pBVwwdKkFK5MyLPqTyzlCHof+IKxJOrMRFCe+HNPsuRdkf6rxr56sMhXrPQu8OP7VMlDa89QIrl5D4zYnb1msDUgfKvjl0gVX7AkZnUMZUE5FemJnx7sS1JggiuM5lEQVKivjgElAaiFlLhfSenmUlUdL037feg6oIRCwEhMxkYr3H9CXt7VRpwfB6TBElyvdftVi3cUyNV+l1l/uMzbM1/0gj2n0qntbeWti+vwhJwV7rHKJyxST7vDSkWC4rggTEabs9gkg7x3fMKGb58t1oO4MgCdku8Gou9TPEVyNbSZ7skRONiCE55ZUkwU/tYljSFvT/ljQF6cDLibuKHW6sk4j/ZtP0jN/MtHJUozkOLVEOzt+ZXjip++f7SRokIOHdmJ5jsU/FHgfVNy3h7LuBgdBMtiY8MqmRIxFyueoL9n1FyopW5yluQnUk6ok09Z8/4V5yVsfe7e6HszOYFgScgzmQcuDiegp4pSXDYx25EleDhYtW0SLi5fnXOKPrxo0qBmjlhhOY/XNPNEamlxM\u003d&quot;}</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">nrx2WsJf4/CDn68vTGi9E57qBhETZpsTkVuSVjzNeeYrSbPUbaIuAbG8M51parjw94p8lNXc7pGTjdL6j8AU8fnm3+f3mems4lGRKET+ugDvqNuCUIanTPMCZFeb/Kqn2ANai9xGD+tPDjkpjXd1pGYa5iWN+7eqaCynlKsv1MuIqy3ClrwaY++88j/VygY0b+HRQ7qTXh4QaIacqF7JVyiQ0pKkn33sd+JXLuM48U5mYkMaj0VrAKWSvZj/kPx4H6HyNnxC2OzXCJdvNQQqQ+txylkQLaOjo32RHoUbi8VbMlnSE6ptdGttEu1M2vSPB+B5a3vLBy5bOnqNJIHeokjvLIEXjrDCZguuahzdiuUTmOOWvt6qmgRiN+2roqCLxHmCxvztXe2d2PtPyxuZNZggIiL+T6GUPHZ8MS32HOvZ0pFJTjiTEwcty7mZ9Mb6eSqmqvQQ3GocMadvYSJNq4c0IhuSvdztw1apHHBxMfo17utDV/eX5cbIbWAYpyPGknBGw3oNnQhcbl0zD0T58FHZ23hREmeL8FvKvBBc1VWRkRPOQ0hLDDvC698tk9xYxWDQI7SkrSMiEZQJsjJM80SjV1Aek2oHklVqPQ0Fr/OrfMmeZ90PifBGRR7mAaBwLAajByh2SwleBWDmt1bwmuGqv7nho13K9nREz40HgXKnJmTty3KxRSzkL0Lpcx1NtHnYrV2BYvIarB+9Me8o902Y4+7zwGCfUtPXgmHXYaOe100pTP4YqvXDMjtzYU6jg3nlvqZ4G8RzO9LEybMvcsGKTvCbg8ET8B8X8StrHRbp74tCYjnroqSGQ+HwYVqP</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">19</td>
+  <td>Sparkme App</td>
+  <td><span class="function-tag">Login</span></td>
+  <td class="url"><a href="https://spark.synctag.com/api/auth/login" target="_blank">https://spark.synctag.com/api/auth/login</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-19')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-19">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-2xx">Status: 201</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;key&quot; : &quot;z8zY9agO/zG58XoDO6QW+mkPueQVBAGXwPCbsyAIPxmbvDYcouZ/ssu6jpPMct47MGerqC9we10NCiVzoijbNwohTjUh+ozT0NUPmK4s2hpDCXxBlqitk2TpfqwxEL2at+DW8bPJ69BBSnbG/PRM3VItB8USK2N5iBGiHaOG1ngUdOzDFJT3FU//ZQ1ATW8BBEUtJ9rGIQ2+Uqg/0f/tVk9+yGQQyITObqIPXWvIQ+AMxs/0XNELfe90Ou+D5eMuGwH3ZiMe8SpCU9Uo0ZXdXC+me/xjlyEu1uXduyTcYV2ZP9+Qe7pZgSHJrpUHsgLFVEVcZp89DQG9VeVcz8P8zwXLumfIaTacMLPWzl+j1XBWMLD2cBq4gGvVNbPKTl/OwnDMgYz0XYBR5E6VPbDk6zjAT0cns14L/vhuwIAorVmTX2fbfvDWWIQD8zy4A0vNtPe206zYNMLwWRHkonvEvpqxvL4Ri2gfjN1kV7kwxwjYOwQ+vAkfTZpEbH2CHVTVsCyKVNfGphZDdQYECe0UzwlKTdxr/jrVno4V8kRschF6E8jwXlukeNpdryN/zAdRFkRZSGbHIbIwIScwmsmBIKkbYRt9Bzrl4Xn3ksKwVRM6zh66z9YSmksvwkTmk9vQ&quot;}</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">DnZm2ArYfShV3kCtGpgNxZdX8+zTiaNVDwy4kTTywbUYSJc8yvxEKMJsOl0tNPCmT+U9+NsLSu0ZRZseoRK1bfw3Lgx9BWxweeUcsAHfoa0jD3GaabcaBGWRb+GuRSu16nIDxGqGnQfs5ZFy7BRiXBpWZ6lvPxjpHKdyp/sC5FwG/TP9xxaV7GAeIbG+ld3AOoyisMOzgylXOH3fzqpEjul0nhmccSgrp/P0rYVU3D+11IAl7V5WlfHhlYw+4ceLdm2IWyma5/xtgoz1AOpnLmG5AzvSk3PBvZQgkrzH1L70VMJrdZJuo3QnwxN0BKRccafNDlxW3EjF+u3CONL0AGuRSs41I2A+/oxub8+Ul87ZrgQr1Mwn6ycOdWAjYmG7SdSFJaJHaDovBt0YIV0mEjADgDC9+stpxRek11y72wUlTrsDk8+GkkN1yqhBmkl4s2g3KpXAchZqf2G+04R83KPbee1oRxfvIwhEznPnn3BOmKV4VyC3tt7pE3+3UCZbCHWBRQEgbmjrggDciUlv4zUIAQ6jZpT3a8A1vlSHbpjphGjBQl+Yj7o+wZdL3kmj9I+BykLFrpQIJHCmvb7m7CQr0LQiTZ7WKnTS0QIOzmT506YRtXxC/mH+7EEs1PsG</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">20</td>
+  <td>WavedIn</td>
+  <td><span class="function-tag">SuperAdmin Login UI</span></td>
+  <td class="url"><a href="https://superadmin.wavedin.app/" target="_blank">https://superadmin.wavedin.app/</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-20')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-20">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+
+&lt;head&gt;&lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.gstatic.com&quot; crossorigin&gt;
+  &lt;meta charset=&quot;utf-8&quot;&gt;
+  &lt;title&gt;WavedIn Super Admin&lt;/title&gt;
+  &lt;!-- &lt;base href=&quot;/velzon/angular/modern/&quot;&gt; --&gt;
+  &lt;!-- &lt;base href=&quot;/velzon/angular/modern-rtl/&quot;&gt; --&gt;
+  &lt;base href=&quot;/&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+  &lt;link rel=&quot;icon&quot; type=&quot;image/x-icon&quot; href=&quot;assets/images/favicon.ico&quot;&gt;
+  &lt;script src=&quot;https://maps.googleapis.com/maps/api/js?key=AIzaSyAbvyBxmMbFhrzP9Z8moyYr6dCr-pzjhBE&quot;&gt;&lt;/script&gt;
+  &lt;style type=&quot;text/css&quot;&gt;@font-face{font-family:'Roboto';font-style:normal;font-weight:300;font-display:swap;src:url(https://fonts.gstatic.com/s/roboto/v32/KFOlCnqEu92Fr1MmSU5fCRc4AMP6lbBP.woff2) format('woff2');unicode-range:U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;}@font-face{font-family:'Roboto';font-style:normal;font-weight:300;font-display:swap;src:url(https://fonts.gstatic.com/s/roboto/v32/KFOlCnqEu92Fr1MmSU5fABc4AMP6lbBP.woff2) format('woff2');unicode-range:U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;}@font-face{font-family:'Roboto';font-style:normal;font-weight:300;font-display:swap;src:url(https://fonts.gstatic.com/s/roboto/v32/KFOlCnqEu92Fr1MmSU5fCBc4AMP6lbBP.woff2) format('woff2');unicode-range:U+1F00-1FFF;}@font-face{font-family:'Roboto';font-style:normal;font-weight:300;font-display:swap;src:url(https://fonts.gstatic.com/s/roboto/v32/KFOlCnqEu92Fr1MmSU5fBxc4AMP6lbBP.woff2) format('woff2');unicode-range:U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;}@font-face{font-family:'Roboto';font-style:normal;font-weight:300;font-display:swap;src:url(https://fonts.gstatic.com/s/roboto/v32/KFOlCnqEu92Fr1MmSU5fCxc4AMP6lbBP.woff2) format('woff2');unicode-range:U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;}@font-face{font-family:'Roboto';font-style:no... [truncated]</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">21</td>
+  <td>WavedIn</td>
+  <td><span class="function-tag">Market Web</span></td>
+  <td class="url"><a href="https://market.wavedin.app/" target="_blank">https://market.wavedin.app/</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-21')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-21">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot; data-critters-container&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;utf-8&quot;&gt;
+  &lt;title&gt;WavedIn - Marketplace&lt;/title&gt;
+  &lt;base href=&quot;/&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+  &lt;meta http-equiv=&quot;Content-Security-Policy&quot; content&gt;
+  &lt;meta http-equiv=&quot;Cache-control&quot; content=&quot;public&quot;&gt;
+  &lt;meta http-equiv=&quot;Cache-control&quot; content=&quot;no-cache&quot;&gt;
+  &lt;meta http-equiv=&quot;Cache-control&quot; content=&quot;no-store&quot;&gt;
+  &lt;link rel=&quot;icon&quot; type=&quot;image/x-icon&quot; href=&quot;favicon.ico&quot;&gt;
+  &lt;link rel=&quot;stylesheet&quot; href=&quot;https://cdn.jsdelivr.net/npm/boxicons@latest/css/boxicons.min.css&quot;&gt;
+  &lt;!-- or --&gt;
+  &lt;link rel=&quot;stylesheet&quot; href=&quot;https://unpkg.com/boxicons@latest/css/boxicons.min.css&quot;&gt;
+  &lt;!-- &lt;link rel=&quot;stylesheet&quot; href=&quot;https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css&quot;&gt; --&gt;
+
+&lt;style&gt;@import&quot;https://fonts.googleapis.com/css2?family=Charm:wght@400;700&amp;family=Jost:wght@300;400;500;600;700&amp;family=Oregano&amp;family=Roboto:wght@300;400;500;700;900&amp;display=swap&quot;;:root{--bs-blue:#0d6efd;--bs-indigo:#6610f2;--bs-purple:#6f42c1;--bs-pink:#d63384;--bs-red:#dc3545;--bs-orange:#fd7e14;--bs-yellow:#ffc107;--bs-green:#198754;--bs-teal:#20c997;--bs-cyan:#0dcaf0;--bs-black:#000;--bs-white:#fff;--bs-gray:#6c757d;--bs-gray-dark:#343a40;--bs-gray-100:#f8f9fa;--bs-gray-200:#e9ecef;--bs-gray-300:#dee2e6;--bs-gray-400:#ced4da;--bs-gray-500:#adb5bd;--bs-gray-600:#6c757d;--bs-gray-700:#495057;--bs-gray-800:#343a40;--bs-gray-900:#212529;--bs-primary:#0d6efd;--bs-secondary:#6c757d;--bs-success:#198754;--bs-info:#0dcaf0;--bs-warning:#ffc107;--bs-danger:#dc3545;--bs-light:#f8f9fa;--bs-dark:#212529;--bs-primary-rgb:13,110,253;--bs-secondary-rgb:108,117,125;--bs-success-rgb:25,135,84;--bs-info-rgb:13,202,240;--bs-warning-rgb:255,193,7;--bs-danger-rgb:220,53,69;--bs-light-rgb:248,249,250;--bs-dark-rgb:33,37,41;--bs-primary-text-emphasis:#052c65;--bs-secondary-text-emphasis:#2b2f32;--bs-success-text-emphasis:#0a3622;--bs-info-text-emphasis:#055160;--bs-warning-text-emphas... [truncated]</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">22</td>
+  <td>Sparkme Web</td>
+  <td><span class="function-tag">Login UI</span></td>
+  <td class="url"><a href="https://sparkanalytics.synctag.com/" target="_blank">https://sparkanalytics.synctag.com/</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-22')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-22">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">&lt;!DOCTYPE html&gt;&lt;html lang=&quot;en&quot;&gt;&lt;head&gt;
+  &lt;meta charset=&quot;utf-8&quot;&gt;
+  &lt;title&gt;Spark-Analytics&lt;/title&gt;
+  &lt;base href=&quot;/&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+  &lt;!-- &lt;link rel=&quot;icon&quot; type=&quot;image/x-icon&quot; href=&quot;favicon.ico&quot; /&gt; --&gt;
+  &lt;link rel=&quot;shortcut icon&quot; type=&quot;image/png&quot; sizes=&quot;16x16&quot; href=&quot;./assets/img/favicon.png&quot;&gt;
+  &lt;link rel=&quot;stylesheet&quot; href=&quot;https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css&quot; integrity=&quot;sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm&quot; crossorigin=&quot;anonymous&quot;&gt;
+  &lt;style type=&quot;text/css&quot;&gt;@font-face{font-family:'Material Icons';font-style:normal;font-weight:400;src:url(https://fonts.gstatic.com/s/materialicons/v139/flUhRq6tzZclQEJ-Vdg-IuiaDsNcIhQ8tQ.woff2) format('woff2');}@font-face{font-family:'Material Icons Outlined';font-style:normal;font-weight:400;src:url(https://fonts.gstatic.com/s/materialiconsoutlined/v108/gok-H7zzDkdnRel8-DQ6KAXJ69wP1tGnf4ZGhUcel5euIg.woff2) format('woff2');}@font-face{font-family:'Material Icons Round';font-style:normal;font-weight:400;src:url(https://fonts.gstatic.com/s/materialiconsround/v107/LDItaoyNOAY6Uewc665JcIzCKsKc_M9flwmPq_HTTw.woff2) format('woff2');}@font-face{font-family:'Material Icons Sharp';font-style:normal;font-weight:400;src:url(https://fonts.gstatic.com/s/materialiconssharp/v108/oPWQ_lt5nv4pWNJpghLP75WiFR4kLh3kvmvRImcycg.woff2) format('woff2');}@font-face{font-family:'Material Icons Two Tone';font-style:normal;font-weight:400;src:url(https://fonts.gstatic.com/s/materialiconstwotone/v111/hESh6WRmNCxEqUmNyh3JDeGxjVVyMg4tHGctNCu0NjbrHg.woff2) format('woff2');}.material-icons{font-family:'Material Icons';font-weight:normal;font-style:normal;font-size:24px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;-webkit-font-feature-settings:'liga';-webkit-font-smoothing:antialiased;}.material-icons-outlined{font-family:'Material Icons Outlined';font-weight:normal;f... [truncated]</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">23</td>
+  <td>Sparkme Web</td>
+  <td><span class="function-tag">Login</span></td>
+  <td class="url"><a href="https://spark.synctag.com/analyticsapi/auth/login" target="_blank">https://spark.synctag.com/analyticsapi/auth/login</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-23')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-23">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-2xx">Status: 201</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;phone&quot;:9999999999,&quot;password&quot;:&quot;Synctag@1&quot;}</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">{&quot;Token&quot;:&quot;eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJUb2tlbiI6IjYzMTU5NzFhYTNjM2Q0OTI1NzE1NTY5ZCIsIlJvbGUiOiIiLCJpYXQiOjE3NzU0NzMzODgsImV4cCI6MTc3NjMzNzM4OH0.rsJSNB7diazaMtfJ3sFbSJM2jKMZHbW0axfpLqmQIcU&quot;,&quot;Role&quot;:[{&quot;_id&quot;:&quot;63159721a3c3d492571556a4&quot;,&quot;name&quot;:&quot;Dashboard&quot;,&quot;icon&quot;:&quot;fa-solid fa-display&quot;,&quot;status&quot;:true,&quot;id&quot;:1,&quot;userId&quot;:&quot;6315971aa3c3d4925715569d&quot;,&quot;urlLink&quot;:&quot;dashboard&quot;,&quot;__v&quot;:0},{&quot;_id&quot;:&quot;63159721a3c3d492571556a6&quot;,&quot;name&quot;:&quot;Dashboard&quot;,&quot;icon&quot;:&quot;fa-solid fa-display&quot;,&quot;status&quot;:true,&quot;id&quot;:1,&quot;userId&quot;:&quot;6315971aa3c3d4925715569d&quot;,&quot;urlLink&quot;:&quot;dashboard&quot;,&quot;__v&quot;:0},{&quot;_id&quot;:&quot;63159721a3c3d492571556a7&quot;,&quot;name&quot;:&quot;User List&quot;,&quot;icon&quot;:&quot;fa-solid fa-person-shelter&quot;,&quot;status&quot;:true,&quot;id&quot;:4,&quot;userId&quot;:&quot;6315971aa3c3d4925715569d&quot;,&quot;urlLink&quot;:&quot;user-list&quot;,&quot;__v&quot;:0}],&quot;UserId&quot;:&quot;6315971aa3c3d4925715569d&quot;}</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">24</td>
+  <td>Algomax ProSky Web</td>
+  <td><span class="function-tag">Login UI</span></td>
+  <td class="url"><a href="https://prosky.algomax.co" target="_blank">https://prosky.algomax.co</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-24')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-24">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">&lt;!DOCTYPE html&gt;&lt;html lang=&quot;en&quot;&gt;&lt;head&gt;
+    &lt;meta charset=&quot;utf-8&quot;&gt;
+    &lt;title&gt;AlgoMax - Admin Dashboard&lt;/title&gt;
+    &lt;!-- &lt;base href=&quot;/velzon/angular/modern/&quot;&gt; --&gt;
+    &lt;!-- &lt;base href=&quot;/velzon/angular/modern-rtl/&quot;&gt; --&gt;
+    &lt;base href=&quot;/&quot;&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+    &lt;link rel=&quot;icon&quot; type=&quot;image/x-icon&quot; href=&quot;assets/images/favicon.ico&quot;&gt;
+  &lt;style&gt;:root{--swiper-theme-color:#007aff}:root{--swiper-navigation-size:44px}@charset &quot;UTF-8&quot;;:root{--vz-blue:#5ea3cb;--vz-indigo:#405189;--vz-purple:#7084c7;--vz-pink:#f672a7;--vz-red:#fa896b;--vz-orange:#f1963b;--vz-yellow:#f7b84b;--vz-green:#6ada7d;--vz-teal:#02a8b5;--vz-cyan:#58caea;--vz-white:#fff;--vz-gray:#878a99;--vz-gray-dark:#343a40;--vz-gray-100:#f3f6f9;--vz-gray-200:#eff2f7;--vz-gray-300:#e9ebec;--vz-gray-400:#ced4da;--vz-gray-500:#adb5bd;--vz-gray-600:#878a99;--vz-gray-700:#495057;--vz-gray-800:#343a40;--vz-gray-900:#212529;--vz-primary:#5ea3cb;--vz-secondary:#7084c7;--vz-success:#6ada7d;--vz-info:#58caea;--vz-warning:#f7b84b;--vz-danger:#fa896b;--vz-light:#f3f6f9;--vz-dark:#212529;--vz-primary-rgb:94, 163, 203;--vz-secondary-rgb:112, 132, 199;--vz-success-rgb:106, 218, 125;--vz-info-rgb:88, 202, 234;--vz-warning-rgb:247, 184, 75;--vz-danger-rgb:250, 137, 107;--vz-light-rgb:243, 246, 249;--vz-dark-rgb:33, 37, 41;--vz-white-rgb:255, 255, 255;--vz-black-rgb:0, 0, 0;--vz-body-color-rgb:33, 37, 41;--vz-body-bg-rgb:241, 241, 241;--vz-font-sans-serif:&quot;hkgrotesk&quot;, sans-serif;--vz-font-monospace:SFMono-Regular, Menlo, Monaco, Consolas, &quot;Liberation Mono&quot;, &quot;Courier New&quot;, monospace;--vz-gradient:linear-gradient(180deg, rgba(255, 255, 255, .15), rgba(255, 255, 255, 0));--vz-body-font-family:var(--vz-font-sans-serif);--vz-body-font-size:.875rem;--vz-body-font-weight:400;--vz-body-line-height:1.5;--vz-body-color:#212529;--vz-body-bg:#f1f1f1;--vz-border-width:1px;--vz-border-style:solid;--vz-border-color:var(--vz-border-color);--vz-border-color-translucent:rgba(0, 0, 0, .175);--vz-border-... [truncated]</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">25</td>
+  <td>Algomax GoPocket Web</td>
+  <td><span class="function-tag">Login UI</span></td>
+  <td class="url"><a href="https://gopocket.algomax.co" target="_blank">https://gopocket.algomax.co</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-25')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-25">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">&lt;!DOCTYPE html&gt;&lt;html lang=&quot;en&quot;&gt;&lt;head&gt;
+    &lt;meta charset=&quot;utf-8&quot;&gt;
+    &lt;title&gt;AlgoMax - Admin Dashboard&lt;/title&gt;
+    &lt;!-- &lt;base href=&quot;/velzon/angular/modern/&quot;&gt; --&gt;
+    &lt;!-- &lt;base href=&quot;/velzon/angular/modern-rtl/&quot;&gt; --&gt;
+    &lt;base href=&quot;/&quot;&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+    &lt;link rel=&quot;icon&quot; type=&quot;image/x-icon&quot; href=&quot;assets/images/favicon.ico&quot;&gt;
+  &lt;style&gt;:root{--swiper-theme-color:#007aff}:root{--swiper-navigation-size:44px}@charset &quot;UTF-8&quot;;:root{--vz-blue:#5ea3cb;--vz-indigo:#405189;--vz-purple:#7084c7;--vz-pink:#f672a7;--vz-red:#fa896b;--vz-orange:#f1963b;--vz-yellow:#f7b84b;--vz-green:#6ada7d;--vz-teal:#02a8b5;--vz-cyan:#58caea;--vz-white:#fff;--vz-gray:#878a99;--vz-gray-dark:#343a40;--vz-gray-100:#f3f6f9;--vz-gray-200:#eff2f7;--vz-gray-300:#e9ebec;--vz-gray-400:#ced4da;--vz-gray-500:#adb5bd;--vz-gray-600:#878a99;--vz-gray-700:#495057;--vz-gray-800:#343a40;--vz-gray-900:#212529;--vz-primary:#5ea3cb;--vz-secondary:#7084c7;--vz-success:#6ada7d;--vz-info:#58caea;--vz-warning:#f7b84b;--vz-danger:#fa896b;--vz-light:#f3f6f9;--vz-dark:#212529;--vz-primary-rgb:94, 163, 203;--vz-secondary-rgb:112, 132, 199;--vz-success-rgb:106, 218, 125;--vz-info-rgb:88, 202, 234;--vz-warning-rgb:247, 184, 75;--vz-danger-rgb:250, 137, 107;--vz-light-rgb:243, 246, 249;--vz-dark-rgb:33, 37, 41;--vz-white-rgb:255, 255, 255;--vz-black-rgb:0, 0, 0;--vz-body-color-rgb:33, 37, 41;--vz-body-bg-rgb:241, 241, 241;--vz-font-sans-serif:&quot;hkgrotesk&quot;, sans-serif;--vz-font-monospace:SFMono-Regular, Menlo, Monaco, Consolas, &quot;Liberation Mono&quot;, &quot;Courier New&quot;, monospace;--vz-gradient:linear-gradient(180deg, rgba(255, 255, 255, .15), rgba(255, 255, 255, 0));--vz-body-font-family:var(--vz-font-sans-serif);--vz-body-font-size:.875rem;--vz-body-font-weight:400;--vz-body-line-height:1.5;--vz-body-color:#212529;--vz-body-bg:#f1f1f1;--vz-border-width:1px;--vz-border-style:solid;--vz-border-color:var(--vz-border-color);--vz-border-color-translucent:rgba(0, 0, 0, .175);--vz-border-... [truncated]</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">26</td>
+  <td>Metcalf</td>
+  <td><span class="function-tag">UI</span></td>
+  <td class="url"><a href="https://metcalf.ai/" target="_blank">https://metcalf.ai/</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-26')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-26">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+  &lt;head&gt;
+    &lt;meta charset=&quot;UTF-8&quot; /&gt;
+    &lt;!-- &lt;link rel=&quot;icon&quot; type=&quot;image/svg+xml&quot; href=&quot;/vite.svg&quot; /&gt; --&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot; /&gt;
+    &lt;title&gt;Conversational Video Interface React&lt;/title&gt;
+    &lt;script type=&quot;module&quot; crossorigin src=&quot;/assets/index-j6sE5nGm.js&quot;&gt;&lt;/script&gt;
+    &lt;link rel=&quot;stylesheet&quot; crossorigin href=&quot;/assets/index-BQjbICvf.css&quot;&gt;
+  &lt;/head&gt;
+  &lt;body&gt;
+    &lt;div id=&quot;root&quot;&gt;&lt;/div&gt;
+  &lt;/body&gt;
+&lt;/html&gt;
+</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">27</td>
+  <td>Humee Admin Web</td>
+  <td><span class="function-tag">Login UI</span></td>
+  <td class="url"><a href="https://www.humee.com/" target="_blank">https://www.humee.com/</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-27')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-27">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+  &lt;head&gt;
+    &lt;meta charset=&quot;UTF-8&quot; /&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; /&gt;
+    &lt;title&gt;
+      Create Your AI Digital Twin | Humee™ - Human-Like AI Assistant
+    &lt;/title&gt;
+    &lt;meta
+      name=&quot;description&quot;
+      content=&quot;Create a digital twin that looks, sounds, and acts exactly like you with Humee™. Build your AI legacy for business automation, family preservation, and 24/7 digital presence.&quot;
+    /&gt;
+    &lt;meta name=&quot;author&quot; content=&quot;Humee™ by MDM Intellectual Property LLC&quot; /&gt;
+    &lt;meta
+      name=&quot;keywords&quot;
+      content=&quot;AI digital twin, create AI avatar, digital legacy, business automation, family preservation, virtual assistant, human-like AI &quot;
+    /&gt;
+
+    &lt;!-- Security --&gt;
+    &lt;!-- &lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src 'self'; script-src 'self' https:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https:; media-src 'self' blob: https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests&quot; /&gt; --&gt;
+    &lt;!-- &lt;meta name=&quot;referrer&quot; content=&quot;strict-origin-when-cross-origin&quot; /&gt; --&gt;
+    &lt;meta name=&quot;color-scheme&quot; content=&quot;light dark&quot; /&gt;
+
+    &lt;link rel=&quot;canonical&quot; href=&quot;https://www.humee.com/&quot; /&gt;
+
+    &lt;!-- Favicon --&gt;
+    &lt;!-- Favicon --&gt;
+    &lt;link rel=&quot;icon&quot; type=&quot;image/x-icon&quot; href=&quot;/fav_Humee.png&quot; /&gt;
+    &lt;link rel=&quot;icon&quot; type=&quot;image/png&quot; sizes=&quot;32x32&quot; href=&quot;/fav_Humee.png&quot; /&gt;
+    &lt;link rel=&quot;icon&quot; type=&quot;image/png&quot; sizes=&quot;16x16&quot; href=&quot;/fav_Humee.png&quot; /&gt;
+    &lt;link rel=&quot;apple-touch-icon&quot; sizes=&quot;180x180&quot; href=&quot;/fav_Humee.png&quot; /&gt;
+
+    &lt;!-- Social --&gt;
+    &lt;meta
+      property=&quot;og:title&quot;
+      content=&quot;Create Your AI Digital Twin | Humee™ - Human-Like AI Assistant&quot;
+    /&gt;
+    &lt;meta
+      property=&quot;og:description&quot;
+      content=&quot;Create a digital twin that looks, sounds, and acts exactly like you with Humee™. Build your AI legacy for business automation, family pr... [truncated]</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">28</td>
+  <td>Humee Dashboard Web</td>
+  <td><span class="function-tag">Login UI</span></td>
+  <td class="url"><a href="https://dashboard.humee.com/" target="_blank">https://dashboard.humee.com/</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-28')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-28">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot; /&gt;
+  &lt;link rel=&quot;icon&quot; type=&quot;image/svg+xml&quot; href=&quot;/fav_Humee.png&quot; /&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot; /&gt;
+  &lt;!-- &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no&quot;&gt; --&gt;
+  &lt;link rel=&quot;stylesheet&quot; href=&quot;https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css&quot;&gt;
+  &lt;link href=&quot;https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css&quot; rel=&quot;stylesheet&quot; /&gt;
+  &lt;title&gt;Humee Dashboard&lt;/title&gt;
+  &lt;script type=&quot;module&quot; crossorigin src=&quot;/assets/index-CcJNT5X_.js&quot;&gt;&lt;/script&gt;
+  &lt;link rel=&quot;stylesheet&quot; crossorigin href=&quot;/assets/index-Dgsmli0p.css&quot;&gt;
+&lt;/head&gt;
+
+&lt;body&gt;
+  &lt;div id=&quot;root&quot;&gt;&lt;/div&gt;
+  &lt;!-- Google tag (gtag.js) --&gt;
+  &lt;script async src=&quot;https://www.googletagmanager.com/gtag/js?id=G-2BMRN8P0ZV&quot;&gt;&lt;/script&gt;
+  &lt;script&gt;
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-2BMRN8P0ZV');
+  &lt;/script&gt;
+  &lt;script&gt;
+    gtag('event', 'conversion', { 'send_to': 'AW-17676628634/bb9oCN-I6tIbEJrl7-xB' });
+  &lt;/script&gt;
+&lt;/body&gt;
+
+&lt;/html&gt;</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">29</td>
+  <td>Humee Dashboard</td>
+  <td><span class="function-tag">Login Number</span></td>
+  <td class="url"><a href="https://api.humee.com/api/users/beforeLogincheckUser" target="_blank">https://api.humee.com/api/users/beforeLogincheckUser</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-29')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-29">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;key&quot; : &quot;fUjZB3a_IJyX6AyCgxVZ4pop-Mu29uTqwJQ7zpvAo1Ove6XhrcwJK77ZsAyebakj&quot;}</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">{&quot;key&quot;:&quot;2D0gETwbNQKo-ghLU_eCetjZwypjQsRFWq5CV1S2wNJfEXV0Y8ykxPSUs7m28G6a&quot;}</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">30</td>
+  <td>Humee Dashboard</td>
+  <td><span class="function-tag">Login OTP</span></td>
+  <td class="url"><a href="https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyB6Fk4wRtuKFPL_2BToGZuGP7bOGUH08lQ" target="_blank">https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyB6Fk4wRtuKFPL_2BToGZuGP7bOGUH08lQ</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-30')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-30">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;sessionInfo&quot;:&quot;AD8T5ItYv_dvp2B6t8uZbWQvvV3vc1XB9lPmk1ET95hWjvCVUQP2SFc9W6nUGmXHoGRW_PwuMA4UNz40Rw2kFeDAgKNXZ9Q2BQYO76bivCM2Pu4Yp_OPpEfM_-M5wonI2597C1ZurCA2bouSZ5hKKzbK7oQin7qcCQ&quot;,&quot;code&quot;:&quot;123456&quot;}</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">{
+  &quot;idToken&quot;: &quot;eyJhbGciOiJSUzI1NiIsImtpZCI6IjVlODJhZmI0ZWY2OWI3NjM4MzA2OWFjNmI1N2U3ZTY1MjAzYmZlOTYiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vbWVldC1odW1lZSIsImF1ZCI6Im1lZXQtaHVtZWUiLCJhdXRoX3RpbWUiOjE3NzU0NzMzOTEsInVzZXJfaWQiOiI2MDdIQndZZlYxWDgyYTNUNmxCZDJnSFFtNEkyIiwic3ViIjoiNjA3SEJ3WWZWMVg4MmEzVDZsQmQyZ0hRbTRJMiIsImlhdCI6MTc3NTQ3MzM5MSwiZXhwIjoxNzc1NDc2OTkxLCJwaG9uZV9udW1iZXIiOiIrMTg4ODg4ODg4ODgiLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7InBob25lIjpbIisxODg4ODg4ODg4OCJdfSwic2lnbl9pbl9wcm92aWRlciI6InBob25lIn19.um19cb2MfAHYKFtlUNI2B-1PQpJb00_RLVTy4u4puZw-thKyVeFucgEBFaGslb9jKCt461Q-q5XUF0wk18GGhYMfY5gBWZnqGo45hVtoOhuSE05ZGkeuAq8KwnyKQejNKdEAOKUUvzVoSkeGxbmCjQn95RNAXyJg6SLD-o-jo3tW4VqLh5kHngpx5ASLn-cCSy1-QHLZjSEOD54vXCe_8ti0za38K-zNUZ2CCSd0ce59KNvryxxawz2aaI7B2SrXO8F3aZD4lzxhSe2FotAItC7r2dv3A6k1nNbjA1hzQt3bn8T8njrSRgCpbOk1dxZWXKrewFEvuVIz9Ip1bsvGbw&quot;,
+  &quot;refreshToken&quot;: &quot;AMf-vBy_jQ2oR560w0zydFGdM8HNh0WofORi3GabUQ3kTEmFSOHXZx5CFTHMuSZ2Hqgra4DByUNyYeCnGR3TMkFQp8zkgW72gvfOf1ZDHJws1wjQgvl-wBTCEBOZZF90-oK1q5bJ8GJhz7K8njPdU5Bv5R8ggs-aNWnZQapjGg2d6q4AdvQ76qGuesN1teZOqwxIsJHK2trL&quot;,
+  &quot;expiresIn&quot;: &quot;3600&quot;,
+  &quot;localId&quot;: &quot;607HBwYfV1X82a3T6lBd2gHQm4I2&quot;,
+  &quot;isNewUser&quot;: false,
+  &quot;phoneNumber&quot;: &quot;+18888888888&quot;
+}
+</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">31</td>
+  <td>Humee Dashboard</td>
+  <td><span class="function-tag">Login</span></td>
+  <td class="url"><a href="https://api.humee.com/api/users/login" target="_blank">https://api.humee.com/api/users/login</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-31')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-31">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;key&quot; : &quot;Dda1sQBpMyyi1OLjbzVM2186-B4y0pWcASJE5eVtTdtsUrwPkPkowkIGaSE4qEakF374sR1GVTAR6lRI4LvDnBTM7E_12YWeE4EVMSje5TjQhF_ja0MQVYZZnKdmgNmx&quot;}</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">{&quot;key&quot;:&quot;2D0gETwbNQKo-ghLU_eCetjZwypjQsRFWq5CV1S2wNJLXpTQZjZoxJxD4VtEZ_hKK81aozrMedAiMWBEAGWDo4mCHUvoscIRm3rUYpoVV3SO5Plg5hQNcUwbgrd2jKLxYDaz0ZqbPY1gzuLgMQQPkflLdI1uvxUCWvDVK76tNt5kaWYvfep_5WYnhdnhzlwilIBZBmDMgELWqAuLrDLqe3wf0V1GOj_1zxrWS6WcA9BNMZ6Ce0vVchDDzJ-DQUuyR5cWzuROpl2SEdWS3PkKZwSuMPQvNiM2069ndL74KJ7sLbgpAXmb9SVf-Dgfhdt__ZYAq4VexM-657tFMagWpbyGVugUoLmYPehexAx_MwcubFZJTa2DCPHS-SY85FxLqedldyoWhppb_2JiKwjMVAZu21vzMBxe_8EW_udxMv9tR-zponNcUYKVA0b9Vv86YoGyE16OmIW8ivDYLMWzijDGCNiwfUlt1MYJHoIQQVsxl_k2oCDUF--5Up6ASlaevwJ1t-Nb5X9MQXyVMEpQC5KhodFuEZw-pXT0DKDZrpVZRvitXMVZEte1g4IX1LrTLWpRuy4iNd8pxght0OgENJwP6_VCxRWUZcvxmVs_sWXFD2R09idlqx1YqFQF3r3fRR91C22_3Hm16Jshy0611eesH9A3U6uhwU5UlwJWQH8D6VtKYH0W8JOJ5u_SNDXBXKC_v144hJy08zbVnfymIsdklWbs84a1k3PJTdm47K2QnyX8Vj623XU6cpLFoVXwYXuQguCwWjHu29lSrhWJ5NvF-BomkU0JPR3cH0ohYDJWAgYrA92F6nmj7M4xqvg7guM9OCNk7Bhes8PVLpAvViPptnxTPRv_45Xz1e9517BrrmgLUUWI3X7RSiiPBXlNiGkdViTjPcdeO7GriPlcxzu3AOf-j_b5UVEUUi8zDlPsMgVqUPyQbyDyCBbsWPsl_J14_rr-9WvpNtwypDyEiF6vDd_Y0Hvel2-1ziVw44g18zIWYJyWdgYqBTfpjwnFi0FCzHoK-Nj7fAnkkJrzIOUxqz_xDZj7nCCWTx137M9YUSs71JKNlPiP9FjktxeTkXvqFFj7pQGMcPjYLFYTtDM3yiM9uYUIpUr8mbG20401hY5BzW5RWXgCxqhVuHLe-WbnHUqaIr0Gl2omCJptq5FXuuX6p6i0H5qraitpGQdckngqR-6NI-vwSQ_ZLXIyjnUjD_ie1wy8JUKZIIHQF_MtnmL3T6svwaTJBPGmascTX-6JEYhHkkAvj40ZAI9wE4BMCxBaLrNFE4xv-p6EkBxxPSXqoTwnumAA6_Hq8sm1meUAaRU3iO0MwZzvC4HbH-SCiYzhbL7huSwGxHATLuegfTnFVuOZ7HzO0Pu61qNmqwOhSgsngA1U-FdZWk96HFuKs0xOr70K2F3SP1mb0CLE7s2QUpi5T32GxCe7c6DL-penNjMIU7YJskuy7RLygBlXDayQgxJPGbGENa4jkLvrDm5ulX7kWTKffE1gB-2KtMPFM6TLxxHpTf3Q-sq_luq0RR0pUm7nkRAafoxlQTEKOJ7Nm_NvSIwv2bkl1vIJpOZmAeSbJtaxG8DUexMJActWQVw0xf1AoL_g708PhnVIbH33y396suzv-a4t8ZIiSG9n6A4fCB66GVOPOkpPFC1UNcy0_63uobxN1y65dxVBlTDZporycP68YYf_rquPL45DZG-hvMCCP4shVI0HSYnXj8nU5TPvEw5VxpSpt_Gex1tmTbZ-XTV8_U0isbxKaVKpn6DUeMIoHi1ZegF8mu8WgbIs1ta_h45_z39XVf5S4Y_n8w05VbqDL1k9bzhVt2fiijglcXWzg2Wl8IZJ1TC4V8axcfbapADrvMDpfd6pZIf0jqQAINhYbvw8ezz8JCH_G0j8iVu3KcF9JOG8MVwKiAIU4URLD6Wyn4FoZUfD2ntxdoktPWIhU-JxUduRRFjqIY06rCX4fgCA3AVvcFY4pcTW... [truncated]</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">32</td>
+  <td>AiSignPro SuperAdmin</td>
+  <td><span class="function-tag">Login OTP</span></td>
+  <td class="url"><a href="https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik" target="_blank">https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-32')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-32">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;sessionInfo&quot;:&quot;AD8T5Itcs-MC9t7FWRkKl51XvapzgqVn0f05dvGi1_mTUHIVUfn-RC6JrsXg3V-Pl_FZ-AP8ByGukF9zmGyJjWrjgNeM8UueDxdKynr1zrM5bICu39WEGwKA-vS5wf8JOjWuyw_4vvDltWEGFCf28jLHAgRwyVZl2A&quot;,&quot;code&quot;:&quot;123456&quot;}</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">{
+  &quot;idToken&quot;: &quot;eyJhbGciOiJSUzI1NiIsImtpZCI6IjVlODJhZmI0ZWY2OWI3NjM4MzA2OWFjNmI1N2U3ZTY1MjAzYmZlOTYiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vcnRtLW15aGVhbHRoIiwiYXVkIjoicnRtLW15aGVhbHRoIiwiYXV0aF90aW1lIjoxNzc1NDczMzkyLCJ1c2VyX2lkIjoidEZDTDZLNU56TWVtY3RteUQ1TWFWckNzck1QMiIsInN1YiI6InRGQ0w2SzVOek1lbWN0bXlENU1hVnJDc3JNUDIiLCJpYXQiOjE3NzU0NzMzOTIsImV4cCI6MTc3NTQ3Njk5MiwicGhvbmVfbnVtYmVyIjoiKzE4ODg4ODg4ODg4IiwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJwaG9uZSI6WyIrMTg4ODg4ODg4ODgiXX0sInNpZ25faW5fcHJvdmlkZXIiOiJwaG9uZSJ9fQ.w-DGn9ibMAr1RsXtJyL_F7hEqpgpgV2mJ4ofWBE8forCwDPPu5r9Mm5rV4TK7FKO73GuG99PdYY4l_ky8ww_sPArjSZxVag6au7Vh09DXVrWq9fZ-3OnXJgUzryi8DSKBKKQfUkemWj_yqX4ovEQs8tWsdDtIxmTE3yCh2kHqXYNPH_vhFrnm99Ww5kn9QM6K27arxSFgSOTvfuGEhNM467Tvk_Y9e4ZEtdr1P3q-IKwYnLZq588jdC_NRwLMQxfcHF9akB7iP6RV9PPHs7vjjOg71vDCD3Dg5nstE6MslYYcagHcCEqxi98_XjGGdoAWjApv5rM8Bj22EL-X7GA-A&quot;,
+  &quot;refreshToken&quot;: &quot;AMf-vBxwfWnD0niOEFmFwHJjM87HDjcr3YYvDoE0UpQrZJD_RwMk0UKsNZjoddzBKI6p46QKMTCwGvWb9KG3cJvzfYr2jBQ7gb2tlKOrN3xL5GrwGKKiPszO8LYL5kfcCtMLXmDS0EPX1eop0mYDXgC1sQihn37uDO_fg8WaBT4lKQ8xkZm6oQEYTRg5x_JRhRZSIYHJuqe9&quot;,
+  &quot;expiresIn&quot;: &quot;3600&quot;,
+  &quot;localId&quot;: &quot;tFCL6K5NzMemctmyD5MaVrCsrMP2&quot;,
+  &quot;isNewUser&quot;: false,
+  &quot;phoneNumber&quot;: &quot;+18888888888&quot;
+}
+</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">33</td>
+  <td>AiSignPro DDP Admin</td>
+  <td><span class="function-tag">Login OTP</span></td>
+  <td class="url"><a href="https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik" target="_blank">https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-33')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-33">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;sessionInfo&quot;:&quot;AD8T5IvU7VyodI7-BTy1cG9QWq63xADt4oAho_0Ub319k0jloE5Q1U4tDx67EMJpeWZCxX0cAQKGlt43AFNeDYQKCrr05MDZS990RA-309kaa_IXXtSxpNfIRD_pTk5NdjpnkNgNBBuRZg5Cy4SNXEXJvgtqqouc4Q&quot;,&quot;code&quot;:&quot;123456&quot;}</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">{
+  &quot;idToken&quot;: &quot;eyJhbGciOiJSUzI1NiIsImtpZCI6IjVlODJhZmI0ZWY2OWI3NjM4MzA2OWFjNmI1N2U3ZTY1MjAzYmZlOTYiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vcnRtLW15aGVhbHRoIiwiYXVkIjoicnRtLW15aGVhbHRoIiwiYXV0aF90aW1lIjoxNzc1NDczMzkzLCJ1c2VyX2lkIjoiMkFxQlRBMmlLOFZkZTkzZnVlejB3azJRZWhHMyIsInN1YiI6IjJBcUJUQTJpSzhWZGU5M2Z1ZXowd2syUWVoRzMiLCJpYXQiOjE3NzU0NzMzOTMsImV4cCI6MTc3NTQ3Njk5MywicGhvbmVfbnVtYmVyIjoiKzE4ODg4ODg4ODg3IiwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJwaG9uZSI6WyIrMTg4ODg4ODg4ODciXX0sInNpZ25faW5fcHJvdmlkZXIiOiJwaG9uZSJ9fQ.r2iw6uAkeItL6B0jZNHoMzTM84naiHEK3QquQDwEwjzZlncxgGvBHOP4zUEhkLNvr_Q1B5_NTTUwakbzmd8FIUwuVbQ1yYvezSx8e2Uktqwz7KSWQgY8x_lGbELFLcQCZl1tLuR1fHlxYmDaQbZ79FIv5H60rFDNAodMyneX6zoVpVWprRz61FSr2cVeD_VOyoxUhW9c9LsR23dDixF3yKla1XVeI2J_RyV4wW53DwHtcN-XU1giT6cUYwWxN_I4C-dQyvq2knFdLS99OytgTf3sr6PsN_Vaohc4LE-Y_hvEPfZ_GqGjTMmYlom42x_pueib2Ug2rQr8DneKzcM7PA&quot;,
+  &quot;refreshToken&quot;: &quot;AMf-vBw0vlqlmFR7k7hNTteWRS7Uhxo69t4wKomR-WGbMc1jVl82ELJFuTgeG7-59cEJFandJ6yp8CmYIz8OkQ7WYdn8MyjwT0j1wUV1HzCKtvNnIP4OKhjtH0qtL_Iwp-xgEd7pMrSq1SDp1_J5XN8K5ED0RcpiIPNLqfB2lp202UUAH6VoaxsURWkBGjUDbjZGoXymZIr_&quot;,
+  &quot;expiresIn&quot;: &quot;3600&quot;,
+  &quot;localId&quot;: &quot;2AqBTA2iK8Vde93fuez0wk2QehG3&quot;,
+  &quot;isNewUser&quot;: false,
+  &quot;phoneNumber&quot;: &quot;+18888888887&quot;
+}
+</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">34</td>
+  <td>AiSignPro Accountant Admin</td>
+  <td><span class="function-tag">Login OTP</span></td>
+  <td class="url"><a href="https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik" target="_blank">https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-34')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-34">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;sessionInfo&quot;:&quot;AD8T5IuATw5ArftpEnSEp1H5WoYhGXT2E5J9NvnpYlKXENs8sNpBYgCFwmSYhwbrbp7ZBKuEzvmXjT65jE_KF7tKzFNUY6oTguUoX7a-bWYXzS3MtQTNOHWSAj3Su5z0Tms_z1L8JqJD2jAMrojJpOP1sKC2iToWpQ&quot;,&quot;code&quot;:&quot;123456&quot;}</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">{
+  &quot;idToken&quot;: &quot;eyJhbGciOiJSUzI1NiIsImtpZCI6IjVlODJhZmI0ZWY2OWI3NjM4MzA2OWFjNmI1N2U3ZTY1MjAzYmZlOTYiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vcnRtLW15aGVhbHRoIiwiYXVkIjoicnRtLW15aGVhbHRoIiwiYXV0aF90aW1lIjoxNzc1NDczMzk0LCJ1c2VyX2lkIjoiOVJXOTFJcUZmNlNyd0NhbUF5SnBZOEE0em1qMiIsInN1YiI6IjlSVzkxSXFGZjZTcndDYW1BeUpwWThBNHptajIiLCJpYXQiOjE3NzU0NzMzOTQsImV4cCI6MTc3NTQ3Njk5NCwicGhvbmVfbnVtYmVyIjoiKzE4ODg4ODg4ODg2IiwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJwaG9uZSI6WyIrMTg4ODg4ODg4ODYiXX0sInNpZ25faW5fcHJvdmlkZXIiOiJwaG9uZSJ9fQ.WOB-5nh7Ej1ipgljhvHB-K1k1Q4kvAoBDKFFhACTJCndaubq2CT1G68DzJyp_gx-SRl2DUi5Wq8hIfND6jaWD4_fCK5nz-d77MIA8pHVs875_KJFfg4Y-mGlu1epcayI_5oTw9HAf49Ejo7hnRPmelpBpgp9cutHcU2QkOxSYrSH65YCqZn9k3XF3qQuRgI45iF7YtLuvE9I8m30pOwXaAlBkw9f8ry_WwPs284jjvPuxrAwOkJZxROJMUrttgWSLBTTHiGOJ-2cBAN4C91Znm9Mmsq9u4OWp4dpBXqRBJmoRX8H3qteURmsZ2RdRndQNx7oLFNvbeBZiv_kWUnxLw&quot;,
+  &quot;refreshToken&quot;: &quot;AMf-vBwaJK_1r-3QMT0mXscmPdrycpNfhYxsmTJGrlhYwDP6IpMNVBmR39j0zzuZs3_Hh6srU_0o4Sdb3szInDgghDhbrQy1dKL6uyW22_69qqLGxNdHL6Zu6kF8m3wqEwfpoYSOIk225O5DFTB_j6kMXyv0NHAacql7Ybf-KGM6w3iejFH0r_PWowCFQRiuIBAKjp4gB1KW&quot;,
+  &quot;expiresIn&quot;: &quot;3600&quot;,
+  &quot;localId&quot;: &quot;9RW91IqFf6SrwCamAyJpY8A4zmj2&quot;,
+  &quot;isNewUser&quot;: false,
+  &quot;phoneNumber&quot;: &quot;+18888888886&quot;
+}
+</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">35</td>
+  <td>AiSignPro CPA</td>
+  <td><span class="function-tag">Login OTP</span></td>
+  <td class="url"><a href="https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik" target="_blank">https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-35')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-35">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;sessionInfo&quot;:&quot;AD8T5Iu4-pA4ppm6fxOhUanYiW9LuYGI_WP976dG2f33MaAUMP-hEIyw8u-ee_A3MdHjoP5kGXHNQvpfD7OtxTyKspOF220HCwL8L_uvRkmU-LWbQX2Hi1nE-z5yWstKEAgQgyPQGL2QttvFcYl6_Ejl7qH-sd8WVg&quot;,&quot;code&quot;:&quot;123456&quot;}</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">{
+  &quot;idToken&quot;: &quot;eyJhbGciOiJSUzI1NiIsImtpZCI6IjVlODJhZmI0ZWY2OWI3NjM4MzA2OWFjNmI1N2U3ZTY1MjAzYmZlOTYiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vcnRtLW15aGVhbHRoIiwiYXVkIjoicnRtLW15aGVhbHRoIiwiYXV0aF90aW1lIjoxNzc1NDczMzk0LCJ1c2VyX2lkIjoiNGZHZkhRS2ExZVpISnlXMm1zdVVBMFgzVmZyMiIsInN1YiI6IjRmR2ZIUUthMWVaSEp5VzJtc3VVQTBYM1ZmcjIiLCJpYXQiOjE3NzU0NzMzOTQsImV4cCI6MTc3NTQ3Njk5NCwicGhvbmVfbnVtYmVyIjoiKzE2NDY0NjQ2NDY0IiwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJwaG9uZSI6WyIrMTY0NjQ2NDY0NjQiXX0sInNpZ25faW5fcHJvdmlkZXIiOiJwaG9uZSJ9fQ.BzE-Qa3-OeRNURn5kebO6r0BPc_O9wToVjJyPgVmVx6yD9JVW66fme7_9Ob8t9Z_u_WlWgaJ9UoMhbpCMNUp6kFWbouxWY1DmcUqWRyhnWRuJD7mi4g2U1iwMxaJ0BQVXS6idVgWbk_Y3Xt5S90L72jVkILUSNZgt59jj8T8652jwm4k66zO3PcniVHEssbMI9c73MXY2Ni5gFsQ8nvegsJ_oCg_ymbVu6SwW8yK_WN8Tjh1nAVtYsy7Lt0y0Om2bYZPLMv-kzhNK5H4z8pXDF6bh8Rv-vu-S_XDoM2JxryuaW5zUQBNKqjvMBXt9P-_gKMW3lz-pBsQiACZz3L1kQ&quot;,
+  &quot;refreshToken&quot;: &quot;AMf-vBxePZRY3VxuTLMluPODUOSFliuwJoYxjIys3QkUlTA_2y3JkCAJDoI0ejXsXb8YLOU1C_FvJ5cdaJ2YzckfP0pS1MGo1V6AgFxP2EAZFXE8BfTg69TQp_gpOIXEWHeASSmqPt9uFCPRFzG7oRzDrldseaiyOdnkF2w3vN5337dmEVVUlQt_xf8kdwk9Tsspuf6PiZib&quot;,
+  &quot;expiresIn&quot;: &quot;3600&quot;,
+  &quot;localId&quot;: &quot;4fGfHQKa1eZHJyW2msuUA0X3Vfr2&quot;,
+  &quot;isNewUser&quot;: false,
+  &quot;phoneNumber&quot;: &quot;+16464646464&quot;
+}
+</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">36</td>
+  <td>AiSignPro Participant</td>
+  <td><span class="function-tag">Login OTP</span></td>
+  <td class="url"><a href="https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik" target="_blank">https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-36')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-36">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-post">POST</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Request Body</div>
+        <div class="detail-value">{&quot;sessionInfo&quot;:&quot;AD8T5IurUSCLqscWe6H4QjbA9HR605VMOpbvrWuDFu6K-XKxnZQXoL0i7VxqOWixp-FIa7AYRiGvo1j-ZwMeay-hvTsomVCoxFGWTupfcazujFS_jn7cQZryTV_Tgaw2jDoT6luWuvIA_mf9xLD0DhjNMG3T4JgJ7A&quot;,&quot;code&quot;:&quot;123456&quot;}</div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">{
+  &quot;idToken&quot;: &quot;eyJhbGciOiJSUzI1NiIsImtpZCI6IjVlODJhZmI0ZWY2OWI3NjM4MzA2OWFjNmI1N2U3ZTY1MjAzYmZlOTYiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vcnRtLW15aGVhbHRoIiwiYXVkIjoicnRtLW15aGVhbHRoIiwiYXV0aF90aW1lIjoxNzc1NDczMzk1LCJ1c2VyX2lkIjoibW10aldiV3F3QVY3T1FGN0xVZXdiOUphZVFxMSIsInN1YiI6Im1tdGpXYldxd0FWN09RRjdMVWV3YjlKYWVRcTEiLCJpYXQiOjE3NzU0NzMzOTUsImV4cCI6MTc3NTQ3Njk5NSwicGhvbmVfbnVtYmVyIjoiKzE1NDU0NTQ1NDU0IiwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJwaG9uZSI6WyIrMTU0NTQ1NDU0NTQiXX0sInNpZ25faW5fcHJvdmlkZXIiOiJwaG9uZSJ9fQ.F_xHaf7I2YvMlY2T1vNGgcGiUcEjECsvc5fK_s3XlwGgVgx3ZrZTnqF2_p6YcNcYmwA5S1AOjjVaoJQYgFGxOfjRZ4q7bWByjYfsmVTxwAq7blCb9Qalwbq_c_ZEvndVcvV33Jyw_sObjQEPc33hVj0XwVnMbCBhjWvQTY9Tb9t_egeX6Xo5isMKeLH0RvyrW7cz-95NOJfnyu7KKupFFnc9ZEXs7pLJKvVQdr-1TUFgpnAoK2cFZx7KN-El-__63q_O__nG9BRAVP7PYE06_s6-gw4vlEk5hmb9D84UnwNzBlClZ1302ZxhgmUIQPhc_RwHGhRMtxv0-5j1gefQUA&quot;,
+  &quot;refreshToken&quot;: &quot;AMf-vBy_9gE-XHqpYEsYttUy0uM5UkQ8Y9MzAb3nESJCIsIZ6xhaDtX-0KJSPMW4STbNkLnB3BothIfo9fqv9Nrg0-5USKWOU-lWukOV9n01b_d6JJ4w0m1QjTxtZEJoP3TLyj63JxENig7jb9cArdGDEbLSdDM7pe7TnddYhSavDB2txcU_IWsojtWINKGJaPBKFPMmC7aK&quot;,
+  &quot;expiresIn&quot;: &quot;3600&quot;,
+  &quot;localId&quot;: &quot;mmtjWbWqwAV7OQF7LUewb9JaeQq1&quot;,
+  &quot;isNewUser&quot;: false,
+  &quot;phoneNumber&quot;: &quot;+15454545454&quot;
+}
+</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">37</td>
+  <td>ZAPAI</td>
+  <td><span class="function-tag">UI</span></td>
+  <td class="url"><a href="https://zapai.us/" target="_blank">https://zapai.us/</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-37')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-37">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">&lt;!--
+ Copyright (c) Streamlit Inc. (2018-2022) Snowflake Inc. (2022-2025)
+
+ Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+--&gt;
+
+&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+  &lt;head&gt;
+    &lt;meta charset=&quot;UTF-8&quot; /&gt;
+    &lt;meta
+      name=&quot;viewport&quot;
+      content=&quot;width=device-width, initial-scale=1, shrink-to-fit=no&quot;
+    /&gt;
+    &lt;link rel=&quot;shortcut icon&quot; href=&quot;./favicon.png&quot; /&gt;
+    &lt;link
+      rel=&quot;preload&quot;
+      href=&quot;./static/media/SourceSansPro-Regular.DZLUzqI4.woff2&quot;
+      as=&quot;font&quot;
+      type=&quot;font/woff2&quot;
+      crossorigin
+    /&gt;
+    &lt;link
+      rel=&quot;preload&quot;
+      href=&quot;./static/media/SourceSansPro-SemiBold.sKQIyTMz.woff2&quot;
+      as=&quot;font&quot;
+      type=&quot;font/woff2&quot;
+      crossorigin
+    /&gt;
+    &lt;link
+      rel=&quot;preload&quot;
+      href=&quot;./static/media/SourceSansPro-Bold.-6c9oR8J.woff2&quot;
+      as=&quot;font&quot;
+      type=&quot;font/woff2&quot;
+      crossorigin
+    /&gt;
+
+    &lt;title&gt;Streamlit&lt;/title&gt;
+
+    &lt;!-- initialize window.prerenderReady to false and then set to true in React app when app is ready for indexing --&gt;
+    &lt;script&gt;
+      window.prerenderReady = false
+    &lt;/script&gt;
+    &lt;script type=&quot;module&quot; crossorigin src=&quot;./static/js/index.C1z8KpLA.js&quot;&gt;&lt;/script&gt;
+    &lt;link rel=&quot;stylesheet&quot; crossorigin href=&quot;./static/css/index.DqDwtg6_.css&quot;&gt;
+  &lt;/head&gt;
+  &lt;body&gt;
+    &lt;noscript&gt;You need to enable JavaScript to run this app.&lt;/noscript&gt;
+    &lt;div id=&quot;root&quot;&gt;&lt;/div&gt;
+  &lt;/body&gt;
+&lt;/html&gt;
+</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">38</td>
+  <td>ZAPCRM</td>
+  <td><span class="function-tag">UI</span></td>
+  <td class="url"><a href="https://zapcrm.io/" target="_blank">https://zapcrm.io/</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-38')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-38">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot; /&gt;
+  &lt;link rel=&quot;icon&quot; type=&quot;image/svg+xml&quot; href=&quot;/favicon.ico&quot; /&gt;
+
+  &lt;!-- SEO Meta Tags --&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot; /&gt;
+  &lt;title&gt;Zap CRM - Next-Generation AI-Powered CRM Platform&lt;/title&gt;
+  &lt;meta name=&quot;description&quot;
+    content=&quot;Transform your sales process with Zap CRM's AI-powered platform. Generate qualified prospects 300% faster, automate marketing campaigns, and close more deals with autonomous AI agents. Start your free 7-day trial today.&quot;&gt;
+  &lt;meta name=&quot;keywords&quot;
+    content=&quot;AI CRM, sales automation, lead generation, marketing automation, prospect generation, sales software, CRM platform, AI sales assistant, automated outreach, multi-channel marketing&quot;&gt;
+  &lt;meta name=&quot;author&quot; content=&quot;Zap CRM&quot;&gt;
+  &lt;meta name=&quot;robots&quot; content=&quot;index, follow&quot;&gt;
+  &lt;link rel=&quot;canonical&quot; href=&quot;https://zapcrm.ai/&quot;&gt;
+
+  &lt;!-- Open Graph Meta Tags --&gt;
+  &lt;meta property=&quot;og:type&quot; content=&quot;website&quot;&gt;
+  &lt;meta property=&quot;og:title&quot; content=&quot;Zap CRM - Next-Generation AI-Powered CRM Platform&quot;&gt;
+  &lt;meta property=&quot;og:description&quot;
+    content=&quot;Transform your sales process with AI-powered prospect generation, automated marketing campaigns, and autonomous lead management. Start your free trial today.&quot;&gt;
+  &lt;meta property=&quot;og:url&quot; content=&quot;https://zapcrm.ai&quot;&gt;
+  &lt;meta property=&quot;og:site_name&quot; content=&quot;Zap CRM&quot;&gt;
+  &lt;meta property=&quot;og:locale&quot; content=&quot;en_US&quot;&gt;
+
+  &lt;!-- Twitter Card Meta Tags --&gt;
+  &lt;meta name=&quot;twitter:card&quot; content=&quot;summary_large_image&quot;&gt;
+  &lt;meta name=&quot;twitter:title&quot; content=&quot;Zap CRM - AI-Powered Sales Automation Platform&quot;&gt;
+  &lt;meta name=&quot;twitter:description&quot;
+    content=&quot;Generate 300% more leads with AI-powered prospect generation and automated marketing campaigns. Free 7-day trial available.&quot;&gt;
+  &lt;meta name=&quot;twitter:creator&quot; content=&quot;@ZapCRM&quot;&gt;
+
+  &lt;!-- Business &amp; Local SEO --&gt;
+  &lt;meta name=&quot;geo.region&quot; content=&quot;US&quot;&gt;
+  &lt;meta name=&quot;geo.placename&quot; content=&quot;United States&quot;&gt;
+
+  &lt;!-- Mobile &amp; App M... [truncated]</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">39</td>
+  <td>Lead ZAPCRM</td>
+  <td><span class="function-tag">UI</span></td>
+  <td class="url"><a href="https://lead.zapcrm.io/" target="_blank">https://lead.zapcrm.io/</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-39')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-39">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+  &lt;head&gt;
+    &lt;script type=&quot;module&quot;&gt;import { injectIntoGlobalHook } from &quot;/@react-refresh&quot;;
+injectIntoGlobalHook(window);
+window.$RefreshReg$ = () =&gt; {};
+window.$RefreshSig$ = () =&gt; (type) =&gt; type;&lt;/script&gt;
+
+    &lt;script type=&quot;module&quot; src=&quot;/@vite/client&quot;&gt;&lt;/script&gt;
+
+    &lt;meta charset=&quot;UTF-8&quot; /&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0, maximum-scale=1&quot; /&gt;
+    &lt;link rel=&quot;icon&quot; href=&quot;./favicon.ico&quot; /&gt;
+    &lt;!-- SEO Meta Tags --&gt;
+    &lt;title&gt;Zap CRM - Next-Generation AI-Powered CRM Platform | Start Free Trial&lt;/title&gt;
+    &lt;meta name=&quot;description&quot; content=&quot;Transform your sales process with Zap CRM's AI-powered platform. Generate qualified prospects 300% faster, automate marketing campaigns, and close more deals with autonomous AI agents. Start your free 10-day trial today.&quot; /&gt;
+    &lt;meta name=&quot;keywords&quot; content=&quot;AI CRM, sales automation, lead generation, marketing automation, prospect generation, sales software, CRM platform, AI sales assistant, automated outreach, multi-channel marketing&quot; /&gt;
+    &lt;meta name=&quot;author&quot; content=&quot;Zap CRM&quot; /&gt;
+    &lt;meta name=&quot;robots&quot; content=&quot;index, follow&quot; /&gt;
+    &lt;link rel=&quot;canonical&quot; href=&quot;https://zapcrm.ai&quot; /&gt;
+    
+    &lt;!-- Open Graph Meta Tags --&gt;
+    &lt;meta property=&quot;og:type&quot; content=&quot;website&quot; /&gt;
+    &lt;meta property=&quot;og:title&quot; content=&quot;Zap CRM - Next-Generation AI-Powered CRM Platform&quot; /&gt;
+    &lt;meta property=&quot;og:description&quot; content=&quot;Transform your sales process with AI-powered prospect generation, automated marketing campaigns, and autonomous lead management. Start your free trial today.&quot; /&gt;
+    &lt;meta property=&quot;og:url&quot; content=&quot;https://zapcrm.ai&quot; /&gt;
+    &lt;meta property=&quot;og:site_name&quot; content=&quot;Zap CRM&quot; /&gt;
+    &lt;meta property=&quot;og:locale&quot; content=&quot;en_US&quot; /&gt;
+    
+    &lt;!-- Twitter Card Meta Tags --&gt;
+    &lt;meta name=&quot;twitter:card&quot; content=&quot;summary_large_image&quot; /&gt;
+    &lt;meta name=&quot;twitter:title&quot; content=&quot;Zap CRM - AI-Powered Sales Automation Platform&quot; /&gt;
+    &lt;meta name=&quot;twitter:description&quot; con... [truncated]</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">40</td>
+  <td>Secure ZAPCRM</td>
+  <td><span class="function-tag">UI</span></td>
+  <td class="url"><a href="https://secure.zapcrm.io/" target="_blank">https://secure.zapcrm.io/</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-40')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-40">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">&lt;!doctype html&gt;&lt;html lang=&quot;en&quot; class=&quot;overflow-hidden lead-connector&quot;&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;/&gt;&lt;meta http-equiv=&quot;X-UA-Compatible&quot; content=&quot;IE=edge&quot;/&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot;/&gt;&lt;link rel=&quot;icon&quot; href=&quot;/favicon.ico&quot;/&gt;&lt;script src=&quot;https://cdnjs.cloudflare.com/ajax/libs/tinymce/4.9.11/tinymce.min.js&quot; defer=&quot;defer&quot;&gt;&lt;/script&gt;&lt;meta name=&quot;google-signin-scope&quot; content=&quot;profile email&quot;/&gt;&lt;meta name=&quot;slack-app-id&quot; content=&quot;A04B2S8J7TQ&quot;/&gt;&lt;meta http-equiv=&quot;origin-trial&quot; content=&quot;Av4OJVfqBZJhYFNMxb2NO1JwBApbKNKlfDKOtjcpeWci9YFSJDTtCf4VvBtkojouGLqhsoBMBYO37eSd3cQwHA0AAAB0eyJvcmlnaW4iOiJodHRwczovL2dvaGlnaGxldmVsLmNvbTo0NDMiLCJmZWF0dXJlIjoiU29mdE5hdmlnYXRpb25IZXVyaXN0aWNzIiwiZXhwaXJ5IjoxNzczMTAwODAwLCJpc1N1YmRvbWFpbiI6dHJ1ZX0=&quot;/&gt;&lt;meta http-equiv=&quot;origin-trial&quot; content=&quot;AmC1YcKG3F9aB1jYFsJ1HT2zXkWGsAed9WAhXPl9AKmZAgl+GVFMWAeePC+Gs24uPREpCuxf2XjqHH2svsGLGgoAAABbeyJvcmlnaW4iOiJodHRwOi8vbG9jYWxob3N0OjgwODAiLCJmZWF0dXJlIjoiU29mdE5hdmlnYXRpb25IZXVyaXN0aWNzIiwiZXhwaXJ5IjoxNzczMTAwODAwfQ==&quot;/&gt;&lt;meta http-equiv=&quot;origin-trial&quot; content=&quot;Am46QAHuDGPcxGKiur6Qhi9rIrpCqKgoZYbotwNyCRB4rMdilYl9Mr43KE6lC0hBZ/kcgE4Bl4zApgGdVoYReQoAAAB1eyJvcmlnaW4iOiJodHRwczovL2dvaGlnaGxldmVsLnNpdGU6NDQzIiwiZmVhdHVyZSI6IlNvZnROYXZpZ2F0aW9uSGV1cmlzdGljcyIsImV4cGlyeSI6MTc3MzEwMDgwMCwiaXNTdWJkb21haW4iOnRydWV9&quot;/&gt;&lt;script src=&quot;https://accounts.google.com/gsi/client&quot; async defer=&quot;defer&quot;&gt;&lt;/script&gt;&lt;script&gt;var isElectron = navigator.userAgent.toLowerCase().includes('electron');&lt;/script&gt;&lt;script&gt;;(function (apiKey) {
+        ;(function (p, e, n, d, o) {
+          var v, w, x, y, z, baseUrl
+          o = p[d] = p[d] || {}
+          o._q = o._q || []
+          v = ['initialize', 'identify', 'updateOptions', 'pageLoad', 'track']
+          for (w = 0, x = v.length; w &lt; x; ++w)
+            (function (m) {
+              o[m] =
+                o[m] ||
+                function () {
+                  o._q[m === v[0] ? 'unshift' : 'push'](
+                    [m].concat([].slice.call(arguments, 0))
+  ... [truncated]</div>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr>
+  <td class="sno">41</td>
+  <td>Social ZAPCRM</td>
+  <td><span class="function-tag">UI</span></td>
+  <td class="url"><a href="https://social.zapcrm.io/" target="_blank">https://social.zapcrm.io/</a></td>
+  <td class="status-ok">✓ OK</td>
+  <td class="expand-col"><button class="expand-btn" onclick="toggleDetails('row-41')">▼</button></td>
+</tr>
+<tr class="details-row" id="row-41">
+  <td colspan="6" class="details-cell">
+    <div class="api-details">
+      <div class="detail-box">
+        <div class="detail-label">HTTP Method & Status</div>
+        <div class="detail-value">
+          <span class="method-badge method-get">GET</span>
+          <span class="status-code status-2xx">Status: 200</span>
+        </div>
+      </div>
+      <div class="detail-box">
+        <div class="detail-label">Response Body</div>
+        <div class="detail-value">&lt;!doctype html&gt;&lt;html lang=&quot;en&quot;&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;/&gt;&lt;link rel=&quot;icon&quot; href=&quot;/favicon.ico&quot;/&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot;/&gt;&lt;meta name=&quot;theme-color&quot; content=&quot;#000000&quot;/&gt;&lt;link rel=&quot;apple-touch-icon&quot; href=&quot;/logo192.png&quot;/&gt;&lt;link rel=&quot;manifest&quot; href=&quot;/manifest.json&quot;/&gt;&lt;title&gt;Loading...&lt;/title&gt;&lt;script defer=&quot;defer&quot; src=&quot;/static/js/main.5b0ea9ef.js&quot;&gt;&lt;/script&gt;&lt;link href=&quot;/static/css/main.de96b671.css&quot; rel=&quot;stylesheet&quot;&gt;&lt;/head&gt;&lt;body&gt;&lt;noscript&gt;You need to enable JavaScript to run this app.&lt;/noscript&gt;&lt;div id=&quot;root&quot;&gt;&lt;/div&gt;&lt;/body&gt;&lt;/html&gt;</div>
+      </div>
+    </div>
+  </td>
+</tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="footer"><p>Generated by AdHash API Test Suite</p></div>
+    </div>
+<script>
+function toggleDetails(rowId) {
+  var row = document.getElementById(rowId);
+  var btn = row.previousElementSibling.querySelector('.expand-btn');
+  if (row.classList.contains('show')) {
+    row.classList.remove('show');
+    btn.textContent = '▼';
+  } else {
+    row.classList.add('show');
+    btn.textContent = '▲';
+  }
+}
+</script>
+</body>
+</html>
