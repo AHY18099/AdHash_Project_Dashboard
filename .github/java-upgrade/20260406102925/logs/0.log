@@ -1,0 +1,1072 @@
+2026-04-06T10:29:25.027Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:29:25.028Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "event": "precheckCompleted",
+  "phase": "precheck",
+  "status": "succeeded"
+}}).
+2026-04-06T10:29:25.029Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:29:25.041Z [INFO] Project d:\Thenilavan\Automation\eclipse-workspace\AdHash_Dashboard is not a maven project, try to get java version from gradle
+2026-04-06T10:29:25.048Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'precheckCompleted' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:29:25.049Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:29:26.693Z [INFO] Try to get java version from gradle config files: 
+2026-04-06T10:29:26.694Z [INFO] Try to get java version from gradle properties: undefined
+2026-04-06T10:29:26.695Z [INFO] Project java version: 8
+2026-04-06T10:29:28.308Z [ERROR] [ReportEventTool] Failed to send project info telemetry: UserError: Failed to detect build tool for the project at d:\Thenilavan\Automation\eclipse-workspace\AdHash_Dashboard. There are child Maven/Gradle projects detected: "AdHash-Projects-Certificate-Expiry-Test-verify", "AdHash-Projects-Certificate-Expiry-Test", "AdHash-API-Test-temp", "AdHash-API-Test", "AdHash_All_Projects_Status_temp\AdHash-Projects-Certificate-Expiry-Test". Would you like to use one of them instead?
+2026-04-06T10:29:34.918Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T10:29:34.919Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "planGenerationStarted",
+  "phase": "plan",
+  "sessionId": "20260406102925",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "status": "succeeded"
+}}).
+2026-04-06T10:29:34.921Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:29:34.922Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T10:29:34.923Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T10:29:35.051Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:29:35.052Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "planGenerationStarted",
+  "phase": "plan",
+  "sessionId": "20260406102925",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "status": "succeeded"
+}}).
+2026-04-06T10:29:35.054Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:29:35.057Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'planGenerationStarted' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:29:35.058Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:30:06.249Z [INFO] ---------------------prepare appmod-list-jdks----------------------
+2026-04-06T10:30:06.250Z [INFO] [Tool.prepareInvocation]({name: appmod-list-jdks, input: {
+  "sessionId": "20260406102925"
+}}).
+2026-04-06T10:30:06.251Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:30:06.254Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "List jdks"
+}}).
+2026-04-06T10:30:06.256Z [INFO] ----------------------prepared appmod-list-jdks----------------------
+2026-04-06T10:30:06.328Z [INFO] ----------------------invoke appmod-list-jdks----------------------
+2026-04-06T10:30:06.329Z [INFO] [Tool.invoke]({name: appmod-list-jdks, input: {
+  "sessionId": "20260406102925"
+}}).
+2026-04-06T10:30:06.330Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:30:06.936Z [INFO] [Tool.invoke]({result: {
+  "message": "We found following jdks in your system:\n\n1. Java 11.0.28\n   📁 Path: C:\\Users\\Adhash Tech\\.jdk\\jdk-11.0.28\\bin\n   🏷️ Source: install\n\n2. Java 17.0.9\n   📁 Path: C:\\Program Files\\Java\\jdk-17\\bin\n   🏷️ Source: others\n\n3. Java 19.0.2\n   📁 Path: C:\\Users\\Adhash Tech\\.jdks\\temurin-19.0.2\\bin\n   🏷️ Source: others\n\n4. Java 21.0.7\n   📁 Path: C:\\Program Files\\Java\\jdk-21\\bin\n   🏷️ Source: PATH,JAVA_HOME\n\n5. Java 21.0.1\n   📁 Path: C:\\Users\\Adhash Tech\\.jdks\\openjdk-21.0.1\\bin\n   🏷️ Source: others\n\n6. Java 21.0.8\n   📁 Path: C:\\Users\\Adhash Tech\\.jdk\\jdk-21.0.8\\bin\n   🏷️ Source: install\n\n7. Java 24.0.1\n   📁 Path: C:\\Users\\Adhash Tech\\.jdks\\openjdk-24.0.1\\bin\n   🏷️ Source: others\n\nTotal: 7 JDK installation(s) found"
+}}).
+2026-04-06T10:30:06.938Z [INFO] ----------------------invoked appmod-list-jdks----------------------
+2026-04-06T10:30:06.959Z [INFO] ---------------------prepare appmod-list-mavens----------------------
+2026-04-06T10:30:06.961Z [INFO] [Tool.prepareInvocation]({name: appmod-list-mavens, input: {
+  "sessionId": "20260406102925"
+}}).
+2026-04-06T10:30:06.962Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:30:06.963Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "List mavens"
+}}).
+2026-04-06T10:30:06.963Z [INFO] ----------------------prepared appmod-list-mavens----------------------
+2026-04-06T10:30:07.045Z [INFO] ----------------------invoke appmod-list-mavens----------------------
+2026-04-06T10:30:07.046Z [INFO] [Tool.invoke]({name: appmod-list-mavens, input: {
+  "sessionId": "20260406102925"
+}}).
+2026-04-06T10:30:07.047Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:30:07.107Z [INFO] [Tool.invoke]({result: {
+  "message": "We found following maven installations in your system:\n\n1. 📁 Path: C:\\Users\\Adhash Tech\\.maven\\maven-3.9.12\\bin\n   🏷️ Source: install\n\n2. 📁 Path: C:\\Program Files\\JetBrains\\IntelliJ IDEA Community Edition 2023.2.4\\plugins\\maven\\lib\\maven3\\bin\n   🏷️ Source: MAVEN_HOME,PATH\n\nTotal: 2 Maven installation(s) found"
+}}).
+2026-04-06T10:30:07.108Z [INFO] ----------------------invoked appmod-list-mavens----------------------
+2026-04-06T10:32:07.671Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T10:32:07.674Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "planInitialized",
+  "phase": "plan",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:32:07.676Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:32:07.679Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T10:32:07.682Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T10:32:07.830Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:32:07.831Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "planInitialized",
+  "phase": "plan",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:32:07.832Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:32:07.833Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'planInitialized' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:32:07.834Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:32:12.335Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T10:32:12.337Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "environmentAnalyzed",
+  "phase": "plan",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:32:12.339Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:32:12.341Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T10:32:12.342Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T10:32:12.543Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:32:12.546Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "environmentAnalyzed",
+  "phase": "plan",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:32:12.550Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:32:12.554Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'environmentAnalyzed' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:32:12.557Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:32:17.455Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T10:32:17.456Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "dependenciesAnalyzed",
+  "phase": "plan",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:32:17.457Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:32:17.458Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T10:32:17.460Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T10:32:17.591Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:32:17.593Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "dependenciesAnalyzed",
+  "phase": "plan",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:32:17.598Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:32:17.600Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'dependenciesAnalyzed' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:32:17.601Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:34:44.802Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T10:34:44.804Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "upgradePathDesigned",
+  "phase": "plan",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:34:44.806Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:34:44.808Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T10:34:44.810Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T10:34:44.978Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:34:44.980Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "upgradePathDesigned",
+  "phase": "plan",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:34:44.981Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:34:44.984Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'upgradePathDesigned' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:34:44.985Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:35:04.565Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T10:35:04.567Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "planReviewed",
+  "phase": "plan",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:35:04.568Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:35:04.570Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T10:35:04.571Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T10:35:04.754Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:35:04.758Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "planReviewed",
+  "phase": "plan",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:35:04.759Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:35:04.761Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'planReviewed' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:35:04.762Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:35:08.648Z [INFO] ---------------------prepare appmod-confirm-upgrade-plan----------------------
+2026-04-06T10:35:08.649Z [INFO] [Tool.prepareInvocation]({name: appmod-confirm-upgrade-plan, input: {
+  "sessionId": "20260406102925"
+}}).
+2026-04-06T10:35:08.651Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:35:08.653Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Review [upgrade plan](file:///d:/Thenilavan/Automation/eclipse-workspace/AdHash_Dashboard/.github/java-upgrade/20260406102925/plan.md)",
+  "confirmationMessages": {
+    "title": "Plan generated",
+    "message": "Please review the generated plan and make any necessary adjustments before proceeding. You can modify the generated [`plan.md`](file:///d:/Thenilavan/Automation/eclipse-workspace/AdHash_Dashboard/.github/java-upgrade/20260406102925/plan.md) directly."
+  }
+}}).
+2026-04-06T10:35:08.654Z [INFO] ----------------------prepared appmod-confirm-upgrade-plan----------------------
+2026-04-06T10:35:21.851Z [INFO] ----------------------invoke appmod-confirm-upgrade-plan----------------------
+2026-04-06T10:35:21.852Z [INFO] [Tool.invoke]({name: appmod-confirm-upgrade-plan, input: {
+  "sessionId": "20260406102925"
+}}).
+2026-04-06T10:35:21.853Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:35:21.861Z [INFO] Upgrade plan confirmed successfully.
+2026-04-06T10:35:21.865Z [INFO] [Tool.invoke]({result: {
+  "message": "Generated plan is reviewed and confirmed by the user! the upgrade process will start now and be tracked in markdown file: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925\\progress.md."
+}}).
+2026-04-06T10:35:21.866Z [INFO] ----------------------invoked appmod-confirm-upgrade-plan----------------------
+2026-04-06T10:35:25.683Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T10:35:25.683Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "planConfirmed",
+  "phase": "plan",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:35:25.686Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:35:25.689Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T10:35:25.691Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T10:35:26.107Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:35:26.108Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "planConfirmed",
+  "phase": "plan",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:35:26.109Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:35:26.110Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'planConfirmed' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:35:26.118Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:36:39.747Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T10:36:39.748Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "planExecutionStarted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:36:39.750Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:36:39.755Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T10:36:39.756Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T10:36:40.058Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:36:40.060Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "planExecutionStarted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:36:40.061Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:36:40.210Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'planExecutionStarted' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:36:40.212Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:37:04.295Z [INFO] ---------------------prepare appmod-install-jdk----------------------
+2026-04-06T10:37:04.299Z [INFO] [Tool.prepareInvocation]({name: appmod-install-jdk, input: {
+  "version": "25",
+  "sessionId": "20260406102925"
+}}).
+2026-04-06T10:37:04.303Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:37:04.686Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Download and install JDK",
+  "confirmationMessages": {
+    "title": "Download and install JDK",
+    "message": "\nThis tool will download and install JDK 25 from Adoptium with below settings.\n- **Version**: 25\n- **Vendor**: Adoptium\n- **Url**: https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.2%2B10/OpenJDK25U-jdk_x64_windows_hotspot_25.0.2_10.zip\n- **Destination**: `C:\\Users\\Adhash Tech\\.jdk`\n- **Checksum**: SHA256: 06ac5f5444a1269dd11d11cbb7ab6ebaecedc60dc1caca82cdb56f29100b7b8c\n- **Signature**: https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.2%2B10/OpenJDK25U-jdk_x64_windows_hotspot_25.0.2_10.zip.sig\n- **Public Key**: https://packages.adoptium.net/artifactory/api/gpg/key/public\n"
+  }
+}}).
+2026-04-06T10:37:04.689Z [INFO] ----------------------prepared appmod-install-jdk----------------------
+2026-04-06T10:40:42.591Z [INFO] ----------------------invoke appmod-install-jdk----------------------
+2026-04-06T10:40:42.594Z [INFO] [Tool.invoke]({name: appmod-install-jdk, input: {
+  "version": "25",
+  "sessionId": "20260406102925"
+}}).
+2026-04-06T10:40:42.604Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:41:46.266Z [INFO] [Tool.invoke]({result: {
+  "result": {
+    "name": "java",
+    "path": "C:\\Users\\Adhash Tech\\.jdk\\jdk-25\\bin",
+    "version": "25"
+  },
+  "message": "JDK 25 is installed at C:\\Users\\Adhash Tech\\.jdk\\jdk-25\\bin",
+  "telemetry": {
+    "tool": "JDK",
+    "version": "25"
+  }
+}}).
+2026-04-06T10:41:46.270Z [INFO] ----------------------invoked appmod-install-jdk----------------------
+2026-04-06T10:42:15.138Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T10:42:15.142Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "environmentSetup",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded",
+  "details": {
+    "jdkPath": "C:\\Users\\Adhash Tech\\.jdk\\jdk-25\\bin",
+    "buildToolPath": "C:\\Users\\Adhash Tech\\.maven\\maven-3.9.12\\bin"
+  }
+}}).
+2026-04-06T10:42:15.145Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:42:15.148Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T10:42:15.151Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T10:42:15.397Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:42:15.398Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "environmentSetup",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded",
+  "details": {
+    "jdkPath": "C:\\Users\\Adhash Tech\\.jdk\\jdk-25\\bin",
+    "buildToolPath": "C:\\Users\\Adhash Tech\\.maven\\maven-3.9.12\\bin"
+  }
+}}).
+2026-04-06T10:42:15.400Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:42:15.404Z [INFO] Project d:\Thenilavan\Automation\eclipse-workspace\AdHash_Dashboard is not a maven project, try to get java version from gradle
+2026-04-06T10:42:15.444Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'environmentSetup' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:42:15.446Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:42:18.015Z [INFO] Try to get java version from gradle config files: 
+2026-04-06T10:42:18.018Z [INFO] Try to get java version from gradle properties: undefined
+2026-04-06T10:42:18.021Z [INFO] Project java version: 8
+2026-04-06T10:42:18.025Z [INFO] Build tool type detected from path: mvn
+2026-04-06T10:42:18.028Z [INFO] Build tool type: mvn
+2026-04-06T10:42:18.031Z [INFO] JDK: {
+  "name": "java",
+  "path": "C:\\Users\\Adhash Tech\\.jdk\\jdk-25\\bin",
+  "version": "8"
+}
+2026-04-06T10:42:18.033Z [INFO] Build tool: {
+  "name": "mvn",
+  "path": "C:\\Users\\Adhash Tech\\.maven\\maven-3.9.12\\bin",
+  "version": ""
+}
+2026-04-06T10:42:18.035Z [INFO] Project config: {
+  "buildTool": {
+    "path": "C:\\Users\\Adhash Tech\\.maven\\maven-3.9.12\\bin",
+    "name": "mvn",
+    "version": ""
+  },
+  "jdk": {
+    "path": "C:\\Users\\Adhash Tech\\.jdk\\jdk-25\\bin",
+    "name": "java",
+    "version": "8"
+  },
+  "name": "AdHash_Dashboard",
+  "dir": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard"
+}
+2026-04-06T10:42:18.963Z [ERROR] [ReportEventTool] Failed to send project info telemetry: Error: spawn EPERM
+2026-04-06T10:53:27.220Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T10:53:27.230Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "buildCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:53:27.232Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:53:27.234Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T10:53:27.236Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T10:53:27.585Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:53:27.587Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "buildCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:53:27.588Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:53:27.590Z [INFO] Project d:\Thenilavan\Automation\eclipse-workspace\AdHash_Dashboard is not a maven project, try to get java version from gradle
+2026-04-06T10:53:27.619Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'buildCompleted' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:53:27.621Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:53:29.929Z [INFO] Try to get java version from gradle config files: 
+2026-04-06T10:53:29.932Z [INFO] Try to get java version from gradle properties: undefined
+2026-04-06T10:53:29.934Z [INFO] Project java version: 8
+2026-04-06T10:53:34.884Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T10:53:34.886Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "testCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "failed"
+}}).
+2026-04-06T10:53:34.889Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:53:34.891Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T10:53:34.894Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T10:53:35.123Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:53:35.126Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "testCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "failed"
+}}).
+2026-04-06T10:53:35.129Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:53:35.132Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'testCompleted' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:53:35.133Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:53:54.458Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T10:53:54.461Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "baselineSetup",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:53:54.465Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:53:54.468Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T10:53:54.471Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T10:53:54.854Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:53:54.857Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "baselineSetup",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:53:54.863Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:53:54.866Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'baselineSetup' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:53:54.868Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:54:05.444Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T10:54:05.446Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "details": {
+    "stepNumber": 3,
+    "stepTitle": "Upgrade AdHash-Projects-Certificate-Expiry-Test to Java 25"
+  },
+  "event": "upgradeStepStarted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:54:05.447Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:54:05.449Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T10:54:05.450Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T10:54:05.639Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:54:05.642Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "details": {
+    "stepNumber": 3,
+    "stepTitle": "Upgrade AdHash-Projects-Certificate-Expiry-Test to Java 25"
+  },
+  "event": "upgradeStepStarted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:54:05.644Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:54:05.646Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'upgradeStepStarted' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:54:05.647Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:55:36.784Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T10:55:36.786Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "details": {
+    "stepNumber": 4,
+    "stepTitle": "Upgrade AdHash-API-Test to Java 25"
+  },
+  "event": "upgradeStepStarted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:55:36.788Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:55:36.790Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T10:55:36.792Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T10:55:36.978Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:55:36.980Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "details": {
+    "stepNumber": 4,
+    "stepTitle": "Upgrade AdHash-API-Test to Java 25"
+  },
+  "event": "upgradeStepStarted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:55:36.981Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:55:36.984Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'upgradeStepStarted' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:55:36.985Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:58:46.386Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T10:58:46.388Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "buildCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:58:46.389Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T10:58:46.391Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T10:58:46.392Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T10:58:46.720Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T10:58:46.722Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "buildCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T10:58:46.723Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T10:58:46.725Z [INFO] Project d:\Thenilavan\Automation\eclipse-workspace\AdHash_Dashboard is not a maven project, try to get java version from gradle
+2026-04-06T10:58:46.781Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'buildCompleted' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T10:58:46.783Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T10:58:48.242Z [INFO] Try to get java version from gradle config files: 
+2026-04-06T10:58:48.246Z [INFO] Try to get java version from gradle properties: undefined
+2026-04-06T10:58:48.249Z [INFO] Project java version: 8
+2026-04-06T11:01:01.724Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T11:01:01.726Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "details": {
+    "stepNumber": 5,
+    "stepTitle": "Final Validation"
+  },
+  "event": "upgradeStepStarted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T11:01:01.727Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T11:01:01.729Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T11:01:01.731Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T11:01:01.962Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T11:01:01.964Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "details": {
+    "stepNumber": 5,
+    "stepTitle": "Final Validation"
+  },
+  "event": "upgradeStepStarted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T11:01:01.966Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T11:01:01.968Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'upgradeStepStarted' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T11:01:01.969Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T11:01:56.791Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T11:01:56.793Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "testCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "failed"
+}}).
+2026-04-06T11:01:56.794Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T11:01:56.797Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T11:01:56.798Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T11:01:57.046Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T11:01:57.048Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "testCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "failed"
+}}).
+2026-04-06T11:01:57.050Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T11:01:57.052Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'testCompleted' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T11:01:57.054Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T11:03:32.745Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T11:03:32.747Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "buildCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T11:03:32.748Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T11:03:32.750Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T11:03:32.752Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T11:03:32.960Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T11:03:32.962Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "buildCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T11:03:32.963Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T11:03:32.964Z [INFO] Project d:\Thenilavan\Automation\eclipse-workspace\AdHash_Dashboard is not a maven project, try to get java version from gradle
+2026-04-06T11:03:32.995Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'buildCompleted' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T11:03:32.996Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T11:03:34.654Z [INFO] Try to get java version from gradle config files: 
+2026-04-06T11:03:34.657Z [INFO] Try to get java version from gradle properties: undefined
+2026-04-06T11:03:34.659Z [INFO] Project java version: 8
+2026-04-06T11:03:38.466Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T11:03:38.468Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "testCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "failed"
+}}).
+2026-04-06T11:03:38.471Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T11:03:38.474Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T11:03:38.475Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T11:03:38.832Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T11:03:38.835Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "testCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "failed"
+}}).
+2026-04-06T11:03:38.837Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T11:03:38.841Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'testCompleted' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T11:03:38.843Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T11:04:40.627Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T11:04:40.628Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "details": {
+    "stepNumber": 5,
+    "stepTitle": "Final Validation",
+    "commitId": "d1a25e2aa5471248cbbd1a33799c0e597f349e7e"
+  },
+  "event": "upgradeValidationCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T11:04:40.630Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T11:04:40.632Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T11:04:40.634Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T11:04:40.826Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T11:04:40.827Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "details": {
+    "stepNumber": 5,
+    "stepTitle": "Final Validation",
+    "commitId": "d1a25e2aa5471248cbbd1a33799c0e597f349e7e"
+  },
+  "event": "upgradeValidationCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T11:04:40.828Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T11:04:40.830Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'upgradeValidationCompleted' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T11:04:40.832Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T11:05:22.815Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T11:05:22.816Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "planExecutionCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T11:05:22.817Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T11:05:22.822Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T11:05:22.823Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T11:05:22.976Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T11:05:22.976Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "planExecutionCompleted",
+  "phase": "execute",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T11:05:22.977Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T11:05:22.983Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'planExecutionCompleted' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T11:05:22.989Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-04-06T11:05:53.365Z [INFO] ---------------------prepare appmod-validate-cves-for-java----------------------
+2026-04-06T11:05:53.368Z [INFO] [Tool.prepareInvocation]({name: appmod-validate-cves-for-java, input: {
+  "dependencies": [
+    "com.aspose:aspose-pdf:19.12",
+    "com.aventstack:extentreports:5.0.9",
+    "com.google.code.gson:gson:2.10.1",
+    "com.googlecode.json-simple:json-simple:1.1.1",
+    "com.itextpdf:html2pdf:2.1.6",
+    "com.itextpdf:itext7-core:7.1.9",
+    "com.itextpdf:itextpdf:5.5.13.2",
+    "com.opencsv:opencsv:5.5.2",
+    "com.sun.mail:javax.mail:1.6.2",
+    "commons-codec:commons-codec:1.15",
+    "commons-io:commons-io:2.16.1",
+    "io.github.bonigarcia:webdrivermanager:5.6.2",
+    "io.rest-assured:rest-assured:5.3.2",
+    "javax.xml.bind:jaxb-api:2.3.1",
+    "org.apache.commons:commons-lang3:3.9",
+    "org.apache.poi:poi-ooxml:5.2.5",
+    "org.glassfish.jaxb:jaxb-runtime:2.3.1",
+    "org.projectlombok:lombok:1.18.36",
+    "org.seleniumhq.selenium:selenium-java:4.16.1",
+    "org.testng:testng:7.10.2"
+  ],
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\AdHash-API-Test",
+  "sessionId": "20260406102925"
+}}).
+2026-04-06T11:05:53.369Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T11:05:53.370Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Validate CVEs"
+}}).
+2026-04-06T11:05:53.371Z [INFO] ----------------------prepared appmod-validate-cves-for-java----------------------
+2026-04-06T11:05:53.402Z [INFO] ----------------------invoke appmod-validate-cves-for-java----------------------
+2026-04-06T11:05:53.403Z [INFO] [Tool.invoke]({name: appmod-validate-cves-for-java, input: {
+  "dependencies": [
+    "com.aspose:aspose-pdf:19.12",
+    "com.aventstack:extentreports:5.0.9",
+    "com.google.code.gson:gson:2.10.1",
+    "com.googlecode.json-simple:json-simple:1.1.1",
+    "com.itextpdf:html2pdf:2.1.6",
+    "com.itextpdf:itext7-core:7.1.9",
+    "com.itextpdf:itextpdf:5.5.13.2",
+    "com.opencsv:opencsv:5.5.2",
+    "com.sun.mail:javax.mail:1.6.2",
+    "commons-codec:commons-codec:1.15",
+    "commons-io:commons-io:2.16.1",
+    "io.github.bonigarcia:webdrivermanager:5.6.2",
+    "io.rest-assured:rest-assured:5.3.2",
+    "javax.xml.bind:jaxb-api:2.3.1",
+    "org.apache.commons:commons-lang3:3.9",
+    "org.apache.poi:poi-ooxml:5.2.5",
+    "org.glassfish.jaxb:jaxb-runtime:2.3.1",
+    "org.projectlombok:lombok:1.18.36",
+    "org.seleniumhq.selenium:selenium-java:4.16.1",
+    "org.testng:testng:7.10.2"
+  ],
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\AdHash-API-Test",
+  "sessionId": "20260406102925"
+}}).
+2026-04-06T11:05:53.404Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T11:05:53.404Z [INFO] Project d:\Thenilavan\Automation\eclipse-workspace\AdHash_Dashboard\AdHash-API-Test is a maven project, try to get java version from pom.xml
+2026-04-06T11:05:53.404Z [INFO] Getting CVEs for dependencies: com.aspose:aspose-pdf:19.12,com.aventstack:extentreports:5.0.9,com.google.code.gson:gson:2.10.1,com.googlecode.json-simple:json-simple:1.1.1,com.itextpdf:html2pdf:2.1.6,com.itextpdf:itext7-core:7.1.9,com.itextpdf:itextpdf:5.5.13.2,com.opencsv:opencsv:5.5.2,com.sun.mail:javax.mail:1.6.2,commons-codec:commons-codec:1.15,commons-io:commons-io:2.16.1,io.github.bonigarcia:webdrivermanager:5.6.2,io.rest-assured:rest-assured:5.3.2,javax.xml.bind:jaxb-api:2.3.1,org.apache.commons:commons-lang3:3.9,org.apache.poi:poi-ooxml:5.2.5,org.glassfish.jaxb:jaxb-runtime:2.3.1,org.projectlombok:lombok:1.18.36,org.seleniumhq.selenium:selenium-java:4.16.1,org.testng:testng:7.10.2
+2026-04-06T11:05:53.405Z [INFO] getting CVEs for dependencies:
+ - com.aspose:aspose-pdf:19.12
+  - com.aventstack:extentreports:5.0.9
+  - com.google.code.gson:gson:2.10.1
+  - com.googlecode.json-simple:json-simple:1.1.1
+  - com.itextpdf:html2pdf:2.1.6
+  - com.itextpdf:itext7-core:7.1.9
+  - com.itextpdf:itextpdf:5.5.13.2
+  - com.opencsv:opencsv:5.5.2
+  - com.sun.mail:javax.mail:1.6.2
+  - commons-codec:commons-codec:1.15
+  - commons-io:commons-io:2.16.1
+  - io.github.bonigarcia:webdrivermanager:5.6.2
+  - io.rest-assured:rest-assured:5.3.2
+  - javax.xml.bind:jaxb-api:2.3.1
+  - org.apache.commons:commons-lang3:3.9
+  - org.apache.poi:poi-ooxml:5.2.5
+  - org.glassfish.jaxb:jaxb-runtime:2.3.1
+  - org.projectlombok:lombok:1.18.36
+  - org.seleniumhq.selenium:selenium-java:4.16.1
+  - org.testng:testng:7.10.2...
+2026-04-06T11:05:53.405Z [INFO] getting gitHub access token...
+2026-04-06T11:05:53.407Z [INFO] Project java version: 25
+2026-04-06T11:05:53.407Z [INFO] Maven project detected.
+2026-04-06T11:05:53.407Z [INFO] Build tool type: mvn
+2026-04-06T11:05:53.613Z [INFO] JDK: {
+  "name": "java",
+  "path": "C:\\Users\\Adhash Tech\\.jdk\\jdk-25\\bin",
+  "version": "25"
+}
+2026-04-06T11:05:53.622Z [INFO] Build tool: {
+  "name": "mvn",
+  "path": "C:\\Program Files\\JetBrains\\IntelliJ IDEA Community Edition 2023.2.4\\plugins\\maven\\lib\\maven3\\bin",
+  "version": "",
+  "source": "MAVEN_HOME,PATH"
+}
+2026-04-06T11:05:53.622Z [INFO] Project config: {
+  "buildTool": {
+    "path": "C:\\Program Files\\JetBrains\\IntelliJ IDEA Community Edition 2023.2.4\\plugins\\maven\\lib\\maven3\\bin",
+    "name": "mvn",
+    "version": "",
+    "source": "MAVEN_HOME,PATH"
+  },
+  "jdk": {
+    "path": "C:\\Users\\Adhash Tech\\.jdk\\jdk-25\\bin",
+    "name": "java",
+    "version": "25"
+  },
+  "name": "AdHash-API-Test",
+  "dir": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\AdHash-API-Test"
+}
+2026-04-06T11:05:53.624Z [INFO] [Environment] Running command (Java undefined): mvn dependency:tree -B
+2026-04-06T11:05:53.669Z [ERROR] [MavenBuildTool] Failed to get dependencies from dependency tree: Error: spawn EPERM
+2026-04-06T11:05:53.670Z [INFO] [Environment] Running command (Java undefined): mvn help:effective-pom -B
+2026-04-06T11:05:53.719Z [ERROR] [MavenBuildTool] Failed to get dependencies from effective pom: Error: spawn EPERM
+2026-04-06T11:05:53.720Z [INFO] [MavenBuildTool] Getting Java version of d:\Thenilavan\Automation\eclipse-workspace\AdHash_Dashboard\AdHash-API-Test from pom.xml
+2026-04-06T11:05:53.721Z [INFO] [MavenBuildTool] Searching for pom.xml files in d:\Thenilavan\Automation\eclipse-workspace\AdHash_Dashboard\AdHash-API-Test
+2026-04-06T11:05:53.721Z [INFO] [MavenBuildTool] Getting all module coordinates of d:\Thenilavan\Automation\eclipse-workspace\AdHash_Dashboard\AdHash-API-Test
+2026-04-06T11:05:53.721Z [INFO] [MavenBuildTool] Getting effective POMs of d:\Thenilavan\Automation\eclipse-workspace\AdHash_Dashboard\AdHash-API-Test
+2026-04-06T11:05:53.723Z [INFO] [Environment] Running command (Java undefined): mvn help:effective-pom -Doutput=effective-pom-b0542c6b-f14f-4f65-aa59-f2a2bc70cf77.log
+2026-04-06T11:05:53.787Z [INFO] [MavenBuildTool] Failed to get effective POMs: Error: spawn EPERM
+2026-04-06T11:05:53.788Z [INFO] [MavenBuildTool] Found pom.xml files: 
+2026-04-06T11:05:53.790Z [INFO] [Environment] Running command (Java undefined): mvn help:evaluate -Dexpression=project.properties -q -DforceStdout
+2026-04-06T11:05:53.840Z [WARN] Failed to telemeter project info: Error: spawn EPERM
+2026-04-06T11:06:04.374Z [INFO] Processing batch 1/1, size: 20
+2026-04-06T11:06:04.374Z [INFO] Proxy configuration: HTTPS_PROXY=(not set), HTTP_PROXY=(not set), NO_PROXY=(not set), NODE_EXTRA_CA_CERTS=(not set), vscode http.proxy=(not set), hasProxy=false
+2026-04-06T11:06:04.375Z [INFO] No proxy detected, using direct connection.
+2026-04-06T11:06:04.377Z [INFO] listing CVEs from GitHub for dependencies [
+  "com.aspose:aspose-pdf:19.12",
+  "com.aventstack:extentreports:5.0.9",
+  "com.google.code.gson:gson:2.10.1",
+  "com.googlecode.json-simple:json-simple:1.1.1",
+  "com.itextpdf:html2pdf:2.1.6",
+  "com.itextpdf:itext7-core:7.1.9",
+  "com.itextpdf:itextpdf:5.5.13.2",
+  "com.opencsv:opencsv:5.5.2",
+  "com.sun.mail:javax.mail:1.6.2",
+  "commons-codec:commons-codec:1.15",
+  "commons-io:commons-io:2.16.1",
+  "io.github.bonigarcia:webdrivermanager:5.6.2",
+  "io.rest-assured:rest-assured:5.3.2",
+  "javax.xml.bind:jaxb-api:2.3.1",
+  "org.apache.commons:commons-lang3:3.9",
+  "org.apache.poi:poi-ooxml:5.2.5",
+  "org.glassfish.jaxb:jaxb-runtime:2.3.1",
+  "org.projectlombok:lombok:1.18.36",
+  "org.seleniumhq.selenium:selenium-java:4.16.1",
+  "org.testng:testng:7.10.2"
+]
+2026-04-06T11:06:04.378Z [INFO] GitHub Advisory API affects parameter: ["com.aspose:aspose-pdf@19.12","com.aventstack:extentreports@5.0.9","com.google.code.gson:gson@2.10.1","com.googlecode.json-simple:json-simple@1.1.1","com.itextpdf:html2pdf@2.1.6","com.itextpdf:itext7-core@7.1.9","com.itextpdf:itextpdf@5.5.13.2","com.opencsv:opencsv@5.5.2","com.sun.mail:javax.mail@1.6.2","commons-codec:commons-codec@1.15","commons-io:commons-io@2.16.1","io.github.bonigarcia:webdrivermanager@5.6.2","io.rest-assured:rest-assured@5.3.2","javax.xml.bind:jaxb-api@2.3.1","org.apache.commons:commons-lang3@3.9","org.apache.poi:poi-ooxml@5.2.5","org.glassfish.jaxb:jaxb-runtime@2.3.1","org.projectlombok:lombok@1.18.36","org.seleniumhq.selenium:selenium-java@4.16.1","org.testng:testng@7.10.2"]
+2026-04-06T11:06:05.425Z [INFO] Fetched 7 total advisories across all pages
+2026-04-06T11:06:05.426Z [INFO] Advisory IDs returned: CVE-2021-43113, CVE-2022-24197, CVE-2022-24196, CVE-2022-24198, CVE-2025-31672, CVE-2025-4641, CVE-2025-48924
+2026-04-06T11:06:05.428Z [INFO] grouping CVEs and finding max patched version by dep...
+2026-04-06T11:06:05.430Z [INFO] done getting 5 CVEs for 20 dependencies
+2026-04-06T11:06:05.430Z [INFO] calculating patched version by dep...
+2026-04-06T11:06:05.432Z [INFO] CVE CVE-2021-43113 for com.itextpdf:itext7-core:7.1.9: patched version 7.1.17
+2026-04-06T11:06:05.433Z [INFO] CVE CVE-2022-24197 for com.itextpdf:itext7-core:7.1.9: patched version 7.1.18
+2026-04-06T11:06:05.433Z [INFO] CVE CVE-2022-24196 for com.itextpdf:itext7-core:7.1.9: patched version 7.1.18
+2026-04-06T11:06:05.434Z [INFO] CVE CVE-2022-24198 for com.itextpdf:itext7-core:7.1.9: patched version 7.2.0
+2026-04-06T11:06:05.434Z [INFO] CVE CVE-2021-43113 for com.itextpdf:itextpdf:5.5.13.2: patched version 5.5.13.3
+2026-04-06T11:06:05.434Z [INFO] CVE CVE-2025-4641 for io.github.bonigarcia:webdrivermanager:5.6.2: patched version 6.1.0
+2026-04-06T11:06:05.435Z [INFO] CVE CVE-2025-48924 for org.apache.commons:commons-lang3:3.9: patched version 3.18.0
+2026-04-06T11:06:05.435Z [INFO] CVE CVE-2025-31672 for org.apache.poi:poi-ooxml:5.2.5: patched version 5.4.0
+2026-04-06T11:06:05.436Z [INFO] finished getting CVEs for dependencies.
+2026-04-06T11:06:05.436Z [INFO] Found 5 dependencies with known CVEs
+2026-04-06T11:06:05.437Z [INFO] CVE issues found:
+- Dependency `com.itextpdf:itext7-core:7.1.9` has **4** known CVEs need to be fixed:
+  - [CVE-2021-43113](https://github.com/advisories/GHSA-gv87-q66h-4277): Command injection in itext7-core
+    - **Severity**: **CRITICAL**
+    - **Details**: iTextPDF in iText before 7.1.17 allows command injection via a CompareTool filename that is mishandled on the gs (aka Ghostscript) command line in GhostscriptHelper.java.
+  - [CVE-2022-24197](https://github.com/advisories/GHSA-c32g-2mgr-cfq7): Out-of-bounds Write in iText
+    - **Severity**: **MEDIUM**
+    - **Details**: iText v7.1.17 was discovered to contain a stack-based buffer overflow via the component ByteBuffer.append, which allows attackers to cause a Denial of Service (DoS) via a crafted PDF file.
+  - [CVE-2022-24196](https://github.com/advisories/GHSA-hhh6-cm2m-3fhc): Allocation of Resources Without Limits or Throttling in iText
+    - **Severity**: **MEDIUM**
+    - **Details**: iText v7.1.17 was discovered to contain an out-of-memory error via the component readStreamBytesRaw, which allows attackers to cause a Denial of Service (DoS) via a crafted PDF file.
+  - [CVE-2022-24198](https://github.com/advisories/GHSA-8c9h-4q7g-fp7h): Out-of-bounds Read in iText
+    - **Severity**: **MEDIUM**
+    - **Details**: iText v7.1.17 was discovered to contain an out-of-bounds exception via the component ARCFOUREncryption.encryptARCFOUR, which allows attackers to cause a Denial of Service (DoS) via a crafted PDF file. NOTE: Vendor does not view this as a vulnerability and has not found it to be exploitable.
+- Dependency `com.itextpdf:itextpdf:5.5.13.2` has **1** known CVEs need to be fixed:
+  - [CVE-2021-43113](https://github.com/advisories/GHSA-gv87-q66h-4277): Command injection in itext7-core
+    - **Severity**: **CRITICAL**
+    - **Details**: iTextPDF in iText before 7.1.17 allows command injection via a CompareTool filename that is mishandled on the gs (aka Ghostscript) command line in GhostscriptHelper.java.
+- Dependency `io.github.bonigarcia:webdrivermanager:5.6.2` has **1** known CVEs need to be fixed:
+  - [CVE-2025-4641](https://github.com/advisories/GHSA-pwm3-776c-8q7q): BoniGarcia WebDriverManager Affected By Improper Restriction of XML External Entity Reference
+    - **Severity**: **CRITICAL**
+    - **Details**: Improper Restriction of XML External Entity Reference vulnerability in bonigarcia webdrivermanager on Windows, MacOS, Linux (XML parsing components modules) allows Data Serialization External Entities Blowup. This vulnerability is associated with program files src/main/java/io/github/bonigarcia/wdm/WebDriverManager.java.
+      
+      This issue affects webdrivermanager: from 1.0.0 before 6.1.0.
+2026-04-06T11:06:05.438Z [INFO] [Tool.invoke]({result: {
+  "message": "The following dependencies have known CVEs that need to be fixed:\n- Dependency `com.itextpdf:itext7-core:7.1.9` has **4** known CVEs need to be fixed:\n  - [CVE-2021-43113](https://github.com/advisories/GHSA-gv87-q66h-4277): Command injection in itext7-core\n    - **Severity**: **CRITICAL**\n    - **Details**: iTextPDF in iText before 7.1.17 allows command injection via a CompareTool filename that is mishandled on the gs (aka Ghostscript) command line in GhostscriptHelper.java.\n  - [CVE-2022-24197](https://github.com/advisories/GHSA-c32g-2mgr-cfq7): Out-of-bounds Write in iText\n    - **Severity**: **MEDIUM**\n    - **Details**: iText v7.1.17 was discovered to contain a stack-based buffer overflow via the component ByteBuffer.append, which allows attackers to cause a Denial of Service (DoS) via a crafted PDF file.\n  - [CVE-2022-24196](https://github.com/advisories/GHSA-hhh6-cm2m-3fhc): Allocation of Resources Without Limits or Throttling in iText\n    - **Severity**: **MEDIUM**\n    - **Details**: iText v7.1.17 was discovered to contain an out-of-memory error via the component readStreamBytesRaw, which allows attackers to cause a Denial of Service (DoS) via a crafted PDF file.\n  - [CVE-2022-24198](https://github.com/advisories/GHSA-8c9h-4q7g-fp7h): Out-of-bounds Read in iText\n    - **Severity**: **MEDIUM**\n    - **Details**: iText v7.1.17 was discovered to contain an out-of-bounds exception via the component ARCFOUREncryption.encryptARCFOUR, which allows attackers to cause a Denial of Service (DoS) via a crafted PDF file. NOTE: Vendor does not view this as a vulnerability and has not found it to be exploitable.\n- Dependency `com.itextpdf:itextpdf:5.5.13.2` has **1** known CVEs need to be fixed:\n  - [CVE-2021-43113](https://github.com/advisories/GHSA-gv87-q66h-4277): Command injection in itext7-core\n    - **Severity**: **CRITICAL**\n    - **Details**: iTextPDF in iText before 7.1.17 allows command injection via a CompareTool filename that is mishandled on the gs (aka Ghostscript) command line in GhostscriptHelper.java.\n- Dependency `io.github.bonigarcia:webdrivermanager:5.6.2` has **1** known CVEs need to be fixed:\n  - [CVE-2025-4641](https://github.com/advisories/GHSA-pwm3-776c-8q7q): BoniGarcia WebDriverManager Affected By Improper Restriction of XML External Entity Reference\n    - **Severity**: **CRITICAL**\n    - **Details**: Improper Restriction of XML External Entity Reference vulnerability in bonigarcia webdrivermanager on Windows, MacOS, Linux (XML parsing components modules) allows Data Serialization External Entities Blowup. This vulnerability is associated with program files src/main/java/io/github/bonigarcia/wdm/WebDriverManager.java.\n      \n      This issue affects webdrivermanager: from 1.0.0 before 6.1.0.",
+  "result": [
+    {
+      "cves": [
+        {
+          "id": "CVE-2021-43113",
+          "ghsa_id": "GHSA-gv87-q66h-4277",
+          "severity": "critical",
+          "summary": "Command injection in itext7-core",
+          "description": "iTextPDF in iText before 7.1.17 allows command injection via a CompareTool filename that is mishandled on the gs (aka Ghostscript) command line in GhostscriptHelper.java.",
+          "html_url": "https://github.com/advisories/GHSA-gv87-q66h-4277",
+          "affectedDeps": [
+            {
+              "name": "com.itextpdf:itext7-core",
+              "vulVersions": "< 7.1.17",
+              "patchedVersion": "7.1.17"
+            },
+            {
+              "name": "com.itextpdf:itextpdf",
+              "vulVersions": "< 5.5.13.3",
+              "patchedVersion": "5.5.13.3"
+            }
+          ]
+        },
+        {
+          "id": "CVE-2022-24197",
+          "ghsa_id": "GHSA-c32g-2mgr-cfq7",
+          "severity": "medium",
+          "summary": "Out-of-bounds Write in iText",
+          "description": "iText v7.1.17 was discovered to contain a stack-based buffer overflow via the component ByteBuffer.append, which allows attackers to cause a Denial of Service (DoS) via a crafted PDF file.",
+          "html_url": "https://github.com/advisories/GHSA-c32g-2mgr-cfq7",
+          "affectedDeps": [
+            {
+              "name": "com.itextpdf:itext7-core",
+              "vulVersions": "<= 7.1.17",
+              "patchedVersion": "7.1.18"
+            }
+          ]
+        },
+        {
+          "id": "CVE-2022-24196",
+          "ghsa_id": "GHSA-hhh6-cm2m-3fhc",
+          "severity": "medium",
+          "summary": "Allocation of Resources Without Limits or Throttling in iText",
+          "description": "iText v7.1.17 was discovered to contain an out-of-memory error via the component readStreamBytesRaw, which allows attackers to cause a Denial of Service (DoS) via a crafted PDF file.",
+          "html_url": "https://github.com/advisories/GHSA-hhh6-cm2m-3fhc",
+          "affectedDeps": [
+            {
+              "name": "com.itextpdf:itext7-core",
+              "vulVersions": "<= 7.1.17",
+              "patchedVersion": "7.1.18"
+            }
+          ]
+        },
+        {
+          "id": "CVE-2022-24198",
+          "ghsa_id": "GHSA-8c9h-4q7g-fp7h",
+          "severity": "medium",
+          "summary": "Out-of-bounds Read in iText",
+          "description": "iText v7.1.17 was discovered to contain an out-of-bounds exception via the component ARCFOUREncryption.encryptARCFOUR, which allows attackers to cause a Denial of Service (DoS) via a crafted PDF file. NOTE: Vendor does not view this as a vulnerability and has not found it to be exploitable.",
+          "html_url": "https://github.com/advisories/GHSA-8c9h-4q7g-fp7h",
+          "affectedDeps": [
+            {
+              "name": "com.itextpdf:itext7-core",
+              "vulVersions": "<= 7.1.17",
+              "patchedVersion": "7.2.0"
+            }
+          ]
+        }
+      ],
+      "dep": "com.itextpdf:itext7-core:7.1.9",
+      "name": "com.itextpdf:itext7-core",
+      "version": "7.1.9",
+      "semver": "7.1.9",
+      "unfixableCves": [],
+      "patchedVersion": "7.2.0"
+    },
+    {
+      "cves": [
+        {
+          "id": "CVE-2021-43113",
+          "ghsa_id": "GHSA-gv87-q66h-4277",
+          "severity": "critical",
+          "summary": "Command injection in itext7-core",
+          "description": "iTextPDF in iText before 7.1.17 allows command injection via a CompareTool filename that is mishandled on the gs (aka Ghostscript) command line in GhostscriptHelper.java.",
+          "html_url": "https://github.com/advisories/GHSA-gv87-q66h-4277",
+          "affectedDeps": [
+            {
+              "name": "com.itextpdf:itext7-core",
+              "vulVersions": "< 7.1.17",
+              "patchedVersion": "7.1.17"
+            },
+            {
+              "name": "com.itextpdf:itextpdf",
+              "vulVersions": "< 5.5.13.3",
+              "patchedVersion": "5.5.13.3"
+            }
+          ]
+        }
+      ],
+      "dep": "com.itextpdf:itextpdf:5.5.13.2",
+      "name": "com.itextpdf:itextpdf",
+      "version": "5.5.13.2",
+      "semver": "5.5.13",
+      "unfixableCves": [],
+      "patchedVersion": "5.5.13.3"
+    },
+    {
+      "cves": [
+        {
+          "id": "CVE-2025-4641",
+          "ghsa_id": "GHSA-pwm3-776c-8q7q",
+          "severity": "critical",
+          "summary": "BoniGarcia WebDriverManager Affected By Improper Restriction of XML External Entity Reference",
+          "description": "Improper Restriction of XML External Entity Reference vulnerability in bonigarcia webdrivermanager on Windows, MacOS, Linux (XML parsing components modules) allows Data Serialization External Entities Blowup. This vulnerability is associated with program files src/main/java/io/github/bonigarcia/wdm/WebDriverManager.java.\n\nThis issue affects webdrivermanager: from 1.0.0 before 6.1.0.",
+          "html_url": "https://github.com/advisories/GHSA-pwm3-776c-8q7q",
+          "affectedDeps": [
+            {
+              "name": "io.github.bonigarcia:webdrivermanager",
+              "vulVersions": ">= 1.0.0, < 6.1.0",
+              "patchedVersion": "6.1.0"
+            }
+          ]
+        }
+      ],
+      "dep": "io.github.bonigarcia:webdrivermanager:5.6.2",
+      "name": "io.github.bonigarcia:webdrivermanager",
+      "version": "5.6.2",
+      "semver": "5.6.2",
+      "unfixableCves": [],
+      "patchedVersion": "6.1.0"
+    }
+  ],
+  "telemetry": {
+    "cve.critical": 3,
+    "cve.medium": 3,
+    "cves": "{\"CVE-2021-43113\":2,\"CVE-2022-24197\":1,\"CVE-2022-24196\":1,\"CVE-2022-24198\":1,\"CVE-2025-4641\":1}"
+  }
+}}).
+2026-04-06T11:06:05.438Z [INFO] ----------------------invoked appmod-validate-cves-for-java----------------------
