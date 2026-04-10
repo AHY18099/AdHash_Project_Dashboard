@@ -1070,3 +1070,31 @@
   }
 }}).
 2026-04-06T11:06:05.438Z [INFO] ----------------------invoked appmod-validate-cves-for-java----------------------
+2026-04-06T11:08:59.406Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-04-06T11:08:59.408Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "summaryGenerated",
+  "message": "Successfully upgraded AdHash-API-Test from Java 11 to 25 and AdHash-Projects-Certificate-Expiry-Test from Java 21 to 25. All projects compile cleanly with JDK 25; test results match baseline with no new regressions. 3 Critical CVEs found in itext7-core and webdrivermanager require separate remediation.",
+  "phase": "summarize",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T11:08:59.409Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-04-06T11:08:59.411Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-04-06T11:08:59.412Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-04-06T11:08:59.494Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-04-06T11:08:59.495Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "summaryGenerated",
+  "message": "Successfully upgraded AdHash-API-Test from Java 11 to 25 and AdHash-Projects-Certificate-Expiry-Test from Java 21 to 25. All projects compile cleanly with JDK 25; test results match baseline with no new regressions. 3 Critical CVEs found in itext7-core and webdrivermanager require separate remediation.",
+  "phase": "summarize",
+  "projectPath": "d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard",
+  "sessionId": "20260406102925",
+  "status": "succeeded"
+}}).
+2026-04-06T11:08:59.495Z [INFO] [Tool.invoke] do invoke.
+2026-04-06T11:08:59.496Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'summaryGenerated' reported!\nSession ID: 20260406102925,\nSession Dir: d:\\Thenilavan\\Automation\\eclipse-workspace\\AdHash_Dashboard\\.github\\java-upgrade\\20260406102925"
+}}).
+2026-04-06T11:08:59.496Z [INFO] ----------------------invoked appmod-report-event----------------------
