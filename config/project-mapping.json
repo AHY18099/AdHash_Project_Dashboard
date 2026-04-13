@@ -505,22 +505,28 @@
       ]
     },
     {
-      "id": "smc",
+  "id": "smc",
+  "name": "SMC",
+  "description": "Send Movie Clips Platform",
+  "color": "#14b8a6",
+  "apps": [
+    {
       "name": "SMC",
-      "description": "Send Movie Clips Platform",
-      "color": "#14b8a6",
-      "apps": [],
-      "servers": [
-        {
-          "name": "SMC - API",
-          "url": "https://api.sendmovieclips.com/",
-          "type": "api"
-        }
-      ],
-      "domains": ["sendmovieclips.com", "api.sendmovieclips.com"],
-      "sslCerts": ["api.sendmovieclips.com"],
-      "apis": []
-    },
+      "playStore": "https://play.google.com/store/apps/details?id=com.smclips",
+      "appStore": null
+    }
+  ],
+  "servers": [
+    {
+      "name": "SMC - API",
+      "url": "https://api.sendmovieclips.com/",
+      "type": "api"
+    }
+  ],
+  "domains": ["sendmovieclips.com", "api.sendmovieclips.com"],
+  "sslCerts": ["api.sendmovieclips.com"],
+  "apis": []
+},
     {
       "id": "synctrade",
       "name": "SyncTrade",
@@ -531,7 +537,41 @@
       "domains": ["synctrade.ai"],
       "sslCerts": [],
       "apis": []
+    },
+{
+  "id": "synctag",
+  "name": "Synctag",
+  "description": "Social Media Tagging Platform",
+  "color": "#22c55e",
+  "apps": [],
+  "servers": [
+    {
+      "name": "Synctag - API",
+      "url": "https://extensionapi.synctag.com/",
+      "type": "api"
+    },
+    {
+      "name": "Synctag - Web",
+      "url": "https://synctag.com/",
+      "type": "web"
     }
+  ],
+  "domains": [
+    "synctag.com",
+    "extensionapi.synctag.com"
+  ],
+  "sslCerts": [
+    "synctag.com",
+    "extensionapi.synctag.com"
+  ],
+  "apis": [
+    {
+      "name": "Synctag Login API",
+      "url": "https://extensionapi.synctag.com/api/auth/login",
+      "method": "POST"
+    }
+  ]
+}
   ]
 }
 
