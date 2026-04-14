@@ -560,13 +560,32 @@
     "synctag.com",
     "extensionapi.synctag.com"
   ],
+  "ssl": [
+    "https://www.synctag.com",
+    "https://extensionapi.synctag.com"
+  ],
   "sslCerts": [
     "synctag.com",
     "extensionapi.synctag.com"
   ],
   "apis": [
     {
-      "name": "Synctag Login API",
+      "name": "Admin Web UI",
+      "url": "https://www.synctag.com",
+      "method": "GET"
+    },
+    {
+      "name": "Send OTP",
+      "url": "https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode",
+      "method": "POST"
+    },
+    {
+      "name": "Verify OTP",
+      "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber",
+      "method": "POST"
+    },
+    {
+      "name": "Login API",
       "url": "https://extensionapi.synctag.com/api/auth/login",
       "method": "POST"
     }

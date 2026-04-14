@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import axios, { AxiosResponse } from 'axios';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface ApiEndpoint {
   name: string;
@@ -7,331 +9,74 @@ interface ApiEndpoint {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   headers?: Record<string, string>;
   body?: any;
-  expectedStatus: number;
+  expectedStatus?: number;
   timeout?: number;
 }
 
-// All AdHash API Endpoints - 41 Total
-const apiEndpoints: ApiEndpoint[] = [
-  // AdHash
-  {
-    name: 'AdHash - Website',
-    url: 'https://adhashtech.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
+interface ProjectApiConfig {
+  name?: string;
+  url?: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+}
 
-  // AutoChecker
-  {
-    name: 'AutoChecker - Admin',
-    url: 'https://manage.autochecker.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
+interface ProjectConfig {
+  apis?: ProjectApiConfig[];
+}
 
-  // KaiCare AI
-  {
-    name: 'KaiCare AI - Admin',
-    url: 'https://admin.kaicare.ai/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'KaiCare AI - Doctor',
-    url: 'https://doctor.kaicare.ai/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'KaiCare AI - CPT Code Loader',
-    url: 'https://adminapi.kaicare.ai/api/PhysicianAsst/UpdateCPTCode',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'KaiCare AI - Call Record Loader',
-    url: 'https://adminapi.kaicare.ai/api/Calls/ProcessCallRecordUploads?key=9dk3ci5AaSsCHJAgRrEqExpEBzF/PfERfrAF7ur07tQ=',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
+interface ProjectMapping {
+  projects?: ProjectConfig[];
+}
 
-  // MyHealth CCM
-  {
-    name: 'MyHealth CCM - CRM',
-    url: 'https://crm.myhealthccm.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'MyHealth CCM - Admin',
-    url: 'https://admin.myhealthccm.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'MyHealth CCM - CPA',
-    url: 'https://cpa.myhealthccm.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'MyHealth CCM - Participants',
-    url: 'https://participants.myhealthccm.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'MyHealth CCM - Forms',
-    url: 'https://forms.myhealthccm.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'MyHealth CCM - Participants CRM',
-    url: 'https://participantscrm.myhealthccm.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-
-  // MyHealth RTM
-  {
-    name: 'MyHealth RTM - Admin',
-    url: 'https://admin.myhealthrtm.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'MyHealth RTM - CPA',
-    url: 'https://cpa.myhealthrtm.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'MyHealth RTM - Participants',
-    url: 'https://participants.myhealthrtm.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-
-  // WavedIn
-  {
-    name: 'WavedIn - Super Admin',
-    url: 'https://superadmin.wavedin.app/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'WavedIn - Market',
-    url: 'https://market.wavedin.app/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-
-  // Synctag / Sparkme
-  {
-    name: 'Sparkme - Analytics',
-    url: 'https://sparkanalytics.synctag.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-
-  // Algomax
-  {
-    name: 'Algomax - ProSky',
-    url: 'https://prosky.algomax.co',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'Algomax - GoPocket',
-    url: 'https://gopocket.algomax.co',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-
-  // ZapCRM
-  {
-    name: 'ZapCRM - AI',
-    url: 'https://zapcrm.ai/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'ZapCRM - Main',
-    url: 'https://zapcrm.io/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'ZapCRM - Lead',
-    url: 'https://lead.zapcrm.io/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'ZapCRM - Secure',
-    url: 'https://secure.zapcrm.io/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'ZapCRM - Social',
-    url: 'https://social.zapcrm.io/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-
-  // AskEPI
-  {
-    name: 'AskEPI - Web',
-    url: 'https://askepi.ai/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-
-  // RiskRealm
-  {
-    name: 'RiskRealm - Admin',
-    url: 'https://www.riskrealm.ai/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'RiskRealm - Chat',
-    url: 'https://chat.riskrealm.ai/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-
-  // AutoeVantage
-  {
-    name: 'AutoeVantage - eCommerce',
-    url: 'https://www.autoevantage.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'AutoeVantage - Tools',
-    url: 'https://tools.autoevantage.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'AutoeVantage - Analytics',
-    url: 'https://admin.autoevantage.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-
-  // Metcalf
-  {
-    name: 'Metcalf - Web',
-    url: 'https://metcalf.ai/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-
-  // Humee
-  {
-    name: 'Humee - Main',
-    url: 'https://www.humee.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'Humee - Dashboard',
-    url: 'https://dashboard.humee.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'Humee - Admin',
-    url: 'https://admin.humee.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'Humee - CPA',
-    url: 'https://cpa.humee.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'Humee - Participant',
-    url: 'https://participant.humee.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-
-  // AiSignPro
-  {
-    name: 'AiSignPro - Admin',
-    url: 'https://admin.aisignpro.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'AiSignPro - CPA',
-    url: 'https://cpa.aisignpro.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-  {
-    name: 'AiSignPro - Participant',
-    url: 'https://participant.aisignpro.com/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
-  },
-
-  // ZapAI
-  {
-    name: 'ZapAI - Web',
-    url: 'https://zapai.us/',
-    method: 'GET',
-    expectedStatus: 200,
-    timeout: 10000
+function serializeApiData(value: unknown): string {
+  if (value === undefined || value === null || value === '') {
+    return '-';
   }
-];
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch (error) {
+    return String(value);
+  }
+}
+
+function emitApiRuntimeDetails(requestBody: unknown, responseBody: unknown, responseCode: number): void {
+  const requestPayload = Buffer.from(serializeApiData(requestBody), 'utf8').toString('base64');
+  const responsePayload = Buffer.from(serializeApiData(responseBody), 'utf8').toString('base64');
+
+  console.log(`__API_REQUEST_BODY__${requestPayload}`);
+  console.log(`__API_RESPONSE_BODY__${responsePayload}`);
+  console.log(`__API_RESPONSE_CODE__${responseCode}`);
+}
+
+function loadApiEndpoints(): ApiEndpoint[] {
+  const mappingPath = path.join(process.cwd(), 'config', 'project-mapping.json');
+  const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8')) as ProjectMapping;
+
+  return (mapping.projects || [])
+    .flatMap((project) => project.apis || [])
+    .filter((api): api is ProjectApiConfig & { name: string; url: string; method: 'GET' | 'POST' | 'PUT' | 'DELETE' } => Boolean(api?.name && api?.url && api?.method))
+    .map((api) => ({
+      name: api.name,
+      url: api.url,
+      method: api.method,
+      expectedStatus: api.method === 'GET' ? 200 : undefined,
+      timeout: 10000
+    }));
+}
+
+function isSuccessfulResponse(endpoint: ApiEndpoint, status: number): boolean {
+  if (endpoint.method === 'GET') {
+    return status === (endpoint.expectedStatus || 200);
+  }
+
+  return status > 0 && status < 500 && status !== 404 && status !== 405;
+}
+
+const apiEndpoints = loadApiEndpoints();
 
 test.describe('API Tests', () => {
   for (const endpoint of apiEndpoints) {
@@ -340,6 +85,7 @@ test.describe('API Tests', () => {
       
       try {
         let response: AxiosResponse;
+        const requestBody = endpoint.method === 'GET' ? '-' : (endpoint.body ?? '-');
 
         switch (endpoint.method) {
           case 'GET':
@@ -387,9 +133,10 @@ test.describe('API Tests', () => {
         console.log(`Response Time: ${responseTime}ms`);
         console.log(`Response Size: ${JSON.stringify(response.data).length} bytes`);
         console.log('========================\n');
+        emitApiRuntimeDetails(requestBody, response.data, response.status);
 
-        // Verify status code
-        expect(response.status).toBe(endpoint.expectedStatus);
+        // Verify the endpoint is healthy enough for its method type.
+        expect(isSuccessfulResponse(endpoint, response.status)).toBe(true);
 
         // Verify response time is acceptable
         expect(responseTime).toBeLessThan(endpoint.timeout || 10000);
@@ -430,7 +177,7 @@ test.describe('API Tests', () => {
             name: endpoint.name,
             status: response.status,
             responseTime,
-            success: response.status === endpoint.expectedStatus
+            success: isSuccessfulResponse(endpoint, response.status)
           };
         } catch (error: any) {
           return {

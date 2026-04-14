@@ -183,6 +183,11 @@
             color: white;
         }
 
+        .status-unavailable {
+            background: #9ca3af;
+            color: white;
+        }
+
         .status-running {
             background: #f59e0b;
             color: white;
@@ -229,6 +234,10 @@
             background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
             cursor: not-allowed;
             opacity: 0.6;
+        }
+
+        .run-suite-btn.unavailable {
+            box-shadow: none;
         }
 
         .run-suite-btn.running {
@@ -651,15 +660,15 @@
                     <div class="section-header-left">
                         <div class="section-title-row">
                             <span class="section-title">🌐 Domain Expiry Monitoring</span>
-                            <span class="section-status status-not-run" id="domainStatus">Not Run</span>
+                            <span class="section-status status-unavailable" id="domainStatus">Not configured in current workspace</span>
                         </div>
-                        <span class="section-count" id="domainCount"></span>
+                        <span class="section-count" id="domainCount">Not configured in current workspace</span>
                     </div>
-                    <button class="run-suite-btn" id="run-domain" onclick="runSingleSuite('domain')">
-                        <span>▶️ Run Test</span>
+                    <button class="run-suite-btn unavailable" id="run-domain" disabled>
+                        <span>Not configured in current workspace</span>
                     </button>
                 </div>
-                <button class="expand-btn" id="btn-domain" onclick="toggleReport('domain')" style="margin: 0 20px 15px 20px; width: calc(100% - 40px);">
+                <button class="expand-btn" id="btn-domain" disabled style="margin: 0 20px 15px 20px; width: calc(100% - 40px); opacity: 0.5; cursor: not-allowed;">
                     <span>📄 View Detailed Report</span>
                     <span class="arrow-icon">▼</span>
                 </button>
@@ -670,7 +679,7 @@
                     </div>
                     <div class="detailed-report-content">
                         <div class="test-details-list" id="details-domain">
-                            <p style="text-align: center; color: #666;">Run tests to see detailed results</p>
+                            <p style="text-align: center; color: #666;">Not configured in current workspace</p>
                         </div>
                     </div>
                 </div>
@@ -700,6 +709,34 @@
         let pollInterval = null;
         let logPollInterval = null;
         let currentLogIndex = 0;
+        const unavailableSuites = {
+            domain: 'Not configured in current workspace'
+        };
+
+        function applySuiteAvailability() {
+            const domainStatus = document.getElementById('domainStatus');
+            const domainCount = document.getElementById('domainCount');
+            const domainButton = document.getElementById('run-domain');
+            const domainDetails = document.getElementById('details-domain');
+
+            if (domainStatus) {
+                domainStatus.className = 'section-status status-unavailable';
+                domainStatus.textContent = unavailableSuites.domain;
+            }
+
+            if (domainCount) {
+                domainCount.textContent = unavailableSuites.domain;
+            }
+
+            if (domainButton) {
+                domainButton.disabled = true;
+                domainButton.classList.add('unavailable');
+            }
+
+            if (domainDetails) {
+                domainDetails.innerHTML = `<p style="text-align: center; color: #666;">${unavailableSuites.domain}</p>`;
+            }
+        }
 
         // Load test counts on page load
         async function loadTestCounts() {
@@ -717,6 +754,7 @@
                 if (data.status === 'success') {
                     testCounts = data.counts;
                     updateDashboard();
+                    applySuiteAvailability();
                     document.getElementById('loading').style.display = 'none';
                     document.getElementById('statsGrid').style.display = 'grid';
                     document.getElementById('sectionsGrid').style.display = 'grid';
@@ -762,13 +800,15 @@
 
             // Keep all section statuses as "Not Run" initially
             // They will be updated sequentially as each suite starts
-            ['appStatus', 'serverStatus', 'certStatus', 'apiStatus', 'domainStatus'].forEach(id => {
+            ['appStatus', 'serverStatus', 'certStatus', 'apiStatus'].forEach(id => {
                 const elem = document.getElementById(id);
                 if (elem) {
                     elem.className = 'section-status status-not-run';
                     elem.textContent = 'Not Run';
                 }
             });
+
+            applySuiteAvailability();
         }
 
         // Load previous results
@@ -990,6 +1030,9 @@
             if (suiteData.status === 'not-run') {
                 elem.className = 'section-status status-not-run';
                 elem.textContent = 'Not Run';
+            } else if (suiteData.status === 'unavailable') {
+                elem.className = 'section-status status-unavailable';
+                elem.textContent = suiteData.message || unavailableSuites.domain;
             } else if (suiteData.status === 'passed') {
                 elem.className = 'section-status status-passed';
                 elem.textContent = 'Passed';
@@ -1004,6 +1047,11 @@
             // Update the count display with detailed statistics
             const countElemId = elementId.replace('Status', 'Count');
             const countElem = document.getElementById(countElemId);
+            if (countElem && suiteData.status === 'unavailable') {
+                countElem.textContent = suiteData.message || unavailableSuites.domain;
+                return;
+            }
+
             if (countElem && suiteData.total > 0) {
                 let countText = '';
                 // Special handling for Server Health Monitoring - show down servers separately
@@ -1064,7 +1112,7 @@
             } catch (error) {
                 console.error('Error loading embedded reports:', error);
                 // If loading fails, just show a link to the full report
-                ['app', 'server', 'cert', 'api', 'domain'].forEach(suiteId => {
+                ['app', 'server', 'cert', 'api'].forEach(suiteId => {
                     const detailsContainer = document.getElementById('details-' + suiteId);
                     if (detailsContainer && detailsContainer.textContent.includes('Run tests')) {
                         detailsContainer.innerHTML = `
@@ -1186,8 +1234,7 @@
                 '📱 App Status Verification': 'appStatus',
                 '🖥️ Server Health Monitoring': 'serverStatus',
                 '🔒 SSL Certificate Monitoring': 'certStatus',
-                '🌐 API Endpoint Testing': 'apiStatus',
-                '🌐 Domain Expiry Monitoring': 'domainStatus'
+                '🌐 API Endpoint Testing': 'apiStatus'
             };
 
             // Get the element ID for the current suite
@@ -1205,7 +1252,7 @@
                 } else {
                     // Check if this suite should be marked as completed or not run
                     // For now, keep it as "Not Run" - will be updated when tests complete
-                    if (elem.textContent !== 'Passed' && elem.textContent !== 'Failed') {
+                    if (elem.textContent !== 'Passed' && elem.textContent !== 'Failed' && elem.textContent !== unavailableSuites.domain) {
                         elem.className = 'section-status status-not-run';
                         elem.textContent = 'Not Run';
                     }

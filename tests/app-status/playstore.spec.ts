@@ -8,38 +8,55 @@ interface AppData {
   expectedUrl: string;
 }
 
-// Real app data from Adhash_App_Status repository (config/unifiedTestData.ts)
-function loadAppData(): AppData[] {
-  // Real data from your cloned repository
-  const realAppData: AppData[] = [
-    {
-      appName: 'AutoChecker',
-      packageName: 'com.autochecker',
-      expectedUrl: 'https://play.google.com/store/apps/details?id=com.autochecker'
-    },
-    {
-      appName: 'WavedIn',
-      packageName: 'com.waivedin',
-      expectedUrl: 'https://play.google.com/store/apps/details?id=com.waivedin'
-    },
-    {
-      appName: 'AlgoMax',
-      packageName: 'com.algomax',
-      expectedUrl: 'https://play.google.com/store/apps/details?id=com.algomax'
-    },
-    {
-      appName: 'Auto Evantage',
-      packageName: 'com.autoevantage',
-      expectedUrl: 'https://play.google.com/store/apps/details?id=com.autoevantage'
-    },
-    {
-      appName: 'Spark Me',
-      packageName: 'com.adhash.sparkme',
-      expectedUrl: 'https://play.google.com/store/apps/details?id=com.adhash.sparkme'
-    }
-  ];
+interface ProjectAppConfig {
+  name?: string;
+  playStore?: string | null;
+}
 
-  return realAppData;
+interface ProjectConfig {
+  apps?: ProjectAppConfig[];
+}
+
+interface ProjectMapping {
+  projects?: ProjectConfig[];
+}
+
+function normalizePlayStoreValue(playStore: string): { packageName: string; expectedUrl: string } {
+  const trimmed = playStore.trim();
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    const url = new URL(trimmed);
+    const packageName = url.searchParams.get('id') || '';
+
+    return {
+      packageName,
+      expectedUrl: trimmed
+    };
+  }
+
+  return {
+    packageName: trimmed,
+    expectedUrl: `https://play.google.com/store/apps/details?id=${trimmed}`
+  };
+}
+
+function loadAppData(): AppData[] {
+  const mappingPath = path.join(process.cwd(), 'config', 'project-mapping.json');
+  const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8')) as ProjectMapping;
+
+  return (mapping.projects || [])
+    .flatMap((project) => project.apps || [])
+    .filter((app): app is ProjectAppConfig & { name: string; playStore: string } => Boolean(app?.name && app?.playStore))
+    .map((app) => {
+      const normalized = normalizePlayStoreValue(app.playStore);
+
+      return {
+        appName: app.name,
+        packageName: normalized.packageName,
+        expectedUrl: normalized.expectedUrl
+      };
+    })
+    .filter((app) => Boolean(app.packageName));
 }
 
 test.describe('Play Store App Verification', () => {

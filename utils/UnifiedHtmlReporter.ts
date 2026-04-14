@@ -20,6 +20,9 @@ interface TestInfo {
   duration: number;
   error?: string;
   file: string;
+    requestBody?: string;
+    responseBody?: string;
+    responseCode?: string;
 }
 
 class UnifiedHtmlReporter implements Reporter {
@@ -33,6 +36,7 @@ class UnifiedHtmlReporter implements Reporter {
 
   onTestEnd(test: TestCase, result: TestResult) {
     const projectName = this.getProjectName(test.location.file);
+        const apiMetadata = this.extractApiMetadata(result);
     
     if (!this.projectResults.has(projectName)) {
       this.projectResults.set(projectName, {
@@ -59,7 +63,10 @@ class UnifiedHtmlReporter implements Reporter {
       status: result.status,
       duration: result.duration,
       error: result.error?.message,
-      file: test.location.file
+            file: test.location.file,
+            requestBody: apiMetadata.requestBody,
+            responseBody: apiMetadata.responseBody,
+            responseCode: apiMetadata.responseCode
     });
   }
 
@@ -198,8 +205,8 @@ class UnifiedHtmlReporter implements Reporter {
                                     <span class="status-badge ${test.status}">${test.status.toUpperCase()}</span>
                                 </td>
                                 <td class="test-duration">${(test.duration / 1000).toFixed(2)}s</td>
-                                <td class="test-details">
-                                    ${test.error ? `<details><summary>Error</summary><pre>${this.escapeHtml(test.error)}</pre></details>` : '-'}
+                                <td class="test-details"${this.buildApiDataAttributes(test)}>
+                                    ${this.renderTestDetails(test)}
                                 </td>
                             </tr>
                         `).join('')}
@@ -213,6 +220,82 @@ class UnifiedHtmlReporter implements Reporter {
     html += '</div>';
     return html;
   }
+
+    private extractApiMetadata(result: TestResult): { requestBody?: string; responseBody?: string; responseCode?: string } {
+        const output = [...result.stdout, ...result.stderr]
+            .map((chunk) => chunk.toString())
+            .join('\n');
+
+        const requestBody = this.extractEncodedMarker(output, '__API_REQUEST_BODY__');
+        const responseBody = this.extractEncodedMarker(output, '__API_RESPONSE_BODY__');
+        const responseCodeMatch = output.match(/__API_RESPONSE_CODE__(\d+)/);
+
+        return {
+            requestBody: requestBody || undefined,
+            responseBody: responseBody || undefined,
+            responseCode: responseCodeMatch ? responseCodeMatch[1] : undefined
+        };
+    }
+
+    private extractEncodedMarker(output: string, marker: string): string {
+        const escapedMarker = marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const match = output.match(new RegExp(`${escapedMarker}([^\r\n]+)`));
+
+        if (!match || !match[1]) {
+            return '';
+        }
+
+        try {
+            return Buffer.from(match[1], 'base64').toString('utf8');
+        } catch (error) {
+            return '';
+        }
+    }
+
+    private encodeAttributeValue(value?: string): string {
+        if (!value) {
+            return '';
+        }
+
+        return Buffer.from(value, 'utf8').toString('base64');
+    }
+
+    private buildApiDataAttributes(test: TestInfo): string {
+        const attributes: string[] = [];
+
+        if (test.requestBody !== undefined) {
+            attributes.push(` data-request-body="${this.encodeAttributeValue(test.requestBody)}"`);
+        }
+
+        if (test.responseBody !== undefined) {
+            attributes.push(` data-response-body="${this.encodeAttributeValue(test.responseBody)}"`);
+        }
+
+        if (test.responseCode !== undefined) {
+            attributes.push(` data-response-code="${this.escapeHtml(test.responseCode)}"`);
+        }
+
+        return attributes.join('');
+    }
+
+    private renderTestDetails(test: TestInfo): string {
+        if (test.requestBody !== undefined || test.responseBody !== undefined || test.responseCode !== undefined) {
+            return `
+                <details>
+                    <summary>API Data</summary>
+                    ${test.responseCode ? `<div><strong>Status Code:</strong> ${this.escapeHtml(test.responseCode)}</div>` : ''}
+                    ${test.requestBody !== undefined ? `<div><strong>Request Body:</strong><pre>${this.escapeHtml(test.requestBody)}</pre></div>` : ''}
+                    ${test.responseBody !== undefined ? `<div><strong>Response Body:</strong><pre>${this.escapeHtml(test.responseBody)}</pre></div>` : ''}
+                </details>
+            `;
+        }
+
+        if (test.error) {
+            return `<details><summary>Error</summary><pre>${this.escapeHtml(test.error)}</pre></details>`;
+        }
+
+        return '-';
+    }
 
   private escapeHtml(text: string): string {
     const map: { [key: string]: string } = {

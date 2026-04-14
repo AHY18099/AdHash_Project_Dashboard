@@ -8,10 +8,11 @@ import * as path from 'path';
 
 interface TestResult {
   repository: string;
-  status: 'success' | 'failed' | 'error';
+  status: 'success' | 'failed' | 'error' | 'unavailable';
   duration: number;
   reportPath: string;
   error?: string;
+  message?: string;
   passed?: number;
   failed?: number;
   warnings?: number;
@@ -335,9 +336,9 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
     result.total = parsed.total;
 
     // Update actual status based on test results
-    if (result.total > 0 && result.failed > 0) {
+    if (result.status !== 'unavailable' && result.total > 0 && result.failed > 0) {
       result.status = 'failed';
-    } else if (result.total > 0 && result.failed === 0) {
+    } else if (result.status !== 'unavailable' && result.total > 0 && result.failed === 0) {
       result.status = 'success';
     }
   });
@@ -465,6 +466,10 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
             border-left-color: #ef4444;
         }
 
+        .report-card.unavailable {
+          border-left-color: #9ca3af;
+        }
+
         .report-card-main {
             display: grid;
             grid-template-columns: 1fr auto;
@@ -522,6 +527,11 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
         .report-status.failed {
             background: #fee2e2;
             color: #991b1b;
+        }
+
+        .report-status.unavailable {
+          background: #f3f4f6;
+          color: #4b5563;
         }
 
         .report-description {
@@ -928,22 +938,33 @@ function generateReportCard(result: TestResult): string {
 
   const duration = (result.duration / 1000).toFixed(2);
 
-  // Parse test results from report
-  const parsed = parseTestResults(result);
+  // Prefer suite totals already computed by the runner. Fall back to legacy report parsing.
+  const parsed = typeof result.total === 'number'
+    ? {
+        passed: result.passed || 0,
+        failed: result.failed || 0,
+        warnings: result.warnings,
+        total: result.total || 0,
+        failedTests: undefined,
+        warningTests: undefined
+      }
+    : parseTestResults(result);
   const { passed, failed, warnings, total, failedTests, warningTests } = parsed;
 
   // Determine actual status based on test results
   // If we have test results, use them to determine status
   // Otherwise, fall back to the command execution status
   let actualStatus = result.status;
-  if (total > 0 && failed > 0) {
+  if (result.status === 'unavailable') {
+    actualStatus = 'unavailable';
+  } else if (total > 0 && failed > 0) {
     actualStatus = 'failed';
   } else if (total > 0 && failed === 0) {
     actualStatus = 'success';
   }
 
-  const statusClass = actualStatus === 'success' ? 'success' : 'failed';
-  const statusText = actualStatus === 'success' ? '✅ Passed' : '❌ Failed';
+  const statusClass = actualStatus === 'success' ? 'success' : actualStatus === 'unavailable' ? 'unavailable' : 'failed';
+  const statusText = actualStatus === 'success' ? '✅ Passed' : actualStatus === 'unavailable' ? 'Not configured in current workspace' : '❌ Failed';
 
   // Generate test counts HTML
   let testCountsHtml = '';
@@ -1037,6 +1058,9 @@ function generateReportCard(result: TestResult): string {
                 </button>`;
   }
 
+  const messageHtml = result.message || result.error ? `
+                    <div class="error-message">${result.message || result.error}</div>` : '';
+
   // Create stats HTML for horizontal display
   const statsHtml = total > 0 ? `
                     <div class="report-stats-section">
@@ -1066,6 +1090,8 @@ function generateReportCard(result: TestResult): string {
 
                         ${statsHtml}
                     </div>
+
+                    ${messageHtml}
 
                     ${warningTestsHtml}
 

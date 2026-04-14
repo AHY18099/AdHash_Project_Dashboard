@@ -1,49 +1,66 @@
 import { generateDashboard } from './utils/dashboard-generator';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface TestResult {
   repository: string;
-  status: 'success' | 'failed' | 'error';
+  status: 'success' | 'failed' | 'error' | 'unavailable';
   duration: number;
   reportPath: string;
   error?: string;
+  message?: string;
+  passed?: number;
+  failed?: number;
+  warnings?: number;
+  total?: number;
 }
 
-// Use existing test results with actual report paths from source repositories
-const results: TestResult[] = [
-  {
-    repository: 'Adhash_App_Status',
-    status: 'success' as const,
-    duration: 45000,
-    reportPath: 'Adhash_App_Status/custom-reports/Unified_App_Verification_Report.html'
-  },
-  {
-    repository: 'Adhash_AllProjects_Server',
-    status: 'success' as const,
-    duration: 12000,
-    reportPath: 'Adhash_AllProjects_Server/reports/server-health-report-2026-02-06.html'
-  },
-  {
-    repository: 'AdHash-Projects-Certificate-Expiry-Test',
-    status: 'success' as const,
-    duration: 8000,
-    reportPath: 'AdHash-Projects-Certificate-Expiry-Test/reports/certificate-report-2026-02-06.html'
-  },
-  {
-    repository: 'AdHash-API-Test',
-    status: 'success' as const,
-    duration: 15000,
-    reportPath: 'AdHash-API-Test/simple-reports/AdHash_API_Simple_Report_2026-02-04_07-38-17.html'
-  }
-];
+const dashboardStatePath = path.join(process.cwd(), 'test-results', 'dashboard-state.json');
+const suiteMap: Record<string, string> = {
+  app: 'Adhash_App_Status',
+  server: 'Adhash_AllProjects_Server',
+  cert: 'AdHash-Projects-Certificate-Expiry-Test',
+  api: 'AdHash-API-Test',
+  domain: 'AdHash_Domain_Report'
+};
 
-console.log('🔄 Regenerating unified dashboard with embedded reports...\n');
+function loadResultsFromState(): TestResult[] {
+  if (!fs.existsSync(dashboardStatePath)) {
+    return Object.entries(suiteMap).map(([suiteId, repository]) => ({
+      repository,
+      status: suiteId === 'domain' ? 'unavailable' : 'error',
+      duration: 0,
+      reportPath: '',
+      message: suiteId === 'domain' ? 'Not configured in current workspace' : undefined
+    }));
+  }
+
+  const state = JSON.parse(fs.readFileSync(dashboardStatePath, 'utf8'));
+  return Object.entries(suiteMap).map(([suiteId, repository]) => {
+    const suiteState = state.suites?.[suiteId] || {};
+    return {
+      repository,
+      status: suiteState.status === 'passed' ? 'success' : suiteState.status === 'unavailable' ? 'unavailable' : suiteState.status === 'failed' ? 'failed' : 'error',
+      duration: suiteState.duration || 0,
+      reportPath: suiteState.reportPath || '',
+      error: suiteState.message,
+      message: suiteState.message,
+      passed: suiteState.passed || 0,
+      failed: suiteState.failed || 0,
+      warnings: suiteState.warning || 0,
+      total: suiteState.total || 0
+    };
+  });
+}
+
+const results = loadResultsFromState();
+
+console.log('🔄 Regenerating unified dashboard from workspace state...\n');
 generateDashboard(results, 'unified-dashboard/index.html');
 console.log('\n✅ Dashboard regenerated successfully!');
 console.log('📂 Opening dashboard in browser...\n');
 
-// Open in browser
 const { exec } = require('child_process');
 const openCommand = process.platform === 'win32' ? 'start' :
                     process.platform === 'darwin' ? 'open' : 'xdg-open';
 exec(`${openCommand} "unified-dashboard/index.html"`);
-

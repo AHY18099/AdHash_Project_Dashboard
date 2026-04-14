@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import * as https from 'https';
 import * as tls from 'tls';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface CertificateInfo {
   domain: string;
@@ -17,37 +19,66 @@ interface DomainConfig {
   warningDays?: number;
 }
 
-// Real domains from AdHash-Projects-Certificate-Expiry-Test repository
-const domains: DomainConfig[] = [
-  // Main Projects
-  { name: 'Algomax - GoPocket', url: 'gopocket.algomax.co', warningDays: 30 },
-  { name: 'Algomax - ProSky', url: 'prosky.algomax.co', warningDays: 30 },
-  { name: 'WavedIn - Admin', url: 'superadmin.wavedin.app', warningDays: 30 },
-  { name: 'WavedIn - Marketplace', url: 'market.wavedin.app', warningDays: 30 },
-  { name: 'Auto Checker', url: 'manage.autochecker.com', warningDays: 30 },
-  { name: 'Spark me', url: 'sparkanalytics.synctag.com', warningDays: 30 },
-  { name: 'ZapAI', url: 'www.zapai.us', warningDays: 30 },
-  { name: 'ZapCRM', url: 'zapcrm.io', warningDays: 30 },
-  { name: 'Lead ZapCRM', url: 'lead.zapcrm.io', warningDays: 30 },
-  { name: 'Metclaf', url: 'metcalf.ai', warningDays: 30 },
-  { name: 'Humee - Admin', url: 'humee.com', warningDays: 30 },
-  { name: 'Humee - Dashboard', url: 'dashboard.humee.com', warningDays: 30 },
-  { name: 'Ai Sign Pro - Admin', url: 'admin.aisignpro.com', warningDays: 30 },
-  { name: 'AI Sign Pro - CPA', url: 'cpa.aisignpro.com', warningDays: 30 },
-  { name: 'Ai Sign Pro - Participant', url: 'participant.aisignpro.com', warningDays: 30 },
-  { name: 'AdHash Website', url: 'adhashtech.com', warningDays: 30 },
+interface ProjectConfig {
+  name?: string;
+  ssl?: string[];
+  sslCerts?: string[];
+}
 
-  // API Endpoints
-  { name: 'WavedIn API', url: 'mobileliveapi.wavedin.app', warningDays: 30 },
-  { name: 'Auto Checker API 1', url: 'manageadminapi.autochecker.com', warningDays: 30 },
-  { name: 'Auto Checker API 2', url: 'ebaydev.autochecker.com', warningDays: 30 },
-  { name: 'Auto Checker API 3', url: 'managemobileapi.autochecker.com', warningDays: 30 },
-  { name: 'Spark me API', url: 'spark.synctag.com', warningDays: 30 },
-  { name: 'ZapCRM Lead API', url: 'api.zapcrm.io', warningDays: 30 },
-  { name: 'Humee API', url: 'api.humee.com', warningDays: 30 },
-  { name: 'Ai Sign Pro API', url: 'api.aisignpro.com', warningDays: 30 },
-  { name: 'SMC API', url: 'api.sendmovieclips.com', warningDays: 30 }
-];
+interface ProjectMapping {
+  projects?: ProjectConfig[];
+}
+
+function normalizeSslHost(value: string): string {
+  const trimmed = value.trim();
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return new URL(trimmed).hostname.toLowerCase();
+  }
+
+  return trimmed.replace(/^https?:\/\//i, '').split('/')[0].replace(/:\d+$/, '').toLowerCase();
+}
+
+function getProjectSslEntries(project: ProjectConfig): string[] {
+  const rawEntries = (project.ssl && project.ssl.length > 0)
+    ? project.ssl
+    : (project.sslCerts || []);
+  const seen = new Set<string>();
+
+  return rawEntries
+    .map((entry) => normalizeSslHost(entry))
+    .filter((entry) => {
+      if (!entry || seen.has(entry)) {
+        return false;
+      }
+
+      seen.add(entry);
+      return true;
+    });
+}
+
+function loadDomainConfigs(): DomainConfig[] {
+  const mappingPath = path.join(process.cwd(), 'config', 'project-mapping.json');
+  const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8')) as ProjectMapping;
+  const seen = new Set<string>();
+
+  return (mapping.projects || [])
+    .flatMap((project) => getProjectSslEntries(project).map((url) => ({
+      name: url,
+      url,
+      warningDays: 30
+    })))
+    .filter((entry) => {
+      if (seen.has(entry.url)) {
+        return false;
+      }
+
+      seen.add(entry.url);
+      return true;
+    });
+}
+
+const domains = loadDomainConfigs();
 
 async function getCertificateInfo(hostname: string): Promise<CertificateInfo> {
   return new Promise((resolve, reject) => {
