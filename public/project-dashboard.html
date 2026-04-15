@@ -2013,6 +2013,7 @@
         }
 
         .response-2xx { background: #d1fae5; color: #065f46; }
+        .response-3xx { background: #dbeafe; color: #1e40af; }
         .response-4xx { background: #fef3c7; color: #92400e; }
         .response-5xx { background: #fee2e2; color: #991b1b; }
 
@@ -2615,6 +2616,36 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
+        function normalizeApiMethod(value) {
+            return String(value || 'GET').trim().toUpperCase();
+        }
+
+        function normalizeApiUrl(value) {
+            return String(value || '').trim().replace(/\/+$/, '').toLowerCase();
+        }
+
+        function normalizeApiName(value) {
+            return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        }
+
+        function buildApiStableKey(test) {
+            return `${normalizeApiMethod(test && test.method)}::${normalizeApiUrl(test && test.url)}::${normalizeApiName(test && test.name)}`;
+        }
+
+        function dedupeApiTests(tests) {
+            const deduped = new Map();
+
+            (tests || []).forEach((test) => {
+                if (!test) {
+                    return;
+                }
+
+                deduped.set(buildApiStableKey(test), test);
+            });
+
+            return Array.from(deduped.values());
+        }
+
         function renderProjectDetails(testResults) {
             const detailContent = document.getElementById('detailContent');
 
@@ -2701,8 +2732,15 @@
         function renderApiEndpointsSection(results) {
             console.log('🔧 renderApiEndpointsSection called with:', results);
             const sectionId = 'apis-section';
+            const dedupedTests = dedupeApiTests(results && Array.isArray(results.tests) ? results.tests : []);
+            const counts = {
+                total: dedupedTests.length,
+                passed: dedupedTests.filter((test) => (test.status || '').toLowerCase() === 'passed').length,
+                warning: dedupedTests.filter((test) => (test.status || '').toLowerCase() === 'warning').length,
+                failed: dedupedTests.filter((test) => (test.status || '').toLowerCase() === 'failed').length
+            };
 
-            if (!results || results.total === 0) {
+            if (!results || counts.total === 0) {
                 console.log('🔧 No API results, returning empty state');
                 return `
                     <div class="detail-section-card">
@@ -2720,7 +2758,7 @@
             }
 
             // Sort tests by status: Failed first, then Warning, then Passed
-            const sortedTests = [...results.tests].sort((a, b) => {
+            const sortedTests = [...dedupedTests].sort((a, b) => {
                 const statusOrder = { 'failed': 0, 'warning': 1, 'passed': 2 };
                 const statusA = (a.status || '').toLowerCase();
                 const statusB = (b.status || '').toLowerCase();
@@ -2733,59 +2771,21 @@
 
             // Render each API endpoint as a simple card (like domains) with collapsible request/response details
             const apiCardsHtml = sortedTests.map((test, index) => {
+                console.log('RENDER API TEST:', test);
                 console.log(`🔧 Rendering API endpoint ${index + 1}: ${test.name}`);
                 const statusClass = test.status.toLowerCase() === 'passed' ? 'status-passed' :
                                    test.status.toLowerCase() === 'warning' ? 'status-warning' : 'status-failed';
 
                 const method = test.method || 'GET';
                 const methodClass = `method-${method}`;
-                const responseCode = test.responseCode || (test.status.toLowerCase() === 'passed' ? '200' : '500');
-                const responseClass = responseCode.toString().startsWith('2') ? 'response-2xx' :
-                                     responseCode.toString().startsWith('4') ? 'response-4xx' : 'response-5xx';
-
-                // Format request body for display
-                let requestBodyDisplay = 'N/A';
-                if (test.requestBody) {
-                    try {
-                        let formatted = typeof test.requestBody === 'string'
-                            ? test.requestBody
-                            : JSON.stringify(test.requestBody, null, 2);
-                        // Truncate if too long (keep first 1000 chars)
-                        if (formatted.length > 1000) {
-                            formatted = formatted.substring(0, 1000) + '\n\n... (truncated)';
-                        }
-                        // Escape HTML to prevent rendering issues
-                        requestBodyDisplay = formatted
-                            .replace(/&/g, '&amp;')
-                            .replace(/</g, '&lt;')
-                            .replace(/>/g, '&gt;')
-                            .replace(/"/g, '&quot;');
-                    } catch (e) {
-                        requestBodyDisplay = String(test.requestBody);
-                    }
-                }
-
-                // Format response body for display
-                let responseBodyDisplay = 'N/A';
-                if (test.responseBody) {
-                    try {
-                        let formatted = typeof test.responseBody === 'string'
-                            ? test.responseBody
-                            : JSON.stringify(test.responseBody, null, 2);
-                        // Truncate if too long (keep first 1000 chars)
-                        if (formatted.length > 1000) {
-                            formatted = formatted.substring(0, 1000) + '\n\n... (truncated)';
-                        }
-                        // Escape HTML to prevent rendering issues
-                        responseBodyDisplay = formatted
-                            .replace(/&/g, '&amp;')
-                            .replace(/</g, '&lt;')
-                            .replace(/>/g, '&gt;')
-                            .replace(/"/g, '&quot;');
-                    } catch (e) {
-                        responseBodyDisplay = String(test.responseBody);
-                    }
-                }
+                const responseCode = test.responseCode !== undefined && test.responseCode !== null && String(test.responseCode).trim() !== ''
+                    ? String(test.responseCode)
+                    : 'Unknown';
+                const responseClass = responseCode.startsWith('2') ? 'response-2xx' :
+                                     responseCode.startsWith('3') ? 'response-3xx' :
+                                     responseCode.startsWith('4') ? 'response-4xx' : 'response-5xx';
+                const requestBodyDisplay = formatApiData(test.requestBody, method === 'GET' || method === 'DELETE' ? 'No request body' : 'Payload not provided');
+                const responseBodyDisplay = formatApiData(test.responseBody, 'No response body');
 
                 return `
                     <div class="detail-test-item ${statusClass}">
@@ -2821,6 +2821,10 @@
                                         <span class="detail-info-value">${responseCode}</span>
                                     </div>
                                     <div class="detail-info-item">
+                                        <span class="detail-info-label">Expected Status</span>
+                                        <span class="detail-info-value">${test.expectedStatus !== undefined && test.expectedStatus !== null ? test.expectedStatus : 'Not specified'}</span>
+                                    </div>
+                                    <div class="detail-info-item">
                                         <span class="detail-info-label">Request Body</span>
                                         <pre class="detail-info-value api-body-pre">${requestBodyDisplay}</pre>
                                     </div>
@@ -2839,11 +2843,11 @@
 
             // Determine section status class
             let statusClass = '';
-            if (results.failed > 0) {
+            if (counts.failed > 0) {
                 statusClass = 'section-failed';
-            } else if (results.warning > 0) {
+            } else if (counts.warning > 0) {
                 statusClass = 'section-warning';
-            } else if (results.passed > 0 && results.failed === 0 && results.warning === 0) {
+            } else if (counts.passed > 0 && counts.failed === 0 && counts.warning === 0) {
                 statusClass = 'section-passed';
             }
 
@@ -2856,10 +2860,10 @@
                             <h3 class="detail-section-title" style="margin: 0;">⚡ API Endpoints</h3>
                         </div>
                         <div style="display: flex; gap: 10px;">
-                            <span style="background: #f0f0f0; color: #3b82f6; border: 2px solid #3b82f6; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">Total: ${results.total}</span>
-                            <span style="background: #f0f0f0; color: #10b981; border: 2px solid #10b981; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">✓ ${results.passed}</span>
-                            ${results.warning > 0 ? `<span style="background: #f0f0f0; color: #f97316; border: 2px solid #f97316; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">⚠ ${results.warning}</span>` : ''}
-                            ${results.failed > 0 ? `<span style="background: #f0f0f0; color: #ef4444; border: 2px solid #ef4444; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">✗ ${results.failed}</span>` : ''}
+                            <span style="background: #f0f0f0; color: #3b82f6; border: 2px solid #3b82f6; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">Total: ${counts.total}</span>
+                            <span style="background: #f0f0f0; color: #10b981; border: 2px solid #10b981; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">✓ ${counts.passed}</span>
+                            ${counts.warning > 0 ? `<span style="background: #f0f0f0; color: #f97316; border: 2px solid #f97316; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">⚠ ${counts.warning}</span>` : ''}
+                            ${counts.failed > 0 ? `<span style="background: #f0f0f0; color: #ef4444; border: 2px solid #ef4444; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">✗ ${counts.failed}</span>` : ''}
                         </div>
                     </div>
                     <div id="${sectionId}" style="display: block; padding-top: 10px;">
@@ -2871,8 +2875,9 @@
 
         function renderDetailSection(title, results, type) {
             const sectionId = type + '-section';
+            const hasTests = results && Array.isArray(results.tests) && results.tests.length > 0;
 
-            if (!results || results.total === 0) {
+            if (!results || (!hasTests && results.total === 0)) {
                 return `
                     <div class="detail-section-card">
                         <div class="detail-section-header" onclick="toggleSection('${sectionId}')">
@@ -3049,32 +3054,40 @@
                     `;
                 }).join('');
             } else if (type === 'ssl') {
-                return sortedTests.map(test => {
-                    const statusClass = test.status.toLowerCase() === 'passed' ? 'status-passed' :
-                                       test.status.toLowerCase() === 'warning' ? 'status-warning' : 'status-failed';
-
-                    // Calculate expiry date
-                    const expiryDate = test.expiryDate || calculateExpiryDate(test.daysRemaining);
+                return sortedTests.map(detail => {
+                    console.log('RENDER SSL TEST:', detail);
+                    const statusClass = detail.status.toLowerCase() === 'passed' ? 'status-passed' :
+                                       detail.status.toLowerCase() === 'warning' ? 'status-warning' : 'status-failed';
+                    const expiryDate = detail.expiryDate || 'N/A';
+                    const expiryDateIST = detail.expiryDateIST || 'N/A';
+                    const daysRemaining = detail.daysRemaining ?? 'N/A';
+                    const daysRemainingDisplay = daysRemaining === 'N/A' ? 'N/A' : `${daysRemaining} days`;
 
                     return `
                         <div class="detail-test-item ${statusClass}">
                             <div class="detail-test-header">
-                                <div class="detail-test-name">🔒 ${test.name}</div>
-                                <span style="background: ${getStatusColor(test.status)}; color: white; padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">${test.status.toUpperCase()}</span>
+                                <div class="detail-test-name">🔒 ${detail.name}</div>
+                                <span style="background: ${getStatusColor(detail.status)}; color: white; padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">${detail.status.toUpperCase()}</span>
                             </div>
                             <div class="detail-test-info">
                                 <div class="detail-info-item">
                                     <span class="detail-info-label">URL</span>
-                                    <span class="detail-info-value"><a href="${test.url}" target="_blank">${test.url}</a></span>
+                                    <span class="detail-info-value"><a href="${detail.url}" target="_blank">${detail.url}</a></span>
                                 </div>
                                 <div class="detail-info-item">
                                     <span class="detail-info-label">Days Remaining</span>
-                                    <span class="detail-info-value">${test.daysRemaining || 'N/A'} days</span>
+                                    <span class="detail-info-value">${daysRemainingDisplay}</span>
                                 </div>
                                 <div class="detail-info-item">
-                                    <span class="detail-info-label">Expiry Date</span>
+                                    <span class="detail-info-label">EXPIRY DATE (UTC)</span>
                                     <span class="detail-info-value">
                                         <span class="expiry-date-badge">📅 ${expiryDate}</span>
+                                    </span>
+                                </div>
+                                <div class="detail-info-item">
+                                    <span class="detail-info-label">EXPIRY DATE (IST)</span>
+                                    <span class="detail-info-value">
+                                        <span class="expiry-date-badge">🕒 ${expiryDateIST}</span>
                                     </span>
                                 </div>
                             </div>
@@ -3083,29 +3096,13 @@
                 }).join('');
             } else if (type === 'domains') {
                 return sortedTests.map(test => {
+                    console.log('RENDER DOMAIN TEST:', test);
                     const statusClass = test.status.toLowerCase() === 'passed' ? 'status-passed' :
                                        test.status.toLowerCase() === 'warning' ? 'status-warning' : 'status-failed';
-
-                    // Use the IST date if available, otherwise format the UTC date
-                    let expiryDateDisplay = 'N/A';
-                    if (test.expiryDateIST) {
-                        expiryDateDisplay = test.expiryDateIST + ' IST';
-                    } else if (test.expiryDate) {
-                        // Format UTC date to readable format
-                        try {
-                            const date = new Date(test.expiryDate);
-                            expiryDateDisplay = date.toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                timeZone: 'UTC'
-                            }) + ' UTC';
-                        } catch (e) {
-                            expiryDateDisplay = test.expiryDate;
-                        }
-                    }
+                    const expiryDate = test.expiryDate || 'N/A';
+                    const expiryDateIST = test.expiryDateIST || 'N/A';
+                    const daysRemaining = test.daysRemaining ?? 'N/A';
+                    const daysRemainingDisplay = daysRemaining === 'N/A' ? 'N/A' : `${daysRemaining} days`;
 
                     return `
                         <div class="detail-test-item ${statusClass}">
@@ -3120,12 +3117,18 @@
                                 </div>
                                 <div class="detail-info-item">
                                     <span class="detail-info-label">Days Remaining</span>
-                                    <span class="detail-info-value">${test.daysRemaining || 'N/A'} days</span>
+                                    <span class="detail-info-value">${daysRemainingDisplay}</span>
                                 </div>
                                 <div class="detail-info-item">
-                                    <span class="detail-info-label">Expiry Date</span>
+                                    <span class="detail-info-label">EXPIRY DATE (UTC)</span>
                                     <span class="detail-info-value">
-                                        <span class="expiry-date-badge">📅 ${expiryDateDisplay}</span>
+                                        <span class="expiry-date-badge">📅 ${expiryDate}</span>
+                                    </span>
+                                </div>
+                                <div class="detail-info-item">
+                                    <span class="detail-info-label">EXPIRY DATE (IST)</span>
+                                    <span class="detail-info-value">
+                                        <span class="expiry-date-badge">🕒 ${expiryDateIST}</span>
                                     </span>
                                 </div>
                             </div>
@@ -3134,29 +3137,24 @@
                 }).join('');
             } else if (type === 'apis') {
                 return sortedTests.map((test, index) => {
+                    console.log('RENDER API TEST:', test);
                     const statusClass = test.status.toLowerCase() === 'passed' ? 'status-passed' :
                                        test.status.toLowerCase() === 'warning' ? 'status-warning' : 'status-failed';
 
                     const method = test.method || 'GET';
                     const methodClass = `method-${method}`;
 
-                    // Parse response code
-                    const responseCode = test.responseCode || (test.status.toLowerCase() === 'passed' ? '200' : '500');
-                    const responseClass = responseCode.toString().startsWith('2') ? 'response-2xx' :
-                                         responseCode.toString().startsWith('4') ? 'response-4xx' : 'response-5xx';
+                    const responseCode = test.responseCode !== undefined && test.responseCode !== null && String(test.responseCode).trim() !== ''
+                        ? String(test.responseCode)
+                        : 'Unknown';
+                    const responseClass = responseCode.startsWith('2') ? 'response-2xx' :
+                                         responseCode.startsWith('3') ? 'response-3xx' :
+                                         responseCode.startsWith('4') ? 'response-4xx' : 'response-5xx';
 
                     const requestId = `api-request-${index}`;
                     const responseId = `api-response-${index}`;
 
                     // Format request/response data
-                    const formatData = (data) => {
-                        if (!data) return 'N/A';
-                        if (typeof data === 'object') {
-                            return JSON.stringify(data, null, 2);
-                        }
-                        return data;
-                    };
-
                     return `
                         <div class="detail-test-item ${statusClass}">
                             <div class="detail-test-header">
@@ -3187,7 +3185,7 @@
                                         <span id="${requestId}-icon" class="api-details-icon">▶</span>
                                     </div>
                                     <div id="${requestId}" class="api-details-content">
-                                        <pre class="api-body-pre" style="font-family: 'Segoe UI', 'Consolas', 'Monaco', monospace; font-size: 0.75rem; line-height: 1.5;">${formatData(test.requestBody)}</pre>
+                                        <pre class="api-body-pre" style="font-family: 'Segoe UI', 'Consolas', 'Monaco', monospace; font-size: 0.75rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;">${formatApiData(test.requestBody, method === 'GET' || method === 'DELETE' ? 'No request body' : 'Payload not provided')}</pre>
                                     </div>
                                 </div>
                                 ` : ''}
@@ -3198,7 +3196,7 @@
                                         <span id="${responseId}-icon" class="api-details-icon">▶</span>
                                     </div>
                                     <div id="${responseId}" class="api-details-content">
-                                        <pre class="api-body-pre" style="font-family: 'Segoe UI', 'Consolas', 'Monaco', monospace; font-size: 0.75rem; max-height: 300px; line-height: 1.5;">${formatData(test.responseBody)}</pre>
+                                        <pre class="api-body-pre" style="font-family: 'Segoe UI', 'Consolas', 'Monaco', monospace; font-size: 0.75rem; max-height: 300px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;">${formatApiData(test.responseBody, 'No response body')}</pre>
                                     </div>
                                 </div>
                                 ` : ''}
@@ -3215,6 +3213,40 @@
             const today = new Date();
             const expiryDate = new Date(today.getTime() + (daysRemaining * 24 * 60 * 60 * 1000));
             return expiryDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatApiData(value, fallbackText) {
+            if (value === undefined || value === null || value === '') {
+                return escapeHtml(fallbackText);
+            }
+
+            if (typeof value === 'string') {
+                const trimmed = value.trim();
+                if (!trimmed) {
+                    return escapeHtml(fallbackText);
+                }
+
+                try {
+                    return escapeHtml(JSON.stringify(JSON.parse(trimmed), null, 2));
+                } catch (error) {
+                    return escapeHtml(trimmed);
+                }
+            }
+
+            try {
+                return escapeHtml(JSON.stringify(value, null, 2));
+            } catch (error) {
+                return escapeHtml(String(value));
+            }
         }
 
         function getStatusColor(status) {

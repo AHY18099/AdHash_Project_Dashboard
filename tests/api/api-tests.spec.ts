@@ -17,6 +17,10 @@ interface ProjectApiConfig {
   name?: string;
   url?: string;
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  headers?: Record<string, string>;
+  body?: any;
+  expectedStatus?: number;
+  timeout?: number;
 }
 
 interface ProjectConfig {
@@ -29,7 +33,7 @@ interface ProjectMapping {
 
 function serializeApiData(value: unknown): string {
   if (value === undefined || value === null || value === '') {
-    return '-';
+    return 'No response body';
   }
 
   if (typeof value === 'string') {
@@ -41,6 +45,98 @@ function serializeApiData(value: unknown): string {
   } catch (error) {
     return String(value);
   }
+}
+
+function getRequestBodyFallback(method: ApiEndpoint['method']): string {
+  return method === 'GET' || method === 'DELETE' ? 'No request body' : 'Payload not provided';
+}
+
+function formatRequestBody(method: ApiEndpoint['method'], value: unknown): string {
+  if (value === undefined || value === null || value === '') {
+    return getRequestBodyFallback(method);
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch (error) {
+    return String(value);
+  }
+}
+
+function isJsonPayload(value: unknown): boolean {
+  if (value === null || value === undefined) {
+    return false;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return (trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'));
+  }
+
+  return typeof value === 'object';
+}
+
+function buildRequestHeaders(headers: Record<string, string> | undefined, body: unknown): Record<string, string> | undefined {
+  const nextHeaders = { ...(headers || {}) };
+  const hasContentType = Object.keys(nextHeaders).some((key) => key.toLowerCase() === 'content-type');
+
+  if (!hasContentType && isJsonPayload(body)) {
+    nextHeaders['Content-Type'] = 'application/json';
+  }
+
+  return Object.keys(nextHeaders).length > 0 ? nextHeaders : undefined;
+}
+
+function buildAxiosRequestConfig(endpoint: ApiEndpoint) {
+  const headers = buildRequestHeaders(endpoint.headers, endpoint.body);
+  const config = {
+    method: endpoint.method,
+    url: endpoint.url,
+    headers,
+    timeout: endpoint.timeout || 10000,
+    validateStatus: () => true
+  } as {
+    method: ApiEndpoint['method'];
+    url: string;
+    headers?: Record<string, string>;
+    timeout: number;
+    validateStatus: () => boolean;
+    data?: unknown;
+  };
+
+  if (endpoint.method !== 'GET' && endpoint.method !== 'DELETE' && endpoint.body !== undefined) {
+    config.data = endpoint.body;
+  }
+
+  return config;
+}
+
+function getApiClassification(endpoint: ApiEndpoint, status: number): 'passed' | 'warning' | 'failed' {
+  if (typeof endpoint.expectedStatus === 'number') {
+    if (status !== endpoint.expectedStatus) {
+      return 'failed';
+    }
+
+    if (status >= 300 && status < 400) {
+      return 'warning';
+    }
+
+    return 'passed';
+  }
+
+  if (status >= 200 && status < 300) {
+    return 'passed';
+  }
+
+  if (status >= 300 && status < 400) {
+    return 'warning';
+  }
+
+  return 'failed';
 }
 
 function emitApiRuntimeDetails(requestBody: unknown, responseBody: unknown, responseCode: number): void {
@@ -63,17 +159,11 @@ function loadApiEndpoints(): ApiEndpoint[] {
       name: api.name,
       url: api.url,
       method: api.method,
-      expectedStatus: api.method === 'GET' ? 200 : undefined,
-      timeout: 10000
+      headers: api.headers,
+      body: api.body,
+      expectedStatus: api.expectedStatus,
+      timeout: api.timeout || 10000
     }));
-}
-
-function isSuccessfulResponse(endpoint: ApiEndpoint, status: number): boolean {
-  if (endpoint.method === 'GET') {
-    return status === (endpoint.expectedStatus || 200);
-  }
-
-  return status > 0 && status < 500 && status !== 404 && status !== 405;
 }
 
 const apiEndpoints = loadApiEndpoints();
@@ -84,45 +174,9 @@ test.describe('API Tests', () => {
       const startTime = Date.now();
       
       try {
-        let response: AxiosResponse;
-        const requestBody = endpoint.method === 'GET' ? '-' : (endpoint.body ?? '-');
-
-        switch (endpoint.method) {
-          case 'GET':
-            response = await axios.get(endpoint.url, {
-              headers: endpoint.headers,
-              timeout: endpoint.timeout || 10000,
-              validateStatus: () => true
-            });
-            break;
-          
-          case 'POST':
-            response = await axios.post(endpoint.url, endpoint.body, {
-              headers: endpoint.headers,
-              timeout: endpoint.timeout || 10000,
-              validateStatus: () => true
-            });
-            break;
-          
-          case 'PUT':
-            response = await axios.put(endpoint.url, endpoint.body, {
-              headers: endpoint.headers,
-              timeout: endpoint.timeout || 10000,
-              validateStatus: () => true
-            });
-            break;
-          
-          case 'DELETE':
-            response = await axios.delete(endpoint.url, {
-              headers: endpoint.headers,
-              timeout: endpoint.timeout || 10000,
-              validateStatus: () => true
-            });
-            break;
-          
-          default:
-            throw new Error(`Unsupported method: ${endpoint.method}`);
-        }
+        const requestConfig = buildAxiosRequestConfig(endpoint);
+        const requestBody = formatRequestBody(endpoint.method, requestConfig.data);
+        const response: AxiosResponse = await axios(requestConfig);
 
         const responseTime = Date.now() - startTime;
 
@@ -135,8 +189,10 @@ test.describe('API Tests', () => {
         console.log('========================\n');
         emitApiRuntimeDetails(requestBody, response.data, response.status);
 
-        // Verify the endpoint is healthy enough for its method type.
-        expect(isSuccessfulResponse(endpoint, response.status)).toBe(true);
+        const classification = getApiClassification(endpoint, response.status);
+
+        // Unexpected 4xx/5xx responses fail the test. Expected negative statuses must be explicit.
+        expect(classification).not.toBe('failed');
 
         // Verify response time is acceptable
         expect(responseTime).toBeLessThan(endpoint.timeout || 10000);
@@ -162,14 +218,7 @@ test.describe('API Tests', () => {
       apiEndpoints.map(async (endpoint) => {
         const startTime = Date.now();
         try {
-          const response = await axios({
-            method: endpoint.method,
-            url: endpoint.url,
-            headers: endpoint.headers,
-            data: endpoint.body,
-            timeout: endpoint.timeout || 10000,
-            validateStatus: () => true
-          });
+          const response = await axios(buildAxiosRequestConfig(endpoint));
           
           const responseTime = Date.now() - startTime;
           
@@ -177,7 +226,7 @@ test.describe('API Tests', () => {
             name: endpoint.name,
             status: response.status,
             responseTime,
-            success: isSuccessfulResponse(endpoint, response.status)
+            success: getApiClassification(endpoint, response.status) !== 'failed'
           };
         } catch (error: any) {
           return {

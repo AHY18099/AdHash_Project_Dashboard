@@ -19,7 +19,7 @@ let testProcessPid = null;
 const serverLogs = [];
 const MAX_LOGS = 100;
 const DASHBOARD_STATE_PATH = path.join(__dirname, 'test-results', 'dashboard-state.json');
-const DOMAIN_REPORT_OUTPUT_PATH = 'D:\\Automation\\AdHash_Domain_Report_Standalone\\godaddy\\report.html';
+const DOMAIN_REPORT_OUTPUT_PATH = path.join(__dirname, 'godaddy', 'report.html');
 const WORKSPACE_SUITES = {
     app: {
         id: 'app',
@@ -518,6 +518,8 @@ app.get('/api/projects', (req, res) => {
         }
 
         const projectData = JSON.parse(fs.readFileSync(projectMappingPath, 'utf8'));
+        attachProjectDomainStatuses(projectData.projects || [], readDashboardState());
+        attachProjectSslDetails(projectData.projects || [], readDashboardState());
         res.json(projectData);
     } catch (error) {
         console.error('Error loading projects:', error);
@@ -534,6 +536,8 @@ app.get('/api/project/:id', (req, res) => {
         }
 
         const projectData = JSON.parse(fs.readFileSync(projectMappingPath, 'utf8'));
+        attachProjectDomainStatuses(projectData.projects || [], readDashboardState());
+        attachProjectSslDetails(projectData.projects || [], readDashboardState());
         const project = projectData.projects.find(p => p.id === req.params.id);
 
         if (!project) {
@@ -564,6 +568,8 @@ app.get('/api/project/:id', (req, res) => {
     try {
         const projectId = req.params.id;
         const projectMapping = JSON.parse(fs.readFileSync(path.join(__dirname, 'config', 'project-mapping.json'), 'utf8'));
+        attachProjectDomainStatuses(projectMapping.projects || [], readDashboardState());
+        attachProjectSslDetails(projectMapping.projects || [], readDashboardState());
         const project = projectMapping.projects.find(p => p.id === projectId);
 
         if (!project) {
@@ -594,6 +600,7 @@ const suiteConfigCache = {
     certificates: null,
     apis: null,
     domains: null,
+    domainsCacheKey: null,
     suiteRows: {}
 };
 
@@ -603,6 +610,67 @@ function normalizeText(value) {
 
 function normalizeUrl(value) {
     return (value || '').toString().trim().replace(/\/+$/, '').toLowerCase();
+}
+
+function normalizeApiMethod(value) {
+    return (value || 'GET').toString().trim().toUpperCase();
+}
+
+function normalizeApiName(value) {
+    return normalizeText((value || '').toString().trim());
+}
+
+function buildApiStableKey(method, url, name) {
+    return `${normalizeApiMethod(method)}::${normalizeUrl(url)}::${normalizeApiName(name)}`;
+}
+
+function dedupeApiResults(details) {
+    const deduped = new Map();
+
+    (details || []).forEach((detail) => {
+        if (!detail) {
+            return;
+        }
+
+        deduped.set(buildApiStableKey(detail.method, detail.url, detail.name), detail);
+    });
+
+    return Array.from(deduped.values());
+}
+
+function classifyApiStatus(responseCode, expectedStatus) {
+    const parsedResponseCode = typeof responseCode === 'number'
+        ? responseCode
+        : (/^\d+$/.test(String(responseCode || '').trim()) ? parseInt(String(responseCode).trim(), 10) : null);
+    const parsedExpectedStatus = typeof expectedStatus === 'number'
+        ? expectedStatus
+        : (/^\d+$/.test(String(expectedStatus || '').trim()) ? parseInt(String(expectedStatus).trim(), 10) : undefined);
+
+    if (typeof parsedExpectedStatus === 'number') {
+        if (parsedResponseCode !== parsedExpectedStatus) {
+            return 'failed';
+        }
+
+        if (parsedExpectedStatus >= 300 && parsedExpectedStatus < 400) {
+            return 'warning';
+        }
+
+        return 'passed';
+    }
+
+    if (parsedResponseCode === null) {
+        return 'failed';
+    }
+
+    if (parsedResponseCode >= 200 && parsedResponseCode < 300) {
+        return 'passed';
+    }
+
+    if (parsedResponseCode >= 300 && parsedResponseCode < 400) {
+        return 'warning';
+    }
+
+    return 'failed';
 }
 
 function normalizeSslHost(value) {
@@ -620,6 +688,30 @@ function normalizeSslHost(value) {
     }
 
     return trimmed.replace(/^https?:\/\//i, '').split('/')[0].replace(/:\d+$/, '').toLowerCase();
+}
+
+function normalizeDomainValue(value) {
+    return String(value || '')
+        .replace(/^https?:\/\//i, '')
+        .replace(/^www\./i, '')
+        .replace(/\/$/, '')
+        .toLowerCase();
+}
+
+function formatToIST(value) {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    return new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+    }).format(date) + ' IST';
 }
 
 function getProjectSslEntries(project) {
@@ -733,6 +825,7 @@ function readSuiteRows(repository) {
         const requestBodyMatch = attributes.match(/data-request-body="([^"]*)"/i);
         const responseBodyMatch = attributes.match(/data-response-body="([^"]*)"/i);
         const responseCodeMatch = attributes.match(/data-response-code="([^"]*)"/i);
+        const expectedStatusMatch = attributes.match(/data-expected-status="([^"]*)"/i);
 
         rows.push({
             status: match[1].toLowerCase(),
@@ -742,7 +835,8 @@ function readSuiteRows(repository) {
             details: stripHtml(match[6]),
             requestBody: decodeBase64Value(requestBodyMatch && requestBodyMatch[1]),
             responseBody: decodeBase64Value(responseBodyMatch && responseBodyMatch[1]),
-            responseCode: decodeHtml(responseCodeMatch && responseCodeMatch[1])
+            responseCode: decodeHtml(responseCodeMatch && responseCodeMatch[1]),
+            expectedStatus: decodeHtml(expectedStatusMatch && expectedStatusMatch[1])
         });
     }
 
@@ -817,19 +911,79 @@ function loadApiSuiteDefinitions() {
         .map((entry) => ({
             name: entry.name,
             url: entry.url,
-            method: entry.method
+            method: entry.method,
+            expectedStatus: entry.expectedStatus
         }));
 
     return suiteConfigCache.apis;
 }
 
 function loadDomainReportEntries() {
-    if (suiteConfigCache.domains) {
+    const state = readDashboardState();
+    const stateGeneratedAt = state && state.generatedAt ? state.generatedAt : '';
+
+    if (suiteConfigCache.domains && suiteConfigCache.domainsCacheKey === stateGeneratedAt) {
+        return suiteConfigCache.domains;
+    }
+
+    const domainDetails = state && state.suites && state.suites.domain && Array.isArray(state.suites.domain.details)
+        ? state.suites.domain.details
+        : [];
+
+    if (domainDetails.length > 0) {
+        const entries = domainDetails
+            .map((detail) => {
+                const normalizedDomain = normalizeSslHost(detail && detail.domain);
+                if (!normalizedDomain) {
+                    return null;
+                }
+
+                let status = 'failed';
+                if (detail.status === 'active') {
+                    status = 'passed';
+                } else if (detail.status === 'expiring') {
+                    status = 'warning';
+                } else if (detail.status === 'error') {
+                    status = 'failed';
+                }
+
+                return {
+                    name: normalizedDomain,
+                    domain: normalizedDomain,
+                    status,
+                    expiryDate: detail.expiryDate || null,
+                    expiryDateIST: detail.expiryDateIST || formatToIST(detail.expiryDate),
+                    daysRemaining: detail.daysRemaining ?? null,
+                    details: ''
+                };
+            })
+            .filter(Boolean);
+
+        const mapping = getProjectMapping();
+        const unmatchedDomains = entries
+            .filter((entry) => !(mapping.projects || []).some((project) =>
+                (project.domains || []).some((domain) => {
+                    const normalizedProjectDomain = normalizeSslHost(domain);
+                    const normalizedEntryDomain = normalizeSslHost(entry.domain);
+
+                    return normalizedEntryDomain === normalizedProjectDomain
+                        || normalizedEntryDomain.endsWith(`.${normalizedProjectDomain}`)
+                        || normalizedProjectDomain.endsWith(`.${normalizedEntryDomain}`);
+                })
+            ))
+            .map((entry) => entry.domain);
+
+        console.log(`[Domain Details] Loaded ${entries.length} domain details from dashboard state`);
+        console.log(`[Domain Details] Unmatched domains: ${unmatchedDomains.length > 0 ? unmatchedDomains.join(', ') : 'none'}`);
+
+        suiteConfigCache.domains = entries;
+        suiteConfigCache.domainsCacheKey = stateGeneratedAt;
         return suiteConfigCache.domains;
     }
 
     if (!fs.existsSync(DOMAIN_REPORT_OUTPUT_PATH)) {
         suiteConfigCache.domains = [];
+        suiteConfigCache.domainsCacheKey = stateGeneratedAt;
         return suiteConfigCache.domains;
     }
 
@@ -868,18 +1022,82 @@ function loadDomainReportEntries() {
             domain: decodeHtml(domainMatch[1]),
             status,
             expiryDate: decodeHtml(expiryDateMatch[1]),
-            expiryDateIST: decodeHtml((expiryDateISTMatch && expiryDateISTMatch[1]) || ''),
+            expiryDateIST: decodeHtml((expiryDateISTMatch && expiryDateISTMatch[1]) || '') || formatToIST(decodeHtml(expiryDateMatch[1])),
             daysRemaining: daysMatch ? parseInt(daysMatch[1], 10) : null,
             details: daysText
         });
     }
 
+    console.log(`[Domain Details] Loaded ${entries.length} domain entries from fallback HTML report`);
+
     suiteConfigCache.domains = entries;
+    suiteConfigCache.domainsCacheKey = stateGeneratedAt;
     return suiteConfigCache.domains;
 }
 
 function createEmptySuiteResult() {
     return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+}
+
+function getProjectDomainStatus(project, domainDetails) {
+    const matched = (domainDetails || []).filter((detail) =>
+        (project.domains || []).some((projectDomain) => {
+            const a = normalizeDomainValue(detail.domain);
+            const b = normalizeDomainValue(projectDomain);
+            return a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`);
+        })
+    );
+
+    console.log('PROJECT DOMAIN MATCH:', project.id, matched);
+
+    const total = matched.length;
+    const passed = matched.filter((detail) => detail.status === 'active').length;
+    const warning = matched.filter((detail) => detail.status === 'expiring').length;
+    const failed = matched.filter((detail) => detail.status === 'error').length;
+
+    return { total, passed, warning, failed, matched };
+}
+
+function getProjectSslDetails(project, sslDetails) {
+    const sslEntries = getProjectSslEntries(project);
+    const sslResults = (sslDetails || []).filter((detail) =>
+        sslEntries.some((domain) => {
+            const a = normalizeDomainValue(detail.domain);
+            const b = normalizeDomainValue(domain);
+            return a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`);
+        })
+    );
+
+    console.log('PROJECT SSL RESULTS:', project && project.id, sslResults);
+    return sslResults;
+}
+
+function attachProjectDomainStatuses(projects, dashboardState) {
+    const domainSuite = dashboardState && dashboardState.suites ? dashboardState.suites.domain : null;
+    const domainDetails = domainSuite && Array.isArray(domainSuite.details) ? domainSuite.details : [];
+
+    console.log('DOMAIN DETAILS:', domainDetails);
+
+    projects.forEach((project) => {
+        const status = getProjectDomainStatus(project, domainDetails);
+        project.domainStatus = {
+            total: status.total,
+            passed: status.passed,
+            warning: status.warning,
+            failed: status.failed
+        };
+    });
+}
+
+function attachProjectSslDetails(projects, dashboardState) {
+    const sslSuite = dashboardState && dashboardState.suites ? dashboardState.suites.cert : null;
+    const sslDetails = sslSuite && Array.isArray(sslSuite.details) ? sslSuite.details : [];
+
+    console.log('SSL DETAILS:', sslDetails);
+
+    projects.forEach((project) => {
+        project.sslDetails = getProjectSslDetails(project, sslDetails);
+    });
 }
 
 function getAppTestResults(projectId) {
@@ -971,6 +1189,9 @@ function getServerTestResults(projectId) {
 
 function getSSLTestResults(projectId) {
     try {
+        const dashboardState = readDashboardState();
+        const sslSuite = dashboardState && dashboardState.suites ? dashboardState.suites.cert : null;
+        const sslDetails = sslSuite && Array.isArray(sslSuite.details) ? sslSuite.details : [];
         const mapping = getProjectMapping();
         const project = mapping.projects.find((entry) => entry.id === projectId);
 
@@ -980,35 +1201,30 @@ function getSSLTestResults(projectId) {
             return createEmptySuiteResult();
         }
 
-        const rows = readSuiteRows('AdHash-Projects-Certificate-Expiry-Test');
-        const definitions = loadCertificateSuiteDefinitions();
         const result = createEmptySuiteResult();
 
-        sslEntries.forEach((domain) => {
-            const definition = definitions.find((entry) => normalizeSslHost(entry.url) === normalizeSslHost(domain));
-            if (!definition) {
-                return;
-            }
+        const matched = getProjectSslDetails(project, sslDetails)
+            .filter((detail) => sslEntries.some((domain) => detail.domain.includes(domain) || domain.includes(detail.domain)));
 
-            const row = findSuiteRow(rows, `Check SSL certificate for ${definition.name}`);
-            if (!row || row.status === 'skipped') {
-                return;
-            }
+        result.total = matched.length;
+        result.passed = matched.filter((detail) => detail.status === 'passed').length;
+        result.warning = matched.filter((detail) => detail.status === 'warning').length;
+        result.failed = matched.filter((detail) => detail.status === 'failed').length;
+        result.details = matched;
 
-            result.total++;
-            if (row.status === 'passed') {
-                result.passed++;
-            } else {
-                result.failed++;
-            }
-
+        matched.forEach((detail) => {
             result.tests.push({
-                name: definition.name,
-                url: `https://${normalizeSslHost(domain)}`,
-                status: row.status,
-                type: 'ssl'
+                name: detail.domain,
+                url: detail.url,
+                status: detail.status,
+                type: 'ssl',
+                expiryDate: detail.expiryDate,
+                expiryDateIST: detail.expiryDateIST || formatToIST(detail.expiryDate),
+                daysRemaining: detail.daysRemaining
             });
         });
+
+        console.log('SSL DETAILS:', matched);
 
         return result;
     } catch (error) {
@@ -1019,6 +1235,9 @@ function getSSLTestResults(projectId) {
 
 function getDomainTestResults(projectId) {
     try {
+        const dashboardState = readDashboardState();
+        const domainSuite = dashboardState && dashboardState.suites ? dashboardState.suites.domain : null;
+        const domainDetails = domainSuite && Array.isArray(domainSuite.details) ? domainSuite.details : [];
         const mapping = getProjectMapping();
         const project = mapping.projects.find((entry) => entry.id === projectId);
 
@@ -1026,50 +1245,29 @@ function getDomainTestResults(projectId) {
             return createEmptySuiteResult();
         }
 
-        const domainEntries = loadDomainReportEntries();
         const result = createEmptySuiteResult();
-        const matchedDomains = new Set();
+        const status = getProjectDomainStatus(project, domainDetails);
 
-        project.domains.forEach((domain) => {
-            const normalizedDomain = normalizeUrl(domain);
-            const entry = domainEntries.find((item) => {
-                const normalizedEntryDomain = normalizeUrl(item.domain);
+        console.log('DOMAIN DETAILS:', domainDetails);
 
-                return normalizedEntryDomain === normalizedDomain
-                    || normalizedDomain.endsWith(`.${normalizedEntryDomain}`);
-            });
+        result.total = status.total;
+        result.passed = status.passed;
+        result.warning = status.warning;
+        result.failed = status.failed;
 
-            if (!entry) {
-                return;
-            }
-
-            const entryKey = normalizeUrl(entry.domain);
-            if (matchedDomains.has(entryKey)) {
-                return;
-            }
-
-            matchedDomains.add(entryKey);
-
-            result.total++;
-
-            if (entry.status === 'passed') {
-                result.passed++;
-            } else if (entry.status === 'warning') {
-                result.warning++;
-            } else {
-                result.failed++;
-            }
-
+        status.matched.forEach((detail) => {
             result.tests.push({
-                name: entry.name,
-                url: `https://${entry.domain}`,
-                status: entry.status,
+                name: detail.domain,
+                url: `https://${detail.domain}`,
+                status: detail.status === 'active' ? 'passed' : detail.status === 'expiring' ? 'warning' : 'failed',
                 type: 'domain',
-                daysRemaining: entry.daysRemaining,
-                expiryDate: entry.expiryDate,
-                expiryDateIST: entry.expiryDateIST
+                expiryDate: detail.expiryDate || null,
+                expiryDateIST: detail.expiryDateIST || formatToIST(detail.expiryDate),
+                daysRemaining: detail.daysRemaining ?? null
             });
         });
+
+        console.log(`[Domain Details] Project ${project.id} matched ${result.total}/${project.domains.length} domains`);
 
         return result;
     } catch (error) {
@@ -1080,6 +1278,9 @@ function getDomainTestResults(projectId) {
 
 function getAPITestResults(projectId) {
     try {
+        const dashboardState = readDashboardState();
+        const apiSuite = dashboardState && dashboardState.suites ? dashboardState.suites.api : null;
+        const apiDetails = apiSuite && Array.isArray(apiSuite.details) ? apiSuite.details : [];
         const mapping = getProjectMapping();
         const project = mapping.projects.find((entry) => entry.id === projectId);
 
@@ -1087,9 +1288,37 @@ function getAPITestResults(projectId) {
             return createEmptySuiteResult();
         }
 
-        const rows = readSuiteRows('AdHash-API-Test');
-        const definitions = loadApiSuiteDefinitions();
         const result = createEmptySuiteResult();
+        const projectApiKeys = new Set((project.apis || []).map((api) => buildApiStableKey(api.method, api.url, api.name)));
+
+        const apiResults = dedupeApiResults(
+            apiDetails.filter((detail) => detail && projectApiKeys.has(buildApiStableKey(detail.method, detail.url, detail.name)))
+        );
+
+        console.log('PROJECT API RESULTS:', project.id, apiResults);
+
+        if (apiResults.length > 0) {
+            result.total = apiResults.length;
+            result.passed = apiResults.filter((detail) => detail.status === 'passed').length;
+            result.warning = apiResults.filter((detail) => detail.status === 'warning').length;
+            result.failed = apiResults.filter((detail) => detail.status === 'failed').length;
+            result.tests = apiResults.map((detail) => ({
+                name: detail.name,
+                url: detail.url,
+                method: detail.method,
+                requestBody: detail.requestBody,
+                responseBody: detail.responseBody,
+                responseCode: detail.responseCode,
+                expectedStatus: detail.expectedStatus,
+                status: detail.status,
+                type: 'api'
+            }));
+
+            return result;
+        }
+
+        const rows = readSuiteRows('AdHash_API_Test');
+        const definitions = loadApiSuiteDefinitions();
 
         project.apis.forEach((api) => {
             const definition = definitions.find((entry) => {
@@ -1107,9 +1336,16 @@ function getAPITestResults(projectId) {
                 return;
             }
 
+            const expectedStatus = typeof definition.expectedStatus === 'number'
+                ? definition.expectedStatus
+                : (/^\d+$/.test(String(row.expectedStatus || '').trim()) ? parseInt(String(row.expectedStatus).trim(), 10) : undefined);
+            const status = classifyApiStatus(row.responseCode, expectedStatus);
+
             result.total++;
-            if (row.status === 'passed') {
+            if (status === 'passed') {
                 result.passed++;
+            } else if (status === 'warning') {
+                result.warning++;
             } else {
                 result.failed++;
             }
@@ -1118,13 +1354,20 @@ function getAPITestResults(projectId) {
                 name: definition.name,
                 url: definition.url,
                 method: definition.method,
-                requestBody: row.requestBody,
-                responseBody: row.responseBody,
+                requestBody: row.requestBody || (normalizeApiMethod(definition.method) === 'GET' ? 'No request body' : 'Payload not provided'),
+                responseBody: row.responseBody || 'No response body',
                 responseCode: row.responseCode,
-                status: row.status,
+                expectedStatus,
+                status,
                 type: 'api'
             });
         });
+
+        result.tests = dedupeApiResults(result.tests);
+        result.total = result.tests.length;
+        result.passed = result.tests.filter((detail) => detail.status === 'passed').length;
+        result.warning = result.tests.filter((detail) => detail.status === 'warning').length;
+        result.failed = result.tests.filter((detail) => detail.status === 'failed').length;
 
         return result;
     } catch (error) {

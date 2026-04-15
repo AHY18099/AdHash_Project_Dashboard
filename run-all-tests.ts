@@ -10,12 +10,62 @@ dotenv.config();
 
 const execAsync = promisify(exec);
 const DASHBOARD_STATE_PATH = path.join(process.cwd(), 'test-results', 'dashboard-state.json');
-const DOMAIN_REPORT_WORKING_DIRECTORY = 'D:\\Automation\\AdHash_Domain_Report_Standalone\\godaddy';
+const DOMAIN_REPORT_WORKING_DIRECTORY = path.join(process.cwd(), 'godaddy');
 const DOMAIN_REPORT_ENTRY_PATH = path.join(DOMAIN_REPORT_WORKING_DIRECTORY, 'index.js');
 const DOMAIN_REPORT_PACKAGE_PATH = path.join(DOMAIN_REPORT_WORKING_DIRECTORY, 'package.json');
 const DOMAIN_REPORT_OUTPUT_PATH = path.join(DOMAIN_REPORT_WORKING_DIRECTORY, 'report.html');
 
 type SuiteId = 'app' | 'server' | 'cert' | 'api' | 'domain';
+
+type DomainDetailStatus = 'active' | 'expiring' | 'error';
+
+type SslDetailStatus = 'passed' | 'warning' | 'failed';
+
+interface DomainDetail {
+  domain: string;
+  status: DomainDetailStatus;
+  expiryDate: string | null;
+  expiryDateIST: string;
+  daysRemaining: number | null;
+}
+
+interface SslDetail {
+  domain: string;
+  url: string;
+  status: SslDetailStatus;
+  expiryDate: string | null;
+  expiryDateIST: string;
+  daysRemaining: number | null;
+}
+
+interface ApiDetail {
+  name: string;
+  url: string;
+  method: string;
+  requestBody: string;
+  responseBody: string;
+  responseCode: number | null;
+  expectedStatus?: number;
+  status: 'passed' | 'warning' | 'failed';
+  type: 'api';
+}
+
+type SuiteDetail = DomainDetail | SslDetail | ApiDetail;
+
+interface DomainSuiteReport {
+  passed: number;
+  failed: number;
+  warnings: number;
+  total: number;
+  details: SuiteDetail[];
+}
+
+interface ApiSuiteConfig {
+  name: string;
+  url: string;
+  method: string;
+  expectedStatus?: number;
+}
 
 interface TestResult {
   repository: string;
@@ -28,6 +78,7 @@ interface TestResult {
   failed?: number;
   warnings?: number;
   total?: number;
+  details?: SuiteDetail[];
 }
 
 interface SuiteDefinition {
@@ -54,7 +105,7 @@ interface DashboardStateSuite {
   failed: number;
   warning: number;
   total: number;
-  details: unknown[];
+  details: SuiteDetail[];
   duration: number;
   reportPath: string;
   message?: string;
@@ -215,22 +266,463 @@ function parseUnifiedSuiteReport(reportPath: string, fallbackTotal: number): { p
   };
 }
 
-function parseDomainSuiteReport(reportPath: string, fallbackTotal: number): { passed: number; failed: number; warnings: number; total: number } {
-  if (!reportPath || !fs.existsSync(reportPath)) {
-    return { passed: 0, failed: 0, warnings: 0, total: fallbackTotal };
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#x27;/gi, "'")
+    .replace(/&#x2f;/gi, '/');
+}
+
+function normalizeHtmlText(value: string): string {
+  return decodeHtmlEntities(value.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+}
+
+function decodeBase64Value(value?: string): string | undefined {
+  if (!value) {
+    return undefined;
   }
 
-  const html = fs.readFileSync(reportPath, 'utf-8');
-  const totalMatch = html.match(/<h3 id="totalDomains">(\d+)<\/h3>/i);
-  const activeMatch = html.match(/<h3 id="activeDomains">(\d+)<\/h3>/i);
-  const expiringMatch = html.match(/<h3 id="expiringDomains"[^>]*>(\d+)<\/h3>/i);
-  const errorMatch = html.match(/<h3 id="errorDomains">(\d+)<\/h3>/i);
+  try {
+    return Buffer.from(value, 'base64').toString('utf8');
+  } catch (error) {
+    return undefined;
+  }
+}
+
+function formatToIST(value?: string | null): string {
+  if (!value) return 'N/A';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'N/A';
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  }).format(date) + ' IST';
+}
+
+function parseDateValue(value?: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed || /^n\/?a$/i.test(trimmed)) {
+    return null;
+  }
+
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString();
+}
+
+function parseDaysRemaining(value?: string | null): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const match = value.match(/-?\d+/);
+  if (!match) {
+    return null;
+  }
+
+  const days = parseInt(match[0], 10);
+  return Number.isNaN(days) ? null : days;
+}
+
+function normalizeDomainHost(value?: string | null): string {
+  return String(value || '')
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/$/, '')
+    .toLowerCase();
+}
+
+function toDomainStatusFromSsl(status: SslDetailStatus): DomainDetailStatus {
+  if (status === 'warning') {
+    return 'expiring';
+  }
+
+  if (status === 'failed') {
+    return 'error';
+  }
+
+  return 'active';
+}
+
+function loadConfiguredDomains(): Set<string> {
+  const mappingPath = path.join(process.cwd(), 'config', 'project-mapping.json');
+  if (!fs.existsSync(mappingPath)) {
+    return new Set();
+  }
+
+  try {
+    const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8')) as { projects?: Array<{ domains?: string[] }> };
+    return new Set(
+      (mapping.projects || [])
+        .flatMap((project) => project.domains || [])
+        .map((domain) => normalizeDomainHost(domain))
+        .filter(Boolean)
+    );
+  } catch (error) {
+    console.error('[Domain Parser] Failed to load configured domains:', error);
+    return new Set();
+  }
+}
+
+function enrichDomainDetailsWithSsl(domainDetails: DomainDetail[], sslDetails: SslDetail[]): DomainDetail[] {
+  const detailsByDomain = new Map<string, DomainDetail>();
+  const configuredDomains = loadConfiguredDomains();
+
+  domainDetails.forEach((detail) => {
+    detailsByDomain.set(normalizeDomainHost(detail.domain), detail);
+  });
+
+  sslDetails.forEach((detail) => {
+    const normalizedDomain = normalizeDomainHost(detail.domain);
+    if (!normalizedDomain || !configuredDomains.has(normalizedDomain)) {
+      return;
+    }
+
+    const existingDetail = detailsByDomain.get(normalizedDomain);
+    if (existingDetail) {
+      detailsByDomain.set(normalizedDomain, {
+        ...existingDetail,
+        expiryDate: existingDetail.expiryDate || detail.expiryDate,
+        expiryDateIST: existingDetail.expiryDateIST !== 'N/A' ? existingDetail.expiryDateIST : detail.expiryDateIST,
+        daysRemaining: existingDetail.daysRemaining ?? detail.daysRemaining
+      });
+      return;
+    }
+
+    detailsByDomain.set(normalizedDomain, {
+      domain: normalizedDomain,
+      status: toDomainStatusFromSsl(detail.status),
+      expiryDate: detail.expiryDate,
+      expiryDateIST: detail.expiryDateIST,
+      daysRemaining: detail.daysRemaining
+    });
+  });
+
+  return Array.from(detailsByDomain.values());
+}
+
+function normalizeApiMethod(method?: string): string {
+  return String(method || 'GET').trim().toUpperCase();
+}
+
+function normalizeApiUrl(value?: string): string {
+  return String(value || '').trim().replace(/\/+$/, '').toLowerCase();
+}
+
+function normalizeApiName(value?: string): string {
+  return normalizeHtmlText(String(value || '')).toLowerCase();
+}
+
+function buildApiStableKey(method?: string, url?: string, name?: string): string {
+  return `${normalizeApiMethod(method)}::${normalizeApiUrl(url)}::${normalizeApiName(name)}`;
+}
+
+function getApiRequestFallback(method: string): string {
+  return method === 'GET' || method === 'DELETE' ? 'No request body' : 'Payload not provided';
+}
+
+function getApiResponseFallback(): string {
+  return 'No response body';
+}
+
+function classifyApiStatus(responseCode: number | null, expectedStatus?: number): 'passed' | 'warning' | 'failed' {
+  if (typeof expectedStatus === 'number') {
+    if (responseCode !== expectedStatus) {
+      return 'failed';
+    }
+
+    if (expectedStatus >= 300 && expectedStatus < 400) {
+      return 'warning';
+    }
+
+    return 'passed';
+  }
+
+  if (responseCode === null) {
+    return 'failed';
+  }
+
+  if (responseCode >= 200 && responseCode < 300) {
+    return 'passed';
+  }
+
+  if (responseCode >= 300 && responseCode < 400) {
+    return 'warning';
+  }
+
+  return 'failed';
+}
+
+function loadApiSuiteConfigs(): ApiSuiteConfig[] {
+  const mappingPath = path.join(process.cwd(), 'config', 'project-mapping.json');
+  if (!fs.existsSync(mappingPath)) {
+    return [];
+  }
+
+  try {
+    const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8')) as { projects?: Array<{ apis?: ApiSuiteConfig[] }> };
+    return (mapping.projects || [])
+      .flatMap((project) => project.apis || [])
+      .filter((api): api is ApiSuiteConfig => Boolean(api?.name && api?.url && api?.method));
+  } catch (error) {
+    console.error('[API Parser] Failed to load project mapping for API expectations:', error);
+    return [];
+  }
+}
+
+function parseApiSuiteReport(reportPath: string, fallbackTotal: number): DomainSuiteReport {
+  if (!reportPath) {
+    return { passed: 0, failed: 0, warnings: 0, total: fallbackTotal, details: [] };
+  }
+
+  const fullReportPath = path.join(process.cwd(), reportPath);
+  if (!fs.existsSync(fullReportPath)) {
+    return { passed: 0, failed: 0, warnings: 0, total: fallbackTotal, details: [] };
+  }
+
+  const html = fs.readFileSync(fullReportPath, 'utf8');
+  const rowPattern = /<tr class="test-row (passed|failed|skipped)">[\s\S]*?<td class="test-name">([^<]+)<\/td>[\s\S]*?<span class="status-badge [^"]+">([^<]+)<\/span>[\s\S]*?<td class="test-duration">([^<]+)<\/td>[\s\S]*?<td class="test-details"([^>]*)>([\s\S]*?)<\/td>[\s\S]*?<\/tr>/gi;
+  const configs = loadApiSuiteConfigs();
+  const configByMethodAndName = new Map(
+    configs.map((entry) => [
+      `${normalizeApiMethod(entry.method)}::${normalizeApiName(entry.name)}`,
+      entry
+    ])
+  );
+  const detailsByKey = new Map<string, ApiDetail>();
+  let parsedCount = 0;
+
+  for (const match of html.matchAll(rowPattern)) {
+    const attributes = match[5] || '';
+    const title = decodeHtmlEntities(match[2]).trim();
+    const titleMatch = title.match(/^(GET|POST|PUT|DELETE|PATCH)\s+(.+)$/i);
+
+    if (!titleMatch) {
+      continue;
+    }
+
+    const method = normalizeApiMethod(titleMatch[1]);
+    const name = titleMatch[2].trim();
+    const requestBody = decodeBase64Value(attributes.match(/data-request-body="([^"]*)"/i)?.[1]) || getApiRequestFallback(method);
+    const responseBody = decodeBase64Value(attributes.match(/data-response-body="([^"]*)"/i)?.[1]) || getApiResponseFallback();
+    const responseCodeValue = decodeHtmlEntities(attributes.match(/data-response-code="([^"]*)"/i)?.[1] || '').trim();
+    const responseCode = /^\d+$/.test(responseCodeValue) ? parseInt(responseCodeValue, 10) : null;
+
+    const config = configByMethodAndName.get(`${method}::${normalizeApiName(name)}`);
+
+    const apiResult: ApiDetail = {
+      name,
+      url: config?.url || '',
+      method,
+      requestBody,
+      responseBody,
+      responseCode,
+      expectedStatus: config?.expectedStatus,
+      status: classifyApiStatus(responseCode, config?.expectedStatus),
+      type: 'api'
+    };
+
+    console.log('API RESULT PARSED:', apiResult);
+    detailsByKey.set(buildApiStableKey(apiResult.method, apiResult.url, apiResult.name), apiResult);
+    parsedCount++;
+  }
+
+  const details = Array.from(detailsByKey.values());
+
+  console.log('DEDUPED API RESULTS:', {
+    parsed: parsedCount,
+    unique: details.length,
+    removed: parsedCount - details.length
+  });
 
   return {
-    total: totalMatch ? parseInt(totalMatch[1], 10) : fallbackTotal,
-    passed: activeMatch ? parseInt(activeMatch[1], 10) : 0,
-    warnings: expiringMatch ? parseInt(expiringMatch[1], 10) : 0,
-    failed: errorMatch ? parseInt(errorMatch[1], 10) : 0
+    passed: details.filter((detail) => detail.status === 'passed').length,
+    failed: details.filter((detail) => detail.status === 'failed').length,
+    warnings: details.filter((detail) => detail.status === 'warning').length,
+    total: details.length || fallbackTotal,
+    details
+  };
+}
+
+function parseDomainSuiteReport(reportPath: string, fallbackTotal: number): DomainSuiteReport {
+  if (!reportPath) {
+    console.log('[Domain Parser] Report path missing: N/A');
+    return { passed: 0, failed: 0, warnings: 0, total: fallbackTotal, details: [] };
+  }
+
+  try {
+    if (!fs.existsSync(reportPath)) {
+      console.log(`[Domain Parser] Report file not found at ${reportPath}`);
+      return { passed: 0, failed: 0, warnings: 0, total: fallbackTotal, details: [] };
+    }
+
+    const html = fs.readFileSync(reportPath, 'utf-8');
+
+    if (!html || !html.trim()) {
+      console.log(`[Domain Parser] Empty HTML in ${reportPath}`);
+      return { passed: 0, failed: 0, warnings: 0, total: fallbackTotal, details: [] };
+    }
+
+    const details: DomainDetail[] = [];
+    const cardPattern = /<div class="domain-card(?: expiring-soon| error)?"[^>]*>[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/gi;
+
+    for (const match of html.matchAll(cardPattern)) {
+      const cardHtml = match[0];
+      const domain = normalizeDomainHost(cardHtml.match(/<div class="domain-url">([^<]+)<\/div>/i)?.[1]);
+      if (!domain) {
+        continue;
+      }
+
+      const badgeClass = cardHtml.match(/<span class="status-badge ([^"]+)">/i)?.[1] || '';
+      const daysText = cardHtml.match(/<div class="days-remaining(?: [^"]+)?"[^>]*>\s*([^<]+)\s*<\/div>/i)?.[1] || '';
+      const daysRemaining = parseDaysRemaining(daysText);
+      const expiryDate = parseDateValue(cardHtml.match(/<div class="expiry-date">([^<]+)<\/div>/i)?.[1]);
+      const expiryDateIST = cardHtml.match(/<div class="expiry-date-ist">([^<]+)<\/div>/i)?.[1]?.trim() || formatToIST(expiryDate);
+
+      let status: DomainDetailStatus = 'error';
+      if (badgeClass.includes('status-active')) {
+        status = (daysRemaining !== null && daysRemaining <= 30) ? 'expiring' : 'active';
+      } else if (badgeClass.includes('status-error')) {
+        status = 'error';
+      }
+
+      details.push({
+        domain,
+        status,
+        expiryDate,
+        expiryDateIST,
+        daysRemaining
+      });
+    }
+
+    const rowPattern = /<div class="domain-row">([\s\S]*?)<\/div>/gi;
+    for (const match of html.matchAll(rowPattern)) {
+      const rowHtml = match[1] || '';
+      const domain = normalizeDomainHost(rowHtml.match(/domain-name">([^<]+)</i)?.[1]);
+      if (!domain || details.some((detail) => normalizeDomainHost(detail.domain) === domain)) {
+        continue;
+      }
+
+      const expiryDate = parseDateValue(rowHtml.match(/expiry-date">([^<]+)</i)?.[1]);
+      const daysRemaining = parseDaysRemaining(rowHtml.match(/days-remaining">([^<]+)</i)?.[1]);
+      const status = ((rowHtml.match(/status\s+(active|expiring|error)/i)?.[1] || 'error').toLowerCase() as DomainDetailStatus);
+
+      details.push({
+        domain,
+        status,
+        expiryDate,
+        expiryDateIST: formatToIST(expiryDate),
+        daysRemaining
+      });
+    }
+
+    const passed = details.filter((detail) => detail.status === 'active').length;
+    const failed = details.filter((detail) => detail.status === 'error').length;
+    const warnings = details.filter((detail) => detail.status === 'expiring').length;
+    const total = details.length || fallbackTotal;
+    const sampleDomains = details.slice(0, 3).map((detail) => `${detail.domain} (${detail.status})`).join(', ');
+
+    console.log(`[Domain Parser] Parsed ${details.length} domain rows from ${reportPath}`);
+    console.log(`[Domain Parser] Sample parsed domains: ${sampleDomains || 'none'}`);
+    console.log('DOMAIN DETAILS PARSED:', details);
+
+    return {
+      passed,
+      failed,
+      warnings,
+      total,
+      details
+    };
+  } catch (error) {
+    console.error(`[Domain Parser] Failed to parse ${reportPath}:`, error);
+    return { passed: 0, failed: 0, warnings: 0, total: fallbackTotal, details: [] };
+  }
+}
+
+function parseSslSuiteReport(reportPath: string, rawOutput: string, fallbackTotal: number): DomainSuiteReport {
+  if (!reportPath) {
+    return { passed: 0, failed: 0, warnings: 0, total: fallbackTotal, details: [] };
+  }
+
+  const fullReportPath = path.join(process.cwd(), reportPath);
+  if (!fs.existsSync(fullReportPath)) {
+    return { passed: 0, failed: 0, warnings: 0, total: fallbackTotal, details: [] };
+  }
+
+  const html = fs.readFileSync(fullReportPath, 'utf-8');
+  const summary = parseUnifiedSuiteReport(reportPath, fallbackTotal);
+  const rowPattern = /<tr class="test-row (passed|failed|skipped)">[\s\S]*?<td class="test-name">Check SSL certificate for ([^<]+)<\/td>[\s\S]*?<\/tr>/gi;
+  const details: SslDetail[] = [];
+
+  for (const match of html.matchAll(rowPattern)) {
+    const rowStatus = match[1].toLowerCase();
+    const domain = decodeHtmlEntities(match[2]).trim();
+
+    if (!domain || rowStatus === 'skipped') {
+      continue;
+    }
+
+    const outputBlockMatch = rawOutput.match(new RegExp(`=== ${escapeRegExp(domain)} Certificate Info ===([\\s\\S]*?)=====================================`, 'i'));
+    const outputBlock = (outputBlockMatch?.[1] || '').replace(/Valid To:/i, 'Expiry Date:');
+    const expiryMatch = outputBlock.match(/Expiry Date:\s*([^\n<]+)/i);
+    const daysMatch = outputBlock.match(/Days Remaining:\s*([0-9]+)/i);
+
+    const expiryDate = parseDateValue(expiryMatch?.[1]?.trim() || null);
+    const daysRemaining = parseDaysRemaining(daysMatch?.[1]?.trim() || null);
+
+    let status: SslDetailStatus = rowStatus === 'passed' ? 'passed' : 'failed';
+    if (status === 'passed' && daysRemaining !== null && daysRemaining <= 30) {
+      status = 'warning';
+    }
+
+    details.push({
+      domain,
+      url: `https://${domain}`,
+      status,
+      expiryDate,
+      expiryDateIST: formatToIST(expiryDate),
+      daysRemaining
+    });
+  }
+
+  const passed = details.filter((detail) => detail.status === 'passed').length;
+  const failed = details.filter((detail) => detail.status === 'failed').length;
+  const warnings = details.filter((detail) => detail.status === 'warning').length;
+  const total = details.length || summary.total || fallbackTotal;
+  const sampleDetails = details.slice(0, 3).map((detail) => `${detail.domain} => ${detail.expiryDate} (${detail.daysRemaining} days)`).join(', ');
+
+  console.log(`[SSL Parser] Parsed ${details.length} SSL details from ${reportPath}`);
+  console.log(`[SSL Parser] Sample SSL details: ${sampleDetails || 'none'}`);
+  console.log('SSL DETAILS PARSED:', details);
+
+  return {
+    passed,
+    failed,
+    warnings,
+    total,
+    details
   };
 }
 
@@ -244,6 +736,7 @@ function createUnavailableResult(definition: SuiteDefinition): TestResult {
     failed: 0,
     warnings: 0,
     total: 0,
+    details: [],
     message: definition.unavailableMessage || 'Not configured in current workspace'
   };
 }
@@ -263,7 +756,8 @@ function createDefaultResult(definition: SuiteDefinition): TestResult {
     passed: 0,
     failed: 0,
     warnings: 0,
-    total: execution.fallbackTotal
+    total: execution.fallbackTotal,
+    details: []
   };
 }
 
@@ -300,7 +794,8 @@ function buildStoredResultsMap(): Map<string, TestResult> {
       passed: suiteState.passed || 0,
       failed: suiteState.failed || 0,
       warnings: suiteState.warning || 0,
-      total: suiteState.total || 0
+      total: suiteState.total || 0,
+      details: suiteState.details || []
     });
   });
 
@@ -308,6 +803,21 @@ function buildStoredResultsMap(): Map<string, TestResult> {
 }
 
 function writeDashboardState(finalResults: TestResult[]): void {
+  const domainResult = finalResults.find((entry) => entry.repository === 'AdHash_Domain_Report');
+  const sslResult = finalResults.find((entry) => entry.repository === 'AdHash-Projects-Certificate-Expiry-Test');
+
+  if (domainResult && sslResult) {
+    domainResult.details = enrichDomainDetailsWithSsl(
+      (domainResult.details || []) as DomainDetail[],
+      (sslResult.details || []) as SslDetail[]
+    );
+    domainResult.total = domainResult.details.length;
+    domainResult.passed = domainResult.details.filter((detail) => (detail as DomainDetail).status === 'active').length;
+    domainResult.warnings = domainResult.details.filter((detail) => (detail as DomainDetail).status === 'expiring').length;
+    domainResult.failed = domainResult.details.filter((detail) => (detail as DomainDetail).status === 'error').length;
+    domainResult.status = domainResult.failed > 0 ? 'failed' : 'success';
+  }
+
   const suites = {} as Record<SuiteId, DashboardStateSuite>;
 
   suiteDefinitions.forEach((definition) => {
@@ -328,7 +838,7 @@ function writeDashboardState(finalResults: TestResult[]): void {
       failed: result.failed || 0,
       warning: result.warnings || 0,
       total: result.total || 0,
-      details: [],
+      details: result.details || [],
       duration: result.duration || 0,
       reportPath: result.reportPath || '',
       message: result.message
@@ -398,7 +908,11 @@ async function runCommand(definition: SuiteDefinition): Promise<TestResult> {
       : archiveSuiteReport(definition.repository);
     const parsed = definition.id === 'domain'
       ? parseDomainSuiteReport(reportPath, fallbackTotal)
-      : { ...parseUnifiedSuiteReport(reportPath, fallbackTotal), warnings: 0 };
+      : definition.id === 'cert'
+        ? parseSslSuiteReport(reportPath, stdout || '', fallbackTotal)
+        : definition.id === 'api'
+          ? parseApiSuiteReport(reportPath, fallbackTotal)
+          : { ...parseUnifiedSuiteReport(reportPath, fallbackTotal), warnings: 0, details: [] as SuiteDetail[] };
     const status = parsed.failed > 0 ? 'failed' : 'success';
 
     return {
@@ -409,7 +923,8 @@ async function runCommand(definition: SuiteDefinition): Promise<TestResult> {
       passed: parsed.passed || (definition.id === 'domain' ? 0 : parsed.total),
       failed: parsed.failed,
       warnings: parsed.warnings || 0,
-      total: parsed.total
+      total: parsed.total,
+      details: (definition.id === 'domain' || definition.id === 'cert' || definition.id === 'api') ? parsed.details : []
     };
   } catch (error: any) {
     if (error.stdout) {
@@ -425,7 +940,11 @@ async function runCommand(definition: SuiteDefinition): Promise<TestResult> {
       : archiveSuiteReport(definition.repository);
     const parsed = definition.id === 'domain'
       ? parseDomainSuiteReport(reportPath, fallbackTotal)
-      : { ...parseUnifiedSuiteReport(reportPath, fallbackTotal), warnings: 0 };
+      : definition.id === 'cert'
+        ? parseSslSuiteReport(reportPath, `${error.stdout || ''}\n${error.stderr || ''}`, fallbackTotal)
+        : definition.id === 'api'
+          ? parseApiSuiteReport(reportPath, fallbackTotal)
+          : { ...parseUnifiedSuiteReport(reportPath, fallbackTotal), warnings: 0, details: [] as SuiteDetail[] };
 
     return {
       repository: definition.repository,
@@ -436,7 +955,8 @@ async function runCommand(definition: SuiteDefinition): Promise<TestResult> {
       passed: parsed.passed,
       failed: parsed.failed || Math.max(parsed.total - parsed.passed, 1),
       warnings: parsed.warnings || 0,
-      total: parsed.total || fallbackTotal
+      total: parsed.total || fallbackTotal,
+      details: (definition.id === 'domain' || definition.id === 'cert' || definition.id === 'api') ? parsed.details : []
     };
   }
 }
