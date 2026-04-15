@@ -1,0 +1,13 @@
+# Generated dashboard and test artifacts
+/suite-reports/
+/playwright-report/
+/test-results/
+/unified-dashboard/
+/unified-report/
+/godaddy/report.html
+
+# Temporary logs and scratch files
+/logs/
+*.log
+*.tmp
+*.temp
