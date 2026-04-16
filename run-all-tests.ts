@@ -14,6 +14,7 @@ const DOMAIN_REPORT_WORKING_DIRECTORY = path.join(process.cwd(), 'godaddy');
 const DOMAIN_REPORT_ENTRY_PATH = path.join(DOMAIN_REPORT_WORKING_DIRECTORY, 'index.js');
 const DOMAIN_REPORT_PACKAGE_PATH = path.join(DOMAIN_REPORT_WORKING_DIRECTORY, 'package.json');
 const DOMAIN_REPORT_OUTPUT_PATH = path.join(DOMAIN_REPORT_WORKING_DIRECTORY, 'report.html');
+const EXPIRY_WARNING_DAYS = 30;
 
 type SuiteId = 'app' | 'server' | 'cert' | 'api' | 'domain';
 
@@ -23,6 +24,7 @@ type SslDetailStatus = 'passed' | 'warning' | 'failed';
 
 interface DomainDetail {
   domain: string;
+  url: string;
   status: DomainDetailStatus;
   expiryDate: string | null;
   expiryDateIST: string;
@@ -36,6 +38,7 @@ interface SslDetail {
   expiryDate: string | null;
   expiryDateIST: string;
   daysRemaining: number | null;
+  reason?: string;
 }
 
 interface ApiDetail {
@@ -345,6 +348,40 @@ function parseDaysRemaining(value?: string | null): number | null {
   return Number.isNaN(days) ? null : days;
 }
 
+function getExpiryStatus(daysRemaining?: number | null, hasError = false): SslDetailStatus {
+  const normalizedDays = daysRemaining === null || daysRemaining === undefined
+    ? null
+    : Number(daysRemaining);
+
+  if (hasError || normalizedDays === null || Number.isNaN(normalizedDays)) {
+    return 'failed';
+  }
+
+  if (normalizedDays < 0) {
+    return 'failed';
+  }
+
+  if (normalizedDays <= EXPIRY_WARNING_DAYS) {
+    return 'warning';
+  }
+
+  return 'passed';
+}
+
+function classifyDomainStatus(daysRemaining: number | null | undefined, hasError = false): DomainDetailStatus {
+  const status = getExpiryStatus(daysRemaining, hasError);
+
+  if (status === 'warning') {
+    return 'expiring';
+  }
+
+  if (status === 'failed') {
+    return 'error';
+  }
+
+  return 'active';
+}
+
 function normalizeDomainHost(value?: string | null): string {
   return String(value || '')
     .trim()
@@ -352,6 +389,157 @@ function normalizeDomainHost(value?: string | null): string {
     .replace(/^www\./i, '')
     .replace(/\/$/, '')
     .toLowerCase();
+}
+
+function buildTrackedDetailKey(type: 'ssl' | 'domain', domain?: string | null, url?: string | null): string {
+  return `${type}::${normalizeDomainHost(domain || url || '')}`;
+}
+
+function getTrackedDetailScore(detail: { status?: string; expiryDate?: string | null; expiryDateIST?: string; daysRemaining?: number | null; reason?: string }): number {
+  let score = 0;
+
+  if (detail.expiryDate) {
+    score += 3;
+  }
+
+  if (detail.expiryDateIST && detail.expiryDateIST !== 'N/A') {
+    score += 2;
+  }
+
+  if (detail.daysRemaining !== null && detail.daysRemaining !== undefined && !Number.isNaN(Number(detail.daysRemaining))) {
+    score += 3;
+  }
+
+  if (detail.reason) {
+    score += 2;
+  }
+
+  if (detail.status === 'passed') {
+    score += 3;
+  } else if (detail.status === 'warning' || detail.status === 'expiring') {
+    score += 2;
+  } else if (detail.status === 'failed' || detail.status === 'error') {
+    score += 1;
+  }
+
+  return score;
+}
+
+function pickPreferredTrackedDetail<T extends { domain?: string; url?: string; status?: string; expiryDate?: string | null; expiryDateIST?: string; daysRemaining?: number | null; reason?: string }>(
+  existing: T | undefined,
+  incoming: T
+): T {
+  if (!existing) {
+    return incoming;
+  }
+
+  const existingScore = getTrackedDetailScore(existing);
+  const incomingScore = getTrackedDetailScore(incoming);
+
+  if (incomingScore > existingScore) {
+    return {
+      ...existing,
+      ...incoming,
+      domain: incoming.domain || existing.domain,
+      url: incoming.url || existing.url,
+      expiryDate: incoming.expiryDate || existing.expiryDate,
+      expiryDateIST: incoming.expiryDateIST && incoming.expiryDateIST !== 'N/A' ? incoming.expiryDateIST : existing.expiryDateIST,
+      daysRemaining: incoming.daysRemaining ?? existing.daysRemaining,
+      reason: incoming.reason || existing.reason
+    };
+  }
+
+  return {
+    ...incoming,
+    ...existing,
+    domain: existing.domain || incoming.domain,
+    url: existing.url || incoming.url,
+    expiryDate: existing.expiryDate || incoming.expiryDate,
+    expiryDateIST: existing.expiryDateIST && existing.expiryDateIST !== 'N/A' ? existing.expiryDateIST : incoming.expiryDateIST,
+      daysRemaining: existing.daysRemaining ?? incoming.daysRemaining,
+      reason: existing.reason || incoming.reason
+  };
+}
+
+function normalizeSslFailureReason(errorMessage?: string | null): string | undefined {
+  const normalizedMessage = String(errorMessage || '').trim();
+  if (!normalizedMessage) {
+    return undefined;
+  }
+
+  if (/ENOTFOUND|getaddrinfo/i.test(normalizedMessage)) {
+    return `DNS RESOLUTION FAILED: ${normalizedMessage}`;
+  }
+
+  if (/ETIMEDOUT|timeout/i.test(normalizedMessage)) {
+    return `TCP CONNECT TIMEOUT: ${normalizedMessage}`;
+  }
+
+  if (/handshake|tls|ssl/i.test(normalizedMessage)) {
+    return `TLS HANDSHAKE FAILED: ${normalizedMessage}`;
+  }
+
+  if (/No certificate found/i.test(normalizedMessage)) {
+    return `CERTIFICATE FETCH FAILED: ${normalizedMessage}`;
+  }
+
+  return `CERTIFICATE FETCH FAILED: ${normalizedMessage}`;
+}
+
+function dedupeDomainDetails(details: DomainDetail[]): DomainDetail[] {
+  const deduped = new Map<string, DomainDetail>();
+
+  details.forEach((detail) => {
+    if (!detail) {
+      return;
+    }
+
+    const normalizedDomain = normalizeDomainHost(detail.domain || detail.url);
+    if (!normalizedDomain) {
+      return;
+    }
+
+    const normalizedDetail: DomainDetail = {
+      ...detail,
+      domain: normalizedDomain,
+      url: detail.url || `https://${normalizedDomain}`
+    };
+
+    deduped.set(
+      buildTrackedDetailKey('domain', normalizedDetail.domain, normalizedDetail.url),
+      pickPreferredTrackedDetail(deduped.get(buildTrackedDetailKey('domain', normalizedDetail.domain, normalizedDetail.url)), normalizedDetail)
+    );
+  });
+
+  return Array.from(deduped.values());
+}
+
+function dedupeSslDetails(details: SslDetail[]): SslDetail[] {
+  const deduped = new Map<string, SslDetail>();
+
+  details.forEach((detail) => {
+    if (!detail) {
+      return;
+    }
+
+    const normalizedDomain = normalizeDomainHost(detail.domain || detail.url);
+    if (!normalizedDomain) {
+      return;
+    }
+
+    const normalizedDetail: SslDetail = {
+      ...detail,
+      domain: normalizedDomain,
+      url: detail.url || `https://${normalizedDomain}`
+    };
+
+    deduped.set(
+      buildTrackedDetailKey('ssl', normalizedDetail.domain, normalizedDetail.url),
+      pickPreferredTrackedDetail(deduped.get(buildTrackedDetailKey('ssl', normalizedDetail.domain, normalizedDetail.url)), normalizedDetail)
+    );
+  });
+
+  return Array.from(deduped.values());
 }
 
 function toDomainStatusFromSsl(status: SslDetailStatus): DomainDetailStatus {
@@ -390,11 +578,15 @@ function enrichDomainDetailsWithSsl(domainDetails: DomainDetail[], sslDetails: S
   const detailsByDomain = new Map<string, DomainDetail>();
   const configuredDomains = loadConfiguredDomains();
 
-  domainDetails.forEach((detail) => {
-    detailsByDomain.set(normalizeDomainHost(detail.domain), detail);
+  dedupeDomainDetails(domainDetails).forEach((detail) => {
+    detailsByDomain.set(normalizeDomainHost(detail.domain), {
+      ...detail,
+      url: detail.url || `https://${normalizeDomainHost(detail.domain)}`,
+      status: classifyDomainStatus(detail.daysRemaining, detail.status === 'error' && (detail.daysRemaining === null || detail.daysRemaining === undefined))
+    });
   });
 
-  sslDetails.forEach((detail) => {
+  dedupeSslDetails(sslDetails).forEach((detail) => {
     const normalizedDomain = normalizeDomainHost(detail.domain);
     if (!normalizedDomain || !configuredDomains.has(normalizedDomain)) {
       return;
@@ -402,25 +594,30 @@ function enrichDomainDetailsWithSsl(domainDetails: DomainDetail[], sslDetails: S
 
     const existingDetail = detailsByDomain.get(normalizedDomain);
     if (existingDetail) {
+      const daysRemaining = existingDetail.daysRemaining ?? detail.daysRemaining;
       detailsByDomain.set(normalizedDomain, {
         ...existingDetail,
+        url: existingDetail.url || detail.url || `https://${normalizedDomain}`,
+        status: classifyDomainStatus(daysRemaining, existingDetail.status === 'error' && (daysRemaining === null || daysRemaining === undefined)),
         expiryDate: existingDetail.expiryDate || detail.expiryDate,
         expiryDateIST: existingDetail.expiryDateIST !== 'N/A' ? existingDetail.expiryDateIST : detail.expiryDateIST,
-        daysRemaining: existingDetail.daysRemaining ?? detail.daysRemaining
+        daysRemaining
       });
       return;
     }
 
     detailsByDomain.set(normalizedDomain, {
       domain: normalizedDomain,
-      status: toDomainStatusFromSsl(detail.status),
+      url: detail.url || `https://${normalizedDomain}`,
+      status: classifyDomainStatus(detail.daysRemaining, detail.status === 'failed'),
       expiryDate: detail.expiryDate,
       expiryDateIST: detail.expiryDateIST,
       daysRemaining: detail.daysRemaining
     });
   });
 
-  return Array.from(detailsByDomain.values());
+  return dedupeDomainDetails(Array.from(detailsByDomain.values()))
+    .filter((detail) => configuredDomains.has(normalizeDomainHost(detail.domain)));
 }
 
 function normalizeApiMethod(method?: string): string {
@@ -600,16 +797,11 @@ function parseDomainSuiteReport(reportPath: string, fallbackTotal: number): Doma
       const daysRemaining = parseDaysRemaining(daysText);
       const expiryDate = parseDateValue(cardHtml.match(/<div class="expiry-date">([^<]+)<\/div>/i)?.[1]);
       const expiryDateIST = cardHtml.match(/<div class="expiry-date-ist">([^<]+)<\/div>/i)?.[1]?.trim() || formatToIST(expiryDate);
-
-      let status: DomainDetailStatus = 'error';
-      if (badgeClass.includes('status-active')) {
-        status = (daysRemaining !== null && daysRemaining <= 30) ? 'expiring' : 'active';
-      } else if (badgeClass.includes('status-error')) {
-        status = 'error';
-      }
+      const status = classifyDomainStatus(daysRemaining, !badgeClass.includes('status-active'));
 
       details.push({
         domain,
+        url: `https://${domain}`,
         status,
         expiryDate,
         expiryDateIST,
@@ -627,10 +819,12 @@ function parseDomainSuiteReport(reportPath: string, fallbackTotal: number): Doma
 
       const expiryDate = parseDateValue(rowHtml.match(/expiry-date">([^<]+)</i)?.[1]);
       const daysRemaining = parseDaysRemaining(rowHtml.match(/days-remaining">([^<]+)</i)?.[1]);
-      const status = ((rowHtml.match(/status\s+(active|expiring|error)/i)?.[1] || 'error').toLowerCase() as DomainDetailStatus);
+      const rawStatus = (rowHtml.match(/status\s+(active|expiring|error)/i)?.[1] || 'error').toLowerCase();
+      const status = classifyDomainStatus(daysRemaining, rawStatus === 'error');
 
       details.push({
         domain,
+        url: `https://${domain}`,
         status,
         expiryDate,
         expiryDateIST: formatToIST(expiryDate),
@@ -638,22 +832,24 @@ function parseDomainSuiteReport(reportPath: string, fallbackTotal: number): Doma
       });
     }
 
-    const passed = details.filter((detail) => detail.status === 'active').length;
-    const failed = details.filter((detail) => detail.status === 'error').length;
-    const warnings = details.filter((detail) => detail.status === 'expiring').length;
-    const total = details.length || fallbackTotal;
-    const sampleDomains = details.slice(0, 3).map((detail) => `${detail.domain} (${detail.status})`).join(', ');
+    const dedupedDetails = dedupeDomainDetails(details);
+    const passed = dedupedDetails.filter((detail) => detail.status === 'active').length;
+    const failed = dedupedDetails.filter((detail) => detail.status === 'error').length;
+    const warnings = dedupedDetails.filter((detail) => detail.status === 'expiring').length;
+    const total = dedupedDetails.length;
+    const sampleDomains = dedupedDetails.slice(0, 3).map((detail) => `${detail.domain} (${detail.status})`).join(', ');
 
     console.log(`[Domain Parser] Parsed ${details.length} domain rows from ${reportPath}`);
+    console.log(`[Domain Parser] Deduped to ${dedupedDetails.length} domain rows`);
     console.log(`[Domain Parser] Sample parsed domains: ${sampleDomains || 'none'}`);
-    console.log('DOMAIN DETAILS PARSED:', details);
+    console.log('DOMAIN DETAILS PARSED:', dedupedDetails);
 
     return {
       passed,
       failed,
       warnings,
       total,
-      details
+      details: dedupedDetails
     };
   } catch (error) {
     console.error(`[Domain Parser] Failed to parse ${reportPath}:`, error);
@@ -687,42 +883,45 @@ function parseSslSuiteReport(reportPath: string, rawOutput: string, fallbackTota
     const outputBlockMatch = rawOutput.match(new RegExp(`=== ${escapeRegExp(domain)} Certificate Info ===([\\s\\S]*?)=====================================`, 'i'));
     const outputBlock = (outputBlockMatch?.[1] || '').replace(/Valid To:/i, 'Expiry Date:');
     const expiryMatch = outputBlock.match(/Expiry Date:\s*([^\n<]+)/i);
-    const daysMatch = outputBlock.match(/Days Remaining:\s*([0-9]+)/i);
+    const daysMatch = outputBlock.match(/Days Remaining:\s*(-?\d+)/i);
+    const failureMatch = rawOutput.match(new RegExp(`✗ Error checking certificate for ${escapeRegExp(domain)}:\s*([^\r\n]+)`, 'i'));
 
     const expiryDate = parseDateValue(expiryMatch?.[1]?.trim() || null);
     const daysRemaining = parseDaysRemaining(daysMatch?.[1]?.trim() || null);
-
-    let status: SslDetailStatus = rowStatus === 'passed' ? 'passed' : 'failed';
-    if (status === 'passed' && daysRemaining !== null && daysRemaining <= 30) {
-      status = 'warning';
-    }
+    const status = getExpiryStatus(daysRemaining, rowStatus !== 'passed');
+    const reason = status === 'failed'
+      ? normalizeSslFailureReason(failureMatch?.[1]?.trim() || null)
+      : undefined;
 
     details.push({
-      domain,
-      url: `https://${domain}`,
+      domain: normalizeDomainHost(domain),
+      url: `https://${normalizeDomainHost(domain)}`,
       status,
       expiryDate,
       expiryDateIST: formatToIST(expiryDate),
-      daysRemaining
+      daysRemaining,
+      reason
     });
   }
 
-  const passed = details.filter((detail) => detail.status === 'passed').length;
-  const failed = details.filter((detail) => detail.status === 'failed').length;
-  const warnings = details.filter((detail) => detail.status === 'warning').length;
-  const total = details.length || summary.total || fallbackTotal;
-  const sampleDetails = details.slice(0, 3).map((detail) => `${detail.domain} => ${detail.expiryDate} (${detail.daysRemaining} days)`).join(', ');
+  const dedupedDetails = dedupeSslDetails(details);
+  const passed = dedupedDetails.filter((detail) => detail.status === 'passed').length;
+  const failed = dedupedDetails.filter((detail) => detail.status === 'failed').length;
+  const warnings = dedupedDetails.filter((detail) => detail.status === 'warning').length;
+  const total = dedupedDetails.length;
+  const sampleDetails = dedupedDetails.slice(0, 3).map((detail) => `${detail.domain} => ${detail.expiryDate} (${detail.daysRemaining} days)`).join(', ');
 
   console.log(`[SSL Parser] Parsed ${details.length} SSL details from ${reportPath}`);
+  console.log(`[SSL Parser] Deduped to ${dedupedDetails.length} SSL details`);
   console.log(`[SSL Parser] Sample SSL details: ${sampleDetails || 'none'}`);
-  console.log('SSL DETAILS PARSED:', details);
+  console.log('SSL DETAILS PARSED:', dedupedDetails);
 
   return {
     passed,
     failed,
     warnings,
     total,
-    details
+    details: dedupedDetails
   };
 }
 
@@ -806,16 +1005,38 @@ function writeDashboardState(finalResults: TestResult[]): void {
   const domainResult = finalResults.find((entry) => entry.repository === 'AdHash_Domain_Report');
   const sslResult = finalResults.find((entry) => entry.repository === 'AdHash-Projects-Certificate-Expiry-Test');
 
+  if (sslResult) {
+    sslResult.details = dedupeSslDetails((sslResult.details || []) as SslDetail[]);
+    sslResult.total = sslResult.details.length;
+    sslResult.passed = sslResult.details.filter((detail) => (detail as SslDetail).status === 'passed').length;
+    sslResult.warnings = sslResult.details.filter((detail) => (detail as SslDetail).status === 'warning').length;
+    sslResult.failed = sslResult.details.filter((detail) => (detail as SslDetail).status === 'failed').length;
+    sslResult.status = sslResult.failed > 0 ? 'failed' : sslResult.warnings > 0 ? 'failed' : 'success';
+  }
+
   if (domainResult && sslResult) {
     domainResult.details = enrichDomainDetailsWithSsl(
-      (domainResult.details || []) as DomainDetail[],
-      (sslResult.details || []) as SslDetail[]
+      dedupeDomainDetails((domainResult.details || []) as DomainDetail[]),
+      dedupeSslDetails((sslResult.details || []) as SslDetail[])
     );
     domainResult.total = domainResult.details.length;
     domainResult.passed = domainResult.details.filter((detail) => (detail as DomainDetail).status === 'active').length;
     domainResult.warnings = domainResult.details.filter((detail) => (detail as DomainDetail).status === 'expiring').length;
     domainResult.failed = domainResult.details.filter((detail) => (detail as DomainDetail).status === 'error').length;
     domainResult.status = domainResult.failed > 0 ? 'failed' : 'success';
+  }
+
+  try {
+    const mappingPath = path.join(process.cwd(), 'config', 'project-mapping.json');
+    const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8')) as { projects?: Array<{ id: string; domains?: string[]; sslCerts?: string[]; ssl?: string[] }> };
+    const syncTrade = (mapping.projects || []).find((project) => project.id === 'synctrade');
+    const syncTradeDomains = new Set((syncTrade?.domains || []).map((entry) => normalizeDomainHost(entry)).filter(Boolean));
+    const syncTradeSsl = new Set((syncTrade?.ssl || syncTrade?.sslCerts || []).map((entry) => normalizeDomainHost(entry)).filter(Boolean));
+
+    console.log('SYNCTRADE SSL DETAILS:', ((sslResult?.details || []) as SslDetail[]).filter((detail) => syncTradeSsl.has(normalizeDomainHost(detail.domain || detail.url))));
+    console.log('SYNCTRADE DOMAIN DETAILS:', ((domainResult?.details || []) as DomainDetail[]).filter((detail) => syncTradeDomains.has(normalizeDomainHost(detail.domain || detail.url))));
+  } catch (error) {
+    console.error('Failed to log SyncTrade detail snapshots:', error);
   }
 
   const suites = {} as Record<SuiteId, DashboardStateSuite>;

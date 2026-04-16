@@ -6,6 +6,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+const EXPIRY_WARNING_DAYS = 30;
+
 interface TestResult {
   repository: string;
   status: 'success' | 'failed' | 'error' | 'unavailable';
@@ -64,12 +66,43 @@ const repoInfo: Record<string, RepoInfo> = {
   'AdHash_Domain_Report': {
     name: 'AdHash_Domain_Report',
     displayName: 'Domain Expiry Monitoring',
-    description: 'WHOIS-based domain expiry tracking with 90-day warnings',
+    description: 'WHOIS-based domain expiry tracking with 30-day warnings',
     icon: '🌐',
     testCount: '12 domains',
     technology: 'Node.js + WHOIS'
   }
 };
+
+function parseDaysRemaining(value?: string | null): number | null {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const match = trimmed.match(/-?\d+/);
+  if (!match) {
+    return null;
+  }
+
+  const days = parseInt(match[0], 10);
+  return Number.isNaN(days) ? null : days;
+}
+
+function classifyExpiryStatus(daysRemaining: number | null | undefined, hasError = false): 'passed' | 'warning' | 'failed' {
+  if (hasError || daysRemaining === null || daysRemaining === undefined || Number.isNaN(daysRemaining)) {
+    return 'failed';
+  }
+
+  if (daysRemaining <= 0) {
+    return 'failed';
+  }
+
+  if (daysRemaining <= EXPIRY_WARNING_DAYS) {
+    return 'warning';
+  }
+
+  return 'passed';
+}
 
 /**
  * Parse test results from report files
@@ -156,14 +189,13 @@ function parseTestResults(result: TestResult): { passed: number; failed: number;
       for (const match of failedRowMatches) {
         const projectName = match[2].trim();
         const url = match[3].trim();
-        const daysRemaining = parseInt(match[4]);
+        const daysRemaining = parseDaysRemaining(match[4]);
         const expiryDate = match[5].trim();
+        const status = classifyExpiryStatus(daysRemaining);
 
-        if (daysRemaining === 0) {
-          // Expired certificate (=0 days) - FAILURE
-          failedCerts.push(`🚨 ${projectName} - Expired (0 days) - ${expiryDate}`);
-        } else if (daysRemaining > 0 && daysRemaining <= 30) {
-          // Expiring soon (>0 and ≤30 days) - WARNING
+        if (status === 'failed') {
+          failedCerts.push(`🚨 ${projectName} - Expired or invalid certificate - ${expiryDate}`);
+        } else if (status === 'warning') {
           warningCerts.push(`⚠️ ${projectName} - Expires in ${daysRemaining} days - ${expiryDate}`);
         }
       }
@@ -211,40 +243,38 @@ function parseTestResults(result: TestResult): { passed: number; failed: number;
       // Parse domain report - HTML format
       const totalMatch = reportContent.match(/<h3 id="totalDomains">(\d+)<\/h3>/i);
       const activeMatch = reportContent.match(/<h3 id="activeDomains">(\d+)<\/h3>/i);
-      const expiringMatch = reportContent.match(/<h3 id="expiringDomains"[^>]*>(\d+)<\/h3>/i);
-      const errorMatch = reportContent.match(/<h3 id="errorDomains">(\d+)<\/h3>/i);
 
       const total = totalMatch ? parseInt(totalMatch[1]) : 0;
-      const active = activeMatch ? parseInt(activeMatch[1]) : 0;
-      const expiring = expiringMatch ? parseInt(expiringMatch[1]) : 0;
-      const errors = errorMatch ? parseInt(errorMatch[1]) : 0;
+      const activeFallback = activeMatch ? parseInt(activeMatch[1]) : 0;
 
-      // Extract expiring domains (warnings)
       const warningDomains: string[] = [];
-      const expiringDomainMatches = reportContent.matchAll(/<div class="domain-card expiring-soon"[\s\S]*?<div class="domain-name">([^<]+)<\/div>[\s\S]*?<div class="domain-url">([^<]+)<\/div>[\s\S]*?<div class="expiry-date">([^<]+)<\/div>[\s\S]*?<div class="days-remaining[^"]*">([^<]+)<\/div>/gi);
-      for (const match of expiringDomainMatches) {
-        const domainName = match[1].trim();
-        const domainUrl = match[2].trim();
-        const expiryDate = match[3].trim();
-        const daysRemaining = match[4].trim();
-        warningDomains.push(`⚠️ ${domainName} (${domainUrl}) - ${daysRemaining} - ${expiryDate}`);
+      const failedDomains: string[] = [];
+      const domainCardMatches = reportContent.matchAll(/<div class="domain-card([^"]*)"[\s\S]*?<div class="domain-name">([^<]+)<\/div>[\s\S]*?<div class="domain-url">([^<]+)<\/div>[\s\S]*?<div class="expiry-date">([^<]+)<\/div>(?:[\s\S]*?<div class="days-remaining[^"]*">([^<]+)<\/div>)?/gi);
+
+      for (const match of domainCardMatches) {
+        const classNames = match[1] || '';
+        const domainName = match[2].trim();
+        const domainUrl = match[3].trim();
+        const expiryDate = match[4].trim();
+        const daysRemaining = parseDaysRemaining(match[5]);
+        const status = classifyExpiryStatus(daysRemaining, classNames.includes('error'));
+
+        if (status === 'warning') {
+          warningDomains.push(`⚠️ ${domainName} (${domainUrl}) - Expires in ${daysRemaining} days - ${expiryDate}`);
+        } else if (status === 'failed') {
+          failedDomains.push(`🚨 ${domainName} (${domainUrl}) - ${expiryDate}`);
+        }
       }
 
-      // Extract error domains (failures)
-      const failedDomains: string[] = [];
-      const errorDomainMatches = reportContent.matchAll(/<div class="domain-card error-card"[\s\S]*?<div class="domain-name">([^<]+)<\/div>[\s\S]*?<div class="domain-url">([^<]+)<\/div>[\s\S]*?<div class="expiry-date">([^<]+)<\/div>/gi);
-      for (const match of errorDomainMatches) {
-        const domainName = match[1].trim();
-        const domainUrl = match[2].trim();
-        const status = match[3].trim();
-        failedDomains.push(`🚨 ${domainName} (${domainUrl}) - ${status}`);
-      }
+      const warnings = warningDomains.length;
+      const failed = failedDomains.length;
+      const passed = total > 0 ? Math.max(total - warnings - failed, 0) : activeFallback;
 
       return {
-        passed: active,
-        failed: errors,
-        warnings: expiring,
-        total,
+        passed,
+        failed,
+        warnings,
+        total: total || passed + warnings + failed,
         failedTests: failedDomains,
         warningTests: warningDomains
       };
@@ -330,9 +360,19 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
 
   // Parse test results from reports
   results.forEach(result => {
-    const parsed = parseTestResults(result);
+    const parsed = typeof result.total === 'number'
+      ? {
+          passed: result.passed || 0,
+          failed: result.failed || 0,
+          warnings: result.warnings,
+          total: result.total || 0,
+          failedTests: undefined,
+          warningTests: undefined
+        }
+      : parseTestResults(result);
     result.passed = parsed.passed;
     result.failed = parsed.failed;
+    result.warnings = parsed.warnings;
     result.total = parsed.total;
 
     // Update actual status based on test results
@@ -991,7 +1031,7 @@ function generateReportCard(result: TestResult): string {
     } else if (result.repository === 'AdHash-Projects-Certificate-Expiry-Test') {
       warningTitle = '⚠️ Certificates Expiring Soon (≤30 days):';
     } else if (result.repository === 'AdHash_Domain_Report') {
-      warningTitle = '⚠️ Domains Expiring Soon (<90 days):';
+      warningTitle = '⚠️ Domains Expiring Soon (≤30 days):';
     }
 
     warningTestsHtml = `

@@ -2962,13 +2962,79 @@
             return renderDetailItems(tests, type);
         }
 
+        function normalizeTrackedValue(value) {
+            return String(value || '')
+                .replace(/^https?:\/\//i, '')
+                .replace(/^www\./i, '')
+                .replace(/\/$/, '')
+                .toLowerCase();
+        }
+
+        function getTrackedDetailScore(detail) {
+            let score = 0;
+
+            if (detail && detail.expiryDate && detail.expiryDate !== 'N/A') score += 3;
+            if (detail && detail.expiryDateIST && detail.expiryDateIST !== 'N/A') score += 2;
+            if (detail && detail.daysRemaining !== undefined && detail.daysRemaining !== null && !Number.isNaN(Number(detail.daysRemaining))) score += 3;
+
+            const status = String(detail && detail.status || '').toLowerCase();
+            if (status === 'passed') score += 3;
+            else if (status === 'warning') score += 2;
+            else if (status === 'failed') score += 1;
+
+            return score;
+        }
+
+        function dedupeDisplayTests(tests, type) {
+            if (!Array.isArray(tests) || (type !== 'ssl' && type !== 'domains')) {
+                return Array.isArray(tests) ? tests : [];
+            }
+
+            const deduped = new Map();
+
+            tests.forEach((test) => {
+                if (!test) {
+                    return;
+                }
+
+                const key = `${type}::${normalizeTrackedValue(test.domain || test.name || test.url)}`;
+                const existing = deduped.get(key);
+
+                if (!existing || getTrackedDetailScore(test) > getTrackedDetailScore(existing)) {
+                    deduped.set(key, {
+                        ...existing,
+                        ...test,
+                        expiryDate: test.expiryDate || (existing && existing.expiryDate) || 'N/A',
+                        expiryDateIST: test.expiryDateIST && test.expiryDateIST !== 'N/A' ? test.expiryDateIST : (existing && existing.expiryDateIST) || 'N/A',
+                        daysRemaining: test.daysRemaining ?? (existing && existing.daysRemaining),
+                        url: test.url || (existing && existing.url),
+                        reason: test.reason || (existing && existing.reason)
+                    });
+                    return;
+                }
+
+                deduped.set(key, {
+                    ...test,
+                    ...existing,
+                    expiryDate: (existing && existing.expiryDate) || test.expiryDate || 'N/A',
+                    expiryDateIST: existing && existing.expiryDateIST && existing.expiryDateIST !== 'N/A' ? existing.expiryDateIST : test.expiryDateIST || 'N/A',
+                    daysRemaining: existing && existing.daysRemaining !== undefined && existing.daysRemaining !== null ? existing.daysRemaining : test.daysRemaining,
+                    url: (existing && existing.url) || test.url,
+                    reason: (existing && existing.reason) || test.reason
+                });
+            });
+
+            return Array.from(deduped.values());
+        }
+
         function renderDetailItems(tests, type) {
             if (!tests || tests.length === 0) {
                 return '<p style="color: #9ca3af; font-style: italic; text-align: center; padding: 20px;">All tests passed - no details to display</p>';
             }
 
             // Sort tests by status: Failed first, then Warning, then Passed
-            const sortedTests = [...tests].sort((a, b) => {
+            const dedupedTests = dedupeDisplayTests(tests, type);
+            const sortedTests = [...dedupedTests].sort((a, b) => {
                 const statusOrder = { 'failed': 0, 'warning': 1, 'passed': 2 };
                 const statusA = (a.status || '').toLowerCase();
                 const statusB = (b.status || '').toLowerCase();
@@ -3062,6 +3128,7 @@
                     const expiryDateIST = detail.expiryDateIST || 'N/A';
                     const daysRemaining = detail.daysRemaining ?? 'N/A';
                     const daysRemainingDisplay = daysRemaining === 'N/A' ? 'N/A' : `${daysRemaining} days`;
+                    const errorReason = detail.reason || 'N/A';
 
                     return `
                         <div class="detail-test-item ${statusClass}">
@@ -3090,6 +3157,12 @@
                                         <span class="expiry-date-badge">🕒 ${expiryDateIST}</span>
                                     </span>
                                 </div>
+                                ${detail.status.toLowerCase() === 'failed' && detail.reason ? `
+                                <div class="detail-info-item">
+                                    <span class="detail-info-label">ERROR REASON</span>
+                                    <span class="detail-info-value">${errorReason}</span>
+                                </div>
+                                ` : ''}
                             </div>
                         </div>
                     `;

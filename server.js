@@ -20,6 +20,7 @@ const serverLogs = [];
 const MAX_LOGS = 100;
 const DASHBOARD_STATE_PATH = path.join(__dirname, 'test-results', 'dashboard-state.json');
 const DOMAIN_REPORT_OUTPUT_PATH = path.join(__dirname, 'godaddy', 'report.html');
+const EXPIRY_WARNING_DAYS = 30;
 const WORKSPACE_SUITES = {
     app: {
         id: 'app',
@@ -698,6 +699,177 @@ function normalizeDomainValue(value) {
         .toLowerCase();
 }
 
+function buildTrackedDetailKey(type, domain, url) {
+    return `${type}::${normalizeDomainValue(domain || url || '')}`;
+}
+
+function getTrackedDetailScore(detail) {
+    let score = 0;
+
+    if (detail && detail.expiryDate) {
+        score += 3;
+    }
+
+    if (detail && detail.expiryDateIST && detail.expiryDateIST !== 'N/A') {
+        score += 2;
+    }
+
+    if (detail && detail.daysRemaining !== null && detail.daysRemaining !== undefined && !Number.isNaN(Number(detail.daysRemaining))) {
+        score += 3;
+    }
+
+    if (detail && detail.reason) {
+        score += 2;
+    }
+
+    if (detail && detail.status === 'passed') {
+        score += 3;
+    } else if (detail && (detail.status === 'warning' || detail.status === 'expiring')) {
+        score += 2;
+    } else if (detail && (detail.status === 'failed' || detail.status === 'error')) {
+        score += 1;
+    }
+
+    return score;
+}
+
+function pickPreferredTrackedDetail(existing, incoming) {
+    if (!existing) {
+        return incoming;
+    }
+
+    const existingScore = getTrackedDetailScore(existing);
+    const incomingScore = getTrackedDetailScore(incoming);
+
+    if (incomingScore > existingScore) {
+        return {
+            ...existing,
+            ...incoming,
+            domain: incoming.domain || existing.domain,
+            url: incoming.url || existing.url,
+            expiryDate: incoming.expiryDate || existing.expiryDate,
+            expiryDateIST: incoming.expiryDateIST && incoming.expiryDateIST !== 'N/A' ? incoming.expiryDateIST : existing.expiryDateIST,
+            daysRemaining: incoming.daysRemaining ?? existing.daysRemaining,
+            reason: incoming.reason || existing.reason
+        };
+    }
+
+    return {
+        ...incoming,
+        ...existing,
+        domain: existing.domain || incoming.domain,
+        url: existing.url || incoming.url,
+        expiryDate: existing.expiryDate || incoming.expiryDate,
+        expiryDateIST: existing.expiryDateIST && existing.expiryDateIST !== 'N/A' ? existing.expiryDateIST : incoming.expiryDateIST,
+        daysRemaining: existing.daysRemaining ?? incoming.daysRemaining,
+        reason: existing.reason || incoming.reason
+    };
+}
+
+function dedupeTrackedResults(type, details) {
+    const deduped = new Map();
+
+    (details || []).forEach((detail) => {
+        if (!detail) {
+            return;
+        }
+
+        const normalizedDomain = normalizeDomainValue(detail.domain || detail.url);
+        if (!normalizedDomain) {
+            return;
+        }
+
+        const normalizedDetail = {
+            ...detail,
+            domain: normalizedDomain,
+            url: detail.url || `https://${normalizedDomain}`
+        };
+        const key = buildTrackedDetailKey(type, normalizedDetail.domain, normalizedDetail.url);
+        deduped.set(key, pickPreferredTrackedDetail(deduped.get(key), normalizedDetail));
+    });
+
+    return Array.from(deduped.values());
+}
+
+function normalizeDaysRemaining(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    const trimmed = String(value || '').trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    const match = trimmed.match(/-?\d+/);
+    if (!match) {
+        return null;
+    }
+
+    const days = parseInt(match[0], 10);
+    return Number.isNaN(days) ? null : days;
+}
+
+function getExpiryStatus(daysRemaining, hasError = false) {
+    const normalizedDays = normalizeDaysRemaining(daysRemaining);
+
+    if (hasError || normalizedDays === null) {
+        return 'failed';
+    }
+
+    if (normalizedDays < 0) {
+        return 'failed';
+    }
+
+    if (normalizedDays <= EXPIRY_WARNING_DAYS) {
+        return 'warning';
+    }
+
+    return 'passed';
+}
+
+function toDomainDetailStatus(status) {
+    if (status === 'warning') {
+        return 'expiring';
+    }
+
+    if (status === 'failed') {
+        return 'error';
+    }
+
+    return 'active';
+}
+
+function normalizeDomainDetail(detail) {
+    const daysRemaining = normalizeDaysRemaining(detail && detail.daysRemaining);
+    const status = toDomainDetailStatus(
+        getExpiryStatus(daysRemaining, detail && detail.status === 'error' && daysRemaining === null)
+    );
+
+    return {
+        ...detail,
+        url: (detail && detail.url) || (detail && detail.domain ? `https://${normalizeDomainValue(detail.domain)}` : undefined),
+        domain: normalizeDomainValue(detail && detail.domain),
+        daysRemaining,
+        status,
+        reason: detail && detail.reason ? String(detail.reason) : undefined
+    };
+}
+
+function normalizeSslDetail(detail) {
+    const daysRemaining = normalizeDaysRemaining(detail && detail.daysRemaining);
+    const status = getExpiryStatus(daysRemaining, detail && detail.status === 'failed' && daysRemaining === null);
+
+    return {
+        ...detail,
+        domain: normalizeDomainValue(detail && detail.domain),
+        url: (detail && detail.url) || (detail && detail.domain ? `https://${normalizeDomainValue(detail.domain)}` : undefined),
+        daysRemaining,
+        status,
+        reason: detail && detail.reason ? String(detail.reason) : undefined
+    };
+}
+
 function formatToIST(value) {
     if (!value) return 'N/A';
     const date = new Date(value);
@@ -933,17 +1105,18 @@ function loadDomainReportEntries() {
     if (domainDetails.length > 0) {
         const entries = domainDetails
             .map((detail) => {
-                const normalizedDomain = normalizeSslHost(detail && detail.domain);
+                const normalizedDetail = normalizeDomainDetail(detail);
+                const normalizedDomain = normalizeSslHost(normalizedDetail && normalizedDetail.domain);
                 if (!normalizedDomain) {
                     return null;
                 }
 
                 let status = 'failed';
-                if (detail.status === 'active') {
+                if (normalizedDetail.status === 'active') {
                     status = 'passed';
-                } else if (detail.status === 'expiring') {
+                } else if (normalizedDetail.status === 'expiring') {
                     status = 'warning';
-                } else if (detail.status === 'error') {
+                } else if (normalizedDetail.status === 'error') {
                     status = 'failed';
                 }
 
@@ -951,9 +1124,9 @@ function loadDomainReportEntries() {
                     name: normalizedDomain,
                     domain: normalizedDomain,
                     status,
-                    expiryDate: detail.expiryDate || null,
-                    expiryDateIST: detail.expiryDateIST || formatToIST(detail.expiryDate),
-                    daysRemaining: detail.daysRemaining ?? null,
+                    expiryDate: normalizedDetail.expiryDate || null,
+                    expiryDateIST: normalizedDetail.expiryDateIST || formatToIST(normalizedDetail.expiryDate),
+                    daysRemaining: normalizedDetail.daysRemaining ?? null,
                     details: ''
                 };
             })
@@ -998,7 +1171,6 @@ function loadDomainReportEntries() {
         const badgeClassMatch = cardHtml.match(/<span class="status-badge ([^"]+)">/i);
         const expiryDateMatch = cardHtml.match(/<div class="expiry-date">([^<]+)<\/div>/i);
         const expiryDateISTMatch = cardHtml.match(/<div class="expiry-date-ist">([^<]+)<\/div>/i);
-        const daysClassMatch = cardHtml.match(/<div class="days-remaining(?: ([^"]+))?"/i);
         const daysTextMatch = cardHtml.match(/<div class="days-remaining(?: [^"]+)?"[^>]*>\s*([^<]+)\s*<\/div>/i);
 
         if (!nameMatch || !domainMatch || !badgeClassMatch || !expiryDateMatch) {
@@ -1007,15 +1179,8 @@ function loadDomainReportEntries() {
 
         const badgeClass = badgeClassMatch[1] || '';
         const daysText = decodeHtml((daysTextMatch && daysTextMatch[1]) || '');
-        const daysMatch = daysText.match(/(\d+)/);
-        const daysClass = (daysClassMatch && daysClassMatch[1]) || '';
-
-        let status = 'failed';
-        if (badgeClass.includes('status-active')) {
-            status = daysClass.includes('warning') ? 'warning' : 'passed';
-        } else if (badgeClass.includes('status-error')) {
-            status = 'failed';
-        }
+        const daysRemaining = normalizeDaysRemaining(daysText);
+        const status = classifyExpiryStatus(daysRemaining, !badgeClass.includes('status-active'));
 
         entries.push({
             name: decodeHtml(nameMatch[1]),
@@ -1023,7 +1188,7 @@ function loadDomainReportEntries() {
             status,
             expiryDate: decodeHtml(expiryDateMatch[1]),
             expiryDateIST: decodeHtml((expiryDateISTMatch && expiryDateISTMatch[1]) || '') || formatToIST(decodeHtml(expiryDateMatch[1])),
-            daysRemaining: daysMatch ? parseInt(daysMatch[1], 10) : null,
+            daysRemaining,
             details: daysText
         });
     }
@@ -1040,12 +1205,9 @@ function createEmptySuiteResult() {
 }
 
 function getProjectDomainStatus(project, domainDetails) {
-    const matched = (domainDetails || []).filter((detail) =>
-        (project.domains || []).some((projectDomain) => {
-            const a = normalizeDomainValue(detail.domain);
-            const b = normalizeDomainValue(projectDomain);
-            return a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`);
-        })
+    const configuredDomains = new Set((project.domains || []).map((projectDomain) => normalizeDomainValue(projectDomain)).filter(Boolean));
+    const matched = dedupeTrackedResults('domain', (domainDetails || []).map(normalizeDomainDetail)).filter((detail) =>
+        configuredDomains.has(normalizeDomainValue(detail.domain || detail.url))
     );
 
     console.log('PROJECT DOMAIN MATCH:', project.id, matched);
@@ -1060,12 +1222,9 @@ function getProjectDomainStatus(project, domainDetails) {
 
 function getProjectSslDetails(project, sslDetails) {
     const sslEntries = getProjectSslEntries(project);
-    const sslResults = (sslDetails || []).filter((detail) =>
-        sslEntries.some((domain) => {
-            const a = normalizeDomainValue(detail.domain);
-            const b = normalizeDomainValue(domain);
-            return a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`);
-        })
+    const configuredSslEntries = new Set(sslEntries.map((entry) => normalizeDomainValue(entry)).filter(Boolean));
+    const sslResults = dedupeTrackedResults('ssl', (sslDetails || []).map(normalizeSslDetail)).filter((detail) =>
+        configuredSslEntries.has(normalizeDomainValue(detail.domain || detail.url))
     );
 
     console.log('PROJECT SSL RESULTS:', project && project.id, sslResults);
@@ -1074,7 +1233,7 @@ function getProjectSslDetails(project, sslDetails) {
 
 function attachProjectDomainStatuses(projects, dashboardState) {
     const domainSuite = dashboardState && dashboardState.suites ? dashboardState.suites.domain : null;
-    const domainDetails = domainSuite && Array.isArray(domainSuite.details) ? domainSuite.details : [];
+    const domainDetails = domainSuite && Array.isArray(domainSuite.details) ? domainSuite.details.map(normalizeDomainDetail) : [];
 
     console.log('DOMAIN DETAILS:', domainDetails);
 
@@ -1091,7 +1250,7 @@ function attachProjectDomainStatuses(projects, dashboardState) {
 
 function attachProjectSslDetails(projects, dashboardState) {
     const sslSuite = dashboardState && dashboardState.suites ? dashboardState.suites.cert : null;
-    const sslDetails = sslSuite && Array.isArray(sslSuite.details) ? sslSuite.details : [];
+    const sslDetails = sslSuite && Array.isArray(sslSuite.details) ? sslSuite.details.map(normalizeSslDetail) : [];
 
     console.log('SSL DETAILS:', sslDetails);
 
@@ -1191,7 +1350,7 @@ function getSSLTestResults(projectId) {
     try {
         const dashboardState = readDashboardState();
         const sslSuite = dashboardState && dashboardState.suites ? dashboardState.suites.cert : null;
-        const sslDetails = sslSuite && Array.isArray(sslSuite.details) ? sslSuite.details : [];
+        const sslDetails = sslSuite && Array.isArray(sslSuite.details) ? dedupeTrackedResults('ssl', sslSuite.details.map(normalizeSslDetail)) : [];
         const mapping = getProjectMapping();
         const project = mapping.projects.find((entry) => entry.id === projectId);
 
@@ -1203,8 +1362,7 @@ function getSSLTestResults(projectId) {
 
         const result = createEmptySuiteResult();
 
-        const matched = getProjectSslDetails(project, sslDetails)
-            .filter((detail) => sslEntries.some((domain) => detail.domain.includes(domain) || domain.includes(detail.domain)));
+        const matched = dedupeTrackedResults('ssl', getProjectSslDetails(project, sslDetails));
 
         result.total = matched.length;
         result.passed = matched.filter((detail) => detail.status === 'passed').length;
@@ -1220,9 +1378,14 @@ function getSSLTestResults(projectId) {
                 type: 'ssl',
                 expiryDate: detail.expiryDate,
                 expiryDateIST: detail.expiryDateIST || formatToIST(detail.expiryDate),
-                daysRemaining: detail.daysRemaining
+                daysRemaining: detail.daysRemaining,
+                reason: detail.reason
             });
         });
+
+        if (project.id === 'synctrade') {
+            console.log('SYNCTRADE SSL PAYLOAD:', project.id, matched);
+        }
 
         console.log('SSL DETAILS:', matched);
 
@@ -1237,7 +1400,7 @@ function getDomainTestResults(projectId) {
     try {
         const dashboardState = readDashboardState();
         const domainSuite = dashboardState && dashboardState.suites ? dashboardState.suites.domain : null;
-        const domainDetails = domainSuite && Array.isArray(domainSuite.details) ? domainSuite.details : [];
+        const domainDetails = domainSuite && Array.isArray(domainSuite.details) ? dedupeTrackedResults('domain', domainSuite.details.map(normalizeDomainDetail)) : [];
         const mapping = getProjectMapping();
         const project = mapping.projects.find((entry) => entry.id === projectId);
 
@@ -1258,7 +1421,7 @@ function getDomainTestResults(projectId) {
         status.matched.forEach((detail) => {
             result.tests.push({
                 name: detail.domain,
-                url: `https://${detail.domain}`,
+                url: detail.url || `https://${detail.domain}`,
                 status: detail.status === 'active' ? 'passed' : detail.status === 'expiring' ? 'warning' : 'failed',
                 type: 'domain',
                 expiryDate: detail.expiryDate || null,
@@ -1266,6 +1429,10 @@ function getDomainTestResults(projectId) {
                 daysRemaining: detail.daysRemaining ?? null
             });
         });
+
+        if (project.id === 'synctrade') {
+            console.log('SYNCTRADE DOMAIN PAYLOAD:', project.id, status.matched);
+        }
 
         console.log(`[Domain Details] Project ${project.id} matched ${result.total}/${project.domains.length} domains`);
 
