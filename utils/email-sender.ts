@@ -2,7 +2,6 @@ import nodemailer from 'nodemailer';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
-import { pathToFileURL } from 'url';
 
 dotenv.config();
 
@@ -198,6 +197,10 @@ const MODULE_REPORT_FILE: Record<SuiteId, string> = {
     api: 'api-endpoints.html',
     domain: 'domain-expiry.html'
 };
+
+function getModuleReportHref(suiteId: SuiteId): string {
+    return `./module-reports/${MODULE_REPORT_FILE[suiteId]}`;
+}
 
 export interface DashboardEmailSendResult {
     enabled: boolean;
@@ -1832,7 +1835,7 @@ function generateModuleReportPages(previewDir: string, model: DashboardEmailMode
             const html = buildModuleReportPage(model, normalizedSection, items);
             fs.writeFileSync(reportPath, html, 'utf8');
 
-            const href = pathToFileURL(reportPath).toString();
+            const href = getModuleReportHref(section.id);
             console.log(`[REPORT LINK] module name: ${section.title}, target report path: ${reportPath}, exists true`);
             console.log(`[REPORT LINK] final href used: ${href}`);
 
