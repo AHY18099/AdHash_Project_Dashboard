@@ -131,8 +131,12 @@ function getStatusLabel(status: string): string {
   return status === 'failed' ? 'FAILED' : status === 'warning' ? 'WARNING' : 'PASSED';
 }
 
-function renderProjectChip(label: string, value: number, className: string): string {
-  return `<span class="project-chip ${className}">${escapeHtml(label)} ${value}</span>`;
+function getChipClass(category: string, hasFailure: boolean): string {
+  return hasFailure ? `project-chip ${category} chip-failed` : `project-chip ${category} chip-normal`;
+}
+
+function renderProjectChip(label: string, value: number, className: string, hasFailure: boolean): string {
+  return `<span class="${getChipClass(className, hasFailure)}">${escapeHtml(label)} ${value}</span>`;
 }
 
 function renderProjectSummaryCard(project: ProjectEmailCard): string {
@@ -144,14 +148,17 @@ function renderProjectSummaryCard(project: ProjectEmailCard): string {
                     <h3>${escapeHtml(project.name)}</h3>
                     <p>${escapeHtml(project.description)}</p>
                 </div>
-                <span class="summary-status-badge ${statusClass}">${escapeHtml(getStatusLabel(project.overallStatus))}</span>
+                <div class="project-badge-group">
+                    <div class="project-failed-count">❗ ${project.failedCount}</div>
+                    <span class="summary-status-badge ${statusClass}">${escapeHtml(getStatusLabel(project.overallStatus))}</span>
+                </div>
             </div>
             <div class="project-summary-chips">
-                ${renderProjectChip('APP', project.results.apps.total, 'app')}
-                ${renderProjectChip('SRV', project.results.servers.total, 'server')}
-                ${renderProjectChip('SSL', project.results.ssl.total, 'ssl')}
-                ${renderProjectChip('DOM', project.results.domains.total, 'domain')}
-                ${renderProjectChip('API', project.results.apis.total, 'api')}
+                ${renderProjectChip('APP', project.results.apps.total, 'app', project.results.apps.failed > 0)}
+                ${renderProjectChip('SRV', project.results.servers.total, 'server', project.results.servers.failed > 0)}
+                ${renderProjectChip('SSL', project.results.ssl.total, 'ssl', project.results.ssl.failed > 0)}
+                ${renderProjectChip('DOM', project.results.domains.total, 'domain', project.results.domains.failed > 0)}
+                ${renderProjectChip('API', project.results.apis.total, 'api', project.results.apis.failed > 0)}
             </div>
         </article>`;
 }
@@ -232,6 +239,7 @@ function renderModuleSection(section: ModuleSection): string {
   const detailCards = section.items.length > 0
     ? section.items.map((item) => renderModuleItemCard(section.id, item)).join('')
     : '<div class="module-empty-state">No structured items were available for this module in the current dashboard state.</div>';
+  const sectionDomId = `${section.id}-section`;
 
   return `<section class="module-section-card ${statusClass}">
             <div class="module-section-header">
@@ -248,12 +256,12 @@ function renderModuleSection(section: ModuleSection): string {
                         ${renderModuleCountBadge('DURATION', section.durationLabel, 'duration')}
                     </div>
                 </div>
-                <button class="module-toggle-btn" id="module-btn-${escapeHtml(section.id)}" type="button" aria-expanded="false" aria-controls="module-details-${escapeHtml(section.id)}" onclick="toggleModuleSection('${escapeHtml(section.id)}')">
+                    <button class="module-toggle-btn" id="module-btn-${escapeHtml(section.id)}" data-target="${escapeHtml(sectionDomId)}" type="button" aria-expanded="false" aria-controls="${escapeHtml(sectionDomId)}" onclick="toggleSection('${escapeHtml(sectionDomId)}')">
                     <span class="toggle-text">View Details</span>
                     <span class="toggle-icon">▼</span>
                 </button>
             </div>
-            <div class="module-section-details" id="module-details-${escapeHtml(section.id)}">
+                  <div class="module-section-details" id="${escapeHtml(sectionDomId)}" style="display:none;">
                 <div class="module-details-grid">
                     ${detailCards}
                 </div>
@@ -700,6 +708,14 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
           align-items: flex-start;
         }
 
+        .project-badge-group {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
         .project-summary-header h3 {
           margin: 0;
           font-size: 20px;
@@ -731,6 +747,18 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
         .summary-status-badge.warning { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
         .summary-status-badge.failed { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
 
+        .project-failed-count {
+          display: inline-block;
+          margin-right: 8px;
+          padding: 4px 10px;
+          border-radius: 12px;
+          background: #3b0a0a;
+          color: #ff4d4f;
+          font-size: 12px;
+          font-weight: 600;
+          border: 1px solid #ff4d4f;
+        }
+
         .project-summary-chips {
           display: flex;
           flex-wrap: wrap;
@@ -757,6 +785,17 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
         .project-chip.ssl { background: rgba(139, 92, 246, 0.16); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.3); }
         .project-chip.domain { background: rgba(16, 185, 129, 0.16); color: #86efac; border-color: rgba(16, 185, 129, 0.3); }
         .project-chip.api { background: rgba(245, 158, 11, 0.16); color: #fcd34d; border-color: rgba(245, 158, 11, 0.3); }
+
+        .chip-normal {
+          box-shadow: none;
+        }
+
+        .chip-failed {
+          background: #2a0d0d !important;
+          color: #ff6b6b !important;
+          border: 1px solid #ff4d4f !important;
+          box-shadow: 0 0 6px rgba(255, 77, 79, 0.4);
+        }
 
         .module-sections-grid {
           display: grid;
@@ -829,12 +868,9 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
         .module-toggle-btn[aria-expanded="true"] .toggle-icon { transform: rotate(180deg); }
 
         .module-section-details {
-          display: none;
           padding: 0 24px 24px 24px;
           border-top: 1px solid rgba(148, 163, 184, 0.12);
         }
-
-        .module-section-details.expanded { display: block; }
 
         .module-details-grid {
           display: grid;
@@ -1226,14 +1262,14 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
     </div>
 
     <script>
-      function toggleModuleSection(sectionId) {
-        const details = document.getElementById('module-details-' + sectionId);
-        const button = document.getElementById('module-btn-' + sectionId);
+      function toggleSection(id) {
+        const details = document.getElementById(id);
+        const button = document.querySelector('.module-toggle-btn[data-target="' + id + '"]');
         const label = button.querySelector('.toggle-text');
         const expanded = button.getAttribute('aria-expanded') === 'true';
 
         button.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-        details.classList.toggle('expanded', !expanded);
+        details.style.display = expanded ? 'none' : 'block';
         label.textContent = expanded ? 'View Details' : 'Hide Details';
         }
     </script>

@@ -139,6 +139,7 @@ export interface ProjectEmailCard {
     description: string;
     color: string;
     overallStatus: ItemStatus;
+    failedCount: number;
     primaryModuleId: SuiteId;
     primaryModuleHref: string;
     results: ProjectSectionResults;
@@ -1117,6 +1118,10 @@ function getOverallProjectStatus(results: ProjectSectionResults): ItemStatus {
     return 'passed';
 }
 
+function getProjectFailedCount(results: ProjectSectionResults): number {
+    return results.apps.failed + results.servers.failed + results.ssl.failed + results.domains.failed + results.apis.failed;
+}
+
 function sortTestsForEmail(tests: EmailItem[]): EmailItem[] {
     const statusOrder: Record<ItemStatus, number> = { failed: 0, warning: 1, passed: 2 };
     return [...tests].sort((left, right) => {
@@ -1154,6 +1159,7 @@ export function buildDashboardRenderModel(rootDir: string): DashboardEmailModel 
             description: project.description || 'Project monitoring summary',
             color: project.color || '#3b82f6',
             overallStatus: getOverallProjectStatus(results),
+            failedCount: getProjectFailedCount(results),
             primaryModuleId: getPrimaryProjectModuleId(results),
             primaryModuleHref: getModuleReportHref(getPrimaryProjectModuleId(results)),
             results
@@ -1220,7 +1226,7 @@ function buildDashboardEmailModel(rootDir: string): DashboardEmailModel {
 }
 
 function escapeHtml(value: unknown): string {
-    return String(value || '')
+    return String(value ?? '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
@@ -1248,6 +1254,18 @@ function getStatusEmoji(status: ItemStatus): string {
     if (status === 'failed') return '✗';
     if (status === 'warning') return '⚠';
     return '✓';
+}
+
+function getProjectChipClasses(hasFailure: boolean, variant: string): string {
+    return `project-chip-badge chip-${variant} ${hasFailure ? 'chip-failed' : 'chip-normal'}`;
+}
+
+function renderProjectFailedCountBadge(failedCount: number): string {
+    return `<span class="project-failed-count">❗ ${escapeHtml(failedCount)}</span>`;
+}
+
+function renderProjectSummaryChip(label: string, value: number, variant: string, hasFailure: boolean): string {
+    return `<span class="${getProjectChipClasses(hasFailure, variant)}">${escapeHtml(label)} ${value}</span>`;
 }
 
 function renderCountChip(label: string, value: number, color: string): string {
@@ -1502,7 +1520,14 @@ function renderProjectStatusBadge(project: ProjectEmailCard): string {
 }
 
 function renderProjectSummaryChips(project: ProjectEmailCard): string {
-    return `${renderCountChip('APP', project.results.apps.total, '#3b82f6')}${renderCountChip('SRV', project.results.servers.total, '#06b6d4')}${renderCountChip('SSL', project.results.ssl.total, '#8b5cf6')}${renderCountChip('DOM', project.results.domains.total, '#10b981')}${renderCountChip('API', project.results.apis.total, '#f59e0b')}`;
+    return `
+        <span class="project-chip-row">
+            ${renderProjectSummaryChip('APP', project.results.apps.total, 'app', project.results.apps.failed > 0)}
+            ${renderProjectSummaryChip('SRV', project.results.servers.total, 'server', project.results.servers.failed > 0)}
+            ${renderProjectSummaryChip('SSL', project.results.ssl.total, 'ssl', project.results.ssl.failed > 0)}
+            ${renderProjectSummaryChip('DOM', project.results.domains.total, 'domain', project.results.domains.failed > 0)}
+            ${renderProjectSummaryChip('API', project.results.apis.total, 'api', project.results.apis.failed > 0)}
+        </span>`;
 }
 
 function renderProjectDetailSections(project: ProjectEmailCard): string {
@@ -1521,6 +1546,7 @@ function renderProjectCard(project: ProjectEmailCard): string {
                                 <div style="font-size:14px;line-height:20px;color:#cbd5e1;padding-top:6px;font-family:Arial,'Segoe UI',sans-serif;">${escapeHtml(project.description)}</div>
                             </td>
                             <td align="right" style="vertical-align:top;white-space:nowrap;">
+                                ${renderProjectFailedCountBadge(project.failedCount)}
                                 ${renderProjectStatusBadge(project)}
                             </td>
                         </tr>
@@ -1538,6 +1564,40 @@ function renderProjectCard(project: ProjectEmailCard): string {
         </table>`;
 }
 
+function renderEmailModuleSection(section: ModuleSection): string {
+    const attentionItems = section.items.filter((item) => item.status !== 'passed');
+    const sectionStatus: ItemStatus = section.failed > 0 ? 'failed' : section.warning > 0 ? 'warning' : 'passed';
+    const headerColor = sectionStatus === 'failed' ? '#7f1d1d' : sectionStatus === 'warning' ? '#7c4a03' : '#065f46';
+    const title = section.id === 'app'
+        ? 'App Status'
+        : section.id === 'server'
+            ? 'Server Health'
+            : section.id === 'cert'
+                ? 'SSL Certificates'
+                : section.id === 'domain'
+                    ? 'Domain Status'
+                    : 'API Status';
+
+    return `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#050b17" style="margin-top:20px;background-color:#050b17;border:1px solid #1f2937;border-collapse:separate;border-radius:18px;overflow:hidden;">
+            <tr>
+                <td style="padding:18px 20px;background:${headerColor};font-family:Arial,'Segoe UI',sans-serif;">
+                    <div style="font-size:18px;line-height:22px;font-weight:800;color:#ffffff;">${escapeHtml(title)} <span style="color:#cbd5e1;">(${section.total})</span></div>
+                    <div style="padding-top:10px;">${renderCountChip('TOTAL', section.total, '#3b82f6')}${section.warning > 0 ? renderCountChip('WARN', section.warning, '#f59e0b') : ''}${section.failed > 0 ? renderCountChip('FAIL', section.failed, '#ef4444') : ''}</div>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding:18px 20px;font-family:Arial,'Segoe UI',sans-serif;">
+                    ${attentionItems.length > 0 ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${attentionItems.map(renderItem).join('')}</table>` : `<div style="padding:16px 14px;border-radius:14px;background:#0b1524;border:1px dashed rgba(148,163,184,0.3);font-size:13px;line-height:18px;color:#94a3b8;text-align:center;">No failed or warning checks in this module.</div>`}
+                </td>
+            </tr>
+        </table>`;
+}
+
+function renderEmailModuleSections(sections: ModuleSection[]): string {
+    return sections.map((section) => renderEmailModuleSection(section)).join('');
+}
+
 function buildDashboardEmailHtml(model: DashboardEmailModel): string {
     return `<!DOCTYPE html>
 <html>
@@ -1545,6 +1605,55 @@ function buildDashboardEmailHtml(model: DashboardEmailModel): string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${escapeHtml(model.headerTitle)}</title>
+    <style>
+        .project-failed-count {
+            display: inline-block;
+            margin-right: 8px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            background: #3b0a0a;
+            color: #ff4d4f;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid #ff4d4f;
+            vertical-align: middle;
+        }
+
+        .project-chip-row {
+            display: inline-block;
+        }
+
+        .project-chip-badge {
+            display: inline-block;
+            margin-right: 8px;
+            margin-bottom: 6px;
+            padding: 5px 12px;
+            border-radius: 18px;
+            font-size: 12px;
+            line-height: 14px;
+            font-weight: 700;
+            font-family: Arial, 'Segoe UI', sans-serif;
+            white-space: nowrap;
+            border: 2px solid transparent;
+        }
+
+        .chip-normal {
+            box-shadow: none;
+        }
+
+        .chip-app { background: #f0f0f0; color: #3b82f6; border-color: #3b82f6; }
+        .chip-server { background: #f0f0f0; color: #06b6d4; border-color: #06b6d4; }
+        .chip-ssl { background: #f0f0f0; color: #8b5cf6; border-color: #8b5cf6; }
+        .chip-domain { background: #f0f0f0; color: #10b981; border-color: #10b981; }
+        .chip-api { background: #f0f0f0; color: #f59e0b; border-color: #f59e0b; }
+
+        .chip-failed {
+            background: #2a0d0d !important;
+            color: #ff6b6b !important;
+            border: 1px solid #ff4d4f !important;
+            box-shadow: 0 0 6px rgba(255, 77, 79, 0.4);
+        }
+    </style>
 </head>
 <body style="margin:0;padding:0;background-color:#000000;color:#ffffff;font-family:Arial,'Segoe UI',sans-serif;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background-color:#000000;margin:0;padding:0;border-collapse:collapse;">
@@ -1583,6 +1692,12 @@ function buildDashboardEmailHtml(model: DashboardEmailModel): string {
                     <tr>
                         <td style="padding-top:24px;">
                             ${model.projects.map(renderProjectCard).join('')}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td>
+                            ${renderEmailModuleSections(model.moduleSections)}
                         </td>
                     </tr>
 
