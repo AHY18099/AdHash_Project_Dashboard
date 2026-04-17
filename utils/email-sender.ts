@@ -202,6 +202,32 @@ function getModuleReportHref(suiteId: SuiteId): string {
     return `./module-reports/${MODULE_REPORT_FILE[suiteId]}`;
 }
 
+function createFinalDashboardBundle(rootDir: string, sourceHtmlPath: string, moduleReportsDir: string): { bundleDir: string; bundleHtmlPath: string } {
+    const bundleDir = path.join(rootDir, 'final-dashboard-bundle');
+    const bundleReportsDir = path.join(bundleDir, 'module-reports');
+    const bundleHtmlPath = path.join(bundleDir, 'AdHash-Projects-Dashboard.html');
+    const bundleIndexPath = path.join(bundleDir, 'index.html');
+
+    fs.rmSync(bundleDir, { recursive: true, force: true });
+    fs.mkdirSync(bundleReportsDir, { recursive: true });
+    fs.copyFileSync(sourceHtmlPath, bundleHtmlPath);
+    fs.copyFileSync(sourceHtmlPath, bundleIndexPath);
+
+    for (const reportFile of Object.values(MODULE_REPORT_FILE)) {
+        const sourceReportPath = path.join(moduleReportsDir, reportFile);
+        const targetReportPath = path.join(bundleReportsDir, reportFile);
+        if (fs.existsSync(sourceReportPath)) {
+            fs.copyFileSync(sourceReportPath, targetReportPath);
+        }
+    }
+
+    console.log(`[BUNDLE] root path: ${bundleDir}`);
+    console.log(`[BUNDLE] main html path: ${bundleHtmlPath}`);
+    console.log(`[BUNDLE] module reports path: ${bundleReportsDir}`);
+
+    return { bundleDir, bundleHtmlPath };
+}
+
 export interface DashboardEmailSendResult {
     enabled: boolean;
     sent: boolean;
@@ -1412,6 +1438,58 @@ function renderAttentionSection(title: string, items: Array<{ projectName: strin
         </table>`;
 }
 
+function renderProjectStatusBadge(project: ProjectEmailCard): string {
+    return `
+        <table role="presentation" cellpadding="0" cellspacing="0" style="display:inline-table;margin-bottom:6px;">
+            <tr>
+                <td bgcolor="${getStatusColor(project.overallStatus)}" style="background-color:${getStatusColor(project.overallStatus)};border-radius:18px;padding:5px 12px;font-size:12px;line-height:14px;font-weight:800;color:${project.overallStatus === 'warning' ? '#111827' : '#ffffff'};font-family:Arial,'Segoe UI',sans-serif;white-space:nowrap;">${getStatusLabel(project.overallStatus)}</td>
+            </tr>
+        </table>`;
+}
+
+function renderProjectSummaryChips(project: ProjectEmailCard): string {
+    return `${renderCountChip('APP', project.results.apps.total, '#3b82f6')}${renderCountChip('SRV', project.results.servers.total, '#06b6d4')}${renderCountChip('SSL', project.results.ssl.total, '#8b5cf6')}${renderCountChip('DOM', project.results.domains.total, '#10b981')}${renderCountChip('API', project.results.apis.total, '#f59e0b')}`;
+}
+
+function renderProjectDetailSections(project: ProjectEmailCard): string {
+    return `${renderSection('App Status', project.results.apps)}${renderSection('Server Health', project.results.servers)}${renderSection('SSL Certificates', project.results.ssl)}${renderSection('Domain Status', project.results.domains)}${renderSection('API Endpoints', project.results.apis)}`;
+}
+
+function renderProjectCard(project: ProjectEmailCard): string {
+    return `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#050b17" style="margin-bottom:24px;background-color:#050b17;border:1px solid #1f2937;border-left:6px solid ${escapeHtml(project.color)};border-collapse:separate;border-radius:22px;overflow:hidden;box-shadow:0 12px 30px rgba(2,6,23,0.22);">
+            <tr>
+                <td style="padding:22px 24px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                            <td style="padding-right:14px;vertical-align:top;">
+                                <div style="font-size:24px;line-height:28px;font-weight:800;color:#ffffff;font-family:Arial,'Segoe UI',sans-serif;">${escapeHtml(project.name)}</div>
+                                <div style="font-size:14px;line-height:20px;color:#cbd5e1;padding-top:6px;font-family:Arial,'Segoe UI',sans-serif;">${escapeHtml(project.description)}</div>
+                            </td>
+                            <td align="right" style="vertical-align:top;white-space:nowrap;">
+                                ${renderProjectStatusBadge(project)}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" style="padding-top:14px;">${renderProjectSummaryChips(project)}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" style="padding-top:16px;">
+                                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                                    <tr>
+                                        <td style="padding:8px 12px;border-radius:999px;background-color:#312e81;font-size:11px;line-height:13px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#e0e7ff;font-family:Arial,'Segoe UI',sans-serif;">Summary Only</td>
+                                        <td style="width:10px;"></td>
+                                        <td style="padding:10px 14px;border-radius:12px;background-color:#111827;border:1px solid #374151;font-size:12px;line-height:14px;font-weight:800;color:#ffffff;font-family:Arial,'Segoe UI',sans-serif;">👉 View Full Details in Attached Report</td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>`;
+}
+
 function buildDashboardEmailHtml(model: DashboardEmailModel): string {
     return `<!DOCTYPE html>
 <html>
@@ -1455,64 +1533,21 @@ function buildDashboardEmailHtml(model: DashboardEmailModel): string {
                     </tr>
 
                     <tr>
-                        <td style="padding:0 0 12px 0;">
-                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#050b17" style="background-color:#050b17;border:1px solid #1f2937;border-collapse:separate;border-radius:20px;">
+                        <td style="padding-top:24px;">
+                            ${model.projects.map(renderProjectCard).join('')}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding:0 0 16px 0;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#050b17" style="background-color:#050b17;border:1px solid #1f2937;border-collapse:separate;border-radius:18px;">
                                 <tr>
-                                    <td style="padding:18px 20px 8px 20px;font-size:18px;line-height:22px;font-weight:800;color:#ffffff;font-family:Arial,'Segoe UI',sans-serif;">Module Status Overview</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding:0 20px 16px 20px;">
-                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                                            ${model.moduleSections.map(renderModuleSection).join('')}
-                                        </table>
+                                    <td style="padding:18px 20px;">
+                                        <div style="font-size:16px;line-height:20px;font-weight:800;color:#ffffff;font-family:Arial,'Segoe UI',sans-serif;">Attached Full Report</div>
+                                        <div style="font-size:13px;line-height:19px;color:#94a3b8;margin-top:8px;font-family:Arial,'Segoe UI',sans-serif;">This email is intentionally compact. Open the attached dashboard report to view full server, SSL, domain, API, and app-level details.</div>
                                     </td>
                                 </tr>
                             </table>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td>
-                            ${renderAttentionSection('Failed Checks Requiring Action', model.failedItems, 'failed')}
-                            ${renderAttentionSection('Warnings Requiring Review', model.warningItems, 'warning')}
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td style="padding-top:24px;">
-                            ${model.projects.map((project) => `
-                                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#050b17" style="margin-bottom:24px;background-color:#050b17;border:1px solid #1f2937;border-collapse:separate;border-radius:22px;">
-                                    <tr>
-                                        <td bgcolor="#0b1526" style="padding:22px 24px;background-color:#0b1526;border-left:6px solid ${escapeHtml(project.color)};border-bottom:1px solid #1f2937;">
-                                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                                                <tr>
-                                                    <td style="font-size:24px;line-height:28px;font-weight:800;color:#ffffff;font-family:Arial,'Segoe UI',sans-serif;">${escapeHtml(project.name)}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td style="font-size:14px;line-height:20px;color:#cbd5e1;padding-top:6px;font-family:Arial,'Segoe UI',sans-serif;">${escapeHtml(project.description)}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td style="padding-top:14px;">${renderCountChip('APP', project.results.apps.total, '#3b82f6')}${renderCountChip('SRV', project.results.servers.total, '#06b6d4')}${renderCountChip('SSL', project.results.ssl.total, '#8b5cf6')}${renderCountChip('DOM', project.results.domains.total, '#10b981')}${renderCountChip('API', project.results.apis.total, '#f59e0b')}
-                                                        <table role="presentation" cellpadding="0" cellspacing="0" style="display:inline-table;margin-bottom:6px;">
-                                                            <tr>
-                                                                <td bgcolor="${getStatusColor(project.overallStatus)}" style="background-color:${getStatusColor(project.overallStatus)};border-radius:18px;padding:5px 12px;font-size:12px;line-height:14px;font-weight:800;color:${project.overallStatus === 'warning' ? '#111827' : '#ffffff'};font-family:Arial,'Segoe UI',sans-serif;white-space:nowrap;">${getStatusLabel(project.overallStatus)}</td>
-                                                            </tr>
-                                                        </table>
-                                                    </td>
-                                                </tr>
-                                            </table>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding:22px 24px;">
-                                            ${renderSection('App Status', project.results.apps)}
-                                            ${renderSection('Server Health', project.results.servers)}
-                                            ${renderSection('SSL Certificates', project.results.ssl)}
-                                            ${renderSection('Domain Status', project.results.domains)}
-                                            ${renderSection('API Endpoints', project.results.apis)}
-                                        </td>
-                                    </tr>
-                                </table>`).join('')}
                         </td>
                     </tr>
 
@@ -1907,12 +1942,14 @@ export async function sendDashboardSummaryEmail(dashboardPath: string, rootDir =
     const subject = buildEmailSubject(model);
     const html = buildDashboardEmailHtml(model);
     const previewPath = path.join(previewDir, 'dashboard-email.html');
-    const attachmentPath = path.join(previewDir, 'AdHash-Projects-Dashboard.html');
+    const previewAttachmentPath = path.join(previewDir, 'AdHash-Projects-Dashboard.html');
 
     console.log('[EMAIL] render source selected: buildDashboardEmailHtml');
     console.log(`[EMAIL] html length: ${html.length}`);
     fs.writeFileSync(previewPath, html, 'utf8');
-    fs.writeFileSync(attachmentPath, html, 'utf8');
+    fs.writeFileSync(previewAttachmentPath, html, 'utf8');
+    const { bundleHtmlPath } = createFinalDashboardBundle(rootDir, previewAttachmentPath, path.join(previewDir, 'module-reports'));
+    const attachmentPath = bundleHtmlPath;
     console.log(`Dashboard email preview generated at: ${previewPath}`);
     console.log(`[ATTACHMENT] file output path: ${attachmentPath}`);
     console.log(`[ATTACHMENT] html length: ${html.length}`);
