@@ -186,9 +186,11 @@ function renderModuleItemCard(sectionId: ModuleSection['id'], item: EmailItem): 
   const fields: string[] = [renderWideDetailField('Project', item.projectName)];
 
   if (sectionId === 'app') {
+    fields.push(renderDetailField('App Name', item.name));
     fields.push(renderDetailField('Store', item.platform));
     fields.push(renderWideDetailField('URL', item.url));
     fields.push(renderDetailField('Status', getStatusLabel(item.status)));
+    fields.push(renderDetailField('Duration', item.durationLabel));
     fields.push(renderWideDetailField('Failure Reason', item.reason));
   } else if (sectionId === 'cert') {
     fields.push(renderWideDetailField('URL', item.url));
@@ -197,6 +199,7 @@ function renderModuleItemCard(sectionId: ModuleSection['id'], item: EmailItem): 
     fields.push(renderDetailField('Expiry Date IST', item.expiryDateIST));
     fields.push(renderDetailField('Days Remaining', item.daysRemaining));
   } else if (sectionId === 'server') {
+    fields.push(renderDetailField('Item Name', item.name));
     fields.push(renderWideDetailField('URL', item.url));
     fields.push(renderDetailField('Status', getStatusLabel(item.status)));
     fields.push(renderDetailField('Duration', item.durationLabel));
@@ -208,8 +211,10 @@ function renderModuleItemCard(sectionId: ModuleSection['id'], item: EmailItem): 
     fields.push(renderDetailField('Expiry Date IST', item.expiryDateIST));
     fields.push(renderDetailField('Days Remaining', item.daysRemaining));
   } else if (sectionId === 'api') {
+    fields.push(renderDetailField('API Name', item.name));
     fields.push(renderDetailField('Method', item.method));
     fields.push(renderWideDetailField('URL', item.url));
+    fields.push(renderDetailField('Status', getStatusLabel(item.status)));
     fields.push(renderDetailField('Status Code', item.responseCode));
     fields.push(renderWideDetailField('Request Summary', summarizeText(item.requestBody)));
     fields.push(renderWideDetailField('Response Summary', summarizeText(item.responseBody)));
@@ -234,21 +239,47 @@ function renderModuleCountBadge(label: string, value: number | string, className
   return `<span class="module-count-badge ${className}">${escapeHtml(label)} ${value}</span>`;
 }
 
+function getModuleSectionDomId(sectionId: ModuleSection['id']): string {
+  if (sectionId === 'cert') {
+    return 'ssl-section';
+  }
+
+  return `${sectionId}-section`;
+}
+
+function getModuleSectionHeading(section: ModuleSection): string {
+  if (section.id === 'app') {
+    return 'App Status';
+  }
+  if (section.id === 'server') {
+    return 'Server Health';
+  }
+  if (section.id === 'cert') {
+    return 'SSL Certificates';
+  }
+  if (section.id === 'domain') {
+    return 'Domain Status';
+  }
+
+  return 'API Status';
+}
+
 function renderModuleSection(section: ModuleSection): string {
   const statusClass = getStatusClass(section.status);
   const detailCards = section.items.length > 0
     ? section.items.map((item) => renderModuleItemCard(section.id, item)).join('')
     : '<div class="module-empty-state">No structured items were available for this module in the current dashboard state.</div>';
-  const sectionDomId = `${section.id}-section`;
+  const sectionDomId = getModuleSectionDomId(section.id);
+  const heading = `${getModuleSectionHeading(section)} (${section.total})`;
 
-  return `<section class="module-section-card ${statusClass}">
-            <div class="module-section-header">
-                <div>
+  return `<section class="module-section module-section-card ${statusClass}">
+            <div class="module-header module-section-header">
+                <div class="module-header-left">
                     <div class="module-title-row">
-                        <h2>${escapeHtml(section.icon)} ${escapeHtml(section.title)}</h2>
+                        <h2>${escapeHtml(section.icon)} ${escapeHtml(heading)}</h2>
                         <span class="summary-status-badge ${statusClass}">${escapeHtml(getStatusLabel(section.status))}</span>
                     </div>
-                    <div class="module-count-row">
+                    <div class="module-badges module-count-row">
                         ${renderModuleCountBadge('PASS', section.passed, 'passed')}
                         ${renderModuleCountBadge('WARN', section.warning, 'warning')}
                         ${renderModuleCountBadge('FAIL', section.failed, 'failed')}
@@ -256,12 +287,9 @@ function renderModuleSection(section: ModuleSection): string {
                         ${renderModuleCountBadge('DURATION', section.durationLabel, 'duration')}
                     </div>
                 </div>
-                    <button class="module-toggle-btn" id="module-btn-${escapeHtml(section.id)}" data-target="${escapeHtml(sectionDomId)}" type="button" aria-expanded="false" aria-controls="${escapeHtml(sectionDomId)}" onclick="toggleSection('${escapeHtml(sectionDomId)}')">
-                    <span class="toggle-text">View Details</span>
-                    <span class="toggle-icon">▼</span>
-                </button>
+                <button class="module-toggle-btn" id="module-btn-${escapeHtml(section.id)}" type="button" aria-expanded="false" aria-controls="${escapeHtml(sectionDomId)}" onclick="toggleModuleSection('${escapeHtml(sectionDomId)}', this)">View Details</button>
             </div>
-                  <div class="module-section-details" id="${escapeHtml(sectionDomId)}" style="display:none;">
+            <div id="${escapeHtml(sectionDomId)}" class="module-detail-content module-section-details" style="display:none;">
                 <div class="module-details-grid">
                     ${detailCards}
                 </div>
@@ -822,6 +850,20 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
           padding: 22px 24px;
         }
 
+        .module-header-left {
+          display: flex;
+          flex-direction: column;
+          gap: 0;
+          min-width: 0;
+          flex: 1;
+        }
+
+        .module-badges {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
         .module-title-row {
           display: flex;
           align-items: center;
@@ -851,25 +893,41 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
         .module-toggle-btn {
           display: inline-flex;
           align-items: center;
-          gap: 8px;
-          border: none;
+          justify-content: center;
+          min-width: 148px;
+          min-height: 46px;
+          border: 1px solid rgba(147, 197, 253, 0.55);
           border-radius: 999px;
-          padding: 11px 16px;
-          background: linear-gradient(135deg, #1d4ed8, #4338ca);
+          padding: 12px 18px;
+          background: linear-gradient(135deg, #2563eb, #1d4ed8);
           color: #ffffff;
           cursor: pointer;
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 800;
           letter-spacing: 0.06em;
           text-transform: uppercase;
+          box-shadow: 0 12px 24px rgba(37, 99, 235, 0.22);
+          transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
         }
 
-        .module-toggle-btn .toggle-icon { transition: transform 0.2s ease; }
-        .module-toggle-btn[aria-expanded="true"] .toggle-icon { transform: rotate(180deg); }
+        .module-toggle-btn:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 16px 28px rgba(37, 99, 235, 0.28);
+        }
+
+        .module-toggle-btn[aria-expanded="true"] {
+          background: linear-gradient(135deg, #0f766e, #0f9f8f);
+          border-color: rgba(153, 246, 228, 0.5);
+          box-shadow: 0 12px 24px rgba(15, 118, 110, 0.22);
+        }
 
         .module-section-details {
           padding: 0 24px 24px 24px;
           border-top: 1px solid rgba(148, 163, 184, 0.12);
+        }
+
+        .module-detail-content {
+          display: none;
         }
 
         .module-details-grid {
@@ -1178,6 +1236,10 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
             flex-direction: column;
             align-items: flex-start;
           }
+
+          .module-toggle-btn {
+            width: 100%;
+          }
         }
 
         @media (max-width: 720px) {
@@ -1262,16 +1324,20 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
     </div>
 
     <script>
-      function toggleSection(id) {
-        const details = document.getElementById(id);
-        const button = document.querySelector('.module-toggle-btn[data-target="' + id + '"]');
-        const label = button.querySelector('.toggle-text');
-        const expanded = button.getAttribute('aria-expanded') === 'true';
+      function toggleModuleSection(sectionId, button) {
+        const section = document.getElementById(sectionId);
+        const isHidden = section.style.display === 'none' || section.style.display === '';
 
-        button.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-        details.style.display = expanded ? 'none' : 'block';
-        label.textContent = expanded ? 'View Details' : 'Hide Details';
+        if (isHidden) {
+          section.style.display = 'block';
+          button.textContent = 'Hide Details';
+          button.setAttribute('aria-expanded', 'true');
+        } else {
+          section.style.display = 'none';
+          button.textContent = 'View Details';
+          button.setAttribute('aria-expanded', 'false');
         }
+      }
     </script>
 </body>
 </html>`;
