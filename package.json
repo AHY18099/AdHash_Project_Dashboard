@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test:all": "ts-node run-all-tests.ts",
+    "generate:dashboard": "ts-node regenerate-dashboard.ts"
   },
   "keywords": [
     "dashboard",

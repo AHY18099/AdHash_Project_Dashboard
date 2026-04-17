@@ -1,4 +1,5 @@
 import { generateDashboard } from './utils/dashboard-generator';
+import { sendDashboardSummaryEmail } from './utils/email-sender';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -53,14 +54,32 @@ function loadResultsFromState(): TestResult[] {
   });
 }
 
-const results = loadResultsFromState();
+async function main(): Promise<void> {
+  const results = loadResultsFromState();
 
-console.log('🔄 Regenerating unified dashboard from workspace state...\n');
-generateDashboard(results, 'unified-dashboard/index.html');
-console.log('\n✅ Dashboard regenerated successfully!');
-console.log('📂 Opening dashboard in browser...\n');
+  console.log('🔄 Regenerating unified dashboard from workspace state...\n');
+  generateDashboard(results, 'unified-dashboard/index.html');
+  console.log('\n✅ Dashboard regenerated successfully!');
 
-const { exec } = require('child_process');
-const openCommand = process.platform === 'win32' ? 'start' :
-                    process.platform === 'darwin' ? 'open' : 'xdg-open';
-exec(`${openCommand} "unified-dashboard/index.html"`);
+  const emailResult = await sendDashboardSummaryEmail(path.join(process.cwd(), 'unified-dashboard', 'index.html'));
+  if (emailResult.enabled && emailResult.previewPath) {
+    console.log(`📧 Dashboard email preview: ${emailResult.previewPath}`);
+  }
+
+  if (emailResult.enabled && !emailResult.sent) {
+    throw new Error(emailResult.error || 'Email send failed');
+  }
+
+  if (emailResult.sent) {
+    console.log('EMAIL SENT SUCCESSFULLY');
+  }
+
+  console.log('WORKFLOW REPORT GENERATION COMPLETE');
+  console.log('RUN COMPLETED');
+  process.exit(0);
+}
+
+main().catch((error) => {
+  console.error('❌ Failed to regenerate dashboard:', error);
+  process.exit(1);
+});

@@ -1,0 +1,49 @@
+name: Scheduled Dashboard Email
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+    - cron: '0 10 * * *'
+
+jobs:
+  generate-and-send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CI: 'true'
+      ZOHO_MAIL_ENABLED: ${{ secrets.ZOHO_MAIL_ENABLED }}
+      ZOHO_MAIL_FROM: ${{ secrets.ZOHO_MAIL_FROM }}
+      ZOHO_MAIL_USER: ${{ secrets.ZOHO_MAIL_USER }}
+      ZOHO_MAIL_PASS: ${{ secrets.ZOHO_MAIL_PASS }}
+      ZOHO_MAIL_TO: ${{ secrets.ZOHO_MAIL_TO }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run cleaned production dashboard pipeline
+        run: npm run test:all
+
+      - name: Upload dashboard artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-output-${{ github.run_number }}
+          if-no-files-found: warn
+          path: |
+            unified-dashboard/**
+            email-preview/**
+            suite-reports/**
+            test-results/**

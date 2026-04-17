@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { generateDashboard } from './utils/dashboard-generator';
-import { sendTestReport } from './utils/email-sender';
+import { sendDashboardSummaryEmail } from './utils/email-sender';
 
 dotenv.config();
 
@@ -1182,64 +1182,9 @@ async function runCommand(definition: SuiteDefinition): Promise<TestResult> {
   }
 }
 
-async function maybeSendEmail(finalResults: TestResult[], totalDuration: number, dashboardPath: string): Promise<void> {
-  const emailEnabled = process.env.ZOHO_MAIL_ENABLED === 'true';
-  if (!emailEnabled) {
-    console.log('\n📧 Email notifications disabled. Set ZOHO_MAIL_ENABLED=true to enable.');
-    return;
-  }
-
-  try {
-    const emailConfig = {
-      host: process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com',
-      port: parseInt(process.env.ZOHO_MAIL_PORT || '465', 10),
-      secure: process.env.ZOHO_MAIL_SECURE === 'true' || true,
-      user: process.env.ZOHO_MAIL_USER || '',
-      pass: process.env.ZOHO_MAIL_PASS || '',
-      from: process.env.ZOHO_MAIL_FROM || process.env.ZOHO_MAIL_USER || '',
-      to: (process.env.ZOHO_MAIL_TO || '').split(',').map((email) => email.trim()).filter(Boolean),
-    };
-
-    if (!emailConfig.user || !emailConfig.pass || emailConfig.to.length === 0) {
-      console.log('⚠️  Email configuration incomplete. Skipping email send.');
-      return;
-    }
-
-    const suiteDetails = finalResults.map((result) => {
-      const definition = suiteDefinitions.find((entry) => entry.repository === result.repository);
-      return {
-        repository: result.repository,
-        displayName: definition?.displayName || result.repository,
-        icon: definition?.icon || '📦',
-        status: result.status === 'unavailable' ? 'error' : result.status,
-        passed: result.passed || 0,
-        failed: result.failed || 0,
-        warnings: result.warnings || 0,
-        total: result.total || 0,
-        error: result.error || result.message
-      };
-    });
-
-    await sendTestReport(
-      dashboardPath,
-      {
-        totalSuites: finalResults.length,
-        successfulSuites: finalResults.filter((result) => result.status === 'success').length,
-        failedSuites: finalResults.filter((result) => result.status === 'failed' || result.status === 'error').length,
-        totalDuration: `${(totalDuration / 1000).toFixed(1)}s`,
-        timestamp: new Date().toLocaleString(),
-        suiteDetails
-      },
-      emailConfig
-    );
-
-    console.log('✅ Email report sent successfully.');
-  } catch (error) {
-    console.error('❌ Failed to send email report:', error);
-  }
-}
-
 async function main(): Promise<void> {
+  const shouldOpenBrowser = String(process.env.CI || '').trim().toLowerCase() !== 'true';
+
   if (process.argv.includes('--regenerate-only')) {
     regenerateDashboardFromState();
     console.log('✅ Dashboard regenerated from stored state.');
@@ -1307,10 +1252,21 @@ async function main(): Promise<void> {
   const dashboardPath = path.join(process.cwd(), 'unified-dashboard', 'index.html');
   generateDashboard(finalResults, dashboardPath);
 
-  const openCommand = process.platform === 'win32' ? 'start' : process.platform === 'darwin' ? 'open' : 'xdg-open';
-  exec(`${openCommand} "${dashboardPath}"`);
+  const emailResult = await sendDashboardSummaryEmail(dashboardPath);
+  if (emailResult.enabled && emailResult.previewPath) {
+    console.log(`📧 Dashboard email preview: ${emailResult.previewPath}`);
+  }
 
-  await maybeSendEmail(finalResults, totalDuration, dashboardPath);
+  if (emailResult.enabled && !emailResult.sent) {
+    throw new Error(emailResult.error || 'Email send failed');
+  }
+
+  if (emailResult.sent) {
+    console.log('EMAIL SENT SUCCESSFULLY');
+  }
+
+  console.log('RUN COMPLETED');
+  process.exit(0);
 }
 
 main().catch((error) => {
