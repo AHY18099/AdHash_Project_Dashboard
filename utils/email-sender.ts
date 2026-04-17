@@ -139,6 +139,8 @@ interface ProjectEmailCard {
     description: string;
     color: string;
     overallStatus: ItemStatus;
+    primaryModuleId: SuiteId;
+    primaryModuleHref: string;
     results: ProjectSectionResults;
 }
 
@@ -193,13 +195,36 @@ const MODULE_SECTION_KEY: Record<SuiteId, SectionKey> = {
 const MODULE_REPORT_FILE: Record<SuiteId, string> = {
     app: 'app-status.html',
     server: 'server-health.html',
-    cert: 'ssl-certificates.html',
-    api: 'api-endpoints.html',
-    domain: 'domain-expiry.html'
+    cert: 'ssl.html',
+    api: 'api.html',
+    domain: 'domain.html'
 };
 
 function getModuleReportHref(suiteId: SuiteId): string {
-    return `./module-reports/${MODULE_REPORT_FILE[suiteId]}`;
+    return `module-reports/${MODULE_REPORT_FILE[suiteId]}`;
+}
+
+function getPrimaryProjectModuleId(results: ProjectSectionResults): SuiteId {
+    const orderedSections: Array<{ suiteId: SuiteId; summary: SectionSummary }> = [
+        { suiteId: 'app', summary: results.apps },
+        { suiteId: 'server', summary: results.servers },
+        { suiteId: 'cert', summary: results.ssl },
+        { suiteId: 'domain', summary: results.domains },
+        { suiteId: 'api', summary: results.apis }
+    ];
+
+    const failedSection = orderedSections.find((entry) => entry.summary.failed > 0);
+    if (failedSection) {
+        return failedSection.suiteId;
+    }
+
+    const warningSection = orderedSections.find((entry) => entry.summary.warning > 0);
+    if (warningSection) {
+        return warningSection.suiteId;
+    }
+
+    const populatedSection = orderedSections.find((entry) => entry.summary.total > 0);
+    return populatedSection ? populatedSection.suiteId : 'app';
 }
 
 function createFinalDashboardBundle(rootDir: string, sourceHtmlPath: string, moduleReportsDir: string): { bundleDir: string; bundleHtmlPath: string } {
@@ -1127,6 +1152,8 @@ function buildDashboardEmailModel(rootDir: string): DashboardEmailModel {
             description: project.description || 'Project monitoring summary',
             color: project.color || '#3b82f6',
             overallStatus: getOverallProjectStatus(results),
+            primaryModuleId: getPrimaryProjectModuleId(results),
+            primaryModuleHref: getModuleReportHref(getPrimaryProjectModuleId(results)),
             results
         };
     }).sort((left, right) => {
@@ -1479,7 +1506,9 @@ function renderProjectCard(project: ProjectEmailCard): string {
                                     <tr>
                                         <td style="padding:8px 12px;border-radius:999px;background-color:#312e81;font-size:11px;line-height:13px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#e0e7ff;font-family:Arial,'Segoe UI',sans-serif;">Summary Only</td>
                                         <td style="width:10px;"></td>
-                                        <td style="padding:10px 14px;border-radius:12px;background-color:#111827;border:1px solid #374151;font-size:12px;line-height:14px;font-weight:800;color:#ffffff;font-family:Arial,'Segoe UI',sans-serif;">👉 View Full Details in Attached Report</td>
+                                        <td>
+                                            <a href="${escapeHtml(project.primaryModuleHref)}" target="_blank" style="display:inline-block;padding:10px 16px;border-radius:8px;background:#1e293b;color:#fff;text-decoration:none;font-weight:500;margin-top:10px;font-size:12px;line-height:14px;font-family:Arial,'Segoe UI',sans-serif;">👉 View Full Details</a>
+                                        </td>
                                     </tr>
                                 </table>
                             </td>
@@ -1941,12 +1970,14 @@ export async function sendDashboardSummaryEmail(dashboardPath: string, rootDir =
     const model = generateModuleReportPages(previewDir, buildDashboardEmailModel(rootDir));
     const subject = buildEmailSubject(model);
     const html = buildDashboardEmailHtml(model);
-    const previewPath = path.join(previewDir, 'dashboard-email.html');
+    const previewPath = path.join(previewDir, 'index.html');
+    const legacyPreviewPath = path.join(previewDir, 'dashboard-email.html');
     const previewAttachmentPath = path.join(previewDir, 'AdHash-Projects-Dashboard.html');
 
     console.log('[EMAIL] render source selected: buildDashboardEmailHtml');
     console.log(`[EMAIL] html length: ${html.length}`);
     fs.writeFileSync(previewPath, html, 'utf8');
+    fs.writeFileSync(legacyPreviewPath, html, 'utf8');
     fs.writeFileSync(previewAttachmentPath, html, 'utf8');
     const { bundleHtmlPath } = createFinalDashboardBundle(rootDir, previewAttachmentPath, path.join(previewDir, 'module-reports'));
     const attachmentPath = bundleHtmlPath;
