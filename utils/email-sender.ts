@@ -98,7 +98,7 @@ interface ApiTestItem {
     status: ItemStatus;
 }
 
-interface EmailItem {
+export interface EmailItem {
     name: string;
     projectName: string;
     url?: string;
@@ -117,7 +117,7 @@ interface EmailItem {
     responseBody?: string;
 }
 
-interface SectionSummary {
+export interface SectionSummary {
     total: number;
     passed: number;
     warning: number;
@@ -125,7 +125,7 @@ interface SectionSummary {
     tests: EmailItem[];
 }
 
-interface ProjectSectionResults {
+export interface ProjectSectionResults {
     apps: SectionSummary;
     servers: SectionSummary;
     ssl: SectionSummary;
@@ -133,7 +133,7 @@ interface ProjectSectionResults {
     apis: SectionSummary;
 }
 
-interface ProjectEmailCard {
+export interface ProjectEmailCard {
     id: string;
     name: string;
     description: string;
@@ -144,7 +144,7 @@ interface ProjectEmailCard {
     results: ProjectSectionResults;
 }
 
-interface DashboardEmailModel {
+export interface DashboardEmailModel {
     generatedAt: string;
     headerTitle: string;
     headerSubtitle: string;
@@ -160,7 +160,7 @@ interface DashboardEmailModel {
     warningItems: Array<{ projectName: string; sectionLabel: string; item: EmailItem }>;
 }
 
-interface ModuleSection {
+export interface ModuleSection {
     id: SuiteId;
     title: string;
     icon: string;
@@ -172,6 +172,7 @@ interface ModuleSection {
     warning: number;
     total: number;
     durationLabel: string;
+    items: EmailItem[];
 }
 
 type SuiteId = 'app' | 'server' | 'cert' | 'api' | 'domain';
@@ -323,7 +324,7 @@ function mapSuiteStatus(value: unknown): ItemStatus {
 }
 
 function buildModuleSections(state: DashboardState): ModuleSection[] {
-    const orderedSuiteIds: SuiteId[] = ['app', 'server', 'cert', 'api', 'domain'];
+    const orderedSuiteIds: SuiteId[] = ['app', 'server', 'cert', 'domain', 'api'];
 
     return orderedSuiteIds.map((suiteId) => {
         const suite = state.suites?.[suiteId] || {};
@@ -338,7 +339,8 @@ function buildModuleSections(state: DashboardState): ModuleSection[] {
             failed: typeof suite.failed === 'number' ? suite.failed : 0,
             warning: typeof suite.warning === 'number' ? suite.warning : 0,
             total: typeof suite.total === 'number' ? suite.total : 0,
-            durationLabel: formatDurationLabel(suite.duration)
+            durationLabel: formatDurationLabel(suite.duration),
+            items: []
         };
     });
 }
@@ -1126,7 +1128,7 @@ function sortTestsForEmail(tests: EmailItem[]): EmailItem[] {
     });
 }
 
-function buildDashboardEmailModel(rootDir: string): DashboardEmailModel {
+export function buildDashboardRenderModel(rootDir: string): DashboardEmailModel {
     const mapping = loadProjectMapping(rootDir);
     const state = loadDashboardState(rootDir);
     const appRows = readSuiteRows(rootDir, 'Adhash_App_Status');
@@ -1135,7 +1137,7 @@ function buildDashboardEmailModel(rootDir: string): DashboardEmailModel {
     const sslDetails = ((state.suites?.cert?.details || []) as SslDetail[]).map(normalizeSslDetail);
     const domainDetails = ((state.suites?.domain?.details || []) as DomainDetail[]).map(normalizeDomainDetail);
     const apiDetails = dedupeApiResults((state.suites?.api?.details || []) as ApiTestItem[]);
-    const moduleSections = buildModuleSections(state);
+    const baseModuleSections = buildModuleSections(state);
 
     const projects = (mapping.projects || []).map((project) => {
         const results: ProjectSectionResults = {
@@ -1185,6 +1187,17 @@ function buildDashboardEmailModel(rootDir: string): DashboardEmailModel {
         }
     }
 
+    const moduleSections = baseModuleSections.map((section) => {
+        const items = getModuleItems(projects, section.id);
+        const normalizedSection = buildModuleSectionFromItems(section, items);
+        return {
+            ...normalizedSection,
+            items,
+            reportHref: getModuleReportHref(section.id),
+            reportExists: true
+        };
+    });
+
     return {
         generatedAt: state.generatedAt || new Date().toISOString(),
         headerTitle: 'AdHash Projects Status Dashboard',
@@ -1200,6 +1213,10 @@ function buildDashboardEmailModel(rootDir: string): DashboardEmailModel {
         failedItems,
         warningItems
     };
+}
+
+function buildDashboardEmailModel(rootDir: string): DashboardEmailModel {
+    return buildDashboardRenderModel(rootDir);
 }
 
 function escapeHtml(value: unknown): string {
@@ -1420,6 +1437,12 @@ function renderAttentionSection(title: string, items: Array<{ projectName: strin
     const headerBackground = status === 'failed'
         ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.24), rgba(127, 29, 29, 0.82))'
         : 'linear-gradient(135deg, rgba(245, 158, 11, 0.28), rgba(120, 53, 15, 0.82))';
+    const groupedItems = items.reduce((groups, entry) => {
+        const bucket = groups.get(entry.projectName) || [];
+        bucket.push(entry);
+        groups.set(entry.projectName, bucket);
+        return groups;
+    }, new Map<string, Array<{ projectName: string; sectionLabel: string; item: EmailItem }>>());
 
     return `
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${background}" style="margin-top:24px;background-color:${background};border:1px solid ${accent};border-collapse:separate;border-radius:22px;overflow:hidden;">
@@ -1431,32 +1454,36 @@ function renderAttentionSection(title: string, items: Array<{ projectName: strin
             </tr>
             <tr>
                 <td style="padding:18px 20px;font-family:Arial,'Segoe UI',sans-serif;">
-                    ${items.length > 0 ? items.slice(0, 12).map(({ projectName, sectionLabel, item }) => `
-                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0b1524" style="margin-bottom:14px;background-color:#0b1524;border:1px solid rgba(148,163,184,0.14);border-left:4px solid ${accent};border-collapse:separate;border-radius:18px;box-shadow:0 12px 30px rgba(2,6,23,0.22);">
+                    ${items.length > 0 ? Array.from(groupedItems.entries()).map(([projectName, projectItems]) => `
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0b1524" style="margin-bottom:16px;background-color:#0b1524;border:1px solid rgba(148,163,184,0.14);border-left:4px solid ${accent};border-collapse:separate;border-radius:18px;box-shadow:0 12px 30px rgba(2,6,23,0.22);">
                             <tr>
-                                <td style="padding:16px 18px;">
-                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                                        <tr>
-                                            <td style="padding-right:12px;vertical-align:top;">
-                                                <div style="font-size:13px;line-height:18px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:${accent};">${escapeHtml(sectionLabel)}</div>
-                                                <div style="font-size:16px;line-height:21px;font-weight:800;color:#ffffff;margin-top:6px;">${escapeHtml(item.name)}</div>
-                                                <div style="font-size:13px;line-height:18px;color:#cbd5e1;margin-top:6px;">${escapeHtml(projectName)}</div>
-                                            </td>
-                                            <td width="96" align="right" style="vertical-align:top;">
-                                                <span style="display:inline-block;min-width:88px;padding:8px 12px;border-radius:999px;border:1px solid ${accent};background-color:${status === 'failed' ? 'rgba(127,29,29,0.55)' : 'rgba(120,53,15,0.55)'};font-size:11px;line-height:13px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:${status === 'warning' ? '#fde68a' : '#fecaca'};text-align:center;">${escapeHtml(getStatusLabel(item.status))}</span>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                    ${item.url ? `<div style="margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(15,23,42,0.72);border:1px solid rgba(59,130,246,0.18);font-size:12px;line-height:17px;color:#bfdbfe;word-break:break-all;overflow-wrap:anywhere;">${escapeHtml(item.url)}</div>` : ''}
-                                    ${item.reason ? `<div style="margin-top:12px;padding:12px 13px;border-radius:14px;background:rgba(2,6,23,0.55);border:1px solid rgba(148,163,184,0.14);font-size:13px;line-height:19px;color:${status === 'failed' ? '#fecaca' : '#fde68a'};word-break:break-word;overflow-wrap:anywhere;white-space:pre-wrap;">${escapeHtml(item.reason)}</div>` : ''}
-                                    ${(item.method || item.durationLabel || item.responseCode !== null && item.responseCode !== undefined || item.expectedStatus !== null && item.expectedStatus !== undefined || item.expiryDate || item.expiryDateIST) ? `<div style="margin-top:12px;font-size:12px;line-height:18px;color:#94a3b8;word-break:break-word;overflow-wrap:anywhere;">${[
-                                        item.method ? `Method: ${escapeHtml(item.method)}` : '',
-                                        item.responseCode !== null && item.responseCode !== undefined ? `Status Code: ${escapeHtml(item.responseCode)}` : '',
-                                        item.expectedStatus !== null && item.expectedStatus !== undefined ? `Expected: ${escapeHtml(item.expectedStatus)}` : '',
-                                        item.durationLabel ? `Duration: ${escapeHtml(item.durationLabel)}` : '',
-                                        item.expiryDate ? `UTC: ${escapeHtml(item.expiryDate)}` : '',
-                                        item.expiryDateIST ? `IST: ${escapeHtml(item.expiryDateIST)}` : ''
-                                    ].filter(Boolean).join(' • ')}</div>` : ''}
+                                <td style="padding:16px 18px 12px 18px;border-bottom:1px solid rgba(148,163,184,0.1);">
+                                    <div style="font-size:16px;line-height:20px;font-weight:800;color:#ffffff;">${escapeHtml(projectName)}</div>
+                                    <div style="font-size:12px;line-height:17px;color:#94a3b8;margin-top:4px;">${projectItems.length} ${status === 'failed' ? 'failed' : 'warning'} item${projectItems.length === 1 ? '' : 's'}</div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding:14px 16px 2px 16px;">
+                                    ${projectItems.map(({ sectionLabel, item }) => `
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#09111f" style="margin-bottom:12px;background-color:#09111f;border:1px solid rgba(148,163,184,0.12);border-radius:14px;">
+                                            <tr>
+                                                <td style="padding:14px 15px;">
+                                                    <div style="font-size:12px;line-height:16px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:${accent};">${escapeHtml(sectionLabel)}</div>
+                                                    <div style="font-size:15px;line-height:20px;font-weight:800;color:#ffffff;margin-top:6px;">${escapeHtml(item.name)}</div>
+                                                    ${item.url ? `<div style="margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(15,23,42,0.72);border:1px solid rgba(59,130,246,0.18);font-size:12px;line-height:17px;color:#bfdbfe;word-break:break-all;overflow-wrap:anywhere;">${escapeHtml(item.url)}</div>` : ''}
+                                                    ${item.reason ? `<div style="margin-top:10px;padding:12px 13px;border-radius:14px;background:rgba(2,6,23,0.55);border:1px solid rgba(148,163,184,0.14);font-size:13px;line-height:19px;color:${status === 'failed' ? '#fecaca' : '#fde68a'};word-break:break-word;overflow-wrap:anywhere;white-space:pre-wrap;">${escapeHtml(item.reason)}</div>` : ''}
+                                                    ${(item.method || item.durationLabel || item.responseCode !== null && item.responseCode !== undefined || item.expectedStatus !== null && item.expectedStatus !== undefined || item.expiryDate || item.expiryDateIST || item.daysRemaining !== null && item.daysRemaining !== undefined) ? `<div style="margin-top:10px;font-size:12px;line-height:18px;color:#94a3b8;word-break:break-word;overflow-wrap:anywhere;">${[
+                                                        item.method ? `Method: ${escapeHtml(item.method)}` : '',
+                                                        item.responseCode !== null && item.responseCode !== undefined ? `Status Code: ${escapeHtml(item.responseCode)}` : '',
+                                                        item.expectedStatus !== null && item.expectedStatus !== undefined ? `Expected: ${escapeHtml(item.expectedStatus)}` : '',
+                                                        item.durationLabel ? `Duration: ${escapeHtml(item.durationLabel)}` : '',
+                                                        item.expiryDate ? `UTC: ${escapeHtml(item.expiryDate)}` : '',
+                                                        item.expiryDateIST ? `IST: ${escapeHtml(item.expiryDateIST)}` : '',
+                                                        item.daysRemaining !== null && item.daysRemaining !== undefined ? `Days Remaining: ${escapeHtml(item.daysRemaining)}` : ''
+                                                    ].filter(Boolean).join(' • ')}</div>` : ''}
+                                                </td>
+                                            </tr>
+                                        </table>`).join('')}
                                 </td>
                             </tr>
                         </table>`).join('') : `<div style="padding:24px 20px;border-radius:18px;background:linear-gradient(180deg, rgba(15,23,42,0.92), rgba(8,16,31,0.96));border:1px dashed rgba(148,163,184,0.32);text-align:center;"><div style="font-size:15px;line-height:20px;font-weight:800;color:#e2e8f0;">${escapeHtml(emptyMessage)}</div><div style="font-size:13px;line-height:18px;color:#94a3b8;margin-top:8px;">${status === 'failed' ? 'The latest dashboard run did not emit any failed items into this section.' : 'No warning items were emitted into the normalized report model for this run.'}</div></div>`}
@@ -1502,15 +1529,7 @@ function renderProjectCard(project: ProjectEmailCard): string {
                         </tr>
                         <tr>
                             <td colspan="2" style="padding-top:16px;">
-                                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-                                    <tr>
-                                        <td style="padding:8px 12px;border-radius:999px;background-color:#312e81;font-size:11px;line-height:13px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#e0e7ff;font-family:Arial,'Segoe UI',sans-serif;">Summary Only</td>
-                                        <td style="width:10px;"></td>
-                                        <td>
-                                            <a href="${escapeHtml(project.primaryModuleHref)}" target="_blank" style="display:inline-block;padding:10px 16px;border-radius:8px;background:#1e293b;color:#fff;text-decoration:none;font-weight:500;margin-top:10px;font-size:12px;line-height:14px;font-family:Arial,'Segoe UI',sans-serif;">👉 View Full Details</a>
-                                        </td>
-                                    </tr>
-                                </table>
+                                <span style="display:inline-block;padding:8px 12px;border-radius:999px;background-color:#312e81;font-size:11px;line-height:13px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#e0e7ff;font-family:Arial,'Segoe UI',sans-serif;">Summary Only</span>
                             </td>
                         </tr>
                     </table>
@@ -1568,6 +1587,13 @@ function buildDashboardEmailHtml(model: DashboardEmailModel): string {
                     </tr>
 
                     <tr>
+                        <td>
+                            ${renderAttentionSection('Failed Checks Requiring Action', model.failedItems, 'failed')}
+                            ${renderAttentionSection('Warnings Requiring Review', model.warningItems, 'warning')}
+                        </td>
+                    </tr>
+
+                    <tr>
                         <td style="padding:0 0 16px 0;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#050b17" style="background-color:#050b17;border:1px solid #1f2937;border-collapse:separate;border-radius:18px;">
                                 <tr>
@@ -1601,9 +1627,9 @@ function getSortableDaysRemaining(value: number | null | undefined): number {
     return typeof value === 'number' && Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
 }
 
-function getModuleItems(model: DashboardEmailModel, suiteId: SuiteId): EmailItem[] {
+function getModuleItems(projects: ProjectEmailCard[], suiteId: SuiteId): EmailItem[] {
     const sectionKey = MODULE_SECTION_KEY[suiteId];
-    const items = model.projects.flatMap((project) => project.results[sectionKey].tests);
+    const items = projects.flatMap((project) => project.results[sectionKey].tests);
 
     return items
         .map((item, index) => ({ item, index }))
@@ -1652,7 +1678,8 @@ function buildModuleSectionFromItems(section: ModuleSection, items: EmailItem[])
         passed,
         warning,
         failed,
-        total
+        total,
+        items
     };
 }
 
@@ -1883,7 +1910,7 @@ function generateModuleReportPages(previewDir: string, model: DashboardEmailMode
     return {
         ...model,
         moduleSections: model.moduleSections.map((section) => {
-            const items = getModuleItems(model, section.id);
+            const items = section.items || [];
             const normalizedSection = buildModuleSectionFromItems(section, items);
 
             if (section.id === 'server') {
@@ -1905,6 +1932,7 @@ function generateModuleReportPages(previewDir: string, model: DashboardEmailMode
 
             return {
                 ...normalizedSection,
+                items,
                 reportHref: href,
                 reportExists: true
             };

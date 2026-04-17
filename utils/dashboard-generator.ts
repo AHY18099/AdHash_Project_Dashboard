@@ -5,6 +5,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { buildDashboardRenderModel, type EmailItem, type ModuleSection, type ProjectEmailCard } from './email-sender';
 
 const EXPIRY_WARNING_DAYS = 30;
 
@@ -102,6 +103,162 @@ function classifyExpiryStatus(daysRemaining: number | null | undefined, hasError
   }
 
   return 'passed';
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function summarizeText(value: string | undefined, maxLength = 180): string {
+  const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return '';
+  }
+
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 1)}…` : normalized;
+}
+
+function getStatusClass(status: string): string {
+  return status === 'failed' ? 'failed' : status === 'warning' ? 'warning' : 'passed';
+}
+
+function getStatusLabel(status: string): string {
+  return status === 'failed' ? 'FAILED' : status === 'warning' ? 'WARNING' : 'PASSED';
+}
+
+function renderProjectChip(label: string, value: number, className: string): string {
+  return `<span class="project-chip ${className}">${escapeHtml(label)} ${value}</span>`;
+}
+
+function renderProjectSummaryCard(project: ProjectEmailCard): string {
+  const statusClass = getStatusClass(project.overallStatus);
+
+  return `<article class="project-summary-card ${statusClass}">
+            <div class="project-summary-header">
+                <div>
+                    <h3>${escapeHtml(project.name)}</h3>
+                    <p>${escapeHtml(project.description)}</p>
+                </div>
+                <span class="summary-status-badge ${statusClass}">${escapeHtml(getStatusLabel(project.overallStatus))}</span>
+            </div>
+            <div class="project-summary-chips">
+                ${renderProjectChip('APP', project.results.apps.total, 'app')}
+                ${renderProjectChip('SRV', project.results.servers.total, 'server')}
+                ${renderProjectChip('SSL', project.results.ssl.total, 'ssl')}
+                ${renderProjectChip('DOM', project.results.domains.total, 'domain')}
+                ${renderProjectChip('API', project.results.apis.total, 'api')}
+            </div>
+        </article>`;
+}
+
+function renderDetailField(label: string, value: unknown): string {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) {
+    return '';
+  }
+
+  return `<div class="detail-field"><span class="detail-label">${escapeHtml(label)}</span><span class="detail-value">${escapeHtml(normalized)}</span></div>`;
+}
+
+function renderWideDetailField(label: string, value: unknown): string {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) {
+    return '';
+  }
+
+  return `<div class="detail-field wide"><span class="detail-label">${escapeHtml(label)}</span><span class="detail-value">${escapeHtml(normalized)}</span></div>`;
+}
+
+function renderModuleItemCard(sectionId: ModuleSection['id'], item: EmailItem): string {
+  const statusClass = getStatusClass(item.status);
+  const fields: string[] = [renderWideDetailField('Project', item.projectName)];
+
+  if (sectionId === 'app') {
+    fields.push(renderDetailField('Store', item.platform));
+    fields.push(renderWideDetailField('URL', item.url));
+    fields.push(renderDetailField('Status', getStatusLabel(item.status)));
+    fields.push(renderWideDetailField('Failure Reason', item.reason));
+  } else if (sectionId === 'cert') {
+    fields.push(renderWideDetailField('URL', item.url));
+    fields.push(renderDetailField('Certificate Status', getStatusLabel(item.status)));
+    fields.push(renderDetailField('Expiry Date UTC', item.expiryDate));
+    fields.push(renderDetailField('Expiry Date IST', item.expiryDateIST));
+    fields.push(renderDetailField('Days Remaining', item.daysRemaining));
+  } else if (sectionId === 'server') {
+    fields.push(renderWideDetailField('URL', item.url));
+    fields.push(renderDetailField('Status', getStatusLabel(item.status)));
+    fields.push(renderDetailField('Duration', item.durationLabel));
+    fields.push(renderWideDetailField('Error Details', item.reason));
+  } else if (sectionId === 'domain') {
+    fields.push(renderWideDetailField('Domain / URL', item.url || item.name));
+    fields.push(renderDetailField('Status', getStatusLabel(item.status)));
+    fields.push(renderDetailField('Expiry Date UTC', item.expiryDate));
+    fields.push(renderDetailField('Expiry Date IST', item.expiryDateIST));
+    fields.push(renderDetailField('Days Remaining', item.daysRemaining));
+  } else if (sectionId === 'api') {
+    fields.push(renderDetailField('Method', item.method));
+    fields.push(renderWideDetailField('URL', item.url));
+    fields.push(renderDetailField('Status Code', item.responseCode));
+    fields.push(renderWideDetailField('Request Summary', summarizeText(item.requestBody)));
+    fields.push(renderWideDetailField('Response Summary', summarizeText(item.responseBody)));
+    fields.push(renderWideDetailField('Failure Details', item.reason));
+  }
+
+  return `<article class="module-detail-card ${statusClass}">
+            <div class="module-detail-header">
+                <div>
+                    <h4>${escapeHtml(item.name)}</h4>
+                    <p>${escapeHtml(item.projectName)}</p>
+                </div>
+                <span class="module-item-status ${statusClass}">${escapeHtml(getStatusLabel(item.status))}</span>
+            </div>
+            <div class="module-detail-grid">
+                ${fields.filter(Boolean).join('')}
+            </div>
+        </article>`;
+}
+
+function renderModuleCountBadge(label: string, value: number | string, className: string): string {
+  return `<span class="module-count-badge ${className}">${escapeHtml(label)} ${value}</span>`;
+}
+
+function renderModuleSection(section: ModuleSection): string {
+  const statusClass = getStatusClass(section.status);
+  const detailCards = section.items.length > 0
+    ? section.items.map((item) => renderModuleItemCard(section.id, item)).join('')
+    : '<div class="module-empty-state">No structured items were available for this module in the current dashboard state.</div>';
+
+  return `<section class="module-section-card ${statusClass}">
+            <div class="module-section-header">
+                <div>
+                    <div class="module-title-row">
+                        <h2>${escapeHtml(section.icon)} ${escapeHtml(section.title)}</h2>
+                        <span class="summary-status-badge ${statusClass}">${escapeHtml(getStatusLabel(section.status))}</span>
+                    </div>
+                    <div class="module-count-row">
+                        ${renderModuleCountBadge('PASS', section.passed, 'passed')}
+                        ${renderModuleCountBadge('WARN', section.warning, 'warning')}
+                        ${renderModuleCountBadge('FAIL', section.failed, 'failed')}
+                        ${renderModuleCountBadge('TOTAL', section.total, 'total')}
+                        ${renderModuleCountBadge('DURATION', section.durationLabel, 'duration')}
+                    </div>
+                </div>
+                <button class="module-toggle-btn" id="module-btn-${escapeHtml(section.id)}" type="button" aria-expanded="false" aria-controls="module-details-${escapeHtml(section.id)}" onclick="toggleModuleSection('${escapeHtml(section.id)}')">
+                    <span class="toggle-text">View Details</span>
+                    <span class="toggle-icon">▼</span>
+                </button>
+            </div>
+            <div class="module-section-details" id="module-details-${escapeHtml(section.id)}">
+                <div class="module-details-grid">
+                    ${detailCards}
+                </div>
+            </div>
+        </section>`;
 }
 
 /**
@@ -290,6 +447,7 @@ function parseTestResults(result: TestResult): { passed: number; failed: number;
 export function generateDashboard(results: TestResult[], outputPath: string = 'unified-dashboard/index.html'): void {
   const timestamp = new Date().toLocaleString();
   const totalDuration = results.reduce((sum, r) => sum + r.duration, 0);
+  const renderModel = buildDashboardRenderModel(process.cwd());
 
   // Create reports directory inside unified-dashboard
   const dashboardDir = path.dirname(outputPath);
@@ -401,10 +559,11 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          background: radial-gradient(circle at top, #1e3a8a 0%, #0f172a 42%, #020617 100%);
             min-height: 100vh;
             padding: 20px 20px 60px 20px;
+          color: #e2e8f0;
         }
 
         .container {
@@ -423,16 +582,17 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
         }
 
         .header {
-            background: white;
+          background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.92));
             border-radius: 20px;
             padding: 40px;
             margin-bottom: 30px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+          box-shadow: 0 24px 80px rgba(2, 6, 23, 0.35);
+          border: 1px solid rgba(96, 165, 250, 0.25);
         }
 
         .header h1 {
             font-size: 42px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, #93c5fd 0%, #c4b5fd 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 10px;
@@ -440,9 +600,10 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
         }
 
         .header .subtitle {
-            color: #666;
+          color: #cbd5e1;
             font-size: 18px;
             margin-bottom: 20px;
+          text-align: center;
         }
 
         .summary {
@@ -453,21 +614,22 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
         }
 
         .summary-card {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+          background: linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(30, 41, 59, 0.95));
             padding: 20px;
             border-radius: 15px;
             text-align: center;
+          border: 1px solid rgba(148, 163, 184, 0.12);
         }
 
         .summary-card .value {
             font-size: 36px;
             font-weight: bold;
-            color: #333;
+            color: #f8fafc;
             margin-bottom: 5px;
         }
 
         .summary-card .label {
-            color: #666;
+            color: #94a3b8;
             font-size: 14px;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -480,8 +642,298 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
         .reports-grid {
             display: flex;
             flex-direction: column;
-            gap: 16px;
+          gap: 24px;
             margin-top: 30px;
+        }
+
+        .project-summary-section,
+        .module-dashboard-section {
+          background: rgba(15, 23, 42, 0.84);
+          border: 1px solid rgba(148, 163, 184, 0.12);
+          border-radius: 24px;
+          padding: 24px;
+          box-shadow: 0 24px 60px rgba(2, 6, 23, 0.22);
+        }
+
+        .section-heading {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 16px;
+          margin-bottom: 20px;
+        }
+
+        .section-heading h2 {
+          margin: 0;
+          font-size: 28px;
+          color: #f8fafc;
+        }
+
+        .section-heading p {
+          margin: 6px 0 0;
+          color: #94a3b8;
+          font-size: 14px;
+        }
+
+        .project-summary-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 18px;
+        }
+
+        .project-summary-card {
+          background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(8, 16, 31, 0.98));
+          border: 1px solid rgba(148, 163, 184, 0.12);
+          border-left: 5px solid #60a5fa;
+          border-radius: 20px;
+          padding: 20px;
+        }
+
+        .project-summary-card.failed { border-left-color: #ef4444; }
+        .project-summary-card.warning { border-left-color: #f59e0b; }
+        .project-summary-card.passed { border-left-color: #10b981; }
+
+        .project-summary-header {
+          display: flex;
+          justify-content: space-between;
+          gap: 14px;
+          align-items: flex-start;
+        }
+
+        .project-summary-header h3 {
+          margin: 0;
+          font-size: 20px;
+          color: #f8fafc;
+        }
+
+        .project-summary-header p {
+          margin: 8px 0 0;
+          color: #94a3b8;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .summary-status-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 88px;
+          padding: 8px 12px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          white-space: nowrap;
+        }
+
+        .summary-status-badge.passed { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
+        .summary-status-badge.warning { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+        .summary-status-badge.failed { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+
+        .project-summary-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 18px;
+        }
+
+        .project-chip,
+        .module-count-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 7px 11px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          border: 1px solid transparent;
+        }
+
+        .project-chip.app { background: rgba(59, 130, 246, 0.16); color: #93c5fd; border-color: rgba(59, 130, 246, 0.3); }
+        .project-chip.server { background: rgba(6, 182, 212, 0.16); color: #67e8f9; border-color: rgba(6, 182, 212, 0.3); }
+        .project-chip.ssl { background: rgba(139, 92, 246, 0.16); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.3); }
+        .project-chip.domain { background: rgba(16, 185, 129, 0.16); color: #86efac; border-color: rgba(16, 185, 129, 0.3); }
+        .project-chip.api { background: rgba(245, 158, 11, 0.16); color: #fcd34d; border-color: rgba(245, 158, 11, 0.3); }
+
+        .module-sections-grid {
+          display: grid;
+          gap: 18px;
+        }
+
+        .module-section-card {
+          background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(8, 16, 31, 0.98));
+          border: 1px solid rgba(148, 163, 184, 0.12);
+          border-left: 5px solid #60a5fa;
+          border-radius: 22px;
+          overflow: hidden;
+        }
+
+        .module-section-card.failed { border-left-color: #ef4444; }
+        .module-section-card.warning { border-left-color: #f59e0b; }
+        .module-section-card.passed { border-left-color: #10b981; }
+
+        .module-section-header {
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          align-items: flex-start;
+          padding: 22px 24px;
+        }
+
+        .module-title-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .module-title-row h2 {
+          margin: 0;
+          font-size: 22px;
+          color: #f8fafc;
+        }
+
+        .module-count-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 16px;
+        }
+
+        .module-count-badge.passed { background: rgba(16, 185, 129, 0.16); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3); }
+        .module-count-badge.warning { background: rgba(245, 158, 11, 0.16); color: #fcd34d; border-color: rgba(245, 158, 11, 0.3); }
+        .module-count-badge.failed { background: rgba(239, 68, 68, 0.16); color: #fca5a5; border-color: rgba(239, 68, 68, 0.3); }
+        .module-count-badge.total { background: rgba(59, 130, 246, 0.16); color: #93c5fd; border-color: rgba(59, 130, 246, 0.3); }
+        .module-count-badge.duration { background: rgba(148, 163, 184, 0.14); color: #cbd5e1; border-color: rgba(148, 163, 184, 0.25); }
+
+        .module-toggle-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          border: none;
+          border-radius: 999px;
+          padding: 11px 16px;
+          background: linear-gradient(135deg, #1d4ed8, #4338ca);
+          color: #ffffff;
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+
+        .module-toggle-btn .toggle-icon { transition: transform 0.2s ease; }
+        .module-toggle-btn[aria-expanded="true"] .toggle-icon { transform: rotate(180deg); }
+
+        .module-section-details {
+          display: none;
+          padding: 0 24px 24px 24px;
+          border-top: 1px solid rgba(148, 163, 184, 0.12);
+        }
+
+        .module-section-details.expanded { display: block; }
+
+        .module-details-grid {
+          display: grid;
+          gap: 16px;
+          padding-top: 22px;
+        }
+
+        .module-detail-card {
+          background: rgba(2, 6, 23, 0.52);
+          border: 1px solid rgba(148, 163, 184, 0.12);
+          border-left: 4px solid #60a5fa;
+          border-radius: 18px;
+          padding: 18px;
+        }
+
+        .module-detail-card.failed { border-left-color: #ef4444; }
+        .module-detail-card.warning { border-left-color: #f59e0b; }
+        .module-detail-card.passed { border-left-color: #10b981; }
+
+        .module-detail-header {
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          align-items: flex-start;
+          margin-bottom: 14px;
+        }
+
+        .module-detail-header h4 {
+          margin: 0;
+          font-size: 18px;
+          color: #f8fafc;
+        }
+
+        .module-detail-header p {
+          margin: 6px 0 0;
+          color: #94a3b8;
+          font-size: 13px;
+        }
+
+        .module-item-status {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 88px;
+          padding: 8px 12px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          white-space: nowrap;
+        }
+
+        .module-item-status.passed { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
+        .module-item-status.warning { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+        .module-item-status.failed { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+
+        .module-detail-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 12px;
+        }
+
+        .detail-field {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          padding: 12px 13px;
+          border-radius: 14px;
+          background: rgba(15, 23, 42, 0.65);
+          border: 1px solid rgba(30, 41, 59, 0.9);
+          min-width: 0;
+        }
+
+        .detail-field.wide { grid-column: 1 / -1; }
+
+        .detail-label {
+          color: #94a3b8;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+
+        .detail-value {
+          color: #f8fafc;
+          font-size: 14px;
+          line-height: 1.55;
+          word-break: break-word;
+          overflow-wrap: anywhere;
+        }
+
+        .module-empty-state {
+          padding: 22px;
+          border-radius: 18px;
+          background: rgba(15, 23, 42, 0.88);
+          border: 1px dashed rgba(148, 163, 184, 0.32);
+          color: #94a3b8;
+          text-align: center;
         }
 
         .report-card {
@@ -677,215 +1129,33 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
         }
 
         .footer {
-            text-align: center;
-            color: white;
+          text-align: center;
+          color: #cbd5e1;
             margin-top: 40px;
             padding: 20px;
         }
 
-        .error-message {
-            background: #fee2e2;
-            color: #991b1b;
-            padding: 10px;
-            border-radius: 10px;
-            margin-top: 10px;
-            font-size: 12px;
+        @media (max-width: 900px) {
+          .module-section-header,
+          .project-summary-header,
+          .section-heading {
+            flex-direction: column;
+            align-items: flex-start;
+          }
         }
 
-        .test-counts {
-            display: flex;
-            gap: 15px;
-            margin: 15px 0;
-            flex-wrap: wrap;
-        }
+        @media (max-width: 720px) {
+          .header h1 {
+            font-size: 34px;
+          }
 
-        .count-badge {
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: bold;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-        }
+          .summary {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
 
-        .count-badge.total {
-            background: #e0e7ff;
-            color: #3730a3;
-        }
-
-        .count-badge.passed {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .count-badge.failed {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .failed-tests {
-            background: #fef2f2;
-            border-left: 4px solid #ef4444;
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin: 12px 24px 0 24px;
-        }
-
-        .failed-tests-title {
-            font-weight: bold;
-            color: #991b1b;
-            margin-bottom: 8px;
-            font-size: 13px;
-        }
-
-        .failed-test-item {
-            color: #7f1d1d;
-            font-size: 12px;
-            padding: 4px 0;
-            padding-left: 16px;
-            position: relative;
-        }
-
-        .failed-test-item::before {
-            content: '•';
-            position: absolute;
-            left: 4px;
-            color: #ef4444;
-        }
-
-        .warning-tests {
-            background: #fffbeb;
-            border-left: 4px solid #f59e0b;
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin: 12px 24px 0 24px;
-        }
-
-        .warning-tests-title {
-            font-weight: bold;
-            color: #92400e;
-            margin-bottom: 8px;
-            font-size: 13px;
-        }
-
-        .warning-test-item {
-            color: #78350f;
-            font-size: 12px;
-            padding: 4px 0;
-            padding-left: 16px;
-            position: relative;
-        }
-
-        .warning-test-item::before {
-            content: '•';
-            position: absolute;
-            left: 4px;
-            color: #f59e0b;
-        }
-
-        .expand-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-            position: absolute;
-            bottom: 20px;
-            right: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: all 0.3s ease;
-        }
-
-        .expand-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-
-        .expand-btn.disabled {
-            background: #9ca3af;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-
-        .expand-btn.disabled:hover {
-            transform: none;
-            box-shadow: none;
-        }
-
-        .detailed-report-container {
-            display: none;
-            margin: 60px 24px 16px 24px;
-            border: 2px solid #e5e7eb;
-            border-radius: 12px;
-            overflow: hidden;
-            background: white;
-        }
-
-        .detailed-report-container.expanded {
-            display: block;
-        }
-
-        .detailed-report-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 16px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .detailed-report-header h3 {
-            margin: 0;
-            font-size: 16px;
-            font-weight: 600;
-        }
-
-        .collapse-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            padding: 6px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-
-        .collapse-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .detailed-report-content {
-            padding: 0;
-            max-height: 600px;
-            overflow-y: auto;
-        }
-
-        .detailed-report-content iframe {
-            width: 100%;
-            min-height: 600px;
-            border: none;
-        }
-
-        .arrow-icon {
-            transition: transform 0.3s ease;
-        }
-
-        .expand-btn.expanded .arrow-icon {
-            transform: rotate(180deg);
-        }
-
-        .report-card-content {
-            padding-bottom: 60px;
-            position: relative;
+          .project-summary-grid {
+            grid-template-columns: 1fr;
+          }
         }
     </style>
 </head>
@@ -921,7 +1191,29 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
 
         <!-- MAIN SECTION - TEST RESULTS -->
         <div class="reports-grid">
-${results.map(result => generateReportCard(result)).join('\n')}
+          <section class="project-summary-section">
+            <div class="section-heading">
+              <div>
+                <h2>Project Summary Cards</h2>
+                <p>Compact project status overview with APP, SRV, SSL, DOM, and API counts.</p>
+              </div>
+            </div>
+            <div class="project-summary-grid">
+              ${renderModel.projects.map((project) => renderProjectSummaryCard(project)).join('\n')}
+            </div>
+          </section>
+
+          <section class="module-dashboard-section">
+            <div class="section-heading">
+              <div>
+                <h2>Module Sections</h2>
+                <p>Each module expands inline inside this page. No separate navigation is required.</p>
+              </div>
+            </div>
+            <div class="module-sections-grid">
+              ${renderModel.moduleSections.map((section) => renderModuleSection(section)).join('\n')}
+            </div>
+          </section>
         </div>
 
         <!-- BOTTOM SECTION -->
@@ -934,28 +1226,15 @@ ${results.map(result => generateReportCard(result)).join('\n')}
     </div>
 
     <script>
-        function toggleReport(repoId) {
-            const container = document.getElementById('report-' + repoId);
-            const btn = document.getElementById('btn-' + repoId);
+      function toggleModuleSection(sectionId) {
+        const details = document.getElementById('module-details-' + sectionId);
+        const button = document.getElementById('module-btn-' + sectionId);
+        const label = button.querySelector('.toggle-text');
+        const expanded = button.getAttribute('aria-expanded') === 'true';
 
-            if (container.classList.contains('expanded')) {
-                container.classList.remove('expanded');
-                btn.classList.remove('expanded');
-                btn.innerHTML = '<span>📄 View Detailed Report</span><span class="arrow-icon">▼</span>';
-            } else {
-                container.classList.add('expanded');
-                btn.classList.add('expanded');
-                btn.innerHTML = '<span>📄 Hide Detailed Report</span><span class="arrow-icon">▲</span>';
-            }
-        }
-
-        function collapseReport(repoId) {
-            const container = document.getElementById('report-' + repoId);
-            const btn = document.getElementById('btn-' + repoId);
-
-            container.classList.remove('expanded');
-            btn.classList.remove('expanded');
-            btn.innerHTML = '<span>📄 View Detailed Report</span><span class="arrow-icon">▼</span>';
+        button.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        details.classList.toggle('expanded', !expanded);
+        label.textContent = expanded ? 'View Details' : 'Hide Details';
         }
     </script>
 </body>

@@ -1,7 +1,8 @@
-import { generateDashboard } from './utils/dashboard-generator';
-import { sendDashboardSummaryEmail } from './utils/email-sender';
 import * as fs from 'fs';
 import * as path from 'path';
+
+const { generateDashboard } = require('./utils/dashboard-generator.ts') as typeof import('./utils/dashboard-generator');
+const { sendDashboardSummaryEmail } = require('./utils/email-sender.ts') as typeof import('./utils/email-sender');
 
 interface TestResult {
   repository: string;
