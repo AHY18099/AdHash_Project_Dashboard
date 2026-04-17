@@ -1702,13 +1702,6 @@ function buildDashboardEmailHtml(model: DashboardEmailModel): string {
                     </tr>
 
                     <tr>
-                        <td>
-                            ${renderAttentionSection('Failed Checks Requiring Action', model.failedItems, 'failed')}
-                            ${renderAttentionSection('Warnings Requiring Review', model.warningItems, 'warning')}
-                        </td>
-                    </tr>
-
-                    <tr>
                         <td style="padding:0 0 16px 0;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#050b17" style="background-color:#050b17;border:1px solid #1f2937;border-collapse:separate;border-radius:18px;">
                                 <tr>
