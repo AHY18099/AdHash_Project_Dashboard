@@ -10,6 +10,14 @@ const EXPIRY_WARNING_DAYS = 30;
 type ItemStatus = 'passed' | 'warning' | 'failed';
 type SectionKey = 'apps' | 'servers' | 'ssl' | 'domains' | 'apis';
 
+interface CategoryIssueCounts {
+    apps: number;
+    servers: number;
+    ssl: number;
+    domains: number;
+    apis: number;
+}
+
 interface EmailConfig {
     host: string;
     port: number;
@@ -140,6 +148,9 @@ export interface ProjectEmailCard {
     color: string;
     overallStatus: ItemStatus;
     failedCount: number;
+    warningCount: number;
+    categoryFailures: CategoryIssueCounts;
+    categoryWarnings: CategoryIssueCounts;
     primaryModuleId: SuiteId;
     primaryModuleHref: string;
     results: ProjectSectionResults;
@@ -421,6 +432,29 @@ function normalizeDaysRemaining(value: unknown): number | null {
     return Number.isNaN(parsed) ? null : parsed;
 }
 
+function deriveDaysRemainingFromExpiryDate(expiryDate: unknown): number | null {
+    if (!expiryDate) {
+        return null;
+    }
+
+    const parsedExpiryDate = new Date(String(expiryDate));
+    if (Number.isNaN(parsedExpiryDate.getTime())) {
+        return null;
+    }
+
+    const millisecondsPerDay = 1000 * 60 * 60 * 24;
+    return Math.ceil((parsedExpiryDate.getTime() - Date.now()) / millisecondsPerDay);
+}
+
+function resolveDaysRemaining(daysRemaining: unknown, expiryDate: unknown): number | null {
+    const derivedDaysRemaining = deriveDaysRemainingFromExpiryDate(expiryDate);
+    if (derivedDaysRemaining !== null) {
+        return derivedDaysRemaining;
+    }
+
+    return normalizeDaysRemaining(daysRemaining);
+}
+
 function getExpiryStatus(daysRemaining: unknown, hasError = false): ItemStatus {
     const normalizedDays = normalizeDaysRemaining(daysRemaining);
 
@@ -450,7 +484,7 @@ function toDomainDetailStatus(status: ItemStatus): 'active' | 'expiring' | 'erro
 }
 
 function normalizeDomainDetail(detail: DomainDetail): DomainDetail {
-    const daysRemaining = normalizeDaysRemaining(detail && detail.daysRemaining);
+    const daysRemaining = resolveDaysRemaining(detail && detail.daysRemaining, detail && detail.expiryDate);
     const status = toDomainDetailStatus(
         getExpiryStatus(daysRemaining, detail && detail.status === 'error' && daysRemaining === null)
     );
@@ -466,7 +500,7 @@ function normalizeDomainDetail(detail: DomainDetail): DomainDetail {
 }
 
 function normalizeSslDetail(detail: SslDetail): SslDetail {
-    const daysRemaining = normalizeDaysRemaining(detail && detail.daysRemaining);
+    const daysRemaining = resolveDaysRemaining(detail && detail.daysRemaining, detail && detail.expiryDate);
     const status = getExpiryStatus(daysRemaining, detail && detail.status === 'failed' && daysRemaining === null);
 
     return {
@@ -1122,6 +1156,30 @@ function getProjectFailedCount(results: ProjectSectionResults): number {
     return results.apps.failed + results.servers.failed + results.ssl.failed + results.domains.failed + results.apis.failed;
 }
 
+function getProjectWarningCount(results: ProjectSectionResults): number {
+    return results.apps.warning + results.servers.warning + results.ssl.warning + results.domains.warning + results.apis.warning;
+}
+
+function getProjectCategoryFailures(results: ProjectSectionResults): CategoryIssueCounts {
+    return {
+        apps: results.apps.failed,
+        servers: results.servers.failed,
+        ssl: results.ssl.failed,
+        domains: results.domains.failed,
+        apis: results.apis.failed
+    };
+}
+
+function getProjectCategoryWarnings(results: ProjectSectionResults): CategoryIssueCounts {
+    return {
+        apps: results.apps.warning,
+        servers: results.servers.warning,
+        ssl: results.ssl.warning,
+        domains: results.domains.warning,
+        apis: results.apis.warning
+    };
+}
+
 function sortTestsForEmail(tests: EmailItem[]): EmailItem[] {
     const statusOrder: Record<ItemStatus, number> = { failed: 0, warning: 1, passed: 2 };
     return [...tests].sort((left, right) => {
@@ -1160,6 +1218,9 @@ export function buildDashboardRenderModel(rootDir: string): DashboardEmailModel 
             color: project.color || '#3b82f6',
             overallStatus: getOverallProjectStatus(results),
             failedCount: getProjectFailedCount(results),
+            warningCount: getProjectWarningCount(results),
+            categoryFailures: getProjectCategoryFailures(results),
+            categoryWarnings: getProjectCategoryWarnings(results),
             primaryModuleId: getPrimaryProjectModuleId(results),
             primaryModuleHref: getModuleReportHref(getPrimaryProjectModuleId(results)),
             results
@@ -1256,16 +1317,34 @@ function getStatusEmoji(status: ItemStatus): string {
     return '✓';
 }
 
-function getProjectChipClasses(hasFailure: boolean, variant: string): string {
-    return `project-chip-badge chip-${variant} ${hasFailure ? 'chip-failed' : 'chip-normal'}`;
+function getProjectChipClasses(variant: string, tone: 'failed' | 'warning' | 'normal'): string {
+    return `project-chip-badge chip-${variant} ${tone === 'failed' ? 'chip-failed' : tone === 'warning' ? 'chip-warning' : 'chip-normal'}`;
 }
 
 function renderProjectFailedCountBadge(failedCount: number): string {
     return `<span class="project-failed-count">❗ ${escapeHtml(failedCount)}</span>`;
 }
 
-function renderProjectSummaryChip(label: string, value: number, variant: string, hasFailure: boolean): string {
-    return `<span class="${getProjectChipClasses(hasFailure, variant)}">${escapeHtml(label)} ${value}</span>`;
+function renderProjectWarningCountBadge(warningCount: number): string {
+    if (warningCount <= 0) {
+        return '';
+    }
+
+    return `<span class="project-warning-count">⚠ ${escapeHtml(warningCount)}</span>`;
+}
+
+function getProjectChipTone(failureCount: number, warningCount: number): 'failed' | 'warning' | 'normal' {
+    if (failureCount > 0) {
+        return 'failed';
+    }
+    if (warningCount > 0) {
+        return 'warning';
+    }
+    return 'normal';
+}
+
+function renderProjectSummaryChip(label: string, value: number, variant: string, tone: 'failed' | 'warning' | 'normal'): string {
+    return `<span class="${getProjectChipClasses(variant, tone)}">${escapeHtml(label)} ${value}</span>`;
 }
 
 function renderCountChip(label: string, value: number, color: string): string {
@@ -1522,11 +1601,11 @@ function renderProjectStatusBadge(project: ProjectEmailCard): string {
 function renderProjectSummaryChips(project: ProjectEmailCard): string {
     return `
         <span class="project-chip-row">
-            ${renderProjectSummaryChip('APP', project.results.apps.total, 'app', project.results.apps.failed > 0)}
-            ${renderProjectSummaryChip('SRV', project.results.servers.total, 'server', project.results.servers.failed > 0)}
-            ${renderProjectSummaryChip('SSL', project.results.ssl.total, 'ssl', project.results.ssl.failed > 0)}
-            ${renderProjectSummaryChip('DOM', project.results.domains.total, 'domain', project.results.domains.failed > 0)}
-            ${renderProjectSummaryChip('API', project.results.apis.total, 'api', project.results.apis.failed > 0)}
+            ${renderProjectSummaryChip('APP', project.results.apps.total, 'app', getProjectChipTone(project.categoryFailures.apps, project.categoryWarnings.apps))}
+            ${renderProjectSummaryChip('SRV', project.results.servers.total, 'server', getProjectChipTone(project.categoryFailures.servers, project.categoryWarnings.servers))}
+            ${renderProjectSummaryChip('SSL', project.results.ssl.total, 'ssl', getProjectChipTone(project.categoryFailures.ssl, project.categoryWarnings.ssl))}
+            ${renderProjectSummaryChip('DOM', project.results.domains.total, 'domain', getProjectChipTone(project.categoryFailures.domains, project.categoryWarnings.domains))}
+            ${renderProjectSummaryChip('API', project.results.apis.total, 'api', getProjectChipTone(project.categoryFailures.apis, project.categoryWarnings.apis))}
         </span>`;
 }
 
@@ -1547,6 +1626,7 @@ function renderProjectCard(project: ProjectEmailCard): string {
                             </td>
                             <td align="right" style="vertical-align:top;white-space:nowrap;">
                                 ${renderProjectFailedCountBadge(project.failedCount)}
+                                ${renderProjectWarningCountBadge(project.warningCount)}
                                 ${renderProjectStatusBadge(project)}
                             </td>
                         </tr>
@@ -1619,6 +1699,19 @@ function buildDashboardEmailHtml(model: DashboardEmailModel): string {
             vertical-align: middle;
         }
 
+        .project-warning-count {
+            display: inline-block;
+            margin-right: 8px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            background: #3a2600;
+            color: #ffb020;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid #ffb020;
+            vertical-align: middle;
+        }
+
         .project-chip-row {
             display: inline-block;
         }
@@ -1652,6 +1745,13 @@ function buildDashboardEmailHtml(model: DashboardEmailModel): string {
             color: #ff6b6b !important;
             border: 1px solid #ff4d4f !important;
             box-shadow: 0 0 6px rgba(255, 77, 79, 0.4);
+        }
+
+        .chip-warning {
+            background: #3a2600 !important;
+            color: #ffb020 !important;
+            border: 1px solid #ffb020 !important;
+            box-shadow: 0 0 6px rgba(255, 176, 32, 0.35);
         }
     </style>
 </head>

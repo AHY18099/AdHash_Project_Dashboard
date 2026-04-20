@@ -131,12 +131,30 @@ function getStatusLabel(status: string): string {
   return status === 'failed' ? 'FAILED' : status === 'warning' ? 'WARNING' : 'PASSED';
 }
 
-function getChipClass(category: string, hasFailure: boolean): string {
-  return hasFailure ? `project-chip ${category} chip-failed` : `project-chip ${category} chip-normal`;
+function getChipClass(category: string, tone: 'failed' | 'warning' | 'normal'): string {
+  return `project-chip ${category} ${tone === 'failed' ? 'chip-failed' : tone === 'warning' ? 'chip-warning' : 'chip-normal'}`;
 }
 
-function renderProjectChip(label: string, value: number, className: string, hasFailure: boolean): string {
-  return `<span class="${getChipClass(className, hasFailure)}">${escapeHtml(label)} ${value}</span>`;
+function getProjectChipTone(failureCount: number, warningCount: number): 'failed' | 'warning' | 'normal' {
+  if (failureCount > 0) {
+    return 'failed';
+  }
+  if (warningCount > 0) {
+    return 'warning';
+  }
+  return 'normal';
+}
+
+function renderProjectChip(label: string, value: number, className: string, tone: 'failed' | 'warning' | 'normal'): string {
+  return `<span class="${getChipClass(className, tone)}">${escapeHtml(label)} ${value}</span>`;
+}
+
+function renderWarningCountBadge(warningCount: number): string {
+  if (warningCount <= 0) {
+    return '';
+  }
+
+  return `<div class="project-warning-count">⚠ ${warningCount}</div>`;
 }
 
 function renderProjectSummaryCard(project: ProjectEmailCard): string {
@@ -150,15 +168,16 @@ function renderProjectSummaryCard(project: ProjectEmailCard): string {
                 </div>
                 <div class="project-badge-group">
                     <div class="project-failed-count">❗ ${project.failedCount}</div>
+                  ${renderWarningCountBadge(project.warningCount)}
                     <span class="summary-status-badge ${statusClass}">${escapeHtml(getStatusLabel(project.overallStatus))}</span>
                 </div>
             </div>
             <div class="project-summary-chips">
-                ${renderProjectChip('APP', project.results.apps.total, 'app', project.results.apps.failed > 0)}
-                ${renderProjectChip('SRV', project.results.servers.total, 'server', project.results.servers.failed > 0)}
-                ${renderProjectChip('SSL', project.results.ssl.total, 'ssl', project.results.ssl.failed > 0)}
-                ${renderProjectChip('DOM', project.results.domains.total, 'domain', project.results.domains.failed > 0)}
-                ${renderProjectChip('API', project.results.apis.total, 'api', project.results.apis.failed > 0)}
+                ${renderProjectChip('APP', project.results.apps.total, 'app', getProjectChipTone(project.categoryFailures.apps, project.categoryWarnings.apps))}
+                ${renderProjectChip('SRV', project.results.servers.total, 'server', getProjectChipTone(project.categoryFailures.servers, project.categoryWarnings.servers))}
+                ${renderProjectChip('SSL', project.results.ssl.total, 'ssl', getProjectChipTone(project.categoryFailures.ssl, project.categoryWarnings.ssl))}
+                ${renderProjectChip('DOM', project.results.domains.total, 'domain', getProjectChipTone(project.categoryFailures.domains, project.categoryWarnings.domains))}
+                ${renderProjectChip('API', project.results.apis.total, 'api', getProjectChipTone(project.categoryFailures.apis, project.categoryWarnings.apis))}
             </div>
         </article>`;
 }
@@ -787,6 +806,18 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
           border: 1px solid #ff4d4f;
         }
 
+        .project-warning-count {
+          display: inline-block;
+          margin-right: 8px;
+          padding: 4px 10px;
+          border-radius: 12px;
+          background: #3a2600;
+          color: #ffb020;
+          font-size: 12px;
+          font-weight: 600;
+          border: 1px solid #ffb020;
+        }
+
         .project-summary-chips {
           display: flex;
           flex-wrap: wrap;
@@ -823,6 +854,13 @@ export function generateDashboard(results: TestResult[], outputPath: string = 'u
           color: #ff6b6b !important;
           border: 1px solid #ff4d4f !important;
           box-shadow: 0 0 6px rgba(255, 77, 79, 0.4);
+        }
+
+        .chip-warning {
+          background: #3a2600 !important;
+          color: #ffb020 !important;
+          border: 1px solid #ffb020 !important;
+          box-shadow: 0 0 6px rgba(255, 176, 32, 0.35);
         }
 
         .module-sections-grid {
