@@ -18,6 +18,10 @@ interface TestResult {
 }
 
 const dashboardStatePath = path.join(process.cwd(), 'test-results', 'dashboard-state.json');
+const emailPreviewPath = path.join(process.cwd(), 'email-preview');
+const finalDashboardBundlePath = path.join(process.cwd(), 'final-dashboard-bundle');
+const unifiedDashboardIndexPath = path.join(process.cwd(), 'unified-dashboard', 'index.html');
+const unifiedDashboardReportsPath = path.join(process.cwd(), 'unified-dashboard', 'reports');
 const suiteMap: Record<string, string> = {
   app: 'Adhash_App_Status',
   server: 'Adhash_AllProjects_Server',
@@ -25,6 +29,41 @@ const suiteMap: Record<string, string> = {
   api: 'AdHash-API-Test',
   domain: 'AdHash_Domain_Report'
 };
+
+function removeGeneratedArtifact(targetPath: string): void {
+  if (!fs.existsSync(targetPath)) {
+    return;
+  }
+
+  fs.rmSync(targetPath, { recursive: true, force: true });
+}
+
+function parseApiSuiteSummary(reportPath: string): Pick<TestResult, 'status' | 'passed' | 'failed' | 'total'> | null {
+  if (!reportPath) {
+    return null;
+  }
+
+  const absoluteReportPath = path.isAbsolute(reportPath) ? reportPath : path.join(process.cwd(), reportPath);
+  if (!fs.existsSync(absoluteReportPath)) {
+    return null;
+  }
+
+  const html = fs.readFileSync(absoluteReportPath, 'utf8');
+  const totalMatch = html.match(/<div class="card-value">(\d+)<\/div>\s*<div class="card-label">Total Tests<\/div>/i);
+  const passedMatch = html.match(/<div class="card-value">(\d+)<\/div>\s*<div class="card-label">Passed<\/div>/i);
+  const failedMatch = html.match(/<div class="card-value">(\d+)<\/div>\s*<div class="card-label">Failed<\/div>/i);
+
+  const total = totalMatch ? parseInt(totalMatch[1], 10) : 0;
+  const passed = passedMatch ? parseInt(passedMatch[1], 10) : 0;
+  const failed = failedMatch ? parseInt(failedMatch[1], 10) : 0;
+
+  return {
+    status: failed > 0 ? 'failed' : 'success',
+    passed,
+    failed,
+    total
+  };
+}
 
 function loadResultsFromState(): TestResult[] {
   if (!fs.existsSync(dashboardStatePath)) {
@@ -40,7 +79,7 @@ function loadResultsFromState(): TestResult[] {
   const state = JSON.parse(fs.readFileSync(dashboardStatePath, 'utf8'));
   return Object.entries(suiteMap).map(([suiteId, repository]) => {
     const suiteState = state.suites?.[suiteId] || {};
-    return {
+    const result: TestResult = {
       repository,
       status: suiteState.status === 'passed' ? 'success' : suiteState.status === 'unavailable' ? 'unavailable' : suiteState.status === 'failed' ? 'failed' : 'error',
       duration: suiteState.duration || 0,
@@ -52,10 +91,27 @@ function loadResultsFromState(): TestResult[] {
       warnings: suiteState.warning || 0,
       total: suiteState.total || 0
     };
+
+    if (suiteId === 'api') {
+      const latestApiSummary = parseApiSuiteSummary(result.reportPath);
+      if (latestApiSummary) {
+        result.status = latestApiSummary.status;
+        result.passed = latestApiSummary.passed;
+        result.failed = latestApiSummary.failed;
+        result.total = latestApiSummary.total;
+      }
+    }
+
+    return result;
   });
 }
 
 async function main(): Promise<void> {
+  removeGeneratedArtifact(emailPreviewPath);
+  removeGeneratedArtifact(finalDashboardBundlePath);
+  removeGeneratedArtifact(unifiedDashboardIndexPath);
+  removeGeneratedArtifact(unifiedDashboardReportsPath);
+
   const results = loadResultsFromState();
 
   console.log('🔄 Regenerating unified dashboard from workspace state...\n');

@@ -607,7 +607,8 @@ const suiteConfigCache = {
     apis: null,
     domains: null,
     domainsCacheKey: null,
-    suiteRows: {}
+    suiteRows: {},
+    suiteRowMtimes: {}
 };
 
 const SKIPPED_SERVER_URL_FRAGMENT = '20.62.109.239';
@@ -1002,14 +1003,18 @@ function getSuiteReportPath(repository) {
 }
 
 function readSuiteRows(repository) {
-    if (suiteConfigCache.suiteRows[repository]) {
+    const reportPath = getSuiteReportPath(repository);
+    const reportStat = fs.existsSync(reportPath) ? fs.statSync(reportPath) : null;
+    const reportMtime = reportStat ? reportStat.mtimeMs : null;
+
+    if (suiteConfigCache.suiteRows[repository] && suiteConfigCache.suiteRowMtimes[repository] === reportMtime) {
         return suiteConfigCache.suiteRows[repository];
     }
 
-    const reportPath = getSuiteReportPath(repository);
     if (!fs.existsSync(reportPath)) {
         console.warn('Suite report not found:', reportPath);
         suiteConfigCache.suiteRows[repository] = [];
+        suiteConfigCache.suiteRowMtimes[repository] = null;
         return suiteConfigCache.suiteRows[repository];
     }
 
@@ -1038,7 +1043,22 @@ function readSuiteRows(repository) {
     }
 
     suiteConfigCache.suiteRows[repository] = rows;
+    suiteConfigCache.suiteRowMtimes[repository] = reportMtime;
     return rows;
+}
+
+function parseExpectedStatus(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    const trimmed = String(value || '').trim();
+    if (!/^\d+$/.test(trimmed)) {
+        return undefined;
+    }
+
+    const parsed = parseInt(trimmed, 10);
+    return Number.isNaN(parsed) ? undefined : parsed;
 }
 
 function findSuiteRow(rows, expectedTitle) {
@@ -1602,52 +1622,52 @@ function getAPITestResults(projectId) {
         const result = createEmptySuiteResult();
         const projectApiKeys = new Set((project.apis || []).map((api) => buildApiStableKey(api.method, api.url, api.name)));
 
-        let apiResults = dedupeApiResults(
-            apiDetails.filter((detail) => detail && projectApiKeys.has(buildApiStableKey(detail.method, detail.url, detail.name)))
-        );
-
         const rows = readSuiteRows('AdHash_API_Test');
-        apiResults = apiResults.map((detail) => {
-            const row = findSuiteRow(rows, `${normalizeApiMethod(detail.method)} ${detail.name}`);
-            return {
-                ...detail,
-                duration: detail.duration || row?.duration,
-                requestBody: detail.requestBody || row?.requestBody,
-                responseBody: detail.responseBody || row?.responseBody
-            };
-        });
-        const existingKeys = new Set(apiResults.map((detail) => buildApiStableKey(detail.method, detail.url, detail.name)));
+        const detailByKey = new Map(
+            dedupeApiResults(
+                apiDetails.filter((detail) => detail && projectApiKeys.has(buildApiStableKey(detail.method, detail.url, detail.name)))
+            ).map((detail) => [buildApiStableKey(detail.method, detail.url, detail.name), detail])
+        );
+        const apiResults = [];
 
         project.apis.forEach((api) => {
             const stableKey = buildApiStableKey(api.method, api.url, api.name);
-            if (existingKeys.has(stableKey)) {
-                return;
-            }
-
             const method = (api.method || 'GET').toUpperCase();
             const row = findSuiteRow(rows, `${method} ${api.name}`);
-            if (!row || row.status === 'skipped') {
+            const detail = detailByKey.get(stableKey);
+
+            if (row && row.status !== 'skipped') {
+                const expectedStatus = parseExpectedStatus(api.expectedStatus) ?? parseExpectedStatus(row.expectedStatus) ?? parseExpectedStatus(detail && detail.expectedStatus);
+                const status = classifyApiStatus(row.responseCode, expectedStatus);
+
+                apiResults.push({
+                    name: api.name,
+                    url: api.url,
+                    method,
+                    duration: (detail && detail.duration) || row.duration,
+                    requestBody: row.requestBody || (detail && detail.requestBody) || (normalizeApiMethod(method) === 'GET' ? 'No request body' : 'Payload not provided'),
+                    responseBody: row.responseBody || (detail && detail.responseBody) || 'No response body',
+                    responseCode: row.responseCode || (detail && detail.responseCode),
+                    expectedStatus,
+                    status,
+                    type: 'api'
+                });
                 return;
             }
 
-            const expectedStatus = typeof api.expectedStatus === 'number'
-                ? api.expectedStatus
-                : (/^\d+$/.test(String(row.expectedStatus || '').trim()) ? parseInt(String(row.expectedStatus).trim(), 10) : undefined);
-            const status = classifyApiStatus(row.responseCode, expectedStatus);
+            if (!detail) {
+                return;
+            }
 
             apiResults.push({
+                ...detail,
                 name: api.name,
                 url: api.url,
                 method,
-                duration: row.duration,
-                requestBody: row.requestBody || (normalizeApiMethod(method) === 'GET' ? 'No request body' : 'Payload not provided'),
-                responseBody: row.responseBody || 'No response body',
-                responseCode: row.responseCode,
-                expectedStatus,
-                status,
-                type: 'api'
+                expectedStatus: parseExpectedStatus(api.expectedStatus) ?? parseExpectedStatus(detail.expectedStatus),
+                requestBody: detail.requestBody || (normalizeApiMethod(method) === 'GET' ? 'No request body' : 'Payload not provided'),
+                responseBody: detail.responseBody || 'No response body'
             });
-            existingKeys.add(stableKey);
         });
 
         result.tests = dedupeApiResults(apiResults);

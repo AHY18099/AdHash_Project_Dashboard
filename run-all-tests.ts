@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { generateDashboard } from './utils/dashboard-generator';
-import { sendDashboardSummaryEmail } from './utils/email-sender';
+import { buildDashboardRenderModel, sendDashboardSummaryEmail } from './utils/email-sender';
 
 dotenv.config();
 
@@ -15,6 +15,11 @@ const DOMAIN_REPORT_ENTRY_PATH = path.join(DOMAIN_REPORT_WORKING_DIRECTORY, 'ind
 const DOMAIN_REPORT_PACKAGE_PATH = path.join(DOMAIN_REPORT_WORKING_DIRECTORY, 'package.json');
 const DOMAIN_REPORT_OUTPUT_PATH = path.join(DOMAIN_REPORT_WORKING_DIRECTORY, 'report.html');
 const EXPIRY_WARNING_DAYS = 30;
+const GENERATED_RESULTS_PATH = path.join(process.cwd(), 'test-results', 'results.json');
+const EMAIL_PREVIEW_DIR = path.join(process.cwd(), 'email-preview');
+const FINAL_DASHBOARD_BUNDLE_DIR = path.join(process.cwd(), 'final-dashboard-bundle');
+const UNIFIED_DASHBOARD_INDEX_PATH = path.join(process.cwd(), 'unified-dashboard', 'index.html');
+const UNIFIED_DASHBOARD_REPORTS_DIR = path.join(process.cwd(), 'unified-dashboard', 'reports');
 
 type SuiteId = 'app' | 'server' | 'cert' | 'api' | 'domain';
 
@@ -1094,6 +1099,53 @@ function regenerateDashboardFromState(): void {
   generateDashboard(storedResults, dashboardPath);
 }
 
+function removeGeneratedArtifact(targetPath: string): void {
+  if (!fs.existsSync(targetPath)) {
+    return;
+  }
+
+  fs.rmSync(targetPath, { recursive: true, force: true });
+}
+
+function getSuiteArchivePath(definition: SuiteDefinition): string {
+  return path.join(process.cwd(), 'suite-reports', `${definition.repository.replace(/[^a-zA-Z0-9]/g, '_')}.html`);
+}
+
+function cleanGeneratedArtifacts(selectedSuites: SuiteDefinition[]): void {
+  const artifactPaths = [
+    DASHBOARD_STATE_PATH,
+    GENERATED_RESULTS_PATH,
+    EMAIL_PREVIEW_DIR,
+    FINAL_DASHBOARD_BUNDLE_DIR,
+    UNIFIED_DASHBOARD_INDEX_PATH,
+    UNIFIED_DASHBOARD_REPORTS_DIR,
+    ...selectedSuites.map((definition) => getSuiteArchivePath(definition))
+  ];
+
+  artifactPaths.forEach(removeGeneratedArtifact);
+}
+
+function logProjectApiSummary(projectId: string): void {
+  const model = buildDashboardRenderModel(process.cwd());
+  const project = model.projects.find((entry: { id: string }) => entry.id === projectId);
+
+  if (!project) {
+    console.log(`[REPORT CHECK] Project ${projectId} not found in final render model`);
+    return;
+  }
+
+  console.log('[REPORT CHECK] DDP summary from final generated report source:');
+  console.log(JSON.stringify({
+    project: project.name,
+    apis: {
+      total: project.results.apis.total,
+      passed: project.results.apis.passed,
+      failed: project.results.apis.failed
+    },
+    finalStatus: project.overallStatus.toUpperCase()
+  }, null, 2));
+}
+
 async function runCommand(definition: SuiteDefinition): Promise<TestResult> {
   const startTime = Date.now();
   const execution = getSuiteExecutionConfig(definition);
@@ -1201,6 +1253,7 @@ async function main(): Promise<void> {
   console.log('🔄 Using workspace-root Playwright specs for suite execution...\n');
 
   const selectedSuites = getSelectedSuites();
+  cleanGeneratedArtifacts(selectedSuites);
   const storedResults = buildStoredResultsMap();
   const startTime = Date.now();
 
@@ -1264,6 +1317,8 @@ async function main(): Promise<void> {
   if (emailResult.sent) {
     console.log('EMAIL SENT SUCCESSFULLY');
   }
+
+  logProjectApiSummary('ddp');
 
   console.log('RUN COMPLETED');
   process.exit(0);

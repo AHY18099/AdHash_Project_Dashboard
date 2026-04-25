@@ -381,6 +381,28 @@ function buildApiStableKey(method: unknown, url: unknown, name: unknown): string
     return `${normalizeApiMethod(method)}::${normalizeUrl(url)}::${normalizeApiName(name)}`;
 }
 
+function getRequestBodyFallback(method: string): string {
+    return method === 'GET' || method === 'DELETE' ? 'No request body' : 'Payload not provided';
+}
+
+function getResponseBodyFallback(): string {
+    return 'No response body';
+}
+
+function parseExpectedStatus(value: unknown): number | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    const trimmed = String(value || '').trim();
+    if (!/^\d+$/.test(trimmed)) {
+        return undefined;
+    }
+
+    const parsed = parseInt(trimmed, 10);
+    return Number.isNaN(parsed) ? undefined : parsed;
+}
+
 function dedupeApiResults(details: ApiTestItem[]): ApiTestItem[] {
     const deduped = new Map<string, ApiTestItem>();
     for (const detail of details || []) {
@@ -1082,47 +1104,50 @@ function getProjectDomainResults(project: ProjectDefinition, domainDetails: Doma
 function getProjectApiResults(project: ProjectDefinition, apiDetails: ApiTestItem[], apiRows: SuiteRow[]): SectionSummary {
     const result = createEmptySectionSummary();
     const projectApiKeys = new Set((project.apis || []).map((api) => buildApiStableKey(api.method, api.url, api.name)));
-    const matchedApiResults = dedupeApiResults(
+    const detailByKey = new Map(
+        dedupeApiResults(
         (apiDetails || []).filter((detail) => detail && projectApiKeys.has(buildApiStableKey(detail.method, detail.url, detail.name)))
+        ).map((detail) => [buildApiStableKey(detail.method, detail.url, detail.name), detail] as const)
     );
 
-    if (matchedApiResults.length > 0) {
-        for (const detail of matchedApiResults) {
-            const status = detail.status as ItemStatus;
-            const row = findSuiteRow(apiRows, `${normalizeApiMethod(detail.method)} ${detail.name}`);
-            const requestBody = normalizePayloadText(detail.requestBody) || row?.requestBody;
-            const responseBody = normalizePayloadText(detail.responseBody) || row?.responseBody;
+    for (const api of project.apis || []) {
+        const stableKey = buildApiStableKey(api.method, api.url, api.name);
+        const row = findSuiteRow(apiRows, `${normalizeApiMethod(api.method)} ${api.name}`);
+        const detail = detailByKey.get(stableKey);
+
+        if (row && row.status !== 'skipped') {
+            const expectedStatus = parseExpectedStatus(api.expectedStatus) ?? parseExpectedStatus(row.expectedStatus) ?? parseExpectedStatus(detail?.expectedStatus);
+            const status = classifyApiStatus(row.responseCode, expectedStatus);
+            const requestBody = row.requestBody || normalizePayloadText(detail?.requestBody) || getRequestBodyFallback(normalizeApiMethod(api.method));
+            const responseBody = row.responseBody || normalizePayloadText(detail?.responseBody) || getResponseBodyFallback();
+
             result.total += 1;
             result[status] += 1;
             result.tests.push({
-                name: detail.name,
+                name: api.name,
                 projectName: project.name,
-                url: detail.url,
+                url: api.url,
                 status,
                 type: 'apis',
-                method: detail.method,
-                responseCode: detail.responseCode,
-                expectedStatus: detail.expectedStatus,
-                durationLabel: row?.durationLabel,
+                method: normalizeApiMethod(api.method),
+                responseCode: row.responseCode || detail?.responseCode || null,
+                expectedStatus,
+                durationLabel: row.durationLabel,
                 requestBody,
                 responseBody,
-                reason: buildApiFailureReason(status, detail.expectedStatus, detail.responseCode, row?.detailText, responseBody)
+                reason: buildApiFailureReason(status, expectedStatus, row.responseCode || detail?.responseCode || null, row.detailText, responseBody)
             });
-        }
-
-        return result;
-    }
-
-    for (const api of project.apis || []) {
-        const row = findSuiteRow(apiRows, `${normalizeApiMethod(api.method)} ${api.name}`);
-        if (!row || row.status === 'skipped') {
             continue;
         }
 
-        const expectedStatus = typeof api.expectedStatus === 'number'
-            ? api.expectedStatus
-            : (/^\d+$/.test(String(row.expectedStatus || '').trim()) ? parseInt(String(row.expectedStatus).trim(), 10) : undefined);
-        const status = classifyApiStatus(row.responseCode, expectedStatus);
+        if (!detail) {
+            continue;
+        }
+
+        const status = detail.status as ItemStatus;
+        const expectedStatus = parseExpectedStatus(api.expectedStatus) ?? parseExpectedStatus(detail.expectedStatus);
+        const requestBody = normalizePayloadText(detail.requestBody) || getRequestBodyFallback(normalizeApiMethod(api.method));
+        const responseBody = normalizePayloadText(detail.responseBody) || getResponseBodyFallback();
 
         result.total += 1;
         result[status] += 1;
@@ -1133,12 +1158,11 @@ function getProjectApiResults(project: ProjectDefinition, apiDetails: ApiTestIte
             status,
             type: 'apis',
             method: normalizeApiMethod(api.method),
-            responseCode: row.responseCode || null,
+            responseCode: detail.responseCode || null,
             expectedStatus,
-            durationLabel: row.durationLabel,
-            requestBody: row.requestBody,
-            responseBody: row.responseBody,
-            reason: buildApiFailureReason(status, expectedStatus, row.responseCode || null, row.detailText, row.responseBody)
+            requestBody,
+            responseBody,
+            reason: buildApiFailureReason(status, expectedStatus, detail.responseCode || null, undefined, responseBody)
         });
     }
 
