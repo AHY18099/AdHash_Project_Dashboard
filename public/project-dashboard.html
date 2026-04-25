@@ -7,7 +7,6 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>AdHash Projects Dashboard v3.0 FINAL</title>
-    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -2198,14 +2197,19 @@
         async function loadProjects() {
             try {
                 const response = await fetch('/api/projects');
+                if (!response.ok) {
+                    throw new Error(`Projects API failed: ${response.status} ${response.statusText}`);
+                }
                 const data = await response.json();
-                projectsData = data.projects;
+                const projects = Array.isArray(data) ? data : Array.isArray(data.projects) ? data.projects : [];
+                projectsData = projects;
                 renderProjects(projectsData);
             } catch (error) {
                 console.error('Error loading projects:', error);
                 document.getElementById('projectsGrid').innerHTML = `
                     <div class="loading">
                         <p style="color: #fee2e2;">❌ Error loading projects</p>
+                        <p style="color: #cbd5e1; margin-top: 8px;">${error.message}</p>
                     </div>
                 `;
             }
@@ -2333,10 +2337,17 @@
         async function fetchAllTestResults() {
             try {
                 const response = await fetch('/api/projects');
+                if (!response.ok) {
+                    throw new Error(`Projects API failed: ${response.status} ${response.statusText}`);
+                }
                 const data = await response.json();
+                const projects = Array.isArray(data) ? data : Array.isArray(data.projects) ? data.projects : [];
 
-                for (const project of data.projects) {
+                for (const project of projects) {
                     const resultsResponse = await fetch(`/api/project/${project.id}/test-results`);
+                    if (!resultsResponse.ok) {
+                        throw new Error(`Project results API failed for ${project.id}: ${resultsResponse.status} ${resultsResponse.statusText}`);
+                    }
                     const results = await resultsResponse.json();
                     globalTestResults[project.id] = results;
                 }
@@ -3040,8 +3051,7 @@
                 }
 
                 const key = `${type}::${normalizeTrackedValue(test.domain || test.name || test.url)}`;
-                        failed: dedupedTests.filter((test) => (test.status || '').toLowerCase() === 'failed').length,
-                        skipped: dedupedTests.filter((test) => (test.status || '').toLowerCase() === 'skipped').length
+        const existing = deduped.get(key);
 
                 if (!existing || getTrackedDetailScore(test) > getTrackedDetailScore(existing)) {
                     deduped.set(key, {
@@ -3522,11 +3532,15 @@
         async function loadServerLogs() {
             try {
                 const response = await fetch('/api/logs');
-                const logs = await response.json();
+                if (!response.ok) {
+                    throw new Error(`Logs API failed: ${response.status} ${response.statusText}`);
+                }
+                const data = await response.json();
+                const logs = Array.isArray(data) ? data : Array.isArray(data.logs) ? data.logs : [];
                 displayLogs(logs);
             } catch (error) {
                 console.error('Failed to load logs:', error);
-                document.getElementById('logViewer').innerHTML = '<div class="log-entry" style="color: #ef4444;">Failed to load server logs</div>';
+                document.getElementById('logViewer').innerHTML = '<div class="log-entry" style="color: #9ca3af;">No logs available</div>';
             }
         }
 

@@ -8,6 +8,13 @@ const PORT = Number(process.env.PORT) || 7777;
 // Parse JSON bodies
 app.use(express.json());
 
+app.use('/api', (req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    next();
+});
+
 // Store test execution status
 let testRunning = false;
 let testResults = null;
@@ -518,17 +525,17 @@ app.get('/api/projects', (req, res) => {
     try {
         const projectMappingPath = path.join(__dirname, 'config', 'project-mapping.json');
         if (!fs.existsSync(projectMappingPath)) {
-            return res.status(404).json({ error: 'Project mapping not found' });
+            return res.status(404).json({ projects: [], error: 'Project mapping not found' });
         }
 
         const projectData = JSON.parse(fs.readFileSync(projectMappingPath, 'utf8'));
         attachProjectDomainStatuses(projectData.projects || [], readDashboardState());
         attachProjectSslDetails(projectData.projects || [], readDashboardState());
         attachProjectServerStatuses(projectData.projects || []);
-        res.json(projectData);
+        res.json({ projects: projectData.projects || [] });
     } catch (error) {
         console.error('Error loading projects:', error);
-        res.status(500).json({ error: 'Failed to load projects' });
+        res.status(500).json({ projects: [], error: 'Failed to load projects' });
     }
 });
 
@@ -562,10 +569,13 @@ app.get('/api/logs', (req, res) => {
     try {
         // Return last 50 logs
         const recentLogs = serverLogs.slice(-50);
-        res.json(recentLogs);
+        res.json({
+            logs: recentLogs,
+            message: recentLogs.length > 0 ? 'Logs loaded successfully' : 'No logs available'
+        });
     } catch (error) {
         console.error('Error fetching logs:', error);
-        res.status(500).json({ error: 'Failed to fetch logs' });
+        res.status(500).json({ logs: [], message: 'No logs available', error: 'Failed to fetch logs' });
     }
 });
 
@@ -1714,6 +1724,10 @@ app.get('/', (req, res) => {
 // Legacy dashboard route
 app.get('/dashboard.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+app.get('/favicon.ico', (req, res) => {
+    res.status(204).end();
 });
 
 // Serve static files with no-cache headers (MUST be last to not override API routes)
