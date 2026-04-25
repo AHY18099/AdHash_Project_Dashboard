@@ -2294,6 +2294,7 @@
                         ${stats.total > 0 ? `
                             <span class="count-badge count-pass" title="Passed">${stats.passed}</span>
                             <span class="count-badge count-warning" title="Warning">${stats.warning}</span>
+                            <span class="count-badge count-warning" title="Skipped">${stats.skipped || 0}</span>
                             <span class="count-badge count-fail" title="Failed">${stats.failed}</span>
                         ` : ''}
                     </div>
@@ -2309,22 +2310,22 @@
             const results = globalTestResults[project.id];
 
             if (!results) {
-                return { total: 0, passed: 0, warning: 0, failed: 0 };
+                return { total: 0, passed: 0, warning: 0, failed: 0, skipped: 0 };
             }
 
             switch(type) {
                 case 'apps':
-                    return results.apps || { total: 0, passed: 0, warning: 0, failed: 0 };
+                    return results.apps || { total: 0, passed: 0, warning: 0, failed: 0, skipped: 0 };
                 case 'servers':
-                    return results.servers || { total: 0, passed: 0, warning: 0, failed: 0 };
+                    return results.servers || { total: 0, passed: 0, warning: 0, failed: 0, skipped: 0 };
                 case 'ssl':
-                    return results.ssl || { total: 0, passed: 0, warning: 0, failed: 0 };
+                    return results.ssl || { total: 0, passed: 0, warning: 0, failed: 0, skipped: 0 };
                 case 'domains':
-                    return results.domains || { total: 0, passed: 0, warning: 0, failed: 0 };
+                    return results.domains || { total: 0, passed: 0, warning: 0, failed: 0, skipped: 0 };
                 case 'apis':
-                    return results.apis || { total: 0, passed: 0, warning: 0, failed: 0 };
+                    return results.apis || { total: 0, passed: 0, warning: 0, failed: 0, skipped: 0 };
                 default:
-                    return { total: 0, passed: 0, warning: 0, failed: 0 };
+                    return { total: 0, passed: 0, warning: 0, failed: 0, skipped: 0 };
             }
         }
 
@@ -2357,9 +2358,11 @@
             let totalPassed = 0;
             let totalFailed = 0;
             let totalWarning = 0;
+            let totalSkipped = 0;
 
             const failedTests = []; // Store individual failed test details
             const warningTests = []; // Store individual warning test details
+            const skippedTests = []; // Store individual skipped test details
 
             // Aggregate data from all projects
             Object.keys(globalTestResults).forEach(projectId => {
@@ -2373,6 +2376,7 @@
                         totalPassed += sectionData.passed || 0;
                         totalFailed += sectionData.failed || 0;
                         totalWarning += sectionData.warning || 0;
+                        totalSkipped += sectionData.skipped || 0;
 
                         // Collect individual failed tests
                         if (sectionData.tests && sectionData.tests.length > 0) {
@@ -2392,6 +2396,14 @@
                                         testName: test.name,
                                         type: test.type,
                                         daysRemaining: test.daysRemaining
+                                    });
+                                } else if (test.status === 'skipped') {
+                                    skippedTests.push({
+                                        projectName: project?.name || projectId,
+                                        section: section.charAt(0).toUpperCase() + section.slice(1),
+                                        testName: test.name,
+                                        type: test.type,
+                                        reason: test.message || test.reason || 'Skipped by QA'
                                     });
                                 }
                             });
@@ -2498,6 +2510,29 @@
                                 </div>
                             </div>
                         `}).join('') : '<div class="no-tests-message">✅ No warnings - All systems healthy!</div>'}
+                    </div>
+                </div>
+
+                <div class="summary-tile warning" onclick="toggleTile(this)">
+                    <div class="summary-tile-header">
+                        <span class="summary-tile-title">Skipped</span>
+                        <span class="summary-tile-expand">▼</span>
+                    </div>
+                    <div class="summary-tile-count">${totalSkipped}</div>
+                    <div class="summary-tile-label">Known external dependencies</div>
+                    <div class="summary-tile-details">
+                        ${skippedTests.length > 0 ? skippedTests.map(test => `
+                            <div class="summary-detail-item">
+                                <span class="summary-detail-icon">⏭️</span>
+                                <div class="summary-detail-content">
+                                    <span class="summary-detail-project">${test.projectName}</span>
+                                    <span class="summary-detail-section">
+                                        <span class="summary-detail-type-badge ${test.type}">${test.type}</span>
+                                        ${test.testName} - ${test.reason}
+                                    </span>
+                                </div>
+                            </div>
+                        `).join('') : '<div class="no-tests-message">No skipped checks in this run.</div>'}
                     </div>
                 </div>
             `;
@@ -2759,7 +2794,7 @@
 
             // Sort tests by status: Failed first, then Warning, then Passed
             const sortedTests = [...dedupedTests].sort((a, b) => {
-                const statusOrder = { 'failed': 0, 'warning': 1, 'passed': 2 };
+                const statusOrder = { 'failed': 0, 'warning': 1, 'skipped': 2, 'passed': 3 };
                 const statusA = (a.status || '').toLowerCase();
                 const statusB = (b.status || '').toLowerCase();
                 const orderA = statusOrder[statusA] !== undefined ? statusOrder[statusA] : 3;
@@ -2823,6 +2858,10 @@
                                     <div class="detail-info-item">
                                         <span class="detail-info-label">Expected Status</span>
                                         <span class="detail-info-value">${test.expectedStatus !== undefined && test.expectedStatus !== null ? test.expectedStatus : 'Not specified'}</span>
+                                    </div>
+                                    <div class="detail-info-item">
+                                        <span class="detail-info-label">Response Time</span>
+                                        <span class="detail-info-value">${test.duration || 'Not available'}</span>
                                     </div>
                                     <div class="detail-info-item">
                                         <span class="detail-info-label">Request Body</span>
@@ -2899,6 +2938,8 @@
                 statusClass = 'section-failed';
             } else if (results.warning > 0) {
                 statusClass = 'section-warning';
+            } else if ((results.skipped || 0) > 0) {
+                statusClass = 'section-warning';
             } else if (results.passed > 0 && results.failed === 0 && results.warning === 0) {
                 statusClass = 'section-passed';
             }
@@ -2914,6 +2955,7 @@
                             <span style="background: #f0f0f0; color: #3b82f6; border: 2px solid #3b82f6; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">Total: ${results.total}</span>
                             <span style="background: #f0f0f0; color: #10b981; border: 2px solid #10b981; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">✓ ${results.passed}</span>
                             ${results.warning > 0 ? `<span style="background: #f0f0f0; color: #f97316; border: 2px solid #f97316; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">⚠ ${results.warning}</span>` : ''}
+                            ${(results.skipped || 0) > 0 ? `<span style="background: #f0f0f0; color: #6b7280; border: 2px solid #6b7280; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">⏭ ${results.skipped || 0}</span>` : ''}
                             ${results.failed > 0 ? `<span style="background: #f0f0f0; color: #ef4444; border: 2px solid #ef4444; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">✗ ${results.failed}</span>` : ''}
                         </div>
                     </div>
@@ -2998,7 +3040,8 @@
                 }
 
                 const key = `${type}::${normalizeTrackedValue(test.domain || test.name || test.url)}`;
-                const existing = deduped.get(key);
+                        failed: dedupedTests.filter((test) => (test.status || '').toLowerCase() === 'failed').length,
+                        skipped: dedupedTests.filter((test) => (test.status || '').toLowerCase() === 'skipped').length
 
                 if (!existing || getTrackedDetailScore(test) > getTrackedDetailScore(existing)) {
                     deduped.set(key, {
@@ -3069,17 +3112,22 @@
                 }).join('');
             } else if (type === 'servers') {
                 return sortedTests.map((test, index) => {
-                    const statusClass = test.status.toLowerCase() === 'passed' ? 'status-passed' :
-                                       test.status.toLowerCase() === 'warning' ? 'status-warning' : 'status-failed';
+                    const normalizedStatus = test.status.toLowerCase();
+                    const statusClass = normalizedStatus === 'passed' ? 'status-passed' :
+                                       normalizedStatus === 'warning' || normalizedStatus === 'skipped' ? 'status-warning' : 'status-failed';
 
                     // Determine server health status
                     // 'passed' = healthy, 'warning' = active but unhealthy (404 etc), 'failed' = down/inactive
-                    const isActive = test.status.toLowerCase() === 'passed' || test.status.toLowerCase() === 'warning';
-                    const isHealthy = test.status.toLowerCase() === 'passed';
+                    const isSkipped = normalizedStatus === 'skipped';
+                    const isActive = normalizedStatus === 'passed' || normalizedStatus === 'warning';
+                    const isHealthy = normalizedStatus === 'passed';
 
                     let healthStatusText = '';
                     let healthColor = '#6b7280';
-                    if (isActive && isHealthy) {
+                    if (isSkipped) {
+                        healthStatusText = 'SKIPPED BY QA';
+                        healthColor = '#6b7280';
+                    } else if (isActive && isHealthy) {
                         healthStatusText = 'ACTIVE & HEALTHY';
                         healthColor = '#10b981'; // green
                     } else if (isActive && !isHealthy) {
@@ -3115,6 +3163,12 @@
                                     <span class="detail-info-label">Checked</span>
                                     <span class="detail-info-value">${currentTime}</span>
                                 </div>
+                                ${test.message ? `
+                                <div class="detail-info-item">
+                                    <span class="detail-info-label">Message</span>
+                                    <span class="detail-info-value">${test.message}</span>
+                                </div>
+                                ` : ''}
                             </div>
                         </div>
                     `;
@@ -3326,7 +3380,8 @@
             const colors = {
                 'passed': '#10b981',
                 'warning': '#f59e0b',
-                'failed': '#ef4444'
+                'failed': '#ef4444',
+                'skipped': '#6b7280'
             };
             return colors[status.toLowerCase()] || colors['passed'];
         }
@@ -3335,7 +3390,8 @@
             const colors = {
                 'passed': { bg: '#d1fae5', color: '#065f46' },
                 'warning': { bg: '#fef3c7', color: '#92400e' },
-                'failed': { bg: '#fee2e2', color: '#991b1b' }
+                'failed': { bg: '#fee2e2', color: '#991b1b' },
+                'skipped': { bg: '#e5e7eb', color: '#374151' }
             };
 
             const style = colors[status] || colors['passed'];

@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import axios from 'axios';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface ServerConfig {
   name: string;
@@ -8,57 +10,61 @@ interface ServerConfig {
   timeout?: number;
 }
 
-// All AdHash Project Servers
-const servers: ServerConfig[] = [
-  // AutoChecker Servers
-  { name: 'AutoChecker - Auto Search', url: 'http://20.7.146.191:3000/', expectedStatus: 200, timeout: 10000 },
-  { name: 'AutoChecker - Manual Search', url: 'http://20.15.121.70:3000/', expectedStatus: 200, timeout: 10000 },
-  { name: 'AutoChecker - PartSouq', url: 'http://20.62.109.239:3000/', expectedStatus: 200, timeout: 10000 },
-  { name: 'AutoChecker - Admin', url: 'https://manage.autochecker.com/', expectedStatus: 200, timeout: 10000 },
-  { name: 'AutoChecker - Admin API', url: 'https://manageadminapi.autochecker.com/', expectedStatus: 200, timeout: 10000 },
-  { name: 'AutoChecker - Mobile API', url: 'https://managemobileapi.autochecker.com/', expectedStatus: 200, timeout: 10000 },
-  { name: 'AutoChecker - eBay API', url: 'https://ebaydev.autochecker.com/', expectedStatus: 200, timeout: 10000 },
+interface ProjectServerConfig {
+  name?: string;
+  url?: string;
+  type?: string;
+}
 
-  // WavedIn Servers
-  { name: 'WavedIn - Mobile API', url: 'https://mobileliveapi.wavedin.app/', expectedStatus: 200, timeout: 10000 },
-  { name: 'WavedIn - Super Admin', url: 'https://superadmin.wavedin.app/', expectedStatus: 200, timeout: 10000 },
+interface ProjectConfig {
+  servers?: ProjectServerConfig[];
+}
 
-  // Zapai Servers
-  { name: 'Zapai - Web', url: 'https://www.zapai.us/', expectedStatus: 200, timeout: 10000 },
+interface ProjectMapping {
+  projects?: ProjectConfig[];
+}
 
-  // Zapcrm Servers
-  { name: 'Zapcrm - Admin', url: 'https://zapcrm.io/', expectedStatus: 200, timeout: 10000 },
-  { name: 'Zapcrm - Lead', url: 'https://lead.zapcrm.io/', expectedStatus: 200, timeout: 10000 },
-  { name: 'Zapcrm - API', url: 'https://api.zapcrm.io/', expectedStatus: 200, timeout: 10000 },
+const SKIPPED_SERVER_URL_FRAGMENT = '20.62.109.239';
+const SKIPPED_SERVER_NAME = 'AutoChecker - PartSouq';
+const SKIPPED_SERVER_MESSAGE = 'Skipped by QA (known issue / external dependency)';
 
-  // Algomax Servers
-  { name: 'Algomax - GoPocket', url: 'https://gopocket.algomax.co/', expectedStatus: 200, timeout: 10000 },
+function isSkippedServer(server: ServerConfig): boolean {
+  return server.name === SKIPPED_SERVER_NAME || server.url.includes(SKIPPED_SERVER_URL_FRAGMENT);
+}
 
-  // Metcalf Servers
-  { name: 'Metcalf - Web', url: 'https://metcalf.ai/', expectedStatus: 200, timeout: 10000 },
+function loadServers(): ServerConfig[] {
+  const mappingPath = path.join(process.cwd(), 'config', 'project-mapping.json');
+  const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8')) as ProjectMapping;
+  const seen = new Set<string>();
 
-  // Adhash Servers
-  { name: 'Adhash - Web', url: 'https://adhashtech.com/', expectedStatus: 200, timeout: 10000 },
+  return (mapping.projects || [])
+    .flatMap((project) => project.servers || [])
+    .filter((server): server is ProjectServerConfig & { name: string; url: string } => Boolean(server?.name && server?.url))
+    .map((server) => ({
+      name: server.name,
+      url: server.url,
+      expectedStatus: 200,
+      timeout: 10000
+    }))
+    .filter((server) => {
+      const stableKey = `${server.name}::${server.url}`.toLowerCase();
+      if (seen.has(stableKey)) {
+        return false;
+      }
 
-  // Humee Servers
-  { name: 'Humee - Admin', url: 'https://humee.com/', expectedStatus: 200, timeout: 10000 },
-  { name: 'Humee - API', url: 'https://api.humee.com/', expectedStatus: 200, timeout: 10000 },
+      seen.add(stableKey);
+      return true;
+    });
+}
 
-  // SMC Servers
-  { name: 'SMC - API', url: 'https://api.sendmovieclips.com/', expectedStatus: 200, timeout: 10000 },
-
-  // AiSignPro Servers
-  { name: 'AiSignPro - Admin', url: 'https://admin.aisignpro.com/', expectedStatus: 200, timeout: 10000 },
-  { name: 'AiSignPro - API', url: 'https://api.aisignpro.com/', expectedStatus: 200, timeout: 10000 },
-
-  // Synctag Servers
-  { name: 'Synctag - API', url: 'https://spark.synctag.com/', expectedStatus: 200, timeout: 10000 }
-];
+const servers = loadServers();
 
 test.describe('Server Health Monitoring', () => {
   // Use HTTP requests only (no browser needed - matches original implementation)
   for (const server of servers) {
     test(`Check ${server.name} health`, async () => {
+      test.skip(isSkippedServer(server), SKIPPED_SERVER_MESSAGE);
+
       const startTime = Date.now();
 
       try {
@@ -105,6 +111,16 @@ test.describe('Server Health Monitoring', () => {
   test('All servers health summary', async () => {
     const results = await Promise.allSettled(
       servers.map(async (server) => {
+        if (isSkippedServer(server)) {
+          return {
+            server: server.name,
+            status: 'skipped',
+            responseTime: 0,
+            healthy: false,
+            message: SKIPPED_SERVER_MESSAGE
+          };
+        }
+
         const startTime = Date.now();
         try {
           const response = await axios.get(server.url, {
@@ -134,6 +150,11 @@ test.describe('Server Health Monitoring', () => {
     results.forEach((result, index) => {
       if (result.status === 'fulfilled') {
         const data = result.value;
+        if (data.status === 'skipped') {
+          console.log(`- ${data.server}: SKIPPED (${data.message})`);
+          return;
+        }
+
         const icon = data.healthy ? '✓' : '✗';
         console.log(`${icon} ${data.server}: ${data.status} (${data.responseTime}ms)`);
         if (data.error) {

@@ -7,7 +7,7 @@ dotenv.config();
 
 const EXPIRY_WARNING_DAYS = 30;
 
-type ItemStatus = 'passed' | 'warning' | 'failed';
+type ItemStatus = 'passed' | 'warning' | 'failed' | 'skipped';
 type SectionKey = 'apps' | 'servers' | 'ssl' | 'domains' | 'apis';
 
 interface CategoryIssueCounts {
@@ -69,6 +69,7 @@ interface DashboardSuiteState {
     passed?: number;
     failed?: number;
     warning?: number;
+    skipped?: number;
     total?: number;
     duration?: number;
     reportPath?: string;
@@ -130,6 +131,7 @@ export interface SectionSummary {
     passed: number;
     warning: number;
     failed: number;
+    skipped: number;
     tests: EmailItem[];
 }
 
@@ -182,6 +184,7 @@ export interface ModuleSection {
     passed: number;
     failed: number;
     warning: number;
+    skipped: number;
     total: number;
     durationLabel: string;
     items: EmailItem[];
@@ -297,7 +300,7 @@ interface NormalizedAppTarget {
 }
 
 function createEmptySectionSummary(): SectionSummary {
-    return { total: 0, passed: 0, warning: 0, failed: 0, tests: [] };
+    return { total: 0, passed: 0, warning: 0, failed: 0, skipped: 0, tests: [] };
 }
 
 function formatDurationLabel(durationMs: unknown): string {
@@ -350,6 +353,7 @@ function buildModuleSections(state: DashboardState): ModuleSection[] {
             passed: typeof suite.passed === 'number' ? suite.passed : 0,
             failed: typeof suite.failed === 'number' ? suite.failed : 0,
             warning: typeof suite.warning === 'number' ? suite.warning : 0,
+            skipped: typeof suite.skipped === 'number' ? suite.skipped : 0,
             total: typeof suite.total === 'number' ? suite.total : 0,
             durationLabel: formatDurationLabel(suite.duration),
             items: []
@@ -1000,11 +1004,11 @@ function getProjectServerResults(project: ProjectDefinition, serverRows: SuiteRo
 
     for (const server of project.servers || []) {
         const row = findSuiteRow(serverRows, `Check ${server.name} health`);
-        if (!row || row.status === 'skipped') {
+        if (!row) {
             continue;
         }
 
-        const status: ItemStatus = row.status === 'passed' ? 'passed' : 'failed';
+        const status: ItemStatus = row.status === 'passed' ? 'passed' : row.status === 'skipped' ? 'skipped' : 'failed';
         result.total += 1;
         result[status] += 1;
         result.tests.push({
@@ -1014,7 +1018,7 @@ function getProjectServerResults(project: ProjectDefinition, serverRows: SuiteRo
             status,
             type: 'servers',
             durationLabel: row.durationLabel,
-            reason: row.detailText
+            reason: row.detailText || (status === 'skipped' ? 'Skipped by QA (known issue / external dependency)' : undefined)
         });
     }
 
@@ -1181,7 +1185,7 @@ function getProjectCategoryWarnings(results: ProjectSectionResults): CategoryIss
 }
 
 function sortTestsForEmail(tests: EmailItem[]): EmailItem[] {
-    const statusOrder: Record<ItemStatus, number> = { failed: 0, warning: 1, passed: 2 };
+    const statusOrder: Record<ItemStatus, number> = { failed: 0, warning: 1, skipped: 2, passed: 3 };
     return [...tests].sort((left, right) => {
         const statusScore = statusOrder[left.status] - statusOrder[right.status];
         if (statusScore !== 0) {
@@ -1226,7 +1230,7 @@ export function buildDashboardRenderModel(rootDir: string): DashboardEmailModel 
             results
         };
     }).sort((left, right) => {
-        const statusOrder: Record<ItemStatus, number> = { failed: 0, warning: 1, passed: 2 };
+        const statusOrder: Record<ItemStatus, number> = { failed: 0, warning: 1, skipped: 2, passed: 3 };
         const statusScore = statusOrder[left.overallStatus] - statusOrder[right.overallStatus];
         if (statusScore !== 0) {
             return statusScore;
@@ -1298,12 +1302,14 @@ function escapeHtml(value: unknown): string {
 function getStatusColor(status: ItemStatus): string {
     if (status === 'failed') return '#ef4444';
     if (status === 'warning') return '#f59e0b';
+    if (status === 'skipped') return '#6b7280';
     return '#10b981';
 }
 
 function getStatusLabel(status: ItemStatus): string {
     if (status === 'failed') return 'FAILED';
     if (status === 'warning') return 'WARNING';
+    if (status === 'skipped') return 'SKIPPED';
     return 'PASSED';
 }
 
@@ -1314,6 +1320,7 @@ function getStatusTextColor(status: ItemStatus): string {
 function getStatusEmoji(status: ItemStatus): string {
     if (status === 'failed') return '✗';
     if (status === 'warning') return '⚠';
+    if (status === 'skipped') return '⏭';
     return '✓';
 }
 
@@ -1646,7 +1653,7 @@ function renderProjectCard(project: ProjectEmailCard): string {
 
 function renderEmailModuleSection(section: ModuleSection): string {
     const attentionItems = section.items.filter((item) => item.status !== 'passed');
-    const sectionStatus: ItemStatus = section.failed > 0 ? 'failed' : section.warning > 0 ? 'warning' : 'passed';
+    const sectionStatus: ItemStatus = section.failed > 0 ? 'failed' : section.warning > 0 || section.skipped > 0 ? 'warning' : 'passed';
     const headerColor = sectionStatus === 'failed' ? '#7f1d1d' : sectionStatus === 'warning' ? '#7c4a03' : '#065f46';
     const title = section.id === 'app'
         ? 'App Status'
@@ -1663,7 +1670,7 @@ function renderEmailModuleSection(section: ModuleSection): string {
             <tr>
                 <td style="padding:18px 20px;background:${headerColor};font-family:Arial,'Segoe UI',sans-serif;">
                     <div style="font-size:18px;line-height:22px;font-weight:800;color:#ffffff;">${escapeHtml(title)} <span style="color:#cbd5e1;">(${section.total})</span></div>
-                    <div style="padding-top:10px;">${renderCountChip('TOTAL', section.total, '#3b82f6')}${section.warning > 0 ? renderCountChip('WARN', section.warning, '#f59e0b') : ''}${section.failed > 0 ? renderCountChip('FAIL', section.failed, '#ef4444') : ''}</div>
+                    <div style="padding-top:10px;">${renderCountChip('TOTAL', section.total, '#3b82f6')}${section.warning > 0 ? renderCountChip('WARN', section.warning, '#f59e0b') : ''}${section.skipped > 0 ? renderCountChip('SKIP', section.skipped, '#6b7280') : ''}${section.failed > 0 ? renderCountChip('FAIL', section.failed, '#ef4444') : ''}</div>
                 </td>
             </tr>
             <tr>
@@ -1851,7 +1858,7 @@ function getModuleItems(projects: ProjectEmailCard[], suiteId: SuiteId): EmailIt
                     return dayScore;
                 }
             } else {
-                const statusOrder: Record<ItemStatus, number> = { failed: 0, warning: 1, passed: 2 };
+                const statusOrder: Record<ItemStatus, number> = { failed: 0, warning: 1, skipped: 2, passed: 3 };
                 const statusScore = statusOrder[left.status] - statusOrder[right.status];
                 if (statusScore !== 0) {
                     return statusScore;
@@ -1877,8 +1884,9 @@ function buildModuleSectionFromItems(section: ModuleSection, items: EmailItem[])
     const passed = items.filter((item) => item.status === 'passed').length;
     const warning = items.filter((item) => item.status === 'warning').length;
     const failed = items.filter((item) => item.status === 'failed').length;
+    const skipped = items.filter((item) => item.status === 'skipped').length;
     const total = items.length;
-    const status = failed > 0 ? 'failed' : warning > 0 ? 'warning' : total > 0 ? 'passed' : section.status;
+    const status = failed > 0 ? 'failed' : warning > 0 || skipped > 0 ? 'warning' : total > 0 ? 'passed' : section.status;
 
     return {
         ...section,
@@ -1886,6 +1894,7 @@ function buildModuleSectionFromItems(section: ModuleSection, items: EmailItem[])
         passed,
         warning,
         failed,
+        skipped,
         total,
         items
     };
@@ -2099,6 +2108,7 @@ function buildModuleReportPage(model: DashboardEmailModel, section: ModuleSectio
                 <div class="summary-card"><div class="label">Passed</div><div class="value" style="color:#6ee7b7;">${section.passed}</div></div>
                 <div class="summary-card"><div class="label">Failed</div><div class="value" style="color:#fca5a5;">${section.failed}</div></div>
                 <div class="summary-card"><div class="label">Warnings</div><div class="value" style="color:#fcd34d;">${section.warning}</div></div>
+                <div class="summary-card"><div class="label">Skipped</div><div class="value" style="color:#d1d5db;">${section.skipped}</div></div>
                 <div class="summary-card"><div class="label">Total</div><div class="value">${section.total}</div></div>
                 <div class="summary-card"><div class="label">Duration</div><div class="value">${escapeHtml(section.durationLabel)}</div></div>
             </div>
@@ -2187,18 +2197,6 @@ function buildEmailSubject(model: DashboardEmailModel): string {
 export async function sendDashboardSummaryEmail(dashboardPath: string, rootDir = process.cwd()): Promise<DashboardEmailSendResult> {
     const { enabled, config, missingKeys } = parseEmailConfigFromEnv(process.env);
 
-    if (!enabled) {
-        console.log('Email notifications disabled. Set ZOHO_MAIL_ENABLED=true to enable.');
-        return {
-            enabled: false,
-            sent: false,
-            recipients: [],
-            missingKeys: []
-        };
-    }
-
-    console.log('Email notifications enabled');
-
     const previewDir = path.join(rootDir, 'email-preview');
     fs.rmSync(previewDir, { recursive: true, force: true });
     fs.mkdirSync(previewDir, { recursive: true });
@@ -2222,6 +2220,21 @@ export async function sendDashboardSummaryEmail(dashboardPath: string, rootDir =
     console.log(`[ATTACHMENT] html length: ${html.length}`);
     console.log('[ATTACHMENT] source = same-as-email true');
     console.log('[ATTACHMENT] write complete');
+
+    if (!enabled) {
+        console.log('Email notifications disabled. Set ZOHO_MAIL_ENABLED=true to enable.');
+        return {
+            enabled: false,
+            sent: false,
+            previewPath,
+            attachmentPath,
+            subject,
+            recipients: [],
+            missingKeys: []
+        };
+    }
+
+    console.log('Email notifications enabled');
 
     if (missingKeys.length > 0) {
         const error = `Missing required email config: ${missingKeys.join(', ')}`;

@@ -524,6 +524,7 @@ app.get('/api/projects', (req, res) => {
         const projectData = JSON.parse(fs.readFileSync(projectMappingPath, 'utf8'));
         attachProjectDomainStatuses(projectData.projects || [], readDashboardState());
         attachProjectSslDetails(projectData.projects || [], readDashboardState());
+        attachProjectServerStatuses(projectData.projects || []);
         res.json(projectData);
     } catch (error) {
         console.error('Error loading projects:', error);
@@ -542,6 +543,7 @@ app.get('/api/project/:id', (req, res) => {
         const projectData = JSON.parse(fs.readFileSync(projectMappingPath, 'utf8'));
         attachProjectDomainStatuses(projectData.projects || [], readDashboardState());
         attachProjectSslDetails(projectData.projects || [], readDashboardState());
+        attachProjectServerStatuses(projectData.projects || []);
         const project = projectData.projects.find(p => p.id === req.params.id);
 
         if (!project) {
@@ -608,6 +610,10 @@ const suiteConfigCache = {
     suiteRows: {}
 };
 
+const SKIPPED_SERVER_URL_FRAGMENT = '20.62.109.239';
+const SKIPPED_SERVER_NAME = 'AutoChecker - PartSouq';
+const SKIPPED_SERVER_MESSAGE = 'Skipped by QA (known issue / external dependency)';
+
 function normalizeText(value) {
     return (value || '').toString().toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
@@ -626,6 +632,22 @@ function normalizeApiName(value) {
 
 function buildApiStableKey(method, url, name) {
     return `${normalizeApiMethod(method)}::${normalizeUrl(url)}::${normalizeApiName(name)}`;
+}
+
+function isSkippedServerDefinition(server) {
+    return Boolean(server && ((server.name || '') === SKIPPED_SERVER_NAME || String(server.url || '').includes(SKIPPED_SERVER_URL_FRAGMENT)));
+}
+
+function buildSkippedServerResult(server) {
+    return {
+        name: server.name,
+        url: server.url || '#',
+        type: 'server',
+        status: 'skipped',
+        message: SKIPPED_SERVER_MESSAGE,
+        responseTime: 0,
+        duration: '0s'
+    };
 }
 
 function dedupeApiResults(details) {
@@ -1310,7 +1332,7 @@ function loadSslReportEntries() {
 }
 
 function createEmptySuiteResult() {
-    return { total: 0, passed: 0, failed: 0, warning: 0, tests: [] };
+    return { total: 0, passed: 0, failed: 0, warning: 0, skipped: 0, tests: [] };
 }
 
 function getProjectDomainStatus(project, domainDetails) {
@@ -1355,6 +1377,38 @@ function attachProjectSslDetails(projects, dashboardState) {
 
     projects.forEach((project) => {
         project.sslDetails = getProjectSslDetails(project, sslDetails);
+    });
+}
+
+function attachProjectServerStatuses(projects) {
+    (projects || []).forEach((project) => {
+        const serverResults = getServerTestResults(project.id);
+        const serverByKey = new Map((serverResults.tests || []).map((test) => [`${normalizeText(test.name)}::${normalizeUrl(test.url)}`, test]));
+
+        project.servers = (project.servers || []).map((server) => {
+            const key = `${normalizeText(server.name)}::${normalizeUrl(server.url)}`;
+            const matched = serverByKey.get(key);
+
+            if (matched) {
+                return {
+                    ...server,
+                    status: matched.status,
+                    message: matched.message || matched.reason,
+                    responseTime: matched.responseTime ?? 0
+                };
+            }
+
+            if (isSkippedServerDefinition(server)) {
+                return {
+                    ...server,
+                    status: 'skipped',
+                    message: SKIPPED_SERVER_MESSAGE,
+                    responseTime: 0
+                };
+            }
+
+            return server;
+        });
     });
 }
 
@@ -1419,7 +1473,14 @@ function getServerTestResults(projectId) {
 
         project.servers.forEach((server) => {
             const row = findSuiteRow(rows, `Check ${server.name} health`);
-            if (!row || row.status === 'skipped') {
+            if (!row && !isSkippedServerDefinition(server)) {
+                return;
+            }
+
+            if (isSkippedServerDefinition(server) || row.status === 'skipped') {
+                result.total++;
+                result.skipped++;
+                result.tests.push(buildSkippedServerResult(server));
                 return;
             }
 
@@ -1434,7 +1495,9 @@ function getServerTestResults(projectId) {
                 name: server.name,
                 url: server.url || '#',
                 type: 'server',
-                status: row.status
+                status: row.status,
+                message: row.details || row.badge,
+                responseTime: 0
             });
         });
 
@@ -1544,6 +1607,15 @@ function getAPITestResults(projectId) {
         );
 
         const rows = readSuiteRows('AdHash_API_Test');
+        apiResults = apiResults.map((detail) => {
+            const row = findSuiteRow(rows, `${normalizeApiMethod(detail.method)} ${detail.name}`);
+            return {
+                ...detail,
+                duration: detail.duration || row?.duration,
+                requestBody: detail.requestBody || row?.requestBody,
+                responseBody: detail.responseBody || row?.responseBody
+            };
+        });
         const existingKeys = new Set(apiResults.map((detail) => buildApiStableKey(detail.method, detail.url, detail.name)));
 
         project.apis.forEach((api) => {
@@ -1567,6 +1639,7 @@ function getAPITestResults(projectId) {
                 name: api.name,
                 url: api.url,
                 method,
+                duration: row.duration,
                 requestBody: row.requestBody || (normalizeApiMethod(method) === 'GET' ? 'No request body' : 'Payload not provided'),
                 responseBody: row.responseBody || 'No response body',
                 responseCode: row.responseCode,
