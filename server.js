@@ -20,6 +20,9 @@ const serverLogs = [];
 const MAX_LOGS = 100;
 const DASHBOARD_STATE_PATH = path.join(__dirname, 'test-results', 'dashboard-state.json');
 const DOMAIN_REPORT_OUTPUT_PATH = path.join(__dirname, 'godaddy', 'report.html');
+const CERTIFICATE_REPORT_OUTPUT_PATH = path.join(__dirname, 'suite-reports', 'AdHash_Projects_Certificate_Expiry_Test.html');
+const DOMAIN_MODULE_REPORT_PATH = path.join(__dirname, 'final-dashboard-bundle', 'module-reports', 'domain.html');
+const SSL_MODULE_REPORT_PATH = path.join(__dirname, 'final-dashboard-bundle', 'module-reports', 'ssl.html');
 const EXPIRY_WARNING_DAYS = 30;
 const WORKSPACE_SUITES = {
     app: {
@@ -983,7 +986,7 @@ function readSuiteRows(repository) {
 
     const reportPath = getSuiteReportPath(repository);
     if (!fs.existsSync(reportPath)) {
-        console.log('Suite report not found:', reportPath);
+        console.warn('Suite report not found:', reportPath);
         suiteConfigCache.suiteRows[repository] = [];
         return suiteConfigCache.suiteRows[repository];
     }
@@ -1102,102 +1105,208 @@ function loadDomainReportEntries() {
         ? state.suites.domain.details
         : [];
 
-    if (domainDetails.length > 0) {
-        const entries = domainDetails
-            .map((detail) => {
-                const normalizedDetail = normalizeDomainDetail(detail);
-                const normalizedDomain = normalizeSslHost(normalizedDetail && normalizedDetail.domain);
-                if (!normalizedDomain) {
-                    return null;
-                }
+    const stateEntries = domainDetails
+        .map((detail) => {
+            const normalizedDetail = normalizeDomainDetail(detail);
+            const normalizedDomain = normalizeSslHost(normalizedDetail && normalizedDetail.domain);
+            if (!normalizedDomain) {
+                return null;
+            }
 
-                let status = 'failed';
-                if (normalizedDetail.status === 'active') {
-                    status = 'passed';
-                } else if (normalizedDetail.status === 'expiring') {
-                    status = 'warning';
-                } else if (normalizedDetail.status === 'error') {
-                    status = 'failed';
-                }
+            let status = 'failed';
+            if (normalizedDetail.status === 'active') {
+                status = 'passed';
+            } else if (normalizedDetail.status === 'expiring') {
+                status = 'warning';
+            } else if (normalizedDetail.status === 'error') {
+                status = 'failed';
+            }
 
-                return {
-                    name: normalizedDomain,
-                    domain: normalizedDomain,
-                    status,
-                    expiryDate: normalizedDetail.expiryDate || null,
-                    expiryDateIST: normalizedDetail.expiryDateIST || formatToIST(normalizedDetail.expiryDate),
-                    daysRemaining: normalizedDetail.daysRemaining ?? null,
-                    details: ''
-                };
-            })
-            .filter(Boolean);
+            return {
+                name: normalizedDomain,
+                domain: normalizedDomain,
+                status,
+                expiryDate: normalizedDetail.expiryDate || null,
+                expiryDateIST: normalizedDetail.expiryDateIST || formatToIST(normalizedDetail.expiryDate),
+                daysRemaining: normalizedDetail.daysRemaining ?? null,
+                details: ''
+            };
+        })
+        .filter(Boolean);
 
-        const mapping = getProjectMapping();
-        const unmatchedDomains = entries
-            .filter((entry) => !(mapping.projects || []).some((project) =>
-                (project.domains || []).some((domain) => {
-                    const normalizedProjectDomain = normalizeSslHost(domain);
-                    const normalizedEntryDomain = normalizeSslHost(entry.domain);
+    const htmlEntries = [];
+    if (fs.existsSync(DOMAIN_REPORT_OUTPUT_PATH)) {
+        const html = fs.readFileSync(DOMAIN_REPORT_OUTPUT_PATH, 'utf8');
+        const cardPattern = /<div class="domain-card(?: expiring-soon| error)?"[^>]*>[\s\S]*?<div class="days-remaining(?: [^"]+)?"[^>]*>[\s\S]*?<\/div>[\s\S]*?<\/div>[\s\S]*?<\/div>/gi;
 
-                    return normalizedEntryDomain === normalizedProjectDomain
-                        || normalizedEntryDomain.endsWith(`.${normalizedProjectDomain}`)
-                        || normalizedProjectDomain.endsWith(`.${normalizedEntryDomain}`);
-                })
-            ))
-            .map((entry) => entry.domain);
+        for (const cardMatch of html.matchAll(cardPattern)) {
+            const cardHtml = cardMatch[0];
+            const nameMatch = cardHtml.match(/<div class="domain-name">([^<]+)<\/div>/i);
+            const domainMatch = cardHtml.match(/<div class="domain-url">([^<]+)<\/div>/i);
+            const badgeClassMatch = cardHtml.match(/<span class="status-badge ([^"]+)">/i);
+            const expiryDateMatch = cardHtml.match(/<div class="expiry-date">([^<]+)<\/div>/i);
+            const expiryDateISTMatch = cardHtml.match(/<div class="expiry-date-ist">([^<]+)<\/div>/i);
+            const daysTextMatch = cardHtml.match(/<div class="days-remaining(?: [^"]+)?"[^>]*>\s*([^<]+)\s*<\/div>/i);
 
-        console.log(`[Domain Details] Loaded ${entries.length} domain details from dashboard state`);
-        console.log(`[Domain Details] Unmatched domains: ${unmatchedDomains.length > 0 ? unmatchedDomains.join(', ') : 'none'}`);
+            if (!nameMatch || !domainMatch || !badgeClassMatch || !expiryDateMatch) {
+                continue;
+            }
 
-        suiteConfigCache.domains = entries;
-        suiteConfigCache.domainsCacheKey = stateGeneratedAt;
-        return suiteConfigCache.domains;
-    }
+            const badgeClass = badgeClassMatch[1] || '';
+            const daysText = decodeHtml((daysTextMatch && daysTextMatch[1]) || '');
+            const daysRemaining = normalizeDaysRemaining(daysText);
+            const status = classifyExpiryStatus(daysRemaining, !badgeClass.includes('status-active'));
 
-    if (!fs.existsSync(DOMAIN_REPORT_OUTPUT_PATH)) {
-        suiteConfigCache.domains = [];
-        suiteConfigCache.domainsCacheKey = stateGeneratedAt;
-        return suiteConfigCache.domains;
-    }
-
-    const html = fs.readFileSync(DOMAIN_REPORT_OUTPUT_PATH, 'utf8');
-    const entries = [];
-    const cardPattern = /<div class="domain-card(?: expiring-soon| error)?"[^>]*>[\s\S]*?<div class="days-remaining(?: [^"]+)?"[^>]*>[\s\S]*?<\/div>[\s\S]*?<\/div>[\s\S]*?<\/div>/gi;
-
-    for (const cardMatch of html.matchAll(cardPattern)) {
-        const cardHtml = cardMatch[0];
-        const nameMatch = cardHtml.match(/<div class="domain-name">([^<]+)<\/div>/i);
-        const domainMatch = cardHtml.match(/<div class="domain-url">([^<]+)<\/div>/i);
-        const badgeClassMatch = cardHtml.match(/<span class="status-badge ([^"]+)">/i);
-        const expiryDateMatch = cardHtml.match(/<div class="expiry-date">([^<]+)<\/div>/i);
-        const expiryDateISTMatch = cardHtml.match(/<div class="expiry-date-ist">([^<]+)<\/div>/i);
-        const daysTextMatch = cardHtml.match(/<div class="days-remaining(?: [^"]+)?"[^>]*>\s*([^<]+)\s*<\/div>/i);
-
-        if (!nameMatch || !domainMatch || !badgeClassMatch || !expiryDateMatch) {
-            continue;
+            htmlEntries.push({
+                name: decodeHtml(nameMatch[1]),
+                domain: decodeHtml(domainMatch[1]),
+                status,
+                expiryDate: decodeHtml(expiryDateMatch[1]),
+                expiryDateIST: decodeHtml((expiryDateISTMatch && expiryDateISTMatch[1]) || '') || formatToIST(decodeHtml(expiryDateMatch[1])),
+                daysRemaining,
+                details: daysText
+            });
         }
-
-        const badgeClass = badgeClassMatch[1] || '';
-        const daysText = decodeHtml((daysTextMatch && daysTextMatch[1]) || '');
-        const daysRemaining = normalizeDaysRemaining(daysText);
-        const status = classifyExpiryStatus(daysRemaining, !badgeClass.includes('status-active'));
-
-        entries.push({
-            name: decodeHtml(nameMatch[1]),
-            domain: decodeHtml(domainMatch[1]),
-            status,
-            expiryDate: decodeHtml(expiryDateMatch[1]),
-            expiryDateIST: decodeHtml((expiryDateISTMatch && expiryDateISTMatch[1]) || '') || formatToIST(decodeHtml(expiryDateMatch[1])),
-            daysRemaining,
-            details: daysText
-        });
     }
 
-    console.log(`[Domain Details] Loaded ${entries.length} domain entries from fallback HTML report`);
+    if (fs.existsSync(DOMAIN_MODULE_REPORT_PATH)) {
+        const html = fs.readFileSync(DOMAIN_MODULE_REPORT_PATH, 'utf8');
+        const cardPattern = /<article class="report-card [^"]+">[\s\S]*?<\/article>/gi;
+
+        for (const cardMatch of html.matchAll(cardPattern)) {
+            const cardHtml = cardMatch[0];
+            const nameMatch = cardHtml.match(/<h2>([^<]+)<\/h2>/i);
+            const badgeMatch = cardHtml.match(/<span class="badge [^"]+">([^<]+)<\/span>/i);
+            if (!nameMatch) {
+                continue;
+            }
+
+            const fields = {};
+            for (const fieldMatch of cardHtml.matchAll(/<div class="field(?: [^"]+)?">\s*<div class="field-label">([^<]+)<\/div>\s*<div class="field-value">([\s\S]*?)<\/div>\s*<\/div>/gi)) {
+                fields[decodeHtml(fieldMatch[1])] = stripHtml(fieldMatch[2]);
+            }
+
+            const domain = decodeHtml(nameMatch[1]);
+            const statusText = decodeHtml((badgeMatch && badgeMatch[1]) || '').toLowerCase();
+            htmlEntries.push({
+                name: domain,
+                domain,
+                url: fields.URL || `https://${normalizeDomainValue(domain)}`,
+                status: statusText === 'failed' ? 'failed' : statusText === 'warning' ? 'warning' : 'passed',
+                expiryDate: fields['Expiry Date (UTC)'] || null,
+                expiryDateIST: fields['Expiry Date (IST)'] || formatToIST(fields['Expiry Date (UTC)']),
+                daysRemaining: normalizeDaysRemaining(fields['Days Remaining']),
+                details: fields['Domain Status'] || statusText
+            });
+        }
+    }
+
+    const entries = dedupeTrackedResults('domain', [...stateEntries, ...htmlEntries].map(normalizeDomainDetail));
 
     suiteConfigCache.domains = entries;
     suiteConfigCache.domainsCacheKey = stateGeneratedAt;
     return suiteConfigCache.domains;
+}
+
+function loadSslReportEntries() {
+    const state = readDashboardState();
+    const stateGeneratedAt = state && state.generatedAt ? state.generatedAt : '';
+
+    if (suiteConfigCache.ssl && suiteConfigCache.sslCacheKey === stateGeneratedAt) {
+        return suiteConfigCache.ssl;
+    }
+
+    const stateDetails = state && state.suites && state.suites.cert && Array.isArray(state.suites.cert.details)
+        ? state.suites.cert.details
+        : [];
+
+    const normalizedStateEntries = stateDetails
+        .map((detail) => normalizeSslDetail(detail))
+        .filter((detail) => normalizeSslHost(detail && (detail.domain || detail.url)))
+        .map((detail) => ({
+            domain: normalizeSslHost(detail.domain || detail.url),
+            url: detail.url || `https://${normalizeSslHost(detail.domain || detail.url)}`,
+            status: detail.status,
+            expiryDate: detail.expiryDate || null,
+            expiryDateIST: detail.expiryDateIST || formatToIST(detail.expiryDate),
+            daysRemaining: detail.daysRemaining ?? null,
+            reason: detail.reason || ''
+        }));
+
+    const htmlEntries = [];
+    if (fs.existsSync(CERTIFICATE_REPORT_OUTPUT_PATH)) {
+        const html = fs.readFileSync(CERTIFICATE_REPORT_OUTPUT_PATH, 'utf8');
+        const cardPattern = /<div class="cert-card(?: expiring-soon| error)?"[^>]*>[\s\S]*?<div class="days-remaining(?: [^"]+)?"[^>]*>[\s\S]*?<\/div>[\s\S]*?<\/div>[\s\S]*?<\/div>/gi;
+
+        for (const cardMatch of html.matchAll(cardPattern)) {
+            const cardHtml = cardMatch[0];
+            const nameMatch = cardHtml.match(/<div class="cert-name">([^<]+)<\/div>/i);
+            const urlMatch = cardHtml.match(/<div class="cert-url">([^<]+)<\/div>/i);
+            const badgeClassMatch = cardHtml.match(/<span class="status-badge ([^"]+)">/i);
+            const expiryDateMatch = cardHtml.match(/<div class="expiry-date">([^<]+)<\/div>/i);
+            const expiryDateISTMatch = cardHtml.match(/<div class="expiry-date-ist">([^<]+)<\/div>/i);
+            const daysTextMatch = cardHtml.match(/<div class="days-remaining(?: [^"]+)?"[^>]*>\s*([^<]+)\s*<\/div>/i);
+            const reasonMatch = cardHtml.match(/<div class="error-reason">(?:<strong>[^<]+<\/strong>\s*)?([^<]+)<\/div>/i);
+
+            if (!nameMatch || !urlMatch || !badgeClassMatch || !expiryDateMatch) {
+                continue;
+            }
+
+            const badgeClass = badgeClassMatch[1] || '';
+            const url = decodeHtml(urlMatch[1]);
+            const domain = normalizeSslHost(decodeHtml(nameMatch[1]) || url);
+            const daysText = decodeHtml((daysTextMatch && daysTextMatch[1]) || '');
+            const daysRemaining = normalizeDaysRemaining(daysText);
+            const status = classifyExpiryStatus(daysRemaining, badgeClass.includes('status-error'));
+
+            htmlEntries.push({
+                domain,
+                url: url || `https://${domain}`,
+                status,
+                expiryDate: decodeHtml(expiryDateMatch[1]),
+                expiryDateIST: decodeHtml((expiryDateISTMatch && expiryDateISTMatch[1]) || '') || formatToIST(decodeHtml(expiryDateMatch[1])),
+                daysRemaining,
+                reason: decodeHtml((reasonMatch && reasonMatch[1]) || '') || daysText
+            });
+        }
+    }
+
+    if (fs.existsSync(SSL_MODULE_REPORT_PATH)) {
+        const html = fs.readFileSync(SSL_MODULE_REPORT_PATH, 'utf8');
+        const cardPattern = /<article class="report-card [^"]+">[\s\S]*?<\/article>/gi;
+
+        for (const cardMatch of html.matchAll(cardPattern)) {
+            const cardHtml = cardMatch[0];
+            const nameMatch = cardHtml.match(/<h2>([^<]+)<\/h2>/i);
+            const badgeMatch = cardHtml.match(/<span class="badge [^"]+">([^<]+)<\/span>/i);
+            if (!nameMatch) {
+                continue;
+            }
+
+            const fields = {};
+            for (const fieldMatch of cardHtml.matchAll(/<div class="field(?: [^"]+)?">\s*<div class="field-label">([^<]+)<\/div>\s*<div class="field-value">([\s\S]*?)<\/div>\s*<\/div>/gi)) {
+                fields[decodeHtml(fieldMatch[1])] = stripHtml(fieldMatch[2]);
+            }
+
+            const domain = normalizeSslHost(decodeHtml(nameMatch[1]) || fields.URL);
+            const statusText = decodeHtml((badgeMatch && badgeMatch[1]) || '').toLowerCase();
+            htmlEntries.push({
+                domain,
+                url: fields.URL || `https://${domain}`,
+                status: statusText === 'failed' ? 'failed' : statusText === 'warning' ? 'warning' : 'passed',
+                expiryDate: fields['Expiry Date (UTC)'] || null,
+                expiryDateIST: fields['Expiry Date (IST)'] || formatToIST(fields['Expiry Date (UTC)']),
+                daysRemaining: normalizeDaysRemaining(fields['Days Remaining']),
+                reason: fields['Certificate Status'] || statusText
+            });
+        }
+    }
+
+    const mergedEntries = dedupeTrackedResults('ssl', [...normalizedStateEntries, ...htmlEntries].map(normalizeSslDetail));
+
+    suiteConfigCache.ssl = mergedEntries;
+    suiteConfigCache.sslCacheKey = stateGeneratedAt;
+    return suiteConfigCache.ssl;
 }
 
 function createEmptySuiteResult() {
@@ -1209,8 +1318,6 @@ function getProjectDomainStatus(project, domainDetails) {
     const matched = dedupeTrackedResults('domain', (domainDetails || []).map(normalizeDomainDetail)).filter((detail) =>
         configuredDomains.has(normalizeDomainValue(detail.domain || detail.url))
     );
-
-    console.log('PROJECT DOMAIN MATCH:', project.id, matched);
 
     const total = matched.length;
     const passed = matched.filter((detail) => detail.status === 'active').length;
@@ -1226,16 +1333,11 @@ function getProjectSslDetails(project, sslDetails) {
     const sslResults = dedupeTrackedResults('ssl', (sslDetails || []).map(normalizeSslDetail)).filter((detail) =>
         configuredSslEntries.has(normalizeDomainValue(detail.domain || detail.url))
     );
-
-    console.log('PROJECT SSL RESULTS:', project && project.id, sslResults);
     return sslResults;
 }
 
 function attachProjectDomainStatuses(projects, dashboardState) {
-    const domainSuite = dashboardState && dashboardState.suites ? dashboardState.suites.domain : null;
-    const domainDetails = domainSuite && Array.isArray(domainSuite.details) ? domainSuite.details.map(normalizeDomainDetail) : [];
-
-    console.log('DOMAIN DETAILS:', domainDetails);
+    const domainDetails = loadDomainReportEntries().map(normalizeDomainDetail);
 
     projects.forEach((project) => {
         const status = getProjectDomainStatus(project, domainDetails);
@@ -1249,10 +1351,7 @@ function attachProjectDomainStatuses(projects, dashboardState) {
 }
 
 function attachProjectSslDetails(projects, dashboardState) {
-    const sslSuite = dashboardState && dashboardState.suites ? dashboardState.suites.cert : null;
-    const sslDetails = sslSuite && Array.isArray(sslSuite.details) ? sslSuite.details.map(normalizeSslDetail) : [];
-
-    console.log('SSL DETAILS:', sslDetails);
+    const sslDetails = loadSslReportEntries().map(normalizeSslDetail);
 
     projects.forEach((project) => {
         project.sslDetails = getProjectSslDetails(project, sslDetails);
@@ -1348,9 +1447,7 @@ function getServerTestResults(projectId) {
 
 function getSSLTestResults(projectId) {
     try {
-        const dashboardState = readDashboardState();
-        const sslSuite = dashboardState && dashboardState.suites ? dashboardState.suites.cert : null;
-        const sslDetails = sslSuite && Array.isArray(sslSuite.details) ? dedupeTrackedResults('ssl', sslSuite.details.map(normalizeSslDetail)) : [];
+        const sslDetails = dedupeTrackedResults('ssl', loadSslReportEntries().map(normalizeSslDetail));
         const mapping = getProjectMapping();
         const project = mapping.projects.find((entry) => entry.id === projectId);
 
@@ -1383,12 +1480,6 @@ function getSSLTestResults(projectId) {
             });
         });
 
-        if (project.id === 'synctrade') {
-            console.log('SYNCTRADE SSL PAYLOAD:', project.id, matched);
-        }
-
-        console.log('SSL DETAILS:', matched);
-
         return result;
     } catch (error) {
         console.error('Error getting SSL test results:', error);
@@ -1398,9 +1489,7 @@ function getSSLTestResults(projectId) {
 
 function getDomainTestResults(projectId) {
     try {
-        const dashboardState = readDashboardState();
-        const domainSuite = dashboardState && dashboardState.suites ? dashboardState.suites.domain : null;
-        const domainDetails = domainSuite && Array.isArray(domainSuite.details) ? dedupeTrackedResults('domain', domainSuite.details.map(normalizeDomainDetail)) : [];
+        const domainDetails = dedupeTrackedResults('domain', loadDomainReportEntries().map(normalizeDomainDetail));
         const mapping = getProjectMapping();
         const project = mapping.projects.find((entry) => entry.id === projectId);
 
@@ -1410,8 +1499,6 @@ function getDomainTestResults(projectId) {
 
         const result = createEmptySuiteResult();
         const status = getProjectDomainStatus(project, domainDetails);
-
-        console.log('DOMAIN DETAILS:', domainDetails);
 
         result.total = status.total;
         result.passed = status.passed;
@@ -1429,12 +1516,6 @@ function getDomainTestResults(projectId) {
                 daysRemaining: detail.daysRemaining ?? null
             });
         });
-
-        if (project.id === 'synctrade') {
-            console.log('SYNCTRADE DOMAIN PAYLOAD:', project.id, status.matched);
-        }
-
-        console.log(`[Domain Details] Project ${project.id} matched ${result.total}/${project.domains.length} domains`);
 
         return result;
     } catch (error) {
@@ -1458,79 +1539,45 @@ function getAPITestResults(projectId) {
         const result = createEmptySuiteResult();
         const projectApiKeys = new Set((project.apis || []).map((api) => buildApiStableKey(api.method, api.url, api.name)));
 
-        const apiResults = dedupeApiResults(
+        let apiResults = dedupeApiResults(
             apiDetails.filter((detail) => detail && projectApiKeys.has(buildApiStableKey(detail.method, detail.url, detail.name)))
         );
 
-        console.log('PROJECT API RESULTS:', project.id, apiResults);
-
-        if (apiResults.length > 0) {
-            result.total = apiResults.length;
-            result.passed = apiResults.filter((detail) => detail.status === 'passed').length;
-            result.warning = apiResults.filter((detail) => detail.status === 'warning').length;
-            result.failed = apiResults.filter((detail) => detail.status === 'failed').length;
-            result.tests = apiResults.map((detail) => ({
-                name: detail.name,
-                url: detail.url,
-                method: detail.method,
-                requestBody: detail.requestBody,
-                responseBody: detail.responseBody,
-                responseCode: detail.responseCode,
-                expectedStatus: detail.expectedStatus,
-                status: detail.status,
-                type: 'api'
-            }));
-
-            return result;
-        }
-
         const rows = readSuiteRows('AdHash_API_Test');
-        const definitions = loadApiSuiteDefinitions();
+        const existingKeys = new Set(apiResults.map((detail) => buildApiStableKey(detail.method, detail.url, detail.name)));
 
         project.apis.forEach((api) => {
-            const definition = definitions.find((entry) => {
-                const sameMethod = (entry.method || 'GET').toUpperCase() === (api.method || 'GET').toUpperCase();
-                const sameUrl = normalizeUrl(entry.url) === normalizeUrl(api.url);
-                return sameMethod && sameUrl;
-            });
-
-            if (!definition) {
+            const stableKey = buildApiStableKey(api.method, api.url, api.name);
+            if (existingKeys.has(stableKey)) {
                 return;
             }
 
-            const row = findSuiteRow(rows, `${definition.method.toUpperCase()} ${definition.name}`);
+            const method = (api.method || 'GET').toUpperCase();
+            const row = findSuiteRow(rows, `${method} ${api.name}`);
             if (!row || row.status === 'skipped') {
                 return;
             }
 
-            const expectedStatus = typeof definition.expectedStatus === 'number'
-                ? definition.expectedStatus
+            const expectedStatus = typeof api.expectedStatus === 'number'
+                ? api.expectedStatus
                 : (/^\d+$/.test(String(row.expectedStatus || '').trim()) ? parseInt(String(row.expectedStatus).trim(), 10) : undefined);
             const status = classifyApiStatus(row.responseCode, expectedStatus);
 
-            result.total++;
-            if (status === 'passed') {
-                result.passed++;
-            } else if (status === 'warning') {
-                result.warning++;
-            } else {
-                result.failed++;
-            }
-
-            result.tests.push({
-                name: definition.name,
-                url: definition.url,
-                method: definition.method,
-                requestBody: row.requestBody || (normalizeApiMethod(definition.method) === 'GET' ? 'No request body' : 'Payload not provided'),
+            apiResults.push({
+                name: api.name,
+                url: api.url,
+                method,
+                requestBody: row.requestBody || (normalizeApiMethod(method) === 'GET' ? 'No request body' : 'Payload not provided'),
                 responseBody: row.responseBody || 'No response body',
                 responseCode: row.responseCode,
                 expectedStatus,
                 status,
                 type: 'api'
             });
+            existingKeys.add(stableKey);
         });
 
-        result.tests = dedupeApiResults(result.tests);
+        result.tests = dedupeApiResults(apiResults);
         result.total = result.tests.length;
         result.passed = result.tests.filter((detail) => detail.status === 'passed').length;
         result.warning = result.tests.filter((detail) => detail.status === 'warning').length;
@@ -1547,7 +1594,6 @@ function getAPITestResults(projectId) {
 app.get('/api/project/:id/test-results', (req, res) => {
     try {
         const projectId = req.params.id;
-        console.log(`📊 Fetching test results for project: ${projectId}`);
 
         const results = {
             apps: getAppTestResults(projectId),
@@ -1557,7 +1603,6 @@ app.get('/api/project/:id/test-results', (req, res) => {
             apis: getAPITestResults(projectId)
         };
 
-        console.log(`✅ Test results for ${projectId}:`, JSON.stringify(results, null, 2));
         res.json(results);
     } catch (error) {
         console.error('❌ Error fetching test results:', error);
