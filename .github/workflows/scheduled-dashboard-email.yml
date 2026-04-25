@@ -12,6 +12,7 @@ jobs:
     timeout-minutes: 90
     env:
       CI: 'true'
+      SUPABASE_API_KEY: ${{ secrets.SUPABASE_API_KEY }}
       ZOHO_MAIL_ENABLED: ${{ secrets.ZOHO_MAIL_ENABLED }}
       ZOHO_MAIL_FROM: ${{ secrets.ZOHO_MAIL_FROM }}
       ZOHO_MAIL_USER: ${{ secrets.ZOHO_MAIL_USER }}
@@ -35,7 +36,7 @@ jobs:
         run: node node_modules/playwright/cli.js install --with-deps chromium
 
       - name: Run cleaned production dashboard pipeline
-        run: npm run test:all
+        run: npm run qa:enterprise
 
       - name: Upload dashboard artifacts
         if: always()
@@ -45,6 +46,7 @@ jobs:
           if-no-files-found: warn
           path: |
             unified-dashboard/**
+            final-dashboard-bundle/**
             email-preview/**
             suite-reports/**
             test-results/**

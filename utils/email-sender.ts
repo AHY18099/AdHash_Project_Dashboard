@@ -3,9 +3,6 @@ import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 import axios from 'axios';
-const { readLatestApiResultsPayload } = require('./latest-api-results.js') as {
-    readLatestApiResultsPayload: (rootDir?: string) => { generatedAt: string; source: string; projects: Array<{ id: string; name: string; results: { apis: SectionSummary & { source?: string } } }> } | null;
-};
 
 dotenv.config();
 
@@ -189,6 +186,12 @@ interface LatestApiSourceProject {
 interface LatestApiSourceResult {
     source: string;
     projects: LatestApiSourceProject[];
+}
+
+interface LatestApiResultsPayload {
+    generatedAt?: string;
+    source?: string;
+    projects?: LatestApiSourceProject[];
 }
 
 function getApiStatusLabel(summary: { failed?: number; warning?: number }): 'FAILED' | 'WARNING' | 'PASSED' {
@@ -1343,7 +1346,40 @@ function buildDashboardEmailModel(rootDir: string): DashboardEmailModel {
     return buildDashboardRenderModel(rootDir);
 }
 
-async function loadLatestApiSource(rootDir: string): Promise<LatestApiSourceResult> {
+function readLatestApiResultsJson(rootDir: string): LatestApiResultsPayload | null {
+    const latestApiResultsPath = path.join(rootDir, 'test-results', 'latest-api-results.json');
+
+    try {
+        if (!fs.existsSync(latestApiResultsPath)) {
+            console.warn('[EMAIL] latest-api-results.json not found. Falling back safely to current dashboard model.');
+            return null;
+        }
+
+        return JSON.parse(fs.readFileSync(latestApiResultsPath, 'utf8')) as LatestApiResultsPayload;
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[EMAIL] Failed to read latest-api-results.json. Falling back safely: ${message}`);
+        return null;
+    }
+}
+
+function buildLatestApiSourceFromModel(model: DashboardEmailModel): LatestApiSourceResult {
+    return {
+        source: 'dashboard-model',
+        projects: model.projects.map((project) => ({
+            id: project.id,
+            name: project.name,
+            results: {
+                apis: {
+                    ...project.results.apis,
+                    source: 'dashboard-model'
+                }
+            }
+        }))
+    };
+}
+
+async function loadLatestApiSource(rootDir: string, fallbackModel: DashboardEmailModel): Promise<LatestApiSourceResult> {
     try {
         const response = await axios.get('http://localhost:7777/api/projects', {
             timeout: 2500,
@@ -1369,15 +1405,15 @@ async function loadLatestApiSource(rootDir: string): Promise<LatestApiSourceResu
         console.log('[EMAIL] Live /api/projects unavailable, falling back to latest generated JSON');
     }
 
-    const payload = readLatestApiResultsPayload(rootDir);
-    if (!payload || !Array.isArray(payload.projects)) {
-        throw new Error('❌ Report generation failed: stale or inconsistent data detected');
+    const payload = readLatestApiResultsJson(rootDir);
+    if (payload && Array.isArray(payload.projects)) {
+        return {
+            source: payload.source || 'latest-run',
+            projects: payload.projects as LatestApiSourceProject[]
+        };
     }
 
-    return {
-        source: payload.source || 'latest-run',
-        projects: payload.projects as LatestApiSourceProject[]
-    };
+    return buildLatestApiSourceFromModel(fallbackModel);
 }
 
 function applyLatestApiResultsToModel(model: DashboardEmailModel, latestSource: LatestApiSourceResult): DashboardEmailModel {
@@ -2402,8 +2438,9 @@ export async function sendDashboardSummaryEmail(dashboardPath: string, rootDir =
     fs.rmSync(previewDir, { recursive: true, force: true });
     fs.mkdirSync(previewDir, { recursive: true });
 
-    const latestApiSource = await loadLatestApiSource(rootDir);
-    const renderModel = applyLatestApiResultsToModel(buildDashboardEmailModel(rootDir), latestApiSource);
+    const baseModel = buildDashboardEmailModel(rootDir);
+    const latestApiSource = await loadLatestApiSource(rootDir, baseModel);
+    const renderModel = applyLatestApiResultsToModel(baseModel, latestApiSource);
     const model = generateModuleReportPages(previewDir, renderModel);
     logEmailProjectApiSummary(model, 'ddp');
     const subject = buildEmailSubject(model);
