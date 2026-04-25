@@ -11,7 +11,7 @@ const EXPIRY_WARNING_DAYS = 30;
 
 interface TestResult {
   repository: string;
-  status: 'success' | 'failed' | 'error' | 'unavailable';
+  status: 'success' | 'warning' | 'failed' | 'error' | 'unavailable';
   duration: number;
   reportPath: string;
   error?: string;
@@ -1422,8 +1422,8 @@ function generateReportCard(result: TestResult): string {
     actualStatus = 'success';
   }
 
-  const statusClass = actualStatus === 'success' ? 'success' : actualStatus === 'unavailable' ? 'unavailable' : 'failed';
-  const statusText = actualStatus === 'success' ? '✅ Passed' : actualStatus === 'unavailable' ? 'Not configured in current workspace' : '❌ Failed';
+  const statusClass = actualStatus === 'success' ? 'success' : actualStatus === 'warning' ? 'warning' : actualStatus === 'unavailable' ? 'unavailable' : 'failed';
+  const statusText = actualStatus === 'success' ? '✅ Passed' : actualStatus === 'warning' ? '⚠ Warning' : actualStatus === 'unavailable' ? 'Not configured in current workspace' : '❌ Failed';
 
   // Generate test counts HTML
   let testCountsHtml = '';

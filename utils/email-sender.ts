@@ -166,7 +166,13 @@ export interface DashboardEmailModel {
     summary: {
         successfulSuites: number;
         failedSuites: number;
+        warningSuites: number;
+        skippedSuites: number;
         totalSuites: number;
+        totalFailedTests: number;
+        totalWarningTests: number;
+        totalSkippedTests: number;
+        finalEmailStatus: 'FAILED' | 'WARNING' | 'PASSED';
         durationLabel: string;
     };
     moduleSections: ModuleSection[];
@@ -200,6 +206,22 @@ function getApiStatusLabel(summary: { failed?: number; warning?: number }): 'FAI
     }
 
     if ((summary.warning || 0) > 0 || (summary as { skipped?: number }).skipped || 0) {
+        return 'WARNING';
+    }
+
+    return 'PASSED';
+}
+
+function getFinalEmailStatus(summary: {
+    totalFailedTests?: number;
+    totalWarningTests?: number;
+    totalSkippedTests?: number;
+}): 'FAILED' | 'WARNING' | 'PASSED' {
+    if ((summary.totalFailedTests || 0) > 0) {
+        return 'FAILED';
+    }
+
+    if ((summary.totalWarningTests || 0) > 0 || (summary.totalSkippedTests || 0) > 0) {
         return 'WARNING';
     }
 
@@ -1333,7 +1355,7 @@ export function buildDashboardRenderModel(rootDir: string): DashboardEmailModel 
             for (const item of sectionResult.tests) {
                 if (item.status === 'failed') {
                     failedItems.push({ projectName: project.name, sectionLabel: sectionKey.toUpperCase(), item });
-                } else if (item.status === 'warning') {
+                } else if (item.status === 'warning' || item.status === 'skipped') {
                     warningItems.push({ projectName: project.name, sectionLabel: sectionKey.toUpperCase(), item });
                 }
             }
@@ -1353,16 +1375,26 @@ export function buildDashboardRenderModel(rootDir: string): DashboardEmailModel 
         };
     });
 
+    const summary: DashboardEmailModel['summary'] = {
+        successfulSuites: Number(state.summary?.passedSuites || 0),
+        failedSuites: Number(state.summary?.failedSuites || 0),
+        warningSuites: Number(state.summary?.warningSuites || 0),
+        skippedSuites: Number(state.summary?.skippedSuites || 0),
+        totalSuites: Number(state.summary?.totalSuites || moduleSections.length),
+        totalFailedTests: failedItems.length,
+        totalWarningTests: warningItems.filter(({ item }) => item.status === 'warning').length,
+        totalSkippedTests: warningItems.filter(({ item }) => item.status === 'skipped').length,
+        finalEmailStatus: 'PASSED',
+        durationLabel: formatDurationLabel(sumSuiteDurations(state.suites))
+    };
+
+    summary.finalEmailStatus = getFinalEmailStatus(summary);
+
     return {
         generatedAt: state.generatedAt || new Date().toISOString(),
         headerTitle: 'AdHash Projects Status Dashboard',
         headerSubtitle: `Unified suite and project monitoring summary generated from dashboard state (${totalTests} project checks).`,
-        summary: {
-            successfulSuites: Number(state.summary?.passedSuites || 0),
-            failedSuites: Number((state.summary?.failedSuites || 0) + (state.summary?.warningSuites || 0)),
-            totalSuites: Number(state.summary?.totalSuites || moduleSections.length),
-            durationLabel: formatDurationLabel(sumSuiteDurations(state.suites))
-        },
+        summary,
         moduleSections,
         projects,
         failedItems,
@@ -2033,10 +2065,13 @@ function buildDashboardEmailHtml(model: DashboardEmailModel): string {
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
                                 <tr>
                                     ${renderSummaryCard('Success', model.summary.successfulSuites, '#10b981', 'Suites completed successfully')}
-                                    ${renderSummaryCard('Failed', model.summary.failedSuites, '#ef4444', 'Suites requiring attention') }
+                                    ${renderSummaryCard('Failed', model.summary.totalFailedTests, '#ef4444', 'Real failed or error checks only') }
                                 </tr>
                                 <tr>
+                                    ${renderSummaryCard('Warning/Skipped', model.summary.totalWarningTests + model.summary.totalSkippedTests, '#f59e0b', 'Warning and skipped checks requiring review') }
                                     ${renderSummaryCard('Total Suites', model.summary.totalSuites, '#3b82f6', 'Configured suites in this run') }
+                                </tr>
+                                <tr>
                                     ${renderSummaryCard('Duration', model.summary.durationLabel, '#2563eb', 'Combined suite runtime') }
                                 </tr>
                             </table>
@@ -2437,8 +2472,7 @@ function parseEmailConfigFromEnv(env: NodeJS.ProcessEnv): { enabled: boolean; co
 }
 
 function buildEmailSubject(model: DashboardEmailModel): string {
-    const status = model.summary.failedSuites > 0 ? 'FAILED' : 'PASSED';
-    return `${status} - AdHash Projects Status Dashboard - ${model.generatedAt}`;
+    return `${model.summary.finalEmailStatus} - AdHash Projects Status Dashboard - ${model.generatedAt}`;
 }
 
 function logEmailProjectApiSummary(model: DashboardEmailModel, projectId = 'ddp'): void {
@@ -2480,6 +2514,16 @@ export async function sendDashboardSummaryEmail(dashboardPath: string, rootDir =
     console.log('[EMAIL] render source selected: buildDashboardEmailHtml');
     console.log(`[EMAIL] data source used: ${latestApiSource.source}`);
     console.log(`[EMAIL] html length: ${html.length}`);
+    console.log({
+        totalSuites: model.summary.totalSuites,
+        passedSuites: model.summary.successfulSuites,
+        failedSuites: model.summary.failedSuites,
+        warningSuites: model.summary.warningSuites + model.summary.skippedSuites,
+        totalFailedTests: model.summary.totalFailedTests,
+        totalWarningTests: model.summary.totalWarningTests,
+        totalSkippedTests: model.summary.totalSkippedTests,
+        finalEmailStatus: model.summary.finalEmailStatus
+    });
     ensureEmailModelMatchesLatestProjectSummary(model, latestApiSource, 'ddp');
     assertEmailMatchesLatestApiSource(model, html, latestApiSource, 'ddp');
     fs.writeFileSync(previewPath, html, 'utf8');

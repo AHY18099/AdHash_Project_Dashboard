@@ -83,7 +83,7 @@ interface ApiSuiteConfig {
 
 interface TestResult {
   repository: string;
-  status: 'success' | 'failed' | 'error' | 'unavailable';
+  status: 'success' | 'warning' | 'failed' | 'error' | 'unavailable';
   duration: number;
   reportPath: string;
   error?: string;
@@ -1042,7 +1042,7 @@ function writeDashboardState(finalResults: TestResult[]): void {
     sslResult.passed = sslResult.details.filter((detail) => (detail as SslDetail).status === 'passed').length;
     sslResult.warnings = sslResult.details.filter((detail) => (detail as SslDetail).status === 'warning').length;
     sslResult.failed = sslResult.details.filter((detail) => (detail as SslDetail).status === 'failed').length;
-    sslResult.status = sslResult.failed > 0 ? 'failed' : sslResult.warnings > 0 ? 'failed' : 'success';
+    sslResult.status = sslResult.failed > 0 ? 'failed' : sslResult.warnings > 0 ? 'warning' : 'success';
   }
 
   if (domainResult && sslResult) {
@@ -1054,7 +1054,7 @@ function writeDashboardState(finalResults: TestResult[]): void {
     domainResult.passed = domainResult.details.filter((detail) => (detail as DomainDetail).status === 'active').length;
     domainResult.warnings = domainResult.details.filter((detail) => (detail as DomainDetail).status === 'expiring').length;
     domainResult.failed = domainResult.details.filter((detail) => (detail as DomainDetail).status === 'error').length;
-    domainResult.status = domainResult.failed > 0 ? 'failed' : 'success';
+    domainResult.status = domainResult.failed > 0 ? 'failed' : domainResult.warnings > 0 ? 'warning' : 'success';
   }
 
   try {
@@ -1080,6 +1080,8 @@ function writeDashboardState(finalResults: TestResult[]): void {
       status = 'passed';
     } else if (result.status === 'failed' || result.status === 'error') {
       status = 'failed';
+    } else if (result.status === 'warning') {
+      status = 'warning';
     } else if (result.status === 'unavailable') {
       status = 'unavailable';
     }
@@ -1225,7 +1227,7 @@ async function runCommand(definition: SuiteDefinition): Promise<TestResult> {
         : definition.id === 'api'
           ? parseApiSuiteReport(reportPath, fallbackTotal)
           : { ...parseUnifiedSuiteReport(reportPath, fallbackTotal), warnings: 0, details: [] as SuiteDetail[] };
-    const status = parsed.failed > 0 ? 'failed' : 'success';
+    const status = parsed.failed > 0 ? 'failed' : parsed.warnings > 0 ? 'warning' : 'success';
 
     return {
       repository: definition.repository,
@@ -1325,7 +1327,7 @@ async function main(): Promise<void> {
   console.log('\n');
 
   finalResults.forEach((result) => {
-    const statusIcon = result.status === 'success' ? '✅' : result.status === 'unavailable' ? '⚪' : '❌';
+    const statusIcon = result.status === 'success' ? '✅' : result.status === 'warning' ? '⚠️' : result.status === 'unavailable' ? '⚪' : '❌';
     const duration = (result.duration / 1000).toFixed(2);
     const errorMessage = result.error || result.message;
     const messageSuffix = errorMessage ? ` (${errorMessage})` : '';

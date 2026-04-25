@@ -6,7 +6,7 @@ const { sendDashboardSummaryEmail } = require('./utils/email-sender.ts') as type
 
 interface TestResult {
   repository: string;
-  status: 'success' | 'failed' | 'error' | 'unavailable';
+  status: 'success' | 'warning' | 'failed' | 'error' | 'unavailable';
   duration: number;
   reportPath: string;
   error?: string;
@@ -81,7 +81,7 @@ function loadResultsFromState(): TestResult[] {
     const suiteState = state.suites?.[suiteId] || {};
     const result: TestResult = {
       repository,
-      status: suiteState.status === 'passed' ? 'success' : suiteState.status === 'unavailable' ? 'unavailable' : suiteState.status === 'failed' ? 'failed' : 'error',
+      status: suiteState.status === 'passed' ? 'success' : suiteState.status === 'warning' ? 'warning' : suiteState.status === 'unavailable' ? 'unavailable' : suiteState.status === 'failed' ? 'failed' : 'error',
       duration: suiteState.duration || 0,
       reportPath: suiteState.reportPath || '',
       error: suiteState.message,
