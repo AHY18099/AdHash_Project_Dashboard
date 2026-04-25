@@ -2,6 +2,10 @@ import nodemailer from 'nodemailer';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
+import axios from 'axios';
+const { readLatestApiResultsPayload } = require('./latest-api-results.js') as {
+    readLatestApiResultsPayload: (rootDir?: string) => { generatedAt: string; source: string; projects: Array<{ id: string; name: string; results: { apis: SectionSummary & { source?: string } } }> } | null;
+};
 
 dotenv.config();
 
@@ -172,6 +176,31 @@ export interface DashboardEmailModel {
     projects: ProjectEmailCard[];
     failedItems: Array<{ projectName: string; sectionLabel: string; item: EmailItem }>;
     warningItems: Array<{ projectName: string; sectionLabel: string; item: EmailItem }>;
+}
+
+interface LatestApiSourceProject {
+    id: string;
+    name: string;
+    results?: {
+        apis?: SectionSummary & { source?: string };
+    };
+}
+
+interface LatestApiSourceResult {
+    source: string;
+    projects: LatestApiSourceProject[];
+}
+
+function getApiStatusLabel(summary: { failed?: number; warning?: number }): 'FAILED' | 'WARNING' | 'PASSED' {
+    if ((summary.failed || 0) > 0) {
+        return 'FAILED';
+    }
+
+    if ((summary.warning || 0) > 0) {
+        return 'WARNING';
+    }
+
+    return 'PASSED';
 }
 
 export interface ModuleSection {
@@ -1314,6 +1343,136 @@ function buildDashboardEmailModel(rootDir: string): DashboardEmailModel {
     return buildDashboardRenderModel(rootDir);
 }
 
+async function loadLatestApiSource(rootDir: string): Promise<LatestApiSourceResult> {
+    try {
+        const response = await axios.get('http://localhost:7777/api/projects', {
+            timeout: 2500,
+            headers: {
+                'Cache-Control': 'no-store'
+            }
+        });
+
+        if (Array.isArray(response.data?.projects)) {
+            const liveProjects = response.data.projects as LatestApiSourceProject[];
+            const hasCanonicalApiResults = liveProjects.some((project) => project.results?.apis && typeof project.results.apis.total === 'number');
+
+            if (hasCanonicalApiResults) {
+                return {
+                    source: 'live-api',
+                    projects: liveProjects
+                };
+            }
+
+            console.log('[EMAIL] Live /api/projects missing canonical results.apis, falling back to latest generated JSON');
+        }
+    } catch (error) {
+        console.log('[EMAIL] Live /api/projects unavailable, falling back to latest generated JSON');
+    }
+
+    const payload = readLatestApiResultsPayload(rootDir);
+    if (!payload || !Array.isArray(payload.projects)) {
+        throw new Error('❌ Report generation failed: stale or inconsistent data detected');
+    }
+
+    return {
+        source: payload.source || 'latest-run',
+        projects: payload.projects as LatestApiSourceProject[]
+    };
+}
+
+function applyLatestApiResultsToModel(model: DashboardEmailModel, latestSource: LatestApiSourceResult): DashboardEmailModel {
+    const projectApiSummaryById = new Map(
+        latestSource.projects
+            .filter((project) => project && project.results && project.results.apis)
+            .map((project) => [project.id, project.results!.apis!] as const)
+    );
+
+    const nextProjects = model.projects.map((project) => {
+        const latestApiSummary = projectApiSummaryById.get(project.id);
+        if (!latestApiSummary) {
+            return project;
+        }
+
+        const nextResults: ProjectSectionResults = {
+            ...project.results,
+            apis: {
+                ...project.results.apis,
+                total: latestApiSummary.total,
+                passed: latestApiSummary.passed,
+                failed: latestApiSummary.failed,
+                warning: latestApiSummary.warning,
+                skipped: latestApiSummary.skipped
+            }
+        };
+        const primaryModuleId = getPrimaryProjectModuleId(nextResults);
+
+        return {
+            ...project,
+            results: nextResults,
+            overallStatus: getOverallProjectStatus(nextResults),
+            failedCount: getProjectFailedCount(nextResults),
+            warningCount: getProjectWarningCount(nextResults),
+            categoryFailures: getProjectCategoryFailures(nextResults),
+            categoryWarnings: getProjectCategoryWarnings(nextResults),
+            primaryModuleId,
+            primaryModuleHref: getModuleReportHref(primaryModuleId)
+        };
+    });
+
+    return {
+        ...model,
+        projects: nextProjects
+    };
+}
+
+function extractEmailProjectApiSummary(html: string, projectName: string): { failed: number; total: number; statusLabel: string } | null {
+    const escapedProjectName = projectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const projectMarker = new RegExp(`<div[^>]*>${escapedProjectName}<\\/div>`, 'i');
+    const markerMatch = projectMarker.exec(html);
+    if (!markerMatch || markerMatch.index < 0) {
+        return null;
+    }
+
+    const cardSlice = html.slice(markerMatch.index, markerMatch.index + 6000);
+    const failedMatch = cardSlice.match(/project-failed-count">❗\s*(\d+)/i);
+    const statusMatch = cardSlice.match(/<td[^>]*>(PASSED|FAILED|WARNING)<\/td>/i);
+    const totalMatch = cardSlice.match(/project-chip-badge chip-api [^"]*">API\s*(\d+)/i);
+
+    if (!statusMatch || !totalMatch) {
+        return null;
+    }
+
+    return {
+        failed: failedMatch ? parseInt(failedMatch[1], 10) : 0,
+        statusLabel: statusMatch[1],
+        total: parseInt(totalMatch[1], 10)
+    };
+}
+
+function assertEmailMatchesLatestApiSource(model: DashboardEmailModel, html: string, latestSource: LatestApiSourceResult, projectId = 'ddp'): void {
+    const latestProject = latestSource.projects.find((entry) => entry.id === projectId);
+    const emailProject = model.projects.find((entry) => entry.id === projectId);
+
+    if (!latestProject || !latestProject.results?.apis || !emailProject) {
+        throw new Error('❌ Report generation failed: stale or inconsistent data detected');
+    }
+
+    const latestStatus = getApiStatusLabel(latestProject.results.apis);
+    const emailStatus = getApiStatusLabel(emailProject.results.apis);
+
+    if (
+        emailProject.results.apis.failed !== latestProject.results.apis.failed ||
+        emailProject.results.apis.total !== latestProject.results.apis.total ||
+        emailStatus !== latestStatus
+    ) {
+        throw new Error('❌ Report generation failed: stale or inconsistent data detected');
+    }
+}
+
+function ensureEmailModelMatchesLatestProjectSummary(model: DashboardEmailModel, latestSource: LatestApiSourceResult, projectId = 'ddp'): void {
+    assertEmailMatchesLatestApiSource(model, '', latestSource, projectId);
+}
+
 function escapeHtml(value: unknown): string {
     return String(value ?? '')
         .replace(/&/g, '&amp;')
@@ -2218,6 +2377,24 @@ function buildEmailSubject(model: DashboardEmailModel): string {
     return `${status} - AdHash Projects Status Dashboard - ${model.generatedAt}`;
 }
 
+function logEmailProjectApiSummary(model: DashboardEmailModel, projectId = 'ddp'): void {
+    const project = model.projects.find((entry) => entry.id === projectId);
+
+    if (!project) {
+        console.log(`[EMAIL] Project ${projectId} not found in render model`);
+        return;
+    }
+
+    console.log(JSON.stringify({
+        project: project.name,
+        apis: {
+            total: project.results.apis.total,
+            passed: project.results.apis.passed,
+            failed: project.results.apis.failed
+        }
+    }, null, 2));
+}
+
 export async function sendDashboardSummaryEmail(dashboardPath: string, rootDir = process.cwd()): Promise<DashboardEmailSendResult> {
     const { enabled, config, missingKeys } = parseEmailConfigFromEnv(process.env);
 
@@ -2225,7 +2402,10 @@ export async function sendDashboardSummaryEmail(dashboardPath: string, rootDir =
     fs.rmSync(previewDir, { recursive: true, force: true });
     fs.mkdirSync(previewDir, { recursive: true });
 
-    const model = generateModuleReportPages(previewDir, buildDashboardEmailModel(rootDir));
+    const latestApiSource = await loadLatestApiSource(rootDir);
+    const renderModel = applyLatestApiResultsToModel(buildDashboardEmailModel(rootDir), latestApiSource);
+    const model = generateModuleReportPages(previewDir, renderModel);
+    logEmailProjectApiSummary(model, 'ddp');
     const subject = buildEmailSubject(model);
     const html = buildDashboardEmailHtml(model);
     const previewPath = path.join(previewDir, 'index.html');
@@ -2233,7 +2413,10 @@ export async function sendDashboardSummaryEmail(dashboardPath: string, rootDir =
     const previewAttachmentPath = path.join(previewDir, 'AdHash-Projects-Dashboard.html');
 
     console.log('[EMAIL] render source selected: buildDashboardEmailHtml');
+    console.log(`[EMAIL] data source used: ${latestApiSource.source}`);
     console.log(`[EMAIL] html length: ${html.length}`);
+    ensureEmailModelMatchesLatestProjectSummary(model, latestApiSource, 'ddp');
+    assertEmailMatchesLatestApiSource(model, html, latestApiSource, 'ddp');
     fs.writeFileSync(previewPath, html, 'utf8');
     fs.writeFileSync(legacyPreviewPath, html, 'utf8');
     fs.writeFileSync(previewAttachmentPath, html, 'utf8');

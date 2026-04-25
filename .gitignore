@@ -3,9 +3,11 @@
 /playwright-report/
 /test-results/
 /unified-dashboard/
+/final-dashboard-bundle/
 /unified-report/
 /email-preview/
 /godaddy/report.html
+/.env
 
 # Temporary logs and scratch files
 /logs/

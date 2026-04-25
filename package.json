@@ -4,10 +4,17 @@
   "description": "AdHash Projects Status Dashboard - Unified Test Execution & Monitoring",
   "main": "server.js",
   "scripts": {
+    "clean:artifacts": "node scripts/clean-artifacts.mjs",
+    "clean:workflow": "node -e \"const fs=require('fs');['suite-reports','test-results','unified-dashboard','final-dashboard-bundle','email-preview'].forEach((target)=>fs.rmSync(target,{recursive:true,force:true}));\"",
     "start": "node server.js",
     "dev": "node server.js",
+    "test:api": "playwright test tests/api/api-tests.spec.ts",
     "test:all": "ts-node run-all-tests.ts",
-    "generate:dashboard": "ts-node regenerate-dashboard.ts"
+    "generate:dashboard": "ts-node regenerate-dashboard.ts",
+    "workflow:email": "npm run clean:workflow && npm run test:api && ts-node run-all-tests.ts --skip-clean && ts-node regenerate-dashboard.ts",
+    "validate-report": "ts-node validate-report.ts",
+    "validate:report": "node scripts/validate-report-consistency.mjs",
+    "qa:enterprise": "node scripts/run-enterprise-qa-pipeline.mjs"
   },
   "keywords": [
     "dashboard",

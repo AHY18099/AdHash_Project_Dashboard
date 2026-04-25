@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const { readLatestApiResultsPayload } = require('./utils/latest-api-results.js');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 7777;
@@ -532,6 +533,7 @@ app.get('/api/projects', (req, res) => {
         attachProjectDomainStatuses(projectData.projects || [], readDashboardState());
         attachProjectSslDetails(projectData.projects || [], readDashboardState());
         attachProjectServerStatuses(projectData.projects || []);
+        attachLatestProjectApiResults(projectData.projects || []);
         res.json({ projects: projectData.projects || [] });
     } catch (error) {
         console.error('Error loading projects:', error);
@@ -551,6 +553,7 @@ app.get('/api/project/:id', (req, res) => {
         attachProjectDomainStatuses(projectData.projects || [], readDashboardState());
         attachProjectSslDetails(projectData.projects || [], readDashboardState());
         attachProjectServerStatuses(projectData.projects || []);
+        attachLatestProjectApiResults(projectData.projects || []);
         const project = projectData.projects.find(p => p.id === req.params.id);
 
         if (!project) {
@@ -586,6 +589,7 @@ app.get('/api/project/:id', (req, res) => {
         const projectMapping = JSON.parse(fs.readFileSync(path.join(__dirname, 'config', 'project-mapping.json'), 'utf8'));
         attachProjectDomainStatuses(projectMapping.projects || [], readDashboardState());
         attachProjectSslDetails(projectMapping.projects || [], readDashboardState());
+        attachLatestProjectApiResults(projectMapping.projects || []);
         const project = projectMapping.projects.find(p => p.id === projectId);
 
         if (!project) {
@@ -609,6 +613,30 @@ function getProjectMapping() {
         console.error('Error loading project mapping:', error);
         return { projects: [] };
     }
+}
+
+function attachLatestProjectApiResults(projects) {
+    const latestApiResults = readLatestApiResultsPayload(__dirname);
+    const apiResultByProjectId = new Map(((latestApiResults && latestApiResults.projects) || []).map((project) => [project.id, project.results && project.results.apis]));
+
+    (projects || []).forEach((project) => {
+        const latestApiSummary = apiResultByProjectId.get(project.id);
+        if (!latestApiSummary) {
+            return;
+        }
+
+        project.results = {
+            ...(project.results || {}),
+            apis: {
+                total: latestApiSummary.total,
+                passed: latestApiSummary.passed,
+                failed: latestApiSummary.failed,
+                warning: latestApiSummary.warning,
+                skipped: latestApiSummary.skipped,
+                source: latestApiSummary.source || 'latest-run'
+            }
+        };
+    });
 }
 
 const suiteConfigCache = {
@@ -1706,10 +1734,24 @@ app.get('/api/project/:id/test-results', (req, res) => {
             apis: getAPITestResults(projectId)
         };
 
-        res.json(results);
+        res.json({
+            projectId,
+            results
+        });
     } catch (error) {
         console.error('❌ Error fetching test results:', error);
-        res.status(500).json({ error: 'Failed to fetch test results', message: error.message });
+        res.status(500).json({
+            projectId: req.params.id,
+            results: {
+                apps: createEmptySuiteResult(),
+                servers: createEmptySuiteResult(),
+                ssl: createEmptySuiteResult(),
+                domains: createEmptySuiteResult(),
+                apis: createEmptySuiteResult()
+            },
+            error: 'Failed to fetch test results',
+            message: error.message
+        });
     }
 });
 

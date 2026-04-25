@@ -1,0 +1,52 @@
+name: Enterprise QA Dashboard
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  qa-enterprise:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CI: 'true'
+      SUPABASE_API_KEY: ${{ secrets.SUPABASE_API_KEY }}
+      ZOHO_MAIL_ENABLED: ${{ secrets.ZOHO_MAIL_ENABLED }}
+      ZOHO_MAIL_FROM: ${{ secrets.ZOHO_MAIL_FROM }}
+      ZOHO_MAIL_USER: ${{ secrets.ZOHO_MAIL_USER }}
+      ZOHO_MAIL_PASS: ${{ secrets.ZOHO_MAIL_PASS }}
+      ZOHO_MAIL_TO: ${{ secrets.ZOHO_MAIL_TO }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run enterprise QA pipeline
+        run: npm run qa:enterprise
+
+      - name: Upload QA dashboard artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: enterprise-qa-dashboard-${{ github.run_number }}
+          if-no-files-found: warn
+          path: |
+            suite-reports/**
+            final-dashboard-bundle/**
+            email-preview/**
+            test-results/**
