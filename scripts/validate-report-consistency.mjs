@@ -20,7 +20,7 @@ function getExpectedStatusLabel(summary) {
     return 'FAILED';
   }
 
-  if ((summary.warning || 0) > 0) {
+  if ((summary.warning || 0) > 0 || (summary.skipped || 0) > 0) {
     return 'WARNING';
   }
 

@@ -199,7 +199,7 @@ function getApiStatusLabel(summary: { failed?: number; warning?: number }): 'FAI
         return 'FAILED';
     }
 
-    if ((summary.warning || 0) > 0) {
+    if ((summary.warning || 0) > 0 || (summary as { skipped?: number }).skipped || 0) {
         return 'WARNING';
     }
 
@@ -813,6 +813,10 @@ function buildApiFailureReason(
         return undefined;
     }
 
+    if (status === 'skipped') {
+        return detailText || 'Skipped in CI: SUPABASE_API_KEY secret is not configured';
+    }
+
     if (detailText) {
         return detailText;
     }
@@ -1172,6 +1176,30 @@ function getProjectApiResults(project: ProjectDefinition, apiDetails: ApiTestIte
             continue;
         }
 
+        if (row && row.status === 'skipped') {
+            const expectedStatus = parseExpectedStatus(api.expectedStatus) ?? parseExpectedStatus(row.expectedStatus) ?? parseExpectedStatus(detail?.expectedStatus);
+            const requestBody = row.requestBody || normalizePayloadText(detail?.requestBody) || getRequestBodyFallback(normalizeApiMethod(api.method));
+            const responseBody = row.responseBody || normalizePayloadText(detail?.responseBody) || getResponseBodyFallback();
+
+            result.total += 1;
+            result.skipped += 1;
+            result.tests.push({
+                name: api.name,
+                projectName: project.name,
+                url: api.url,
+                status: 'skipped',
+                type: 'apis',
+                method: normalizeApiMethod(api.method),
+                responseCode: row.responseCode || detail?.responseCode || null,
+                expectedStatus,
+                durationLabel: row.durationLabel,
+                requestBody,
+                responseBody,
+                reason: buildApiFailureReason('skipped', expectedStatus, row.responseCode || detail?.responseCode || null, row.detailText, responseBody)
+            });
+            continue;
+        }
+
         if (!detail) {
             continue;
         }
@@ -1206,7 +1234,7 @@ function getOverallProjectStatus(results: ProjectSectionResults): ItemStatus {
     if (sections.some((section) => section.failed > 0)) {
         return 'failed';
     }
-    if (sections.some((section) => section.warning > 0)) {
+    if (sections.some((section) => section.warning > 0 || section.skipped > 0)) {
         return 'warning';
     }
     return 'passed';
@@ -1217,7 +1245,7 @@ function getProjectFailedCount(results: ProjectSectionResults): number {
 }
 
 function getProjectWarningCount(results: ProjectSectionResults): number {
-    return results.apps.warning + results.servers.warning + results.ssl.warning + results.domains.warning + results.apis.warning;
+    return results.apps.warning + results.servers.warning + results.ssl.warning + results.domains.warning + results.apis.warning + results.apps.skipped + results.servers.skipped + results.ssl.skipped + results.domains.skipped + results.apis.skipped;
 }
 
 function getProjectCategoryFailures(results: ProjectSectionResults): CategoryIssueCounts {
@@ -1232,11 +1260,11 @@ function getProjectCategoryFailures(results: ProjectSectionResults): CategoryIss
 
 function getProjectCategoryWarnings(results: ProjectSectionResults): CategoryIssueCounts {
     return {
-        apps: results.apps.warning,
-        servers: results.servers.warning,
-        ssl: results.ssl.warning,
-        domains: results.domains.warning,
-        apis: results.apis.warning
+        apps: results.apps.warning + results.apps.skipped,
+        servers: results.servers.warning + results.servers.skipped,
+        ssl: results.ssl.warning + results.ssl.skipped,
+        domains: results.domains.warning + results.domains.skipped,
+        apis: results.apis.warning + results.apis.skipped
     };
 }
 

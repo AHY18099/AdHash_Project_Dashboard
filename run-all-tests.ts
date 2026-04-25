@@ -4,7 +4,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { generateDashboard } from './utils/dashboard-generator';
-import { buildDashboardRenderModel, sendDashboardSummaryEmail } from './utils/email-sender';
+import { buildDashboardRenderModel } from './utils/email-sender';
+const { buildLatestApiResultsPayload, writeLatestApiResultsPayload } = require('./utils/latest-api-results.js') as {
+  buildLatestApiResultsPayload: (rootDir?: string) => { generatedAt: string; source: string; projects: Array<{ id: string; name: string; results: { apis: { total: number; passed: number; failed: number; warning: number; skipped: number; source: string } } }> };
+  writeLatestApiResultsPayload: (rootDir?: string, payload?: unknown) => string;
+};
 
 dotenv.config();
 
@@ -54,8 +58,9 @@ interface ApiDetail {
   responseBody: string;
   responseCode: number | null;
   expectedStatus?: number;
-  status: 'passed' | 'warning' | 'failed';
+  status: 'passed' | 'warning' | 'failed' | 'skipped';
   type: 'api';
+  reason?: string;
 }
 
 type SuiteDetail = DomainDetail | SslDetail | ApiDetail;
@@ -64,6 +69,7 @@ interface DomainSuiteReport {
   passed: number;
   failed: number;
   warnings: number;
+  skipped?: number;
   total: number;
   details: SuiteDetail[];
 }
@@ -291,6 +297,15 @@ function decodeHtmlEntities(value: string): string {
 
 function normalizeHtmlText(value: string): string {
   return decodeHtmlEntities(value.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+}
+
+function normalizeDetailText(value: unknown): string | undefined {
+  const trimmed = normalizeHtmlText(String(value || '')).trim();
+  if (!trimmed || trimmed === '-' || trimmed.toLowerCase() === 'n/a') {
+    return undefined;
+  }
+
+  return trimmed;
 }
 
 function decodeBase64Value(value?: string): string | undefined {
@@ -677,6 +692,10 @@ function classifyApiStatus(responseCode: number | null, expectedStatus?: number)
   return 'failed';
 }
 
+function getApiSkippedReason(detailText?: string, responseBody?: string): string {
+  return normalizeDetailText(detailText) || normalizeDetailText(responseBody) || 'Skipped by Playwright';
+}
+
 function loadApiSuiteConfigs(): ApiSuiteConfig[] {
   const mappingPath = path.join(process.cwd(), 'config', 'project-mapping.json');
   if (!fs.existsSync(mappingPath)) {
@@ -717,6 +736,7 @@ function parseApiSuiteReport(reportPath: string, fallbackTotal: number): DomainS
   let parsedCount = 0;
 
   for (const match of html.matchAll(rowPattern)) {
+    const rowStatus = String(match[1] || '').trim().toLowerCase();
     const attributes = match[5] || '';
     const title = decodeHtmlEntities(match[2]).trim();
     const titleMatch = title.match(/^(GET|POST|PUT|DELETE|PATCH)\s+(.+)$/i);
@@ -733,6 +753,10 @@ function parseApiSuiteReport(reportPath: string, fallbackTotal: number): DomainS
     const responseCode = /^\d+$/.test(responseCodeValue) ? parseInt(responseCodeValue, 10) : null;
 
     const config = configByMethodAndName.get(`${method}::${normalizeApiName(name)}`);
+    const normalizedDetailText = normalizeDetailText(match[6]);
+    const status = rowStatus === 'skipped'
+      ? 'skipped'
+      : classifyApiStatus(responseCode, config?.expectedStatus);
 
     const apiResult: ApiDetail = {
       name,
@@ -742,8 +766,9 @@ function parseApiSuiteReport(reportPath: string, fallbackTotal: number): DomainS
       responseBody,
       responseCode,
       expectedStatus: config?.expectedStatus,
-      status: classifyApiStatus(responseCode, config?.expectedStatus),
-      type: 'api'
+      status,
+      type: 'api',
+      reason: status === 'skipped' ? getApiSkippedReason(normalizedDetailText, responseBody) : undefined
     };
 
     console.log('API RESULT PARSED:', apiResult);
@@ -763,6 +788,7 @@ function parseApiSuiteReport(reportPath: string, fallbackTotal: number): DomainS
     passed: details.filter((detail) => detail.status === 'passed').length,
     failed: details.filter((detail) => detail.status === 'failed').length,
     warnings: details.filter((detail) => detail.status === 'warning').length,
+    skipped: details.filter((detail) => detail.status === 'skipped').length,
     total: details.length || fallbackTotal,
     details
   };
@@ -1090,6 +1116,10 @@ function writeDashboardState(finalResults: TestResult[]): void {
   }
 
   fs.writeFileSync(DASHBOARD_STATE_PATH, JSON.stringify(state, null, 2));
+
+  const latestApiPayload = buildLatestApiResultsPayload(process.cwd());
+  const latestApiPath = writeLatestApiResultsPayload(process.cwd(), latestApiPayload);
+  console.log(`[LATEST RUN] API summary written to ${latestApiPath}`);
 }
 
 function regenerateDashboardFromState(): void {
@@ -1113,6 +1143,11 @@ function getSuiteArchivePath(definition: SuiteDefinition): string {
 
 function cleanGeneratedArtifacts(selectedSuites: SuiteDefinition[]): void {
   const artifactPaths = [
+    path.join(process.cwd(), 'suite-reports'),
+    path.join(process.cwd(), 'test-results'),
+    path.join(process.cwd(), 'unified-dashboard'),
+    path.join(process.cwd(), 'final-dashboard-bundle'),
+    path.join(process.cwd(), 'email-preview'),
     DASHBOARD_STATE_PATH,
     GENERATED_RESULTS_PATH,
     EMAIL_PREVIEW_DIR,
@@ -1123,6 +1158,10 @@ function cleanGeneratedArtifacts(selectedSuites: SuiteDefinition[]): void {
   ];
 
   artifactPaths.forEach(removeGeneratedArtifact);
+}
+
+function hasFlag(flag: string): boolean {
+  return process.argv.includes(flag);
 }
 
 function logProjectApiSummary(projectId: string): void {
@@ -1236,8 +1275,9 @@ async function runCommand(definition: SuiteDefinition): Promise<TestResult> {
 
 async function main(): Promise<void> {
   const shouldOpenBrowser = String(process.env.CI || '').trim().toLowerCase() !== 'true';
+  const skipClean = hasFlag('--skip-clean');
 
-  if (process.argv.includes('--regenerate-only')) {
+  if (hasFlag('--regenerate-only')) {
     regenerateDashboardFromState();
     console.log('✅ Dashboard regenerated from stored state.');
     return;
@@ -1253,7 +1293,11 @@ async function main(): Promise<void> {
   console.log('🔄 Using workspace-root Playwright specs for suite execution...\n');
 
   const selectedSuites = getSelectedSuites();
-  cleanGeneratedArtifacts(selectedSuites);
+  if (skipClean) {
+    console.log('⚠️  Skipping artifact cleanup because --skip-clean was provided.');
+  } else {
+    cleanGeneratedArtifacts(selectedSuites);
+  }
   const storedResults = buildStoredResultsMap();
   const startTime = Date.now();
 
@@ -1304,19 +1348,7 @@ async function main(): Promise<void> {
   console.log('📊 Generating unified dashboard...');
   const dashboardPath = path.join(process.cwd(), 'unified-dashboard', 'index.html');
   generateDashboard(finalResults, dashboardPath);
-
-  const emailResult = await sendDashboardSummaryEmail(dashboardPath);
-  if (emailResult.enabled && emailResult.previewPath) {
-    console.log(`📧 Dashboard email preview: ${emailResult.previewPath}`);
-  }
-
-  if (emailResult.enabled && !emailResult.sent) {
-    throw new Error(emailResult.error || 'Email send failed');
-  }
-
-  if (emailResult.sent) {
-    console.log('EMAIL SENT SUCCESSFULLY');
-  }
+  console.log('📭 Email sending skipped in run-all-tests.ts. Run ts-node regenerate-dashboard.ts after this step.');
 
   logProjectApiSummary('ddp');
 
