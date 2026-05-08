@@ -273,20 +273,25 @@ function buildFailedModulesHtmlForTemplate(state) {
         { key: 'domain', label: 'Domain Status' }
     ];
 
+    let mapping;
+    try { mapping = getProjectMapping(); } catch (e) { mapping = { projects: [] }; }
+    const projects = mapping.projects || [];
+
     return moduleConfig.map(({ key, label }) => {
         let total = 0, failed = 0, skipped = 0;
         let failedItems = [];
 
-        if (key === 'api') {
-            // Use per-project API results so ZapAI-style failures (row=skipped, detail=failed) are captured
-            let mapping;
-            try { mapping = getProjectMapping(); } catch (e) { mapping = { projects: [] }; }
-            (mapping.projects || []).forEach((project) => {
-                const apiResult = getAPITestResults(project.id);
-                total += apiResult.total;
-                failed += apiResult.failed;
-                skipped += apiResult.skipped;
-                (apiResult.tests || []).forEach((test) => {
+        if (key === 'api' || key === 'server' || key === 'app') {
+            // Use per-project results — suite-level details array may be empty for these types
+            const getResults = key === 'api' ? getAPITestResults
+                             : key === 'server' ? getServerTestResults
+                             : getAppTestResults;
+            projects.forEach((project) => {
+                const result = getResults(project.id);
+                total += result.total;
+                failed += result.failed;
+                skipped += result.skipped;
+                (result.tests || []).forEach((test) => {
                     if ((test.status || '').toLowerCase() === 'failed') {
                         failedItems.push({ ...test, projectName: project.name });
                     }
