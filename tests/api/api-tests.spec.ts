@@ -368,7 +368,6 @@ function loadApiEndpoints(): ApiEndpoint[] {
   return (mapping.projects || [])
     .flatMap((project) => project.apis || [])
     .filter((api): api is ProjectApiConfig & { name: string; url: string; method: 'GET' | 'POST' | 'PUT' | 'DELETE' } => Boolean(api?.name && api?.url && api?.method))
-    .filter((api) => !excludedApis.has(api.name))
     .map((api) => ({
       name: api.name,
       url: api.url,
