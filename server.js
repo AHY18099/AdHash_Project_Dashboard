@@ -513,19 +513,8 @@ async function dispatchZohoSummaryMail(state) {
         return;
     }
 
-    // Permanently locked to Email Preview style per user preference.
-    const emailPreviewCandidates = [
-        path.join(__dirname, 'email-preview', 'AdHash-Projects-Dashboard.html'),
-        path.join(__dirname, 'email-preview', 'index.html')
-    ];
-    const emailPreviewPath = emailPreviewCandidates.find((candidate) => fs.existsSync(candidate));
-
-    if (!emailPreviewPath) {
-        addLog('❌ Email report not sent: locked template missing in email-preview.', 'error');
-        return;
-    }
-
-    const html = fs.readFileSync(emailPreviewPath, 'utf8');
+    // Build dynamic email HTML so live run data (failed details, project view) is always current.
+    const html = buildSummaryEmailHtml(summary, state);
 
     try {
         await sendZohoMail({
