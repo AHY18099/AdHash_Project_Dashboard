@@ -2093,9 +2093,31 @@ function getAPITestResults(projectId) {
 
             if (row) {
                 if (row.status === 'skipped') {
+                    // If the dashboard detail recorded a definitive failure for this API,
+                    // prefer that status over the suite row's 'skipped' classification.
+                    if (detail && String(detail.status || '').toLowerCase() === 'failed') {
+                        const expectedStatus = parseExpectedStatus(api.expectedStatus) ?? parseExpectedStatus(row.expectedStatus) ?? parseExpectedStatus(detail.expectedStatus);
+                        apiResults.push({
+                            name: api.name,
+                            url: api.url,
+                            method,
+                            duration: (detail && detail.duration) || row.duration,
+                            requestBody: detail.requestBody || row.requestBody || (normalizeApiMethod(method) === 'GET' ? 'No request body' : 'Payload not provided'),
+                            responseBody: detail.responseBody || row.responseBody || 'No response body',
+                            responseCode: detail.responseCode || row.responseCode || null,
+                            expectedStatus,
+                            status: 'failed',
+                            type: 'api'
+                        });
+                        return;
+                    }
+
                     const skippedReason = row.details || (detail && detail.reason) || 'Skipped by suite';
                     const normalizedSkippedReason = String(skippedReason || '').trim().toLowerCase();
-                    const normalizedRowResponseBody = String((row.responseBody || (detail && detail.responseBody) || '')).trim().toLowerCase();
+                    // Only use the row's own responseBody here – falling back to detail.responseBody
+                    // would incorrectly suppress tests whose detail says "No response body" but whose
+                    // actual status is a real failure.
+                    const normalizedRowResponseBody = String(row.responseBody || '').trim().toLowerCase();
 
                     // Ignore placeholder rows that are effectively "not run" rather than actionable skips.
                     if (normalizedSkippedReason === 'no response body' || normalizedRowResponseBody === 'no response body') {
