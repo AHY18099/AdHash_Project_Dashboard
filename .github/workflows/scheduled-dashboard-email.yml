@@ -13,6 +13,7 @@ jobs:
     env:
       CI: 'true'
       SUPABASE_API_KEY: ${{ secrets.SUPABASE_API_KEY }}
+      EXCLUDED_APIS: 'ZapAI UI'
       ZOHO_MAIL_ENABLED: ${{ secrets.ZOHO_MAIL_ENABLED }}
       ZOHO_MAIL_FROM: ${{ secrets.ZOHO_MAIL_FROM }}
       ZOHO_MAIL_USER: ${{ secrets.ZOHO_MAIL_USER }}
