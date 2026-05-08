@@ -309,16 +309,24 @@ function buildAxiosRequestConfig(endpoint: ApiEndpoint) {
 }
 
 function buildApiFailureMessage(endpoint: ApiEndpoint, status: number, responseBody: string): string {
-  if (status === 401) {
-    console.error('Supabase Auth Failed - Missing/Invalid API Key');
+  const isSupabase = isSupabaseRequest(endpoint.url);
+  const isLogin = isSupabaseLoginRequest(endpoint.url);
+
+  let baseMessage = `API request failed for ${endpoint.name} - Status: ${status}`;
+
+  if (isSupabase && (status === 401 || status === 403)) {
+    baseMessage = `Supabase Auth Failed for ${endpoint.name} - Status: ${status}`;
+  } else if (isLogin) {
+    baseMessage = `Supabase Login Failed for ${endpoint.name} - Status: ${status}`;
+  } else if (isSupabase && status === 404) {
+    baseMessage = `Supabase endpoint not found for ${endpoint.name} - Status: ${status}`;
   }
 
-  const baseMessage = `Supabase Auth Failed for ${endpoint.name} - Status: ${status}`;
   if (!responseBody.trim()) {
-    return baseMessage;
+    return `${baseMessage}\nURL: ${endpoint.url}`;
   }
 
-  return `${baseMessage}\nResponse: ${responseBody}`;
+  return `${baseMessage}\nURL: ${endpoint.url}\nResponse: ${responseBody}`;
 }
 
 function getApiClassification(endpoint: ApiEndpoint, status: number): ApiClassification {

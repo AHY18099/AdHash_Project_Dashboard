@@ -584,8 +584,9 @@
       "apis": [
         {
           "name": "ZapAI UI",
-          "url": "https://zapai.us/",
-          "method": "GET"
+          "url": "https://www.zapai.us/",
+          "method": "GET",
+          "expectedStatus": 200
         }
       ]
     },
