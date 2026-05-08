@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { readLatestApiResultsPayload } = require('./utils/latest-api-results.js');
+const { sendZohoMail } = require('./utils/zoho-mail');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 7777;
@@ -22,6 +23,8 @@ let testResults = null;
 let testLogs = [];
 let currentSuite = null;
 let testProcessPid = null;
+let testProcessRef = null;
+let lastMailDispatchKey = null;
 
 // Store server logs
 const serverLogs = [];
@@ -193,22 +196,404 @@ function isProcessRunning(pid) {
     }
 }
 
+function buildMailDispatchKey(state) {
+    if (!state || !state.summary) {
+        return null;
+    }
+
+    const summary = state.summary;
+    return [
+        state.generatedAt || '',
+        summary.passedSuites || 0,
+        summary.failedSuites || 0,
+        summary.skippedSuites || 0,
+        summary.totalSuites || 0
+    ].join('|');
+}
+
+function escapeHtml(value) {
+        return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+}
+
+function normalizeSuiteStatus(value) {
+    const status = String(value || '').toLowerCase();
+    if (status === 'passed' || status === 'failed' || status === 'warning') {
+        return status;
+    }
+    if (status === 'unavailable' || status === 'not-run') {
+        return 'skipped';
+    }
+    return 'skipped';
+}
+
+function getSuiteDisplayLabel(key) {
+    const suiteLabels = {
+        app: 'App Status Verification',
+        server: 'Server Health Monitoring',
+        cert: 'SSL Certificate Monitoring',
+        api: 'API Endpoint Testing',
+        domain: 'Domain Expiry Monitoring'
+    };
+
+    return suiteLabels[key] || key;
+}
+
+function buildSuiteRowsHtml(state) {
+        const suites = (state && state.suites) || {};
+        const orderedSuiteKeys = ['app', 'server', 'cert', 'api', 'domain'];
+
+        return orderedSuiteKeys
+                .map((key) => {
+                        const suite = suites[key] || {};
+                        const normalizedStatus = normalizeSuiteStatus(suite.status);
+                        const badgeBg = normalizedStatus === 'passed'
+                                ? '#e8f7ee'
+                                : normalizedStatus === 'failed'
+                                        ? '#fdecea'
+                                        : '#fff8e6';
+                        const badgeColor = normalizedStatus === 'passed'
+                                ? '#146c43'
+                                : normalizedStatus === 'failed'
+                                        ? '#b42318'
+                                        : '#8a6d3b';
+
+                        return `<tr>
+                            <td style="padding:10px;border:1px solid #e5e7eb;font-size:13px;color:#111827;">${escapeHtml(getSuiteDisplayLabel(key))}</td>
+                                <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;">
+                                        <span style="display:inline-block;padding:3px 8px;border-radius:999px;background:${badgeBg};color:${badgeColor};font-size:12px;font-weight:600;text-transform:uppercase;">${escapeHtml(normalizedStatus)}</span>
+                                </td>
+                                <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;font-size:13px;">${Number(suite.total || 0)}</td>
+                                <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;font-size:13px;color:#146c43;">${Number(suite.passed || 0)}</td>
+                                <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;font-size:13px;color:#b42318;">${Number(suite.failed || 0)}</td>
+                                <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;font-size:13px;color:#8a6d3b;">${Number(suite.warning || 0)}</td>
+                                <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;font-size:13px;color:#6b7280;">${Number(suite.skipped || 0)}</td>
+                        </tr>`;
+                })
+                .join('');
+}
+
+        function buildFailedDetailsRowsHtml(state) {
+            const suites = (state && state.suites) || {};
+            const orderedSuiteKeys = ['app', 'server', 'cert', 'api', 'domain'];
+            const rows = [];
+
+            orderedSuiteKeys.forEach((suiteKey) => {
+                const suite = suites[suiteKey] || {};
+                const failedCount = Number(suite.failed || 0);
+                if (failedCount <= 0) {
+                    return;
+                }
+
+                const details = Array.isArray(suite.details) ? suite.details : [];
+                const failedDetails = details.filter((detail) => {
+                    const status = String((detail && detail.status) || '').toLowerCase();
+                    return status === 'failed' || status === 'error';
+                });
+
+                if (failedDetails.length === 0) {
+                    rows.push(`<tr>
+                        <td style="padding:10px;border:1px solid #e5e7eb;font-size:13px;">${escapeHtml(getSuiteDisplayLabel(suiteKey))}</td>
+                        <td style="padding:10px;border:1px solid #e5e7eb;font-size:13px;">${escapeHtml('Failed checks summary')}</td>
+                        <td style="padding:10px;border:1px solid #e5e7eb;font-size:13px;color:#b42318;">${escapeHtml(`Total failed checks: ${failedCount}`)}</td>
+                    </tr>`);
+                    return;
+                }
+
+                failedDetails.forEach((detail) => {
+                    const itemName = detail.name || detail.domain || detail.url || 'Unknown check';
+                    const reason = detail.reason
+                        || detail.message
+                        || (detail.responseCode ? `Response code: ${detail.responseCode}` : '')
+                        || (detail.expiryDate ? `Expiry: ${detail.expiryDate}` : '')
+                        || 'Failed during execution';
+
+                    rows.push(`<tr>
+                        <td style="padding:10px;border:1px solid #e5e7eb;font-size:13px;">${escapeHtml(getSuiteDisplayLabel(suiteKey))}</td>
+                        <td style="padding:10px;border:1px solid #e5e7eb;font-size:13px;">${escapeHtml(itemName)}</td>
+                        <td style="padding:10px;border:1px solid #e5e7eb;font-size:13px;color:#b42318;">${escapeHtml(reason)}</td>
+                    </tr>`);
+                });
+            });
+
+            if (rows.length === 0) {
+                return `<tr>
+                    <td colspan="3" style="padding:12px;border:1px solid #e5e7eb;font-size:13px;color:#146c43;text-align:center;">No failed checks in this run.</td>
+                </tr>`;
+            }
+
+            return rows.join('');
+        }
+
+        function buildProjectViewRowsHtml() {
+            let mapping;
+            try {
+                mapping = getProjectMapping();
+            } catch (error) {
+                return `<tr><td colspan="7" style="padding:12px;border:1px solid #e5e7eb;color:#b42318;">Unable to load project mapping for project view.</td></tr>`;
+            }
+
+            const projects = Array.isArray(mapping && mapping.projects) ? mapping.projects : [];
+            if (projects.length === 0) {
+                return `<tr><td colspan="7" style="padding:12px;border:1px solid #e5e7eb;color:#6b7280;">No projects configured.</td></tr>`;
+            }
+
+            const rows = projects.map((project) => {
+                const app = getAppTestResults(project.id);
+                const server = getServerTestResults(project.id);
+                const ssl = getSSLTestResults(project.id);
+                const domain = getDomainTestResults(project.id);
+                const api = getAPITestResults(project.id);
+
+                const total = Number(app.total || 0) + Number(server.total || 0) + Number(ssl.total || 0) + Number(domain.total || 0) + Number(api.total || 0);
+                const passed = Number(app.passed || 0) + Number(server.passed || 0) + Number(ssl.passed || 0) + Number(domain.passed || 0) + Number(api.passed || 0);
+                const failed = Number(app.failed || 0) + Number(server.failed || 0) + Number(ssl.failed || 0) + Number(domain.failed || 0) + Number(api.failed || 0);
+                const warning = Number(app.warning || 0) + Number(server.warning || 0) + Number(ssl.warning || 0) + Number(domain.warning || 0) + Number(api.warning || 0);
+                const skipped = Number(app.skipped || 0) + Number(server.skipped || 0) + Number(ssl.skipped || 0) + Number(domain.skipped || 0) + Number(api.skipped || 0);
+
+                const status = failed > 0 ? 'failed' : (warning > 0 ? 'warning' : (skipped > 0 ? 'skipped' : 'passed'));
+                const badgeBg = status === 'passed' ? '#e8f7ee' : status === 'failed' ? '#fdecea' : '#fff8e6';
+                const badgeColor = status === 'passed' ? '#146c43' : status === 'failed' ? '#b42318' : '#8a6d3b';
+
+                return {
+                    sortWeight: failed * 100000 + warning * 1000 + skipped * 100 + total,
+                    html: `<tr>
+                        <td style="padding:10px;border:1px solid #e5e7eb;font-size:13px;">${escapeHtml(project.name || project.id)}</td>
+                        <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;"><span style="display:inline-block;padding:3px 8px;border-radius:999px;background:${badgeBg};color:${badgeColor};font-size:12px;font-weight:600;text-transform:uppercase;">${escapeHtml(status)}</span></td>
+                        <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;font-size:13px;">${total}</td>
+                        <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;font-size:13px;color:#146c43;">${passed}</td>
+                        <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;font-size:13px;color:#b42318;">${failed}</td>
+                        <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;font-size:13px;color:#8a6d3b;">${warning}</td>
+                        <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;font-size:13px;color:#6b7280;">${skipped}</td>
+                    </tr>`
+                };
+            });
+
+            return rows
+                .sort((a, b) => b.sortWeight - a.sortWeight)
+                .map((entry) => entry.html)
+                .join('');
+        }
+
+function buildSummaryEmailHtml(summary, state) {
+        const generatedAt = escapeHtml(state && state.generatedAt ? state.generatedAt : new Date().toISOString());
+        const passed = Number(summary.passedSuites || 0);
+        const failed = Number(summary.failedSuites || 0);
+        const warning = Number(summary.warningSuites || 0);
+        const skipped = Number(summary.skippedSuites || 0);
+        const total = Number(summary.totalSuites || 0);
+
+        return `<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+    <div style="max-width:900px;margin:0 auto;padding:24px;">
+        <div style="background:#111827;color:#ffffff;border-radius:12px;padding:20px;">
+            <h2 style="margin:0 0 8px 0;font-size:22px;">AdHash QA Summary Report</h2>
+            <div style="font-size:13px;opacity:0.9;">Generated: ${generatedAt}</div>
+        </div>
+
+        <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;margin-top:14px;padding:16px;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                <tr>
+                    <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;"><div style="font-size:12px;color:#6b7280;">Total Suites</div><div style="font-size:24px;font-weight:700;">${total}</div></td>
+                    <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;"><div style="font-size:12px;color:#6b7280;">Passed</div><div style="font-size:24px;font-weight:700;color:#146c43;">${passed}</div></td>
+                    <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;"><div style="font-size:12px;color:#6b7280;">Failed</div><div style="font-size:24px;font-weight:700;color:#b42318;">${failed}</div></td>
+                    <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;"><div style="font-size:12px;color:#6b7280;">Warning</div><div style="font-size:24px;font-weight:700;color:#8a6d3b;">${warning}</div></td>
+                    <td style="padding:10px;border:1px solid #e5e7eb;text-align:center;"><div style="font-size:12px;color:#6b7280;">Skipped</div><div style="font-size:24px;font-weight:700;color:#6b7280;">${skipped}</div></td>
+                </tr>
+            </table>
+        </div>
+
+        <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;margin-top:14px;padding:16px;">
+            <h3 style="margin:0 0 12px 0;font-size:18px;">Suite Breakdown</h3>
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                <thead>
+                    <tr>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#f9fafb;text-align:left;font-size:12px;color:#374151;">Suite</th>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#f9fafb;text-align:center;font-size:12px;color:#374151;">Status</th>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#f9fafb;text-align:center;font-size:12px;color:#374151;">Total</th>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#f9fafb;text-align:center;font-size:12px;color:#374151;">Passed</th>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#f9fafb;text-align:center;font-size:12px;color:#374151;">Failed</th>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#f9fafb;text-align:center;font-size:12px;color:#374151;">Warning</th>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#f9fafb;text-align:center;font-size:12px;color:#374151;">Skipped</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${buildSuiteRowsHtml(state)}
+                </tbody>
+            </table>
+        </div>
+
+        <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;margin-top:14px;padding:16px;">
+            <h3 style="margin:0 0 12px 0;font-size:18px;color:#b42318;">Failed Details</h3>
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                <thead>
+                    <tr>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#fef2f2;text-align:left;font-size:12px;color:#7f1d1d;">Suite</th>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#fef2f2;text-align:left;font-size:12px;color:#7f1d1d;">Item</th>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#fef2f2;text-align:left;font-size:12px;color:#7f1d1d;">Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${buildFailedDetailsRowsHtml(state)}
+                </tbody>
+            </table>
+        </div>
+
+        <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;margin-top:14px;padding:16px;">
+            <h3 style="margin:0 0 12px 0;font-size:18px;">Project View</h3>
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                <thead>
+                    <tr>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#f9fafb;text-align:left;font-size:12px;color:#374151;">Project</th>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#f9fafb;text-align:center;font-size:12px;color:#374151;">Status</th>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#f9fafb;text-align:center;font-size:12px;color:#374151;">Total</th>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#f9fafb;text-align:center;font-size:12px;color:#374151;">Passed</th>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#f9fafb;text-align:center;font-size:12px;color:#374151;">Failed</th>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#f9fafb;text-align:center;font-size:12px;color:#374151;">Warning</th>
+                        <th style="padding:10px;border:1px solid #e5e7eb;background:#f9fafb;text-align:center;font-size:12px;color:#374151;">Skipped</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${buildProjectViewRowsHtml()}
+                </tbody>
+            </table>
+        </div>
+
+        <div style="padding:10px 4px 0 4px;font-size:12px;color:#6b7280;">
+            This email is optimized for mailbox rendering (no script-dependent report layout).
+        </div>
+    </div>
+</body>
+</html>`;
+}
+
+async function dispatchZohoSummaryMail(state) {
+    if (process.env.ZOHO_MAIL_ENABLED !== 'true' || !state) {
+        addLog('❌ Zoho mail not sent: mail disabled or state missing', 'error');
+        return;
+    }
+
+    // Reconstruct summary if missing
+    let summary = state.summary;
+    if (!summary && state.suites) {
+        // Aggregate from suite results
+        const suiteKeys = Object.keys(state.suites);
+        let passed = 0, failed = 0, warning = 0, skipped = 0, total = 0;
+        suiteKeys.forEach(k => {
+            const s = state.suites[k];
+            if (!s) return;
+            passed += s.passed || 0;
+            failed += s.failed || 0;
+            warning += s.warning || 0;
+            skipped += s.skipped || 0;
+            total += s.total || 0;
+        });
+        summary = {
+            passedSuites: passed,
+            failedSuites: failed,
+            warningSuites: warning,
+            skippedSuites: skipped,
+            totalSuites: total
+        };
+        addLog('⚠️ Summary missing in dashboard state, reconstructed for mail send.', 'warning');
+    }
+    if (!summary) {
+        addLog('❌ Zoho mail not sent: summary missing and could not reconstruct.', 'error');
+        return;
+    }
+
+    const mailDispatchKey = [state.generatedAt || '', summary.passedSuites || 0, summary.failedSuites || 0, summary.skippedSuites || 0, summary.totalSuites || 0].join('|');
+    if (!mailDispatchKey || mailDispatchKey === lastMailDispatchKey) {
+        addLog('ℹ️ Zoho mail not sent: already sent for this summary.', 'info');
+        return;
+    }
+
+    // Permanently locked to Email Preview style per user preference.
+    const emailPreviewCandidates = [
+        path.join(__dirname, 'email-preview', 'AdHash-Projects-Dashboard.html'),
+        path.join(__dirname, 'email-preview', 'index.html')
+    ];
+    const emailPreviewPath = emailPreviewCandidates.find((candidate) => fs.existsSync(candidate));
+
+    if (!emailPreviewPath) {
+        addLog('❌ Email report not sent: locked template missing in email-preview.', 'error');
+        return;
+    }
+
+    const html = fs.readFileSync(emailPreviewPath, 'utf8');
+
+    try {
+        await sendZohoMail({
+            subject: `AdHash Test Report: ${summary.passedSuites} Passed, ${summary.failedSuites} Failed`,
+            html
+        });
+        lastMailDispatchKey = mailDispatchKey;
+        addLog('📧 Test report sent via Zoho Mail', 'info');
+    } catch (err) {
+        addLog('❌ Failed to send Zoho Mail: ' + (err && err.message), 'error');
+        console.error('Failed to send Zoho Mail:', err);
+    }
+}
+
+async function recoverCompletedRunFromState() {
+    const state = readDashboardState();
+    if (!state || !state.summary) {
+        return false;
+    }
+
+    testResults = {
+        status: 'completed',
+        totalTests: state.summary.totalSuites,
+        passed: state.summary.passedSuites,
+        failed: state.summary.failedSuites,
+        timestamp: state.generatedAt || new Date().toISOString()
+    };
+
+    try {
+        await dispatchZohoSummaryMail(state);
+    } catch (mailErr) {
+        addLog('❌ Failed to send Zoho Mail: ' + (mailErr && mailErr.message), 'error');
+        console.error('Failed to send Zoho Mail:', mailErr);
+    }
+
+    return true;
+}
+
 // API endpoint to check if tests are running
-app.get('/api/test-status', (req, res) => {
+app.get('/api/test-status', async (req, res) => {
+    const trackedProcessAlive = Boolean(testProcessRef && testProcessRef.exitCode === null && !testProcessRef.killed);
+
     // Auto-recover from stuck state: if testRunning is true but process is dead, reset state
-    if (testRunning && !isProcessRunning(testProcessPid)) {
+    if (testRunning && !trackedProcessAlive && !isProcessRunning(testProcessPid)) {
         console.log('⚠️ Test process is dead but flag is stuck. Auto-resetting state...');
         testRunning = false;
         testProcessPid = null;
+        testProcessRef = null;
         currentSuite = null;
+        await recoverCompletedRunFromState();
     }
 
+    const persistedState = readDashboardState();
+    const hasPersistedResults = !!(persistedState && persistedState.summary);
+    const persistedResults = hasPersistedResults ? {
+        status: 'completed',
+        totalTests: persistedState.summary.totalSuites,
+        passed: persistedState.summary.passedSuites,
+        failed: persistedState.summary.failedSuites,
+        timestamp: persistedState.generatedAt || new Date().toISOString()
+    } : null;
+
     res.json({
-        status: testRunning ? 'running' : (testResults ? 'completed' : 'idle'),
+        status: testRunning ? 'running' : ((testResults || hasPersistedResults) ? 'completed' : 'idle'),
         running: testRunning,
-        hasResults: testResults !== null,
+        hasResults: testResults !== null || hasPersistedResults,
         currentSuite: currentSuite,
-        results: testResults
+        results: testResults || persistedResults
     });
 });
 
@@ -347,6 +732,7 @@ app.post('/api/reset-state', (req, res) => {
     testLogs = [];
     currentSuite = null;
     testProcessPid = null;
+    testProcessRef = null;
     res.json({ status: 'reset', message: 'Test state has been reset' });
 });
 
@@ -390,7 +776,7 @@ app.post('/api/run-single-suite/:suite', (req, res) => {
 
 // API endpoint to trigger test run
 app.post('/api/run-tests', (req, res) => {
-    const { exec } = require('child_process');
+    const { spawn } = require('child_process');
 
     if (testRunning) {
         return res.json({ status: 'already-running', message: 'Tests are already running' });
@@ -402,16 +788,21 @@ app.post('/api/run-tests', (req, res) => {
     testLogs = [];
     currentSuite = null;
     testProcessPid = null;
+    testProcessRef = null;
 
     res.json({ status: 'started', message: 'Tests are running in the background...' });
 
     addLog('🚀 Starting sequential test execution...', 'info');
  addLog('📋 Running configured suites, including external domain monitoring...', 'info');
-    // Run the unified test framework
-    const testProcess = exec('npx ts-node run-all-tests.ts', { cwd: __dirname });
+    // Run the unified test framework with streaming output (no exec buffer cap)
+    const testProcess = spawn('npx', ['ts-node', 'run-all-tests.ts'], {
+        cwd: __dirname,
+        shell: true
+    });
 
     // Store the process PID for state recovery
     testProcessPid = testProcess.pid;
+    testProcessRef = testProcess;
     console.log(`📌 Test process started with PID: ${testProcessPid}`);
 
     // Capture stdout in real-time
@@ -460,12 +851,13 @@ app.post('/api/run-tests', (req, res) => {
     });
 
     // Function to parse and finalize results
-    const finalizeResults = (code) => {
+    const finalizeResults = async (code) => {
         if (!testRunning) return; // Already finalized
 
         testRunning = false;
         currentSuite = null;
         testProcessPid = null;
+        testProcessRef = null;
 
         if (code !== 0) {
             addLog(`⚠️ Test process exited with code ${code}`, 'warning');
@@ -475,7 +867,17 @@ app.post('/api/run-tests', (req, res) => {
 
         addLog('📊 Parsing test results...', 'info');
 
-        const state = readDashboardState();
+        let state = readDashboardState();
+        if (!state || !state.summary) {
+            // Allow state writer a few extra seconds after child process close.
+            for (let attempt = 0; attempt < 5; attempt++) {
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+                state = readDashboardState();
+                if (state && state.summary) {
+                    break;
+                }
+            }
+        }
         if (state && state.summary) {
             try {
                 testResults = {
@@ -488,6 +890,16 @@ app.post('/api/run-tests', (req, res) => {
 
                 addLog(`📊 Results: ${state.summary.passedSuites} passed, ${state.summary.failedSuites} failed, ${state.summary.skippedSuites} skipped`, state.summary.failedSuites === 0 ? 'success' : 'warning');
                 console.log('✅ Test results parsed and stored:', testResults);
+
+                // --- Send Zoho Mail if enabled ---
+                try {
+                    await dispatchZohoSummaryMail(state);
+                } catch (mailErr) {
+                    addLog('❌ Failed to send Zoho Mail: ' + (mailErr && mailErr.message), 'error');
+                    console.error('Failed to send Zoho Mail:', mailErr);
+                }
+                // --- End Zoho Mail ---
+
             } catch (parseError) {
                 console.error('Error parsing results:', parseError);
                 addLog('⚠️ Could not parse test results', 'warning');
@@ -518,6 +930,11 @@ app.post('/api/run-tests', (req, res) => {
     testProcess.on('close', (code) => {
         console.log(`🔒 Test process closed with code ${code}`);
         finalizeResults(code);
+    });
+
+    testProcess.on('error', (err) => {
+        addLog(`❌ Test process spawn error: ${err.message}`, 'error');
+        finalizeResults(1);
     });
 });
 
@@ -1674,7 +2091,33 @@ function getAPITestResults(projectId) {
             const row = findSuiteRow(rows, `${method} ${api.name}`);
             const detail = detailByKey.get(stableKey);
 
-            if (row && row.status !== 'skipped') {
+            if (row) {
+                if (row.status === 'skipped') {
+                    const skippedReason = row.details || (detail && detail.reason) || 'Skipped by suite';
+                    const normalizedSkippedReason = String(skippedReason || '').trim().toLowerCase();
+                    const normalizedRowResponseBody = String((row.responseBody || (detail && detail.responseBody) || '')).trim().toLowerCase();
+
+                    // Ignore placeholder rows that are effectively "not run" rather than actionable skips.
+                    if (normalizedSkippedReason === 'no response body' || normalizedRowResponseBody === 'no response body') {
+                        return;
+                    }
+
+                    apiResults.push({
+                        name: api.name,
+                        url: api.url,
+                        method,
+                        duration: (detail && detail.duration) || row.duration,
+                        requestBody: row.requestBody || (detail && detail.requestBody) || (normalizeApiMethod(method) === 'GET' ? 'No request body' : 'Payload not provided'),
+                        responseBody: row.responseBody || (detail && detail.responseBody) || 'No response body',
+                        responseCode: row.responseCode || (detail && detail.responseCode) || null,
+                        expectedStatus: parseExpectedStatus(api.expectedStatus) ?? parseExpectedStatus(row.expectedStatus) ?? parseExpectedStatus(detail && detail.expectedStatus),
+                        status: 'skipped',
+                        type: 'api',
+                        reason: skippedReason
+                    });
+                    return;
+                }
+
                 const expectedStatus = parseExpectedStatus(api.expectedStatus) ?? parseExpectedStatus(row.expectedStatus) ?? parseExpectedStatus(detail && detail.expectedStatus);
                 const status = classifyApiStatus(row.responseCode, expectedStatus);
 
@@ -1697,6 +2140,15 @@ function getAPITestResults(projectId) {
                 return;
             }
 
+            const detailStatus = String(detail.status || '').toLowerCase();
+            const detailReason = String(detail.reason || '').toLowerCase();
+            const detailResponseBody = String(detail.responseBody || '').toLowerCase();
+
+            // Ignore synthetic placeholders when an API check never actually executed.
+            if (detailStatus === 'skipped' && (detailReason === 'no response body' || detailResponseBody === 'no response body')) {
+                return;
+            }
+
             apiResults.push({
                 ...detail,
                 name: api.name,
@@ -1713,6 +2165,7 @@ function getAPITestResults(projectId) {
         result.passed = result.tests.filter((detail) => detail.status === 'passed').length;
         result.warning = result.tests.filter((detail) => detail.status === 'warning').length;
         result.failed = result.tests.filter((detail) => detail.status === 'failed').length;
+        result.skipped = result.tests.filter((detail) => detail.status === 'skipped').length;
 
         return result;
     } catch (error) {
@@ -1801,5 +2254,20 @@ app.listen(PORT, () => {
     // Log server startup
     logToArray('info', `Server started successfully on port ${PORT}`);
     logToArray('info', 'Project dashboard available at http://localhost:' + PORT);
+
+    // On startup, recover persisted results and attempt Zoho summary dispatch.
+    (async () => {
+        try {
+            const recovered = await recoverCompletedRunFromState();
+            if (recovered) {
+                addLog('📦 Recovered persisted test results on startup.', 'info');
+            } else {
+                addLog('ℹ️ No persisted summary found on startup; skipped recovery mail dispatch.', 'info');
+            }
+        } catch (error) {
+            addLog('❌ Startup recovery/mail dispatch failed: ' + (error && error.message), 'error');
+            console.error('Startup recovery/mail dispatch failed:', error);
+        }
+    })();
 });
 
