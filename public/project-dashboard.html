@@ -2463,27 +2463,9 @@
                 });
             });
 
-            // Render tiles
+            // Render tiles — Failed first so issues are immediately visible
             tilesContainer.innerHTML = `
-                <div class="summary-tile total" onclick="toggleTile(this)">
-                    <div class="summary-tile-header">
-                        <span class="summary-tile-title">Total Tests</span>
-                        <span class="summary-tile-expand">▼</span>
-                    </div>
-                    <div class="summary-tile-count">${totalTests}</div>
-                    <div class="summary-tile-label">All test cases</div>
-                </div>
-
-                <div class="summary-tile passed" onclick="toggleTile(this)">
-                    <div class="summary-tile-header">
-                        <span class="summary-tile-title">Passed</span>
-                        <span class="summary-tile-expand">▼</span>
-                    </div>
-                    <div class="summary-tile-count">${totalPassed}</div>
-                    <div class="summary-tile-label">${totalTests > 0 ? Math.round((totalPassed/totalTests)*100) : 0}% of total</div>
-                </div>
-
-                <div class="summary-tile failed" onclick="toggleTile(this)">
+                <div class="summary-tile failed${totalFailed > 0 ? ' expanded' : ''}" onclick="toggleTile(this)">
                     <div class="summary-tile-header">
                         <span class="summary-tile-title">Failed</span>
                         <span class="summary-tile-expand">▼</span>
@@ -2513,6 +2495,24 @@
                             </div>
                         `}).join('') : '<div class="no-tests-message">✅ No failed tests - Everything is working!</div>'}
                     </div>
+                </div>
+
+                <div class="summary-tile total" onclick="toggleTile(this)">
+                    <div class="summary-tile-header">
+                        <span class="summary-tile-title">Total Tests</span>
+                        <span class="summary-tile-expand">▼</span>
+                    </div>
+                    <div class="summary-tile-count">${totalTests}</div>
+                    <div class="summary-tile-label">All test cases</div>
+                </div>
+
+                <div class="summary-tile passed" onclick="toggleTile(this)">
+                    <div class="summary-tile-header">
+                        <span class="summary-tile-title">Passed</span>
+                        <span class="summary-tile-expand">▼</span>
+                    </div>
+                    <div class="summary-tile-count">${totalPassed}</div>
+                    <div class="summary-tile-label">${totalTests > 0 ? Math.round((totalPassed/totalTests)*100) : 0}% of total</div>
                 </div>
 
                 <div class="summary-tile warning" onclick="toggleTile(this)">
