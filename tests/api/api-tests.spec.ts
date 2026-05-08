@@ -358,9 +358,17 @@ function loadApiEndpoints(): ApiEndpoint[] {
   const mappingPath = path.join(process.cwd(), 'config', 'project-mapping.json');
   const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8')) as ProjectMapping;
 
+  const excludedApis = new Set(
+    String(process.env.EXCLUDED_APIS || '')
+      .split(',')
+      .map((name) => name.trim())
+      .filter(Boolean)
+  );
+
   return (mapping.projects || [])
     .flatMap((project) => project.apis || [])
     .filter((api): api is ProjectApiConfig & { name: string; url: string; method: 'GET' | 'POST' | 'PUT' | 'DELETE' } => Boolean(api?.name && api?.url && api?.method))
+    .filter((api) => !excludedApis.has(api.name))
     .map((api) => ({
       name: api.name,
       url: api.url,
