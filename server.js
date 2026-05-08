@@ -243,6 +243,80 @@ function getSuiteDisplayLabel(key) {
     return suiteLabels[key] || key;
 }
 
+// Builds a single chip badge for the email template dark-card style
+function buildTemplateChip(count, label, color) {
+    return `<table role="presentation" cellpadding="0" cellspacing="0" style="display:inline-table;margin-right:8px;margin-bottom:6px;border-collapse:separate;"><tr><td style="background-color:#f0f0f0;border:2px solid ${color};border-radius:18px;padding:5px 12px;font-size:12px;line-height:14px;font-weight:700;color:${color};font-family:Arial,'Segoe UI',sans-serif;white-space:nowrap;">${escapeHtml(label)} ${count}</td></tr></table>`;
+}
+
+// Builds failed item rows matching the email template dark-card style
+function buildTemplateFailedItemsHtml(failedItems) {
+    const rows = failedItems.map((item) => {
+        const name = item.name || item.domain || item.url || 'Unknown';
+        const projectLine = item.projectName ? `<div style="margin-top:6px;font-size:13px;color:#d1d5db;"><strong style="color:#ffffff;">Project:</strong> ${escapeHtml(item.projectName)}</div>` : '';
+        const urlLine = item.url ? `<div style="margin-top:6px;font-size:13px;color:#d1d5db;"><strong style="color:#ffffff;">URL:</strong> ${escapeHtml(item.url)}</div>` : '';
+        const durationLine = item.duration ? `<div style="margin-top:6px;font-size:13px;color:#d1d5db;"><strong style="color:#ffffff;">Duration:</strong> ${escapeHtml(String(item.duration))}</div>` : '';
+        const reason = item.reason || item.message || (item.responseCode ? `Response code: ${item.responseCode}` : '') || 'Failed during execution';
+        const reasonLine = `<div style="margin-top:6px;font-size:13px;color:#fca5a5;"><strong style="color:#ffffff;">Error Reason:</strong> ${escapeHtml(reason)}</div>`;
+        return `<tr><td style="padding:0 0 12px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#2a1114" style="background-color:#2a1114;border:1px solid #ef4444;border-collapse:separate;border-radius:14px;"><tr><td style="padding:14px 16px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="font-size:14px;line-height:18px;font-weight:700;color:#ffffff;font-family:Arial,'Segoe UI',sans-serif;padding-right:12px;vertical-align:top;">&#x2717; ${escapeHtml(name)}</td><td width="92" align="right" style="vertical-align:top;"><table role="presentation" cellpadding="0" cellspacing="0" align="right"><tr><td bgcolor="#ef4444" style="background-color:#ef4444;border-radius:999px;padding:4px 10px;font-size:11px;line-height:13px;font-weight:800;letter-spacing:0.7px;color:#ffffff;font-family:Arial,'Segoe UI',sans-serif;white-space:nowrap;">FAILED</td></tr></table></td></tr><tr><td colspan="2" style="padding-top:4px;">${projectLine}${urlLine}${durationLine}${reasonLine}</td></tr></table></td></tr></table></td></tr>`;
+    });
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows.join('')}</table>`;
+}
+
+// Builds all failed-module section cards for injection into the locked email template
+function buildFailedModulesHtmlForTemplate(state) {
+    const suites = (state && state.suites) || {};
+    const moduleConfig = [
+        { key: 'app',    label: 'App Status' },
+        { key: 'server', label: 'Server Health' },
+        { key: 'cert',   label: 'SSL Certificate Status' },
+        { key: 'api',    label: 'API Status' },
+        { key: 'domain', label: 'Domain Status' }
+    ];
+
+    return moduleConfig.map(({ key, label }) => {
+        let total = 0, failed = 0, skipped = 0;
+        let failedItems = [];
+
+        if (key === 'api') {
+            // Use per-project API results so ZapAI-style failures (row=skipped, detail=failed) are captured
+            let mapping;
+            try { mapping = getProjectMapping(); } catch (e) { mapping = { projects: [] }; }
+            (mapping.projects || []).forEach((project) => {
+                const apiResult = getAPITestResults(project.id);
+                total += apiResult.total;
+                failed += apiResult.failed;
+                skipped += apiResult.skipped;
+                (apiResult.tests || []).forEach((test) => {
+                    if ((test.status || '').toLowerCase() === 'failed') {
+                        failedItems.push({ ...test, projectName: project.name });
+                    }
+                });
+            });
+        } else {
+            const suite = suites[key] || {};
+            total = Number(suite.total || 0);
+            failed = Number(suite.failed || 0);
+            skipped = Number(suite.skipped || 0);
+            const details = Array.isArray(suite.details) ? suite.details : [];
+            failedItems = details.filter((d) => {
+                const s = String((d && d.status) || '').toLowerCase();
+                return s === 'failed' || s === 'error';
+            });
+        }
+
+        const headerBg = failed > 0 ? '#7f1d1d' : '#065f46';
+        let chips = buildTemplateChip(total, 'TOTAL', '#3b82f6');
+        if (skipped > 0) chips += buildTemplateChip(skipped, 'SKIP', '#6b7280');
+        if (failed > 0) chips += buildTemplateChip(failed, 'FAIL', '#ef4444');
+
+        const bodyContent = failedItems.length === 0
+            ? '<div style="padding:16px 14px;border-radius:14px;background:#0b1524;border:1px dashed rgba(148,163,184,0.3);font-size:13px;line-height:18px;color:#94a3b8;text-align:center;">No failed or warning checks in this module.</div>'
+            : buildTemplateFailedItemsHtml(failedItems);
+
+        return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#050b17" style="margin-top:20px;background-color:#050b17;border:1px solid #1f2937;border-collapse:separate;border-radius:18px;overflow:hidden;"><tr><td style="padding:18px 20px;background:${headerBg};font-family:Arial,'Segoe UI',sans-serif;"><div style="font-size:18px;line-height:22px;font-weight:800;color:#ffffff;">${escapeHtml(label)} <span style="color:#cbd5e1;">(${total})</span></div><div style="padding-top:10px;">${chips}</div></td></tr><tr><td style="padding:18px 20px;font-family:Arial,'Segoe UI',sans-serif;">${bodyContent}</td></tr></table>`;
+    }).join('');
+}
+
 function buildSuiteRowsHtml(state) {
         const suites = (state && state.suites) || {};
         const orderedSuiteKeys = ['app', 'server', 'cert', 'api', 'domain'];
@@ -513,8 +587,23 @@ async function dispatchZohoSummaryMail(state) {
         return;
     }
 
-    // Build dynamic email HTML so live run data (failed details, project view) is always current.
-    const html = buildSummaryEmailHtml(summary, state);
+    // Permanently locked to Email Preview style. Inject live failed-module data at placeholder.
+    const emailPreviewCandidates = [
+        path.join(__dirname, 'email-preview', 'AdHash-Projects-Dashboard.html'),
+        path.join(__dirname, 'email-preview', 'index.html')
+    ];
+    const emailPreviewPath = emailPreviewCandidates.find((candidate) => fs.existsSync(candidate));
+
+    if (!emailPreviewPath) {
+        addLog('❌ Email report not sent: locked template missing in email-preview.', 'error');
+        return;
+    }
+
+    let html = fs.readFileSync(emailPreviewPath, 'utf8');
+    // Inject live failed-module cards so the Failed Details section always reflects current run
+    if (html.includes('<!--LIVE_FAILED_MODULES-->')) {
+        html = html.replace('<!--LIVE_FAILED_MODULES-->', buildFailedModulesHtmlForTemplate(state));
+    }
 
     try {
         await sendZohoMail({
