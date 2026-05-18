@@ -751,7 +751,7 @@
   "servers": [
     {
       "name": "DDP - Website",
-      "url": "https://new.duediligenceproject.com/",
+      "url": "https://www.ddphub.ai/",
       "type": "web"
     },
     {
@@ -761,17 +761,17 @@
     }
   ],
   "domains": [
-    "new.duediligenceproject.com",
+    "www.ddphub.ai",
     "twfnwlccyudfgqjmmdva.supabase.co"
   ],
   "sslCerts": [
-    "new.duediligenceproject.com",
+    "www.ddphub.ai",
     "twfnwlccyudfgqjmmdva.supabase.co"
   ],
   "apis": [
     {
       "name": "DDP Website",
-      "url": "https://new.duediligenceproject.com/",
+      "url": "https://www.ddphub.ai/",
       "method": "GET",
       "expectedStatus": 200
     },
@@ -1004,4 +1004,3 @@
 }
   ]
 }
-
