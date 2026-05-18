@@ -93,7 +93,7 @@ assertCondition(emailCard.statusLabel === dashboardCard.statusLabel, `DDP status
 
 console.log(`[validate:report] Source: ${latestApiResults.source || 'latest-run'}`);
 console.log(`[validate:report] DDP API = ${latestApi.passed}/${latestApi.total} passed, failed ${latestApi.failed}`);
-console.log(`[validate:report] DDP final status = ${ddpFinalStatus || expectedStatus}`);
+console.log(`[validate:report] DDP final status = ${expectedStatus}`);
 console.log(`[validate:report] Email DDP = API ${emailCard.total}, failed ${emailCard.failed}, status ${emailCard.statusLabel}`);
 console.log(`[validate:report] Dashboard DDP = API ${dashboardCard.total}, failed ${dashboardCard.failed}, status ${dashboardCard.statusLabel}`);
 console.log('[validate:report] Report consistency validated');
