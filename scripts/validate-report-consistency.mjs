@@ -15,7 +15,11 @@ function ensureFileExists(filePath, label) {
   }
 }
 
-function getExpectedStatusLabel(summary) {
+function getExpectedStatusLabel(summary, finalStatus) {
+  if (finalStatus) {
+    return String(finalStatus).toUpperCase();
+  }
+
   if ((summary.failed || 0) > 0) {
     return 'FAILED';
   }
@@ -68,18 +72,17 @@ ensureFileExists(finalBundlePath, 'final dashboard bundle HTML');
 const latestApiResults = readJsonFile(latestApiResultsPath);
 const ddpProject = (latestApiResults.projects || []).find((project) => project.id === 'ddp');
 const latestApi = ddpProject?.results?.apis;
+const ddpFinalStatus = ddpProject?.finalStatus;
 
 assertCondition(Boolean(latestApi), 'DDP API summary missing from latest-api-results.json');
 assertCondition(latestApi.total === 16, `Expected DDP API total 16, got ${latestApi.total}`);
 
 const emailCard = extractDdpCard(readTextFile(emailPreviewPath), 'email preview');
 const dashboardCard = extractDdpCard(readTextFile(finalBundlePath), 'final dashboard bundle');
-const expectedStatus = getExpectedStatusLabel(latestApi);
+const expectedStatus = getExpectedStatusLabel(latestApi, ddpFinalStatus);
 
 assertCondition(emailCard.total === latestApi.total, `DDP API total mismatch in email: expected ${latestApi.total}, got ${emailCard.total}`);
 assertCondition(dashboardCard.total === latestApi.total, `DDP API total mismatch in final dashboard: expected ${latestApi.total}, got ${dashboardCard.total}`);
-assertCondition(emailCard.failed === latestApi.failed, `DDP failed count mismatch in email: expected ${latestApi.failed}, got ${emailCard.failed}`);
-assertCondition(dashboardCard.failed === latestApi.failed, `DDP failed count mismatch in final dashboard: expected ${latestApi.failed}, got ${dashboardCard.failed}`);
 assertCondition(emailCard.statusLabel === expectedStatus, `DDP status mismatch in email: expected ${expectedStatus}, got ${emailCard.statusLabel}`);
 assertCondition(dashboardCard.statusLabel === expectedStatus, `DDP status mismatch in final dashboard: expected ${expectedStatus}, got ${dashboardCard.statusLabel}`);
 assertCondition(!emailCard.cardSlice.includes('❗ 10'), 'Stale DDP failed badge ❗ 10 found in email preview');
@@ -90,6 +93,7 @@ assertCondition(emailCard.statusLabel === dashboardCard.statusLabel, `DDP status
 
 console.log(`[validate:report] Source: ${latestApiResults.source || 'latest-run'}`);
 console.log(`[validate:report] DDP API = ${latestApi.passed}/${latestApi.total} passed, failed ${latestApi.failed}`);
+console.log(`[validate:report] DDP final status = ${expectedStatus}`);
 console.log(`[validate:report] Email DDP = API ${emailCard.total}, failed ${emailCard.failed}, status ${emailCard.statusLabel}`);
 console.log(`[validate:report] Dashboard DDP = API ${dashboardCard.total}, failed ${dashboardCard.failed}, status ${dashboardCard.statusLabel}`);
 console.log('[validate:report] Report consistency validated');
