@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>AdHash — Sign In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+
+/* ── LIGHT (default) ── */
+body{
+  --bg:#f0f4f8;
+  --card:#ffffff;
+  --card2:#f8fafc;
+  --border:rgba(148,163,184,0.2);
+  --border-focus:rgba(59,130,246,0.5);
+  --txt:#1e293b;
+  --txt2:#334155;
+  --mut:#64748b;
+  --fail:#ef4444;
+  --grad-a:#3b82f6;
+  --grad-b:#8b5cf6;
+  --shadow:0 8px 32px rgba(100,116,139,0.14);
+  --glow-a:rgba(59,130,246,0.12);
+  --glow-b:rgba(139,92,246,0.08);
+  font-family:'Inter','Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;
+  background:var(--bg);
+  color:var(--txt);
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  position:relative;
+  overflow:hidden;
+  transition:background .3s,color .3s;
+}
+
+/* ── DARK ── */
+body.dark{
+  --bg:#000000;
+  --card:#111111;
+  --card2:#161616;
+  --border:rgba(255,255,255,0.1);
+  --border-focus:rgba(0,212,255,0.5);
+  --txt:#ffffff;
+  --txt2:#e0e0e0;
+  --mut:#9ca3af;
+  --fail:#ff4444;
+  --grad-a:#00d4ff;
+  --grad-b:#00ffc6;
+  --shadow:0 10px 40px rgba(0,0,0,0.5);
+  --glow-a:rgba(0,212,255,0.1);
+  --glow-b:rgba(0,255,198,0.07);
+}
+
+/* ── AMBIENT GLOWS ── */
+body::before{
+  content:'';position:absolute;width:640px;height:640px;border-radius:50%;
+  background:radial-gradient(circle,var(--glow-a) 0%,transparent 65%);
+  top:-180px;left:-180px;pointer-events:none;transition:background .3s;
+}
+body::after{
+  content:'';position:absolute;width:520px;height:520px;border-radius:50%;
+  background:radial-gradient(circle,var(--glow-b) 0%,transparent 65%);
+  bottom:-100px;right:-100px;pointer-events:none;transition:background .3s;
+}
+
+/* ── THEME TOGGLE (top-right) ── */
+.theme-toggle{
+  position:fixed;top:20px;right:20px;z-index:100;
+  padding:7px 16px;border-radius:50px;
+  border:1.5px solid var(--border);
+  background:var(--card);
+  color:var(--txt2);
+  cursor:pointer;font-size:13px;font-weight:600;
+  font-family:inherit;
+  transition:all .2s;
+  box-shadow:var(--shadow);
+}
+.theme-toggle:hover{
+  border-color:var(--grad-a);
+  color:var(--grad-a);
+}
+
+/* ── CARD ── */
+.login-card{
+  background:var(--card);
+  border:1.5px solid var(--border);
+  border-radius:20px;
+  padding:44px 40px;
+  width:100%;max-width:420px;
+  position:relative;z-index:1;
+  box-shadow:var(--shadow);
+  animation:fadeUp .3s ease-out;
+  transition:background .3s,border-color .3s,box-shadow .3s;
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+/* ── BRAND ── */
+.login-brand{text-align:center;margin-bottom:28px}
+.login-logo{
+  font-size:30px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.login-logo .wordmark{
+  background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.login-logo .badge{
+  font-size:12px;font-weight:700;color:#fff;
+  background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);
+  padding:3px 10px;border-radius:6px;letter-spacing:.3px;
+  -webkit-text-fill-color:#fff;
+}
+.login-subtitle{color:var(--mut);font-size:13px;font-weight:400}
+
+/* ── ERROR ── */
+.login-err{
+  background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.28);
+  border-radius:10px;padding:10px 14px;font-size:12px;font-weight:500;
+  color:var(--fail);margin-bottom:16px;display:none;line-height:1.4;
+}
+.login-err.show{display:block}
+
+/* ── FORM FIELDS ── */
+.fg{margin-bottom:16px}
+.fg label{
+  display:block;font-size:11px;color:var(--mut);margin-bottom:6px;
+  text-transform:uppercase;letter-spacing:.6px;font-weight:700;
+}
+.fg input{
+  width:100%;background:var(--card2);
+  border:1.5px solid var(--border);border-radius:10px;
+  padding:11px 14px;color:var(--txt);font-size:14px;
+  outline:none;font-family:inherit;
+  transition:border-color .2s,box-shadow .2s,background .2s;
+}
+.fg input:focus{
+  border-color:var(--grad-a);
+  box-shadow:0 0 0 3px var(--glow-a);
+  background:var(--card);
+}
+.fg input::placeholder{color:var(--mut);opacity:.7}
+
+/* ── BUTTON ── */
+.login-btn{
+  width:100%;padding:12px;border:none;border-radius:50px;
+  cursor:pointer;font-size:14px;font-weight:700;
+  color:#fff;letter-spacing:.3px;
+  background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);
+  margin-top:6px;
+  font-family:inherit;
+  transition:opacity .2s,transform .2s,box-shadow .2s;
+  box-shadow:0 4px 16px rgba(59,130,246,.3);
+}
+body.dark .login-btn{color:#000;box-shadow:0 4px 16px rgba(0,212,255,.3)}
+.login-btn:hover:not(:disabled){opacity:.92;transform:translateY(-2px);box-shadow:0 8px 24px rgba(59,130,246,.4)}
+body.dark .login-btn:hover:not(:disabled){box-shadow:0 8px 24px rgba(0,212,255,.35)}
+.login-btn:active{transform:translateY(0)}
+.login-btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+
+/* ── FOOTER NOTE ── */
+.login-footer{
+  margin-top:20px;text-align:center;
+  font-size:11px;color:var(--mut);font-weight:500;
+}
+
+/* ── DIVIDER ── */
+.login-divider{
+  height:1px;background:var(--border);margin:20px 0;
+  position:relative;
+}
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">🌙 Dark</button>
+
+<div class="login-card">
+  <div class="login-brand">
+    <div class="login-logo">
+      <span class="wordmark">AdHash</span>
+    </div>
+    <div class="login-subtitle">Sign in to your workspace</div>
+  </div>
+  <div id="login-err" class="login-err"></div>
+  <div class="fg">
+    <label>Email Address</label>
+    <input type="email" id="l-email" placeholder="you@example.com" autocomplete="username">
+  </div>
+  <div class="fg">
+    <label>Password</label>
+    <input type="password" id="l-pwd" placeholder="••••••••" autocomplete="current-password">
+  </div>
+  <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In →</button>
+  <div class="login-footer">Authorized access only &nbsp;·&nbsp; AdHash Technology</div>
+</div>
+
+<script>
+// ── THEME ──
+function initTheme(){
+  const t=localStorage.getItem('adhash_theme');
+  if(t==='dark'){document.body.classList.add('dark');document.getElementById('theme-btn').textContent='☀ Light';}
+  else{document.body.classList.remove('dark');document.getElementById('theme-btn').textContent='🌙 Dark';}
+}
+function toggleTheme(){
+  document.body.classList.toggle('dark');
+  const isDark=document.body.classList.contains('dark');
+  localStorage.setItem('adhash_theme',isDark?'dark':'light');
+  document.getElementById('theme-btn').textContent=isDark?'☀ Light':'🌙 Dark';
+}
+initTheme();
+
+// ── ENTER KEY ──
+document.getElementById('l-email').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('l-pwd').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+// ── SESSION CHECK ──
+async function checkSession(){
+  try{
+    const r=await fetch('/api/auth/session',{cache:'no-store'});
+    const d=await r.json();
+    if(d.authenticated)window.location.href='/landing';
+  }catch(_){}
+}
+
+// ── LOGIN ──
+async function doLogin(){
+  const errEl=document.getElementById('login-err');
+  const btn=document.getElementById('login-btn');
+  errEl.classList.remove('show');errEl.textContent='';
+  btn.disabled=true;btn.textContent='Signing in…';
+  const email=document.getElementById('l-email').value.trim();
+  const password=document.getElementById('l-pwd').value;
+  try{
+    const r=await fetch('/api/auth/login',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,password})
+    });
+    const d=await r.json();
+    if(!r.ok||!d.success)throw new Error(d.message||'Invalid email or password.');
+    window.location.href='/landing';
+  }catch(err){
+    errEl.textContent=err.message;errEl.classList.add('show');
+    btn.disabled=false;btn.textContent='Sign In →';
+  }
+}
+
+checkSession();
+</script>
+</body>
+</html>

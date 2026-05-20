@@ -6,15 +6,81 @@ const { sendZohoMail } = require('./utils/zoho-mail');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 7777;
+const SUPER_ADMIN_EMAIL = 'thenilavan@adhashtech.com';
+const SUPER_ADMIN_PASSWORD = 'Qateam@123';
+const SUPER_ADMIN_ROLE = 'super-admin';
+const AUTH_COOKIE_NAME = 'adhash_auth';
+const AUTH_COOKIE_VALUE = Buffer.from(`${SUPER_ADMIN_EMAIL}:${SUPER_ADMIN_PASSWORD}`).toString('base64url');
 
 // Parse JSON bodies
 app.use(express.json());
+
+function parseCookies(req) {
+    const header = req.headers.cookie || '';
+    return header.split(';').reduce((cookies, part) => {
+        const [rawKey, ...rest] = part.trim().split('=');
+        if (!rawKey) return cookies;
+        cookies[rawKey] = decodeURIComponent(rest.join('='));
+        return cookies;
+    }, {});
+}
+
+function isAuthenticated(req) {
+    const cookies = parseCookies(req);
+    return cookies[AUTH_COOKIE_NAME] === AUTH_COOKIE_VALUE;
+}
+
+function setAuthCookie(res) {
+    res.setHeader(
+        'Set-Cookie',
+        `${AUTH_COOKIE_NAME}=${encodeURIComponent(AUTH_COOKIE_VALUE)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200`
+    );
+}
+
+function clearAuthCookie(res) {
+    res.setHeader(
+        'Set-Cookie',
+        `${AUTH_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
+    );
+}
 
 app.use('/api', (req, res, next) => {
     res.set('Cache-Control', 'no-store');
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
     next();
+});
+
+app.post('/api/auth/login', (req, res) => {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const password = String(req.body?.password || '');
+
+    if (email === SUPER_ADMIN_EMAIL && password === SUPER_ADMIN_PASSWORD) {
+        setAuthCookie(res);
+        return res.json({
+            success: true,
+            role: SUPER_ADMIN_ROLE,
+            redirectTo: '/project-dashboard'
+        });
+    }
+
+    return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password.'
+    });
+});
+
+app.get('/api/auth/session', (req, res) => {
+    const authenticated = isAuthenticated(req);
+    res.json({
+        authenticated,
+        role: authenticated ? SUPER_ADMIN_ROLE : null
+    });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+    clearAuthCookie(res);
+    res.json({ success: true });
 });
 
 // Store test execution status
@@ -2313,12 +2379,52 @@ app.get('/api/project/:id/test-results', (req, res) => {
     }
 });
 
-// Main route - serve project dashboard
+// Main route — redirect authenticated users to landing, otherwise login
 app.get('/', (req, res) => {
+    if (isAuthenticated(req)) {
+        return res.redirect('/landing');
+    }
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    res.sendFile(path.join(__dirname, 'public', 'project-dashboard.html'));
+    return res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Landing page — workspace selector
+app.get('/landing', (req, res) => {
+    if (!isAuthenticated(req)) {
+        return res.redirect('/');
+    }
+    return res.sendFile(path.join(__dirname, 'public', 'landing.html'));
+});
+
+// QA Dashboard
+app.get('/qa-dashboard', (req, res) => {
+    if (!isAuthenticated(req)) {
+        return res.redirect('/');
+    }
+    return res.sendFile(path.join(__dirname, 'public', 'qa-dashboard.html'));
+});
+
+app.get('/project-dashboard', (req, res) => {
+    if (!isAuthenticated(req)) {
+        return res.redirect('/');
+    }
+    return res.sendFile(path.join(__dirname, 'public', 'project-dashboard.html'));
+});
+
+app.get('/project-dashboard.html', (req, res) => {
+    if (!isAuthenticated(req)) {
+        return res.redirect('/');
+    }
+    return res.sendFile(path.join(__dirname, 'public', 'project-dashboard.html'));
+});
+
+app.get('/public/project-dashboard.html', (req, res) => {
+    if (!isAuthenticated(req)) {
+        return res.redirect('/');
+    }
+    return res.sendFile(path.join(__dirname, 'public', 'project-dashboard.html'));
 });
 
 // Legacy dashboard route
