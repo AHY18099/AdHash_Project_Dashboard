@@ -2016,6 +2016,196 @@
         .response-4xx { background: #fef3c7; color: #92400e; }
         .response-5xx { background: #fee2e2; color: #991b1b; }
 
+        /* ── ADD / EDIT PROJECT BUTTON ── */
+        .add-project-btn {
+            display: flex; align-items: center; gap: 8px;
+            padding: 13px 22px;
+            border-radius: 50px;
+            border: 2px solid transparent;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: #fff;
+            font-size: 0.95rem; font-weight: 700;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: 0 4px 18px rgba(0,212,255,0.25);
+            white-space: nowrap;
+        }
+        body.light-mode .add-project-btn { box-shadow: 0 4px 18px rgba(59,130,246,0.25); }
+        .add-project-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,212,255,0.4); }
+        body.light-mode .add-project-btn:hover { box-shadow: 0 8px 28px rgba(59,130,246,0.35); }
+
+        /* project-card edit / delete overlay buttons */
+        .card-actions {
+            position: absolute; top: 12px; right: 12px;
+            display: flex; gap: 6px;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 10;
+        }
+        .project-card:hover .card-actions { opacity: 1; pointer-events: auto; }
+        .card-action-btn {
+            width: 30px; height: 30px;
+            border-radius: 8px; border: none;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .card-action-btn.edit { background: rgba(0,212,255,0.15); color: #00d4ff; }
+        .card-action-btn.del  { background: rgba(239,68,68,0.15);  color: #ef4444; }
+        body.light-mode .card-action-btn.edit { background: rgba(59,130,246,0.15); color: #3b82f6; }
+        .card-action-btn:hover { transform: scale(1.1); }
+
+        /* ── PROJECT MODAL ── */
+        .proj-modal-backdrop {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+            z-index: 9000;
+            display: none; align-items: center; justify-content: center;
+        }
+        .proj-modal-backdrop.open { display: flex; }
+        .proj-modal {
+            background: var(--bg-card);
+            border: 1.5px solid var(--border-color);
+            border-radius: 20px;
+            width: 92%; max-width: 760px;
+            max-height: 92vh;
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+            animation: pmSlideIn 0.22s ease;
+        }
+        @keyframes pmSlideIn { from { opacity:0; transform: translateY(-20px) scale(0.97); } to { opacity:1; transform: none; } }
+        .proj-modal-head {
+            display: flex; align-items: center; gap: 12px;
+            padding: 22px 28px;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .proj-modal-title { font-size: 1.2rem; font-weight: 800; color: var(--text-primary); flex: 1; }
+        .proj-modal-close {
+            width: 32px; height: 32px; border-radius: 8px;
+            border: 1.5px solid var(--border-color);
+            background: transparent; color: var(--text-muted);
+            font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .proj-modal-close:hover { background: rgba(239,68,68,0.12); color: #ef4444; border-color: #ef4444; }
+        .proj-modal-body {
+            flex: 1; overflow-y: auto; padding: 24px 28px;
+            display: flex; flex-direction: column; gap: 20px;
+        }
+        .pm-row { display: flex; gap: 16px; flex-wrap: wrap; }
+        .pm-field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 200px; }
+        .pm-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted); }
+        .pm-input {
+            padding: 10px 14px; border-radius: 10px;
+            border: 1.5px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.95rem; font-family: inherit;
+            transition: border-color 0.2s;
+            outline: none;
+        }
+        .pm-input:focus { border-color: var(--gradient-start); }
+
+        /* Tab bar */
+        .pm-tabs { display: flex; gap: 4px; border-bottom: 1.5px solid var(--border-color); padding-bottom: 0; flex-wrap: wrap; }
+        .pm-tab {
+            padding: 8px 16px; border-radius: 8px 8px 0 0;
+            border: 1.5px solid transparent;
+            border-bottom: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.85rem; font-weight: 600;
+            cursor: pointer; transition: all 0.15s;
+            position: relative; bottom: -1px;
+        }
+        .pm-tab.active {
+            background: var(--bg-card);
+            border-color: var(--border-color);
+            border-bottom-color: var(--bg-card);
+            color: var(--gradient-start);
+        }
+        .pm-panel { display: none; flex-direction: column; gap: 12px; padding-top: 16px; }
+        .pm-panel.active { display: flex; }
+
+        /* URL list entries */
+        .pm-list { display: flex; flex-direction: column; gap: 8px; }
+        .pm-entry {
+            display: flex; align-items: flex-start; gap: 8px;
+            background: var(--bg-secondary);
+            border: 1.5px solid var(--border-color);
+            border-radius: 10px; padding: 10px 12px;
+            position: relative;
+        }
+        .pm-entry-fields { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+        .pm-entry-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .pm-entry-input {
+            flex: 1; min-width: 140px;
+            padding: 7px 10px; border-radius: 8px;
+            border: 1.5px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 0.88rem; font-family: inherit;
+            outline: none;
+        }
+        .pm-entry-input:focus { border-color: var(--gradient-start); }
+        .pm-entry-del {
+            background: none; border: none;
+            color: var(--text-muted); cursor: pointer;
+            font-size: 16px; padding: 4px;
+            border-radius: 6px; transition: color 0.2s;
+            flex-shrink: 0;
+        }
+        .pm-entry-del:hover { color: #ef4444; }
+        .pm-add-entry {
+            display: flex; align-items: center; gap: 6px;
+            padding: 8px 14px; border-radius: 8px;
+            border: 1.5px dashed var(--border-color);
+            background: transparent; color: var(--text-muted);
+            font-size: 0.85rem; font-weight: 600;
+            cursor: pointer; transition: all 0.2s; width: 100%;
+            justify-content: center;
+        }
+        .pm-add-entry:hover { border-color: var(--gradient-start); color: var(--gradient-start); }
+
+        .pm-select {
+            padding: 7px 10px; border-radius: 8px;
+            border: 1.5px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 0.88rem; font-family: inherit;
+            outline: none; cursor: pointer;
+        }
+        .pm-select:focus { border-color: var(--gradient-start); }
+
+        .proj-modal-foot {
+            padding: 16px 28px;
+            border-top: 1px solid var(--border-color);
+            display: flex; justify-content: flex-end; gap: 10px;
+            flex-shrink: 0;
+        }
+        .pm-cancel-btn {
+            padding: 10px 22px; border-radius: 50px;
+            border: 1.5px solid var(--border-color);
+            background: transparent; color: var(--text-muted);
+            font-size: 0.9rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .pm-cancel-btn:hover { border-color: var(--text-muted); color: var(--text-primary); }
+        .pm-save-btn {
+            padding: 10px 28px; border-radius: 50px;
+            border: none;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: #fff; font-size: 0.9rem; font-weight: 700;
+            cursor: pointer; transition: all 0.2s;
+            box-shadow: 0 4px 14px rgba(0,212,255,0.25);
+        }
+        body.light-mode .pm-save-btn { box-shadow: 0 4px 14px rgba(59,130,246,0.25); }
+        .pm-save-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,212,255,0.4); }
+        .pm-save-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .header h1 {
@@ -2054,6 +2244,9 @@
                 <input type="text" id="searchInput" placeholder="🔍 Search projects..." onkeyup="filterProjects()">
             </div>
             <div class="run-all-btn-container">
+                <button class="add-project-btn" onclick="openAddProjectModal()">
+                    ＋ Add Project
+                </button>
                 <button class="run-all-btn" id="runAllBtn" onclick="runAllTests()">
                     ▶ Run All Tests
                 </button>
@@ -2308,7 +2501,11 @@
             grid.innerHTML = buildFailedListHtml() + sortedProjects.map((project, index) => {
                 const cardStyleClass = `card-style-${(index % 5) + 1}`;
                 return `
-                <div class="project-card ${cardStyleClass}" style="--project-color: ${project.color}" onclick="openProjectDetail('${project.id}')">
+                <div class="project-card ${cardStyleClass}" style="--project-color: ${project.color}; position:relative;" onclick="openProjectDetail('${project.id}')">
+                    <div class="card-actions" onclick="event.stopPropagation()">
+                        <button class="card-action-btn edit" onclick="openEditProjectModal('${project.id}')" title="Edit project">✏️</button>
+                        <button class="card-action-btn del" onclick="deleteProject('${project.id}','${escapeHtml(project.name)}')" title="Delete project">🗑️</button>
+                    </div>
                     <div class="project-header">
                         <div class="project-name">${project.name}</div>
                         <div class="project-description">${project.description}</div>
@@ -3681,6 +3878,286 @@
 
         // Load logs on page load
         loadServerLogs();
+    </script>
+
+    <!-- ══ ADD / EDIT PROJECT MODAL ══════════════════════════════════════════ -->
+    <div class="proj-modal-backdrop" id="projModalBackdrop" onclick="closeProjModal(event)">
+      <div class="proj-modal" onclick="event.stopPropagation()">
+        <div class="proj-modal-head">
+          <span style="font-size:1.4rem" id="pmTitleIcon">➕</span>
+          <div class="proj-modal-title" id="pmTitle">Add New Project</div>
+          <button class="proj-modal-close" onclick="closeProjModal()">✕</button>
+        </div>
+        <div class="proj-modal-body">
+          <!-- Basic info -->
+          <div class="pm-row">
+            <div class="pm-field" style="flex:1 1 160px">
+              <label class="pm-label">Project ID *</label>
+              <input class="pm-input" id="pmId" placeholder="e.g. myproject" />
+            </div>
+            <div class="pm-field" style="flex:2 1 200px">
+              <label class="pm-label">Project Name *</label>
+              <input class="pm-input" id="pmName" placeholder="e.g. My Project" />
+            </div>
+            <div class="pm-field" style="flex:0 0 80px">
+              <label class="pm-label">Color</label>
+              <input class="pm-input" type="color" id="pmColor" value="#3b82f6" style="padding:4px;height:42px;cursor:pointer" />
+            </div>
+          </div>
+          <div class="pm-field">
+            <label class="pm-label">Description</label>
+            <input class="pm-input" id="pmDesc" placeholder="Short project description" />
+          </div>
+
+          <!-- URL tabs -->
+          <div>
+            <div class="pm-tabs">
+              <button class="pm-tab active" onclick="switchPmTab('apps',this)">📱 Apps</button>
+              <button class="pm-tab" onclick="switchPmTab('servers',this)">🖥️ Servers</button>
+              <button class="pm-tab" onclick="switchPmTab('ssl',this)">🔒 SSL Certs</button>
+              <button class="pm-tab" onclick="switchPmTab('domains',this)">🌐 Domains</button>
+              <button class="pm-tab" onclick="switchPmTab('apis',this)">⚡ APIs</button>
+            </div>
+
+            <!-- Apps panel -->
+            <div class="pm-panel active" id="pm-panel-apps">
+              <div class="pm-list" id="pm-list-apps"></div>
+              <button class="pm-add-entry" onclick="addPmEntry('apps')">＋ Add App</button>
+            </div>
+            <!-- Servers panel -->
+            <div class="pm-panel" id="pm-panel-servers">
+              <div class="pm-list" id="pm-list-servers"></div>
+              <button class="pm-add-entry" onclick="addPmEntry('servers')">＋ Add Server URL</button>
+            </div>
+            <!-- SSL panel -->
+            <div class="pm-panel" id="pm-panel-ssl">
+              <div class="pm-list" id="pm-list-ssl"></div>
+              <button class="pm-add-entry" onclick="addPmEntry('ssl')">＋ Add SSL Domain</button>
+            </div>
+            <!-- Domains panel -->
+            <div class="pm-panel" id="pm-panel-domains">
+              <div class="pm-list" id="pm-list-domains"></div>
+              <button class="pm-add-entry" onclick="addPmEntry('domains')">＋ Add Domain</button>
+            </div>
+            <!-- APIs panel -->
+            <div class="pm-panel" id="pm-panel-apis">
+              <div class="pm-list" id="pm-list-apis"></div>
+              <button class="pm-add-entry" onclick="addPmEntry('apis')">＋ Add API Endpoint</button>
+            </div>
+          </div>
+        </div>
+        <div class="proj-modal-foot">
+          <button class="pm-cancel-btn" onclick="closeProjModal()">Cancel</button>
+          <button class="pm-save-btn" id="pmSaveBtn" onclick="saveProjModal()">Save Project</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    // ── PROJECT MODAL STATE ────────────────────────────────────────────────────
+    let pmEditId = null; // null = create, string = edit
+
+    function openAddProjectModal() {
+        pmEditId = null;
+        document.getElementById('pmTitle').textContent = 'Add New Project';
+        document.getElementById('pmTitleIcon').textContent = '➕';
+        document.getElementById('pmId').value = '';
+        document.getElementById('pmId').disabled = false;
+        document.getElementById('pmName').value = '';
+        document.getElementById('pmDesc').value = '';
+        document.getElementById('pmColor').value = '#3b82f6';
+        clearAllPmLists();
+        switchPmTab('apps', document.querySelector('.pm-tab'));
+        document.getElementById('projModalBackdrop').classList.add('open');
+    }
+
+    function openEditProjectModal(projectId) {
+        const project = projectsData.find(p => p.id === projectId);
+        if (!project) return;
+        pmEditId = projectId;
+        document.getElementById('pmTitle').textContent = 'Edit Project';
+        document.getElementById('pmTitleIcon').textContent = '✏️';
+        document.getElementById('pmId').value = project.id;
+        document.getElementById('pmId').disabled = true;
+        document.getElementById('pmName').value = project.name;
+        document.getElementById('pmDesc').value = project.description || '';
+        document.getElementById('pmColor').value = project.color || '#3b82f6';
+        clearAllPmLists();
+        (project.apps || []).forEach(a => addPmEntry('apps', a));
+        (project.servers || []).forEach(s => addPmEntry('servers', s));
+        (project.sslCerts || []).forEach(d => addPmEntry('ssl', d));
+        (project.domains || []).forEach(d => addPmEntry('domains', d));
+        (project.apis || []).forEach(a => addPmEntry('apis', a));
+        switchPmTab('apps', document.querySelector('.pm-tab'));
+        document.getElementById('projModalBackdrop').classList.add('open');
+    }
+
+    function closeProjModal(e) {
+        if (e && e.target !== document.getElementById('projModalBackdrop')) return;
+        document.getElementById('projModalBackdrop').classList.remove('open');
+    }
+
+    function switchPmTab(name, btn) {
+        document.querySelectorAll('.pm-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.pm-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('pm-panel-' + name).classList.add('active');
+    }
+
+    function clearAllPmLists() {
+        ['apps','servers','ssl','domains','apis'].forEach(k => {
+            document.getElementById('pm-list-' + k).innerHTML = '';
+        });
+    }
+
+    // Build entry row depending on type
+    function addPmEntry(type, data) {
+        const list = document.getElementById('pm-list-' + type);
+        const div = document.createElement('div');
+        div.className = 'pm-entry';
+
+        let inner = '<div class="pm-entry-fields">';
+        if (type === 'apps') {
+            const name = (data && data.name) || '';
+            const ps = (data && data.playStore) || '';
+            const as = (data && data.appStore) || '';
+            inner += `<div class="pm-entry-row">
+              <input class="pm-entry-input" placeholder="App name" data-key="name" value="${escapeHtml(name)}" />
+            </div>
+            <div class="pm-entry-row">
+              <input class="pm-entry-input" placeholder="Play Store ID (e.g. com.example.app)" data-key="playStore" value="${escapeHtml(ps)}" />
+              <input class="pm-entry-input" placeholder="App Store ID (e.g. id123456)" data-key="appStore" value="${escapeHtml(as)}" />
+            </div>`;
+        } else if (type === 'servers') {
+            const name = (data && data.name) || '';
+            const url = (data && data.url) || '';
+            const stype = (data && data.type) || 'web';
+            inner += `<div class="pm-entry-row">
+              <input class="pm-entry-input" placeholder="Name" data-key="name" value="${escapeHtml(name)}" style="flex:1 1 120px" />
+              <select class="pm-select" data-key="type">
+                <option value="web" ${stype==='web'?'selected':''}>web</option>
+                <option value="api" ${stype==='api'?'selected':''}>api</option>
+                <option value="admin" ${stype==='admin'?'selected':''}>admin</option>
+                <option value="service" ${stype==='service'?'selected':''}>service</option>
+              </select>
+            </div>
+            <div class="pm-entry-row">
+              <input class="pm-entry-input" placeholder="URL (https://...)" data-key="url" value="${escapeHtml(url)}" />
+            </div>`;
+        } else if (type === 'ssl') {
+            const domain = typeof data === 'string' ? data : (data || '');
+            inner += `<div class="pm-entry-row">
+              <input class="pm-entry-input" placeholder="Domain (e.g. example.com)" data-key="domain" value="${escapeHtml(domain)}" />
+            </div>`;
+        } else if (type === 'domains') {
+            const domain = typeof data === 'string' ? data : (data || '');
+            inner += `<div class="pm-entry-row">
+              <input class="pm-entry-input" placeholder="Domain (e.g. example.com)" data-key="domain" value="${escapeHtml(domain)}" />
+            </div>`;
+        } else if (type === 'apis') {
+            const name = (data && data.name) || '';
+            const url = (data && data.url) || '';
+            const method = (data && data.method) || 'GET';
+            inner += `<div class="pm-entry-row">
+              <input class="pm-entry-input" placeholder="Endpoint name" data-key="name" value="${escapeHtml(name)}" style="flex:2" />
+              <select class="pm-select" data-key="method">
+                <option value="GET" ${method==='GET'?'selected':''}>GET</option>
+                <option value="POST" ${method==='POST'?'selected':''}>POST</option>
+                <option value="PUT" ${method==='PUT'?'selected':''}>PUT</option>
+                <option value="DELETE" ${method==='DELETE'?'selected':''}>DELETE</option>
+                <option value="PATCH" ${method==='PATCH'?'selected':''}>PATCH</option>
+              </select>
+            </div>
+            <div class="pm-entry-row">
+              <input class="pm-entry-input" placeholder="URL (https://...)" data-key="url" value="${escapeHtml(url)}" />
+            </div>`;
+        }
+        inner += '</div>';
+        inner += '<button class="pm-entry-del" onclick="this.closest(\'.pm-entry\').remove()" title="Remove">✕</button>';
+        div.innerHTML = inner;
+        list.appendChild(div);
+    }
+
+    function collectPmEntries(type) {
+        const list = document.getElementById('pm-list-' + type);
+        const entries = [];
+        list.querySelectorAll('.pm-entry').forEach(entry => {
+            if (type === 'apps') {
+                const name = entry.querySelector('[data-key="name"]').value.trim();
+                const playStore = entry.querySelector('[data-key="playStore"]').value.trim();
+                const appStore = entry.querySelector('[data-key="appStore"]').value.trim();
+                if (name || playStore || appStore) entries.push({ name, playStore, appStore });
+            } else if (type === 'servers') {
+                const name = entry.querySelector('[data-key="name"]').value.trim();
+                const url = entry.querySelector('[data-key="url"]').value.trim();
+                const stype = entry.querySelector('[data-key="type"]').value;
+                if (url) entries.push({ name, url, type: stype });
+            } else if (type === 'ssl' || type === 'domains') {
+                const domain = entry.querySelector('[data-key="domain"]').value.trim();
+                if (domain) entries.push(domain);
+            } else if (type === 'apis') {
+                const name = entry.querySelector('[data-key="name"]').value.trim();
+                const url = entry.querySelector('[data-key="url"]').value.trim();
+                const method = entry.querySelector('[data-key="method"]').value;
+                if (url) entries.push({ name, url, method });
+            }
+        });
+        return entries;
+    }
+
+    async function saveProjModal() {
+        const id = document.getElementById('pmId').value.trim().toLowerCase().replace(/\s+/g, '-');
+        const name = document.getElementById('pmName').value.trim();
+        if (!name) { alert('Project name is required.'); return; }
+        if (!pmEditId && !id) { alert('Project ID is required.'); return; }
+
+        const payload = {
+            name,
+            description: document.getElementById('pmDesc').value.trim(),
+            color: document.getElementById('pmColor').value,
+            apps: collectPmEntries('apps'),
+            servers: collectPmEntries('servers'),
+            sslCerts: collectPmEntries('ssl'),
+            domains: collectPmEntries('domains'),
+            apis: collectPmEntries('apis')
+        };
+        if (!pmEditId) payload.id = id;
+
+        const btn = document.getElementById('pmSaveBtn');
+        btn.disabled = true;
+        btn.textContent = 'Saving…';
+
+        try {
+            const url = pmEditId ? `/api/projects/${pmEditId}` : '/api/projects';
+            const method = pmEditId ? 'PUT' : 'POST';
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Server error');
+            document.getElementById('projModalBackdrop').classList.remove('open');
+            await loadProjects();
+        } catch (err) {
+            alert('Failed to save project: ' + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Save Project';
+        }
+    }
+
+    async function deleteProject(projectId, projectName) {
+        if (!confirm(`Delete project "${projectName}"?\n\nThis will remove it from all test suites.`)) return;
+        try {
+            const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Server error');
+            await loadProjects();
+        } catch (err) {
+            alert('Failed to delete project: ' + err.message);
+        }
+    }
     </script>
 </body>
 </html>

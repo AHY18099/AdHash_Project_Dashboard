@@ -13,8 +13,12 @@
           "type": "web"
         }
       ],
-      "domains": ["adhashtech.com"],
-      "sslCerts": ["adhashtech.com"],
+      "domains": [
+        "adhashtech.com"
+      ],
+      "sslCerts": [
+        "adhashtech.com"
+      ],
       "apis": [
         {
           "name": "AdHash Website",
@@ -47,8 +51,16 @@
           "type": "admin"
         }
       ],
-      "domains": ["wavedin.app", "mobileliveapi.wavedin.app", "superadmin.wavedin.app"],
-      "sslCerts": ["superadmin.wavedin.app", "market.wavedin.app", "mobileliveapi.wavedin.app"],
+      "domains": [
+        "wavedin.app",
+        "mobileliveapi.wavedin.app",
+        "superadmin.wavedin.app"
+      ],
+      "sslCerts": [
+        "superadmin.wavedin.app",
+        "market.wavedin.app",
+        "mobileliveapi.wavedin.app"
+      ],
       "apis": [
         {
           "name": "WavedIn App Login",
@@ -89,8 +101,14 @@
           "type": "web"
         }
       ],
-      "domains": ["algomax.co", "gopocket.algomax.co"],
-      "sslCerts": ["prosky.algomax.co", "gopocket.algomax.co"],
+      "domains": [
+        "algomax.co",
+        "gopocket.algomax.co"
+      ],
+      "sslCerts": [
+        "prosky.algomax.co",
+        "gopocket.algomax.co"
+      ],
       "apis": [
         {
           "name": "Algomax ProSky Web",
@@ -153,8 +171,19 @@
           "type": "api"
         }
       ],
-      "domains": ["autochecker.com", "manage.autochecker.com", "manageadminapi.autochecker.com", "managemobileapi.autochecker.com", "ebaydev.autochecker.com"],
-      "sslCerts": ["manageadminapi.autochecker.com", "ebaydev.autochecker.com", "managemobileapi.autochecker.com", "manage.autochecker.com"],
+      "domains": [
+        "autochecker.com",
+        "manage.autochecker.com",
+        "manageadminapi.autochecker.com",
+        "managemobileapi.autochecker.com",
+        "ebaydev.autochecker.com"
+      ],
+      "sslCerts": [
+        "manageadminapi.autochecker.com",
+        "ebaydev.autochecker.com",
+        "managemobileapi.autochecker.com",
+        "manage.autochecker.com"
+      ],
       "apis": [
         {
           "name": "AutoChecker Login UI",
@@ -219,8 +248,14 @@
           "type": "api"
         }
       ],
-      "domains": ["synctag.com", "spark.synctag.com"],
-      "sslCerts": ["spark.synctag.com", "sparkanalytics.synctag.com"],
+      "domains": [
+        "synctag.com",
+        "spark.synctag.com"
+      ],
+      "sslCerts": [
+        "spark.synctag.com",
+        "sparkanalytics.synctag.com"
+      ],
       "apis": [
         {
           "name": "Sparkme App Login",
@@ -264,8 +299,22 @@
           "type": "api"
         }
       ],
-      "domains": ["humee.com", "humee.io", "api.humee.com", "dashboard.humee.com", "desktop.humee.com", "participant.humee.com", "cpa.humee.com", "apiparticipant.humee.com"],
-      "sslCerts": ["humee.com", "api.humee.com", "dashboard.humee.com", "desktop.humee.com"],
+      "domains": [
+        "humee.com",
+        "humee.io",
+        "api.humee.com",
+        "dashboard.humee.com",
+        "desktop.humee.com",
+        "participant.humee.com",
+        "cpa.humee.com",
+        "apiparticipant.humee.com"
+      ],
+      "sslCerts": [
+        "humee.com",
+        "api.humee.com",
+        "dashboard.humee.com",
+        "desktop.humee.com"
+      ],
       "apis": [
         {
           "name": "Humee Admin Web UI",
@@ -322,8 +371,12 @@
           "type": "web"
         }
       ],
-      "domains": ["metcalf.ai"],
-      "sslCerts": ["metcalf.ai"],
+      "domains": [
+        "metcalf.ai"
+      ],
+      "sslCerts": [
+        "metcalf.ai"
+      ],
       "apis": [
         {
           "name": "Metcalf UI",
@@ -350,8 +403,18 @@
           "type": "admin"
         }
       ],
-      "domains": ["api.aisignpro.com", "admin.aisignpro.com", "cpa.aisignpro.com", "ddp.aisignpro.com"],
-      "sslCerts": ["api.aisignpro.com", "admin.aisignpro.com", "cpa.aisignpro.com", "ddp.aisignpro.com"],
+      "domains": [
+        "api.aisignpro.com",
+        "admin.aisignpro.com",
+        "cpa.aisignpro.com",
+        "ddp.aisignpro.com"
+      ],
+      "sslCerts": [
+        "api.aisignpro.com",
+        "admin.aisignpro.com",
+        "cpa.aisignpro.com",
+        "ddp.aisignpro.com"
+      ],
       "apis": [
         {
           "name": "AiSignPro SuperAdmin UI",
@@ -523,8 +586,16 @@
           "type": "web"
         }
       ],
-      "domains": ["zapcrm.io", "api.zapcrm.io", "secure.zapcrm.io", "social.zapcrm.io"],
-      "sslCerts": ["zapcrm.io", "api.zapcrm.io"],
+      "domains": [
+        "zapcrm.io",
+        "api.zapcrm.io",
+        "secure.zapcrm.io",
+        "social.zapcrm.io"
+      ],
+      "sslCerts": [
+        "zapcrm.io",
+        "api.zapcrm.io"
+      ],
       "apis": [
         {
           "name": "ZapCRM UI",
@@ -556,8 +627,12 @@
           "type": "web"
         }
       ],
-      "domains": ["lead.zapcrm.io"],
-      "sslCerts": ["lead.zapcrm.io"],
+      "domains": [
+        "lead.zapcrm.io"
+      ],
+      "sslCerts": [
+        "lead.zapcrm.io"
+      ],
       "apis": [
         {
           "name": "Lead ZapCRM UI",
@@ -579,8 +654,13 @@
           "type": "web"
         }
       ],
-      "domains": ["zapai.us", "www.zapai.us"],
-      "sslCerts": ["www.zapai.us"],
+      "domains": [
+        "zapai.us",
+        "www.zapai.us"
+      ],
+      "sslCerts": [
+        "www.zapai.us"
+      ],
       "apis": [
         {
           "name": "ZapAI UI",
@@ -591,33 +671,39 @@
       ]
     },
     {
-  "id": "smc",
-  "name": "SMC",
-  "description": "Send Movie Clips Platform",
-  "color": "#14b8a6",
-  "apps": [
-    {
+      "id": "smc",
       "name": "SMC",
-      "playStore": "https://play.google.com/store/apps/details?id=com.smclips",
-      "appStore": null
-    }
-  ],
-  "servers": [
-    {
-      "name": "SMC - API",
-      "url": "https://api.sendmovieclips.com/",
-      "type": "api"
-    }
-  ],
-  "domains": ["sendmovieclips.com", "api.sendmovieclips.com"],
-  "sslCerts": ["api.sendmovieclips.com"],
-"apis": [
-  {
-    "name": "SMC API",
-    "url": "https://api.sendmovieclips.com/",
-    "method": "GET"
-  }
-]},
+      "description": "Send Movie Clips Platform",
+      "color": "#14b8a6",
+      "apps": [
+        {
+          "name": "SMC",
+          "playStore": "https://play.google.com/store/apps/details?id=com.smclips",
+          "appStore": null
+        }
+      ],
+      "servers": [
+        {
+          "name": "SMC - API",
+          "url": "https://api.sendmovieclips.com/",
+          "type": "api"
+        }
+      ],
+      "domains": [
+        "sendmovieclips.com",
+        "api.sendmovieclips.com"
+      ],
+      "sslCerts": [
+        "api.sendmovieclips.com"
+      ],
+      "apis": [
+        {
+          "name": "SMC API",
+          "url": "https://api.sendmovieclips.com/",
+          "method": "GET"
+        }
+      ]
+    },
     {
       "id": "synctrade",
       "name": "SyncTrade",
@@ -625,8 +711,13 @@
       "color": "#0ea5e9",
       "apps": [],
       "servers": [],
-      "domains": ["synctrade.ai"],
-      "sslCerts": ["synctrade.ai", "nse.synctrade.ai"],
+      "domains": [
+        "synctrade.ai"
+      ],
+      "sslCerts": [
+        "synctrade.ai",
+        "nse.synctrade.ai"
+      ],
       "apis": [
         {
           "name": "SyncTrade SuperAdmin Login Number",
@@ -676,331 +767,331 @@
         }
       ]
     },
-{
-  "id": "synctag",
-  "name": "Synctag",
-  "description": "Social Media Tagging Platform",
-  "color": "#22c55e",
-  "apps": [],
-  "servers": [
     {
-      "name": "Synctag - API",
-      "url": "https://extensionapi.synctag.com/",
-      "type": "api"
+      "id": "synctag",
+      "name": "Synctag",
+      "description": "Social Media Tagging Platform",
+      "color": "#22c55e",
+      "apps": [],
+      "servers": [
+        {
+          "name": "Synctag - API",
+          "url": "https://extensionapi.synctag.com/",
+          "type": "api"
+        },
+        {
+          "name": "Synctag - Web",
+          "url": "https://synctag.com/",
+          "type": "web"
+        }
+      ],
+      "domains": [
+        "synctag.com",
+        "extensionapi.synctag.com"
+      ],
+      "sslCerts": [
+        "synctag.com",
+        "extensionapi.synctag.com"
+      ],
+      "apis": [
+        {
+          "name": "Admin Web UI",
+          "url": "https://www.synctag.com",
+          "method": "GET"
+        },
+        {
+          "name": "Send OTP",
+          "url": "https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key=AIzaSyArKT5Wgkm05nacl3cHo-gT4gbeYSNdUrw",
+          "method": "POST",
+          "expectedStatus": 200,
+          "body": {
+            "phoneNumber": "+918888888888",
+            "clientType": "CLIENT_TYPE_WEB",
+            "captchaResponse": "NO_RECAPTCHA",
+            "recaptchaVersion": "RECAPTCHA_ENTERPRISE",
+            "recaptchaToken": "0cAFcWeA5Dry3c5kUBNJ9I1mhBspa6tq9cFgzvyqP-PjlEfKlMeBcIGbI8eskxIVvb3khkxZHtHKy1hhsfTtqOrnLxjR3Hf1ORPjRrHpptSzi6426ISbtfest5ut1pgtoBN4Wbur9OViAno8vifbcnpdaTaXRcpJsxQ5jfh92PUhm65sUFkBvW2Jq5Lsex8qWvQt8XjFouQ8L3fgUhHyk3R8YgG1kHoePw6929gjVmxVdiLQ1M1_dLZJtbe-ei9V6NURJPVdSdYlaIZTewCJp7N3DquSvCCF8Bk1_EjDTEKC-cWhel9DOC5EQBm3WYO0lYDJR8GtZrOIFFF6uk6a3r1OWWWN4q_CwlNCJPvKuDtoLOLNZduzwTe3LWV45wUj4gs6krmRl-dt1ilQF6zmSa9GA_q2QCmb1-KfoVDAJ9AKYsyPvRCXxOLwqFpK7FOq_xktQWLgcNtfr0Y6huh6NsDRQ55L5r2dnuU8S23_Cszr5INR-0gslXvbKZVOIEFCzWVJo1-5eEqNsOfupS-fF33TG8nImRhNVApYWJQHcz-ZXhjUTd7M_D7mTdp1XzQc_L6IKlZ-Zc_8-ZcUUxbhmHSfAUrcVl-x1hhY8y5BvPoZYu1e6rC4pL3z20D5oV5bZ8D3Y2nYYFaQeGaIDD6oB1F295FOtVkmPqqCnXhkHIg9_h66vRkjtBkJCC8m-3Tl2GkXkLLpmMaAy4cmK6VCJqixb-ZVf2IlPmJYRFcveg27RDjcWg6ZmeDXYkRCSCw4FrZLxDJb2X0aRqg-4PNs_WBuPMvgJFjm7LR5LD24p8OX5vz_oOoz_Zn3VMpPFNawJ0Y2ii6A4-nJPxhvrp_waL_gn_BsWMkT0d5a0032LgPbEiyJOazMQOo_RW0HfHou2fm_FFaBLmp6XOsta5IlG_q5MIct1b0D1tiUDa4Vdv-sZxDMu473U0Dyo"
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyArKT5Wgkm05nacl3cHo-gT4gbeYSNdUrw",
+          "method": "POST",
+          "expectedStatus": 200,
+          "body": {
+            "sessionInfo": "AD8T5IvpkW05qqT6tFrdNTEZHzjD0zT7G42N_9sScmh_gENvTwyafsJ5CnG5dWgyQOUP-BNUXX-9J_dbsTcT5UvIy8uAkmS0bKleujyBojZs1siV0Y3-z0FjzHja9_zvvsecMkqgMFQX_6p2HElULoAimVKqLiUOjA",
+            "code": "987650"
+          }
+        },
+        {
+          "name": "Login API",
+          "url": "https://extensionapi.synctag.com/api/auth/login",
+          "method": "POST",
+          "expectedStatus": 201,
+          "body": {
+            "encryptedData": "jowOtQkMYKZNEiq4buHhmIMT0oKDeMh7+s/n7PfbnvONYEpJzP2KpWdiKXiPTAIWMf9VZtpSVC5Yqx1lsYBk5g=="
+          }
+        }
+      ]
     },
     {
-      "name": "Synctag - Web",
-      "url": "https://synctag.com/",
-      "type": "web"
+      "id": "ddp",
+      "name": "DDP",
+      "description": "Due Diligence Project",
+      "color": "#0f766e",
+      "apps": [],
+      "servers": [
+        {
+          "name": "DDP - Website",
+          "url": "https://www.ddphub.ai/",
+          "type": "web"
+        },
+        {
+          "name": "DDP - Supabase",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/",
+          "type": "api"
+        }
+      ],
+      "domains": [
+        "www.ddphub.ai",
+        "twfnwlccyudfgqjmmdva.supabase.co"
+      ],
+      "sslCerts": [
+        "www.ddphub.ai",
+        "twfnwlccyudfgqjmmdva.supabase.co"
+      ],
+      "apis": [
+        {
+          "name": "DDP Website",
+          "url": "https://www.ddphub.ai/",
+          "method": "GET",
+          "expectedStatus": 200
+        },
+        {
+          "name": "Super Admin - Login with Email",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/token?grant_type=password",
+          "method": "POST",
+          "expectedStatus": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}"
+          },
+          "body": {
+            "email": "superadmin@ddp.events",
+            "password": "Admin@123",
+            "gotrue_meta_security": {}
+          },
+          "capture": {
+            "accessToken": "access_token"
+          }
+        },
+        {
+          "name": "Super Admin - Send OTP",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/functions/v1/send-otp",
+          "method": "POST",
+          "expectedStatus": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
+            "Authorization": "Bearer {{Super Admin - Login with Email.accessToken|DDP_SUPER_ADMIN_ACCESS_TOKEN}}"
+          },
+          "body": {
+            "email": "superadmin@ddp.events",
+            "userId": "2af47393-51cb-4d50-a80d-521d541e7646",
+            "purpose": "login"
+          }
+        },
+        {
+          "name": "Super Admin - Login",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/user",
+          "method": "GET",
+          "expectedStatus": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
+            "Authorization": "Bearer {{Super Admin - Login with Email.accessToken|DDP_SUPER_ADMIN_ACCESS_TOKEN}}"
+          }
+        },
+        {
+          "name": "DDP Admin - Login with Email",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/token?grant_type=password",
+          "method": "POST",
+          "expectedStatus": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}"
+          },
+          "body": {
+            "email": "ddpadmin@ddp.events",
+            "password": "Admin@123",
+            "gotrue_meta_security": {}
+          },
+          "capture": {
+            "accessToken": "access_token"
+          }
+        },
+        {
+          "name": "DDP Admin - Send OTP",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/functions/v1/send-otp",
+          "method": "POST",
+          "expectedStatus": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
+            "Authorization": "Bearer {{DDP Admin - Login with Email.accessToken|DDP_ADMIN_ACCESS_TOKEN}}"
+          },
+          "body": {
+            "email": "ddpadmin@ddp.events",
+            "userId": "fb3505fc-45e6-4f58-a397-92be20cc5b24",
+            "purpose": "login"
+          }
+        },
+        {
+          "name": "DDP Admin - Login",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/user",
+          "method": "GET",
+          "expectedStatus": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
+            "Authorization": "Bearer {{DDP Admin - Login with Email.accessToken|DDP_ADMIN_ACCESS_TOKEN}}"
+          }
+        },
+        {
+          "name": "Solo Admin - Login with Email",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/token?grant_type=password",
+          "method": "POST",
+          "expectedStatus": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}"
+          },
+          "body": {
+            "email": "solo@ddp.events",
+            "password": "Admin@123",
+            "gotrue_meta_security": {}
+          },
+          "capture": {
+            "accessToken": "access_token"
+          }
+        },
+        {
+          "name": "Solo Admin - Send OTP",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/functions/v1/send-otp",
+          "method": "POST",
+          "expectedStatus": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
+            "Authorization": "Bearer {{Solo Admin - Login with Email.accessToken|DDP_SOLO_ADMIN_ACCESS_TOKEN}}"
+          },
+          "body": {
+            "email": "solo@ddp.events",
+            "userId": "2690870c-5be9-4c91-b178-6c7cc1d595ae",
+            "purpose": "login"
+          }
+        },
+        {
+          "name": "Solo Admin - Login",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/user",
+          "method": "GET",
+          "expectedStatus": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
+            "Authorization": "Bearer {{Solo Admin - Login with Email.accessToken|DDP_SOLO_ADMIN_ACCESS_TOKEN}}"
+          }
+        },
+        {
+          "name": "Business Admin - Login with Email",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/token?grant_type=password",
+          "method": "POST",
+          "expectedStatus": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}"
+          },
+          "body": {
+            "email": "businessowner@ddp.events",
+            "password": "Admin@123",
+            "gotrue_meta_security": {}
+          },
+          "capture": {
+            "accessToken": "access_token"
+          }
+        },
+        {
+          "name": "Business Admin - Send OTP",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/functions/v1/send-otp",
+          "method": "POST",
+          "expectedStatus": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
+            "Authorization": "Bearer {{Business Admin - Login with Email.accessToken|DDP_BUSINESS_ADMIN_ACCESS_TOKEN}}"
+          },
+          "body": {
+            "email": "businessowner@ddp.events",
+            "userId": "05af6ba8-bda2-4083-9d1b-0aabd98e1660",
+            "purpose": "login"
+          }
+        },
+        {
+          "name": "Business Admin - Login",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/user",
+          "method": "GET",
+          "expectedStatus": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
+            "Authorization": "Bearer {{Business Admin - Login with Email.accessToken|DDP_BUSINESS_ADMIN_ACCESS_TOKEN}}"
+          }
+        },
+        {
+          "name": "Sponsor Admin - Login with Email",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/token?grant_type=password",
+          "method": "POST",
+          "expectedStatus": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}"
+          },
+          "body": {
+            "email": "sponsors@ddp.events",
+            "password": "Admin@123",
+            "gotrue_meta_security": {}
+          },
+          "capture": {
+            "accessToken": "access_token"
+          }
+        },
+        {
+          "name": "Sponsor Admin - Send OTP",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/functions/v1/send-otp",
+          "method": "POST",
+          "expectedStatus": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
+            "Authorization": "Bearer {{Sponsor Admin - Login with Email.accessToken|DDP_SPONSOR_ADMIN_ACCESS_TOKEN}}"
+          },
+          "body": {
+            "email": "sponsors@ddp.events",
+            "userId": "086def2b-3eff-4ae7-b442-a472de2bb9c7",
+            "purpose": "login"
+          }
+        },
+        {
+          "name": "Sponsor Admin - Login",
+          "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/user",
+          "method": "GET",
+          "expectedStatus": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
+            "Authorization": "Bearer {{Sponsor Admin - Login with Email.accessToken|DDP_SPONSOR_ADMIN_ACCESS_TOKEN}}"
+          }
+        }
+      ]
     }
-  ],
-  "domains": [
-    "synctag.com",
-    "extensionapi.synctag.com"
-  ],
-  "sslCerts": [
-    "synctag.com",
-    "extensionapi.synctag.com"
-  ],
-  "apis": [
-    {
-      "name": "Admin Web UI",
-      "url": "https://www.synctag.com",
-      "method": "GET"
-    },
-    {
-      "name": "Send OTP",
-      "url": "https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key=AIzaSyArKT5Wgkm05nacl3cHo-gT4gbeYSNdUrw",
-      "method": "POST",
-      "expectedStatus": 200,
-      "body": {
-        "phoneNumber": "+918888888888",
-        "clientType": "CLIENT_TYPE_WEB",
-        "captchaResponse": "NO_RECAPTCHA",
-        "recaptchaVersion": "RECAPTCHA_ENTERPRISE",
-        "recaptchaToken": "0cAFcWeA5Dry3c5kUBNJ9I1mhBspa6tq9cFgzvyqP-PjlEfKlMeBcIGbI8eskxIVvb3khkxZHtHKy1hhsfTtqOrnLxjR3Hf1ORPjRrHpptSzi6426ISbtfest5ut1pgtoBN4Wbur9OViAno8vifbcnpdaTaXRcpJsxQ5jfh92PUhm65sUFkBvW2Jq5Lsex8qWvQt8XjFouQ8L3fgUhHyk3R8YgG1kHoePw6929gjVmxVdiLQ1M1_dLZJtbe-ei9V6NURJPVdSdYlaIZTewCJp7N3DquSvCCF8Bk1_EjDTEKC-cWhel9DOC5EQBm3WYO0lYDJR8GtZrOIFFF6uk6a3r1OWWWN4q_CwlNCJPvKuDtoLOLNZduzwTe3LWV45wUj4gs6krmRl-dt1ilQF6zmSa9GA_q2QCmb1-KfoVDAJ9AKYsyPvRCXxOLwqFpK7FOq_xktQWLgcNtfr0Y6huh6NsDRQ55L5r2dnuU8S23_Cszr5INR-0gslXvbKZVOIEFCzWVJo1-5eEqNsOfupS-fF33TG8nImRhNVApYWJQHcz-ZXhjUTd7M_D7mTdp1XzQc_L6IKlZ-Zc_8-ZcUUxbhmHSfAUrcVl-x1hhY8y5BvPoZYu1e6rC4pL3z20D5oV5bZ8D3Y2nYYFaQeGaIDD6oB1F295FOtVkmPqqCnXhkHIg9_h66vRkjtBkJCC8m-3Tl2GkXkLLpmMaAy4cmK6VCJqixb-ZVf2IlPmJYRFcveg27RDjcWg6ZmeDXYkRCSCw4FrZLxDJb2X0aRqg-4PNs_WBuPMvgJFjm7LR5LD24p8OX5vz_oOoz_Zn3VMpPFNawJ0Y2ii6A4-nJPxhvrp_waL_gn_BsWMkT0d5a0032LgPbEiyJOazMQOo_RW0HfHou2fm_FFaBLmp6XOsta5IlG_q5MIct1b0D1tiUDa4Vdv-sZxDMu473U0Dyo"
-      }
-    },
-    {
-      "name": "Verify OTP",
-      "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyArKT5Wgkm05nacl3cHo-gT4gbeYSNdUrw",
-      "method": "POST",
-      "expectedStatus": 200,
-      "body": {
-        "sessionInfo": "AD8T5IvpkW05qqT6tFrdNTEZHzjD0zT7G42N_9sScmh_gENvTwyafsJ5CnG5dWgyQOUP-BNUXX-9J_dbsTcT5UvIy8uAkmS0bKleujyBojZs1siV0Y3-z0FjzHja9_zvvsecMkqgMFQX_6p2HElULoAimVKqLiUOjA",
-        "code": "987650"
-      }
-    },
-    {
-      "name": "Login API",
-      "url": "https://extensionapi.synctag.com/api/auth/login",
-      "method": "POST",
-      "expectedStatus": 201,
-      "body": {
-        "encryptedData": "jowOtQkMYKZNEiq4buHhmIMT0oKDeMh7+s/n7PfbnvONYEpJzP2KpWdiKXiPTAIWMf9VZtpSVC5Yqx1lsYBk5g=="
-      }
-    }
-  ]
-},
-{
-  "id": "ddp",
-  "name": "DDP",
-  "description": "Due Diligence Project",
-  "color": "#0f766e",
-  "apps": [],
-  "servers": [
-    {
-      "name": "DDP - Website",
-      "url": "https://www.ddphub.ai/",
-      "type": "web"
-    },
-    {
-      "name": "DDP - Supabase",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/",
-      "type": "api"
-    }
-  ],
-  "domains": [
-    "www.ddphub.ai",
-    "twfnwlccyudfgqjmmdva.supabase.co"
-  ],
-  "sslCerts": [
-    "www.ddphub.ai",
-    "twfnwlccyudfgqjmmdva.supabase.co"
-  ],
-  "apis": [
-    {
-      "name": "DDP Website",
-      "url": "https://www.ddphub.ai/",
-      "method": "GET",
-      "expectedStatus": 200
-    },
-    {
-      "name": "Super Admin - Login with Email",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/token?grant_type=password",
-      "method": "POST",
-      "expectedStatus": 200,
-      "headers": {
-        "Content-Type": "application/json",
-        "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}"
-      },
-      "body": {
-        "email": "superadmin@ddp.events",
-        "password": "Admin@123",
-        "gotrue_meta_security": {}
-      },
-      "capture": {
-        "accessToken": "access_token"
-      }
-    },
-    {
-      "name": "Super Admin - Send OTP",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/functions/v1/send-otp",
-      "method": "POST",
-      "expectedStatus": 200,
-      "headers": {
-        "Content-Type": "application/json",
-        "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
-        "Authorization": "Bearer {{Super Admin - Login with Email.accessToken|DDP_SUPER_ADMIN_ACCESS_TOKEN}}"
-      },
-      "body": {
-        "email": "superadmin@ddp.events",
-        "userId": "2af47393-51cb-4d50-a80d-521d541e7646",
-        "purpose": "login"
-      }
-    },
-    {
-      "name": "Super Admin - Login",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/user",
-      "method": "GET",
-      "expectedStatus": 200,
-      "headers": {
-        "Content-Type": "application/json",
-        "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
-        "Authorization": "Bearer {{Super Admin - Login with Email.accessToken|DDP_SUPER_ADMIN_ACCESS_TOKEN}}"
-      }
-    },
-    {
-      "name": "DDP Admin - Login with Email",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/token?grant_type=password",
-      "method": "POST",
-      "expectedStatus": 200,
-      "headers": {
-        "Content-Type": "application/json",
-        "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}"
-      },
-      "body": {
-        "email": "ddpadmin@ddp.events",
-        "password": "Admin@123",
-        "gotrue_meta_security": {}
-      },
-      "capture": {
-        "accessToken": "access_token"
-      }
-    },
-    {
-      "name": "DDP Admin - Send OTP",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/functions/v1/send-otp",
-      "method": "POST",
-      "expectedStatus": 200,
-      "headers": {
-        "Content-Type": "application/json",
-        "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
-        "Authorization": "Bearer {{DDP Admin - Login with Email.accessToken|DDP_ADMIN_ACCESS_TOKEN}}"
-      },
-      "body": {
-        "email": "ddpadmin@ddp.events",
-        "userId": "fb3505fc-45e6-4f58-a397-92be20cc5b24",
-        "purpose": "login"
-      }
-    },
-    {
-      "name": "DDP Admin - Login",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/user",
-      "method": "GET",
-      "expectedStatus": 200,
-      "headers": {
-        "Content-Type": "application/json",
-        "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
-        "Authorization": "Bearer {{DDP Admin - Login with Email.accessToken|DDP_ADMIN_ACCESS_TOKEN}}"
-      }
-    },
-    {
-      "name": "Solo Admin - Login with Email",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/token?grant_type=password",
-      "method": "POST",
-      "expectedStatus": 200,
-      "headers": {
-        "Content-Type": "application/json",
-        "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}"
-      },
-      "body": {
-        "email": "solo@ddp.events",
-        "password": "Admin@123",
-        "gotrue_meta_security": {}
-      },
-      "capture": {
-        "accessToken": "access_token"
-      }
-    },
-    {
-      "name": "Solo Admin - Send OTP",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/functions/v1/send-otp",
-      "method": "POST",
-      "expectedStatus": 200,
-      "headers": {
-        "Content-Type": "application/json",
-        "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
-        "Authorization": "Bearer {{Solo Admin - Login with Email.accessToken|DDP_SOLO_ADMIN_ACCESS_TOKEN}}"
-      },
-      "body": {
-        "email": "solo@ddp.events",
-        "userId": "2690870c-5be9-4c91-b178-6c7cc1d595ae",
-        "purpose": "login"
-      }
-    },
-    {
-      "name": "Solo Admin - Login",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/user",
-      "method": "GET",
-      "expectedStatus": 200,
-      "headers": {
-        "Content-Type": "application/json",
-        "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
-        "Authorization": "Bearer {{Solo Admin - Login with Email.accessToken|DDP_SOLO_ADMIN_ACCESS_TOKEN}}"
-      }
-    },
-    {
-      "name": "Business Admin - Login with Email",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/token?grant_type=password",
-      "method": "POST",
-      "expectedStatus": 200,
-      "headers": {
-        "Content-Type": "application/json",
-        "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}"
-      },
-      "body": {
-        "email": "businessowner@ddp.events",
-        "password": "Admin@123",
-        "gotrue_meta_security": {}
-      },
-      "capture": {
-        "accessToken": "access_token"
-      }
-    },
-    {
-      "name": "Business Admin - Send OTP",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/functions/v1/send-otp",
-      "method": "POST",
-      "expectedStatus": 200,
-      "headers": {
-        "Content-Type": "application/json",
-        "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
-        "Authorization": "Bearer {{Business Admin - Login with Email.accessToken|DDP_BUSINESS_ADMIN_ACCESS_TOKEN}}"
-      },
-      "body": {
-        "email": "businessowner@ddp.events",
-        "userId": "05af6ba8-bda2-4083-9d1b-0aabd98e1660",
-        "purpose": "login"
-      }
-    },
-    {
-      "name": "Business Admin - Login",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/user",
-      "method": "GET",
-      "expectedStatus": 200,
-      "headers": {
-        "Content-Type": "application/json",
-        "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
-        "Authorization": "Bearer {{Business Admin - Login with Email.accessToken|DDP_BUSINESS_ADMIN_ACCESS_TOKEN}}"
-      }
-    },
-    {
-      "name": "Sponsor Admin - Login with Email",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/token?grant_type=password",
-      "method": "POST",
-      "expectedStatus": 200,
-      "headers": {
-        "Content-Type": "application/json",
-        "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}"
-      },
-      "body": {
-        "email": "sponsors@ddp.events",
-        "password": "Admin@123",
-        "gotrue_meta_security": {}
-      },
-      "capture": {
-        "accessToken": "access_token"
-      }
-    },
-    {
-      "name": "Sponsor Admin - Send OTP",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/functions/v1/send-otp",
-      "method": "POST",
-      "expectedStatus": 200,
-      "headers": {
-        "Content-Type": "application/json",
-        "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
-        "Authorization": "Bearer {{Sponsor Admin - Login with Email.accessToken|DDP_SPONSOR_ADMIN_ACCESS_TOKEN}}"
-      },
-      "body": {
-        "email": "sponsors@ddp.events",
-        "userId": "086def2b-3eff-4ae7-b442-a472de2bb9c7",
-        "purpose": "login"
-      }
-    },
-    {
-      "name": "Sponsor Admin - Login",
-      "url": "https://twfnwlccyudfgqjmmdva.supabase.co/auth/v1/user",
-      "method": "GET",
-      "expectedStatus": 200,
-      "headers": {
-        "Content-Type": "application/json",
-        "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
-        "Authorization": "Bearer {{Sponsor Admin - Login with Email.accessToken|DDP_SPONSOR_ADMIN_ACCESS_TOKEN}}"
-      }
-    }
-  ]
-}
   ]
 }

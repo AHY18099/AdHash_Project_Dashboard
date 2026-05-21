@@ -906,6 +906,9 @@ app.post('/api/run-single-suite/:suite', (req, res) => {
 
     res.json({ status: 'success', message: `Running ${suiteConfig.name}...` });
 
+    // Regenerate spec files before running this suite
+    try { regenerateSpecFiles(); } catch (e) { addLog('⚠️ Spec regeneration warning: ' + e.message, 'warn'); }
+
     // Run the suite through the workspace-root runner
     const testProcess = exec(`npx ts-node run-all-tests.ts --suite ${suite}`, { cwd: __dirname });
 
@@ -941,8 +944,11 @@ app.post('/api/run-tests', (req, res) => {
 
     res.json({ status: 'started', message: 'Tests are running in the background...' });
 
+    // Regenerate spec files from latest project-mapping.json before running
+    try { regenerateSpecFiles(); } catch (e) { addLog('⚠️ Spec regeneration warning: ' + e.message, 'warn'); }
+
     addLog('🚀 Starting sequential test execution...', 'info');
- addLog('📋 Running configured suites, including external domain monitoring...', 'info');
+    addLog('📋 Running configured suites, including external domain monitoring...', 'info');
     // Run the unified test framework with streaming output (no exec buffer cap)
     const testProcess = spawn('npx', ['ts-node', 'run-all-tests.ts'], {
         cwd: __dirname,
@@ -2425,6 +2431,197 @@ app.get('/public/project-dashboard.html', (req, res) => {
         return res.redirect('/');
     }
     return res.sendFile(path.join(__dirname, 'public', 'project-dashboard.html'));
+});
+
+// ─── PROJECT MANAGEMENT API ───────────────────────────────────────────────────
+
+const PROJECT_MAPPING_PATH = path.join(__dirname, 'config', 'project-mapping.json');
+
+function readProjectMapping() {
+    try {
+        return JSON.parse(fs.readFileSync(PROJECT_MAPPING_PATH, 'utf8'));
+    } catch (e) {
+        return { projects: [] };
+    }
+}
+
+function writeProjectMapping(data) {
+    fs.writeFileSync(PROJECT_MAPPING_PATH, JSON.stringify(data, null, 2), 'utf8');
+}
+
+// Regenerate spec files for all 5 test repositories from current project-mapping.json
+function regenerateSpecFiles() {
+    const mapping = readProjectMapping();
+    const projects = mapping.projects || [];
+
+    // 1. Server health spec  →  Adhash_AllProjects_Server
+    const serverSpecDir = path.join(__dirname, '..', 'Adhash_AllProjects_Server', 'tests', 'server-health');
+    if (fs.existsSync(serverSpecDir)) {
+        const servers = [];
+        projects.forEach(p => {
+            (p.servers || []).forEach(s => servers.push({ name: s.name, url: s.url }));
+        });
+        const serverSpec = `import { test, expect } from '@playwright/test';
+const SERVERS = ${JSON.stringify(servers, null, 2)};
+for (const server of SERVERS) {
+  test(\`Server Health: \${server.name}\`, async ({ request }) => {
+    const res = await request.get(server.url, { timeout: 30000 });
+    expect(res.status()).toBeLessThan(500);
+  });
+}
+`;
+        fs.writeFileSync(path.join(serverSpecDir, 'server-check.spec.ts'), serverSpec, 'utf8');
+        logToArray('info', `Regenerated server spec (${servers.length} servers)`);
+    }
+
+    // 2. SSL cert spec  →  AdHash-Projects-Certificate-Expiry-Test
+    const certSpecDir = path.join(__dirname, '..', 'AdHash-Projects-Certificate-Expiry-Test', 'tests', 'certificate');
+    if (fs.existsSync(certSpecDir)) {
+        const certs = [];
+        projects.forEach(p => {
+            (p.sslCerts || []).forEach(domain => certs.push({ name: `${p.name} - ${domain}`, domain }));
+        });
+        const certSpec = `import { test, expect } from '@playwright/test';
+import * as tls from 'tls';
+const CERTS = ${JSON.stringify(certs, null, 2)};
+for (const cert of CERTS) {
+  test(\`SSL Certificate: \${cert.name}\`, async () => {
+    await new Promise<void>((resolve, reject) => {
+      const socket = tls.connect(443, cert.domain, { servername: cert.domain }, () => {
+        const c = socket.getPeerCertificate();
+        const expiry = new Date(c.valid_to);
+        const daysLeft = Math.floor((expiry.getTime() - Date.now()) / 86400000);
+        socket.destroy();
+        if (daysLeft < 7) reject(new Error(\`Certificate expires in \${daysLeft} days\`));
+        else resolve();
+      });
+      socket.on('error', reject);
+    });
+  });
+}
+`;
+        fs.writeFileSync(path.join(certSpecDir, 'cert-expiry.spec.ts'), certSpec, 'utf8');
+        logToArray('info', `Regenerated cert spec (${certs.length} certs)`);
+    }
+
+    // 3. API spec  →  AdHash-API-Test
+    const apiSpecDir = path.join(__dirname, '..', 'AdHash-API-Test', 'tests', 'api');
+    if (fs.existsSync(apiSpecDir)) {
+        const apis = [];
+        projects.forEach(p => {
+            (p.apis || []).forEach(a => apis.push({ name: a.name, url: a.url, method: a.method || 'GET', body: a.body || null, expectedStatus: a.expectedStatus || 200 }));
+        });
+        const apiSpec = `import { test, expect } from '@playwright/test';
+const APIS = ${JSON.stringify(apis, null, 2)};
+for (const api of APIS) {
+  test(\`API: \${api.name}\`, async ({ request }) => {
+    const opts: any = { timeout: 30000 };
+    if (api.body) opts.data = api.body;
+    const res = await request[api.method.toLowerCase()](api.url, opts);
+    expect(res.status()).toBeLessThan(500);
+  });
+}
+`;
+        fs.writeFileSync(path.join(apiSpecDir, 'api-tests.spec.ts'), apiSpec, 'utf8');
+        logToArray('info', `Regenerated API spec (${apis.length} endpoints)`);
+    }
+
+    // 4. App status spec  →  Adhash_App_Status
+    const appSpecDir = path.join(__dirname, '..', 'Adhash_App_Status', 'tests', 'app-status');
+    if (fs.existsSync(appSpecDir)) {
+        const appEntries = [];
+        projects.forEach(p => {
+            (p.apps || []).forEach(a => {
+                if (a.playStore) appEntries.push({ name: `${a.name} (Play Store)`, store: 'play', id: a.playStore });
+                if (a.appStore) appEntries.push({ name: `${a.name} (App Store)`, store: 'app', id: a.appStore });
+            });
+        });
+        const appSpec = `import { test, expect } from '@playwright/test';
+const APPS = ${JSON.stringify(appEntries, null, 2)};
+for (const app of APPS) {
+  test(\`App Status: \${app.name}\`, async ({ request }) => {
+    const url = app.store === 'play'
+      ? \`https://play.google.com/store/apps/details?id=\${app.id}\`
+      : \`https://apps.apple.com/app/\${app.id}\`;
+    const res = await request.get(url, { timeout: 30000 });
+    expect(res.status()).toBeLessThan(400);
+  });
+}
+`;
+        fs.writeFileSync(path.join(appSpecDir, 'playstore.spec.ts'), appSpec, 'utf8');
+        logToArray('info', `Regenerated app spec (${appEntries.length} apps)`);
+    }
+
+    // 5. Domain report  →  AdHash_Domain_Report (write a domains.json config file)
+    const domainRepoDir = path.join(__dirname, '..', 'AdHash_Domain_Report');
+    if (fs.existsSync(domainRepoDir)) {
+        const domains = [];
+        projects.forEach(p => {
+            (p.domains || []).forEach(d => domains.push(d));
+        });
+        fs.writeFileSync(path.join(domainRepoDir, 'domains.json'), JSON.stringify({ domains }, null, 2), 'utf8');
+        logToArray('info', `Regenerated domain list (${domains.length} domains)`);
+    }
+}
+
+// POST create project
+app.post('/api/projects', (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    const data = readProjectMapping();
+    const body = req.body;
+    if (!body.id || !body.name) return res.status(400).json({ error: 'id and name are required' });
+    if (data.projects.find(p => p.id === body.id)) return res.status(409).json({ error: 'Project id already exists' });
+    const project = {
+        id: body.id,
+        name: body.name,
+        description: body.description || '',
+        color: body.color || '#3b82f6',
+        apps: body.apps || [],
+        servers: body.servers || [],
+        domains: body.domains || [],
+        sslCerts: body.sslCerts || [],
+        apis: body.apis || []
+    };
+    data.projects.push(project);
+    writeProjectMapping(data);
+    regenerateSpecFiles();
+    res.json({ success: true, project });
+});
+
+// PUT update project
+app.put('/api/projects/:id', (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    const data = readProjectMapping();
+    const idx = data.projects.findIndex(p => p.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Project not found' });
+    const body = req.body;
+    const existing = data.projects[idx];
+    data.projects[idx] = {
+        id: existing.id,
+        name: body.name || existing.name,
+        description: body.description !== undefined ? body.description : existing.description,
+        color: body.color || existing.color,
+        apps: body.apps !== undefined ? body.apps : existing.apps,
+        servers: body.servers !== undefined ? body.servers : existing.servers,
+        domains: body.domains !== undefined ? body.domains : existing.domains,
+        sslCerts: body.sslCerts !== undefined ? body.sslCerts : existing.sslCerts,
+        apis: body.apis !== undefined ? body.apis : existing.apis
+    };
+    writeProjectMapping(data);
+    regenerateSpecFiles();
+    res.json({ success: true, project: data.projects[idx] });
+});
+
+// DELETE project
+app.delete('/api/projects/:id', (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    const data = readProjectMapping();
+    const idx = data.projects.findIndex(p => p.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Project not found' });
+    data.projects.splice(idx, 1);
+    writeProjectMapping(data);
+    regenerateSpecFiles();
+    res.json({ success: true });
 });
 
 // Legacy dashboard route
