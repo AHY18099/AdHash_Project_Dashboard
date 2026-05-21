@@ -2127,6 +2127,19 @@
             border-bottom-color: var(--bg-card);
             color: var(--gradient-start);
         }
+        .pm-tab-count {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 18px; height: 18px;
+            border-radius: 999px;
+            background: rgba(0,212,255,0.18);
+            color: var(--gradient-start);
+            font-size: 0.72rem; font-weight: 800;
+            padding: 0 5px;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+        body.light-mode .pm-tab-count { background: rgba(59,130,246,0.14); color: #3b82f6; }
+        .pm-tab-count.empty { display: none; }
         .pm-panel { display: none; flex-direction: column; gap: 12px; padding-top: 16px; }
         .pm-panel.active { display: flex; }
 
@@ -3912,11 +3925,11 @@
           <!-- URL tabs -->
           <div>
             <div class="pm-tabs">
-              <button class="pm-tab active" onclick="switchPmTab('apps',this)">📱 Apps</button>
-              <button class="pm-tab" onclick="switchPmTab('servers',this)">🖥️ Servers</button>
-              <button class="pm-tab" onclick="switchPmTab('ssl',this)">🔒 SSL Certs</button>
-              <button class="pm-tab" onclick="switchPmTab('domains',this)">🌐 Domains</button>
-              <button class="pm-tab" onclick="switchPmTab('apis',this)">⚡ APIs</button>
+              <button class="pm-tab active" id="pm-tab-apps" onclick="switchPmTab('apps',this)">📱 Apps<span class="pm-tab-count empty" id="pm-cnt-apps"></span></button>
+              <button class="pm-tab" id="pm-tab-servers" onclick="switchPmTab('servers',this)">🖥️ Servers<span class="pm-tab-count empty" id="pm-cnt-servers"></span></button>
+              <button class="pm-tab" id="pm-tab-ssl" onclick="switchPmTab('ssl',this)">🔒 SSL Certs<span class="pm-tab-count empty" id="pm-cnt-ssl"></span></button>
+              <button class="pm-tab" id="pm-tab-domains" onclick="switchPmTab('domains',this)">🌐 Domains<span class="pm-tab-count empty" id="pm-cnt-domains"></span></button>
+              <button class="pm-tab" id="pm-tab-apis" onclick="switchPmTab('apis',this)">⚡ APIs<span class="pm-tab-count empty" id="pm-cnt-apis"></span></button>
             </div>
 
             <!-- Apps panel -->
@@ -3988,7 +4001,10 @@
         (project.sslCerts || []).forEach(d => addPmEntry('ssl', d));
         (project.domains || []).forEach(d => addPmEntry('domains', d));
         (project.apis || []).forEach(a => addPmEntry('apis', a));
-        switchPmTab('apps', document.querySelector('.pm-tab'));
+        // Auto-select the first tab that has entries; fallback to Apps
+        const tabOrder = ['apps','servers','ssl','domains','apis'];
+        const firstFilled = tabOrder.find(k => document.getElementById('pm-list-'+k).querySelectorAll('.pm-entry').length > 0) || 'apps';
+        switchPmTab(firstFilled, document.getElementById('pm-tab-'+firstFilled));
         document.getElementById('projModalBackdrop').classList.add('open');
     }
 
@@ -4007,6 +4023,22 @@
     function clearAllPmLists() {
         ['apps','servers','ssl','domains','apis'].forEach(k => {
             document.getElementById('pm-list-' + k).innerHTML = '';
+        });
+        updateTabCounts();
+    }
+
+    function updateTabCounts() {
+        ['apps','servers','ssl','domains','apis'].forEach(k => {
+            const count = document.getElementById('pm-list-' + k).querySelectorAll('.pm-entry').length;
+            const badge = document.getElementById('pm-cnt-' + k);
+            if (!badge) return;
+            if (count > 0) {
+                badge.textContent = count;
+                badge.classList.remove('empty');
+            } else {
+                badge.textContent = '';
+                badge.classList.add('empty');
+            }
         });
     }
 
@@ -4073,9 +4105,10 @@
             </div>`;
         }
         inner += '</div>';
-        inner += '<button class="pm-entry-del" onclick="this.closest(\'.pm-entry\').remove()" title="Remove">✕</button>';
+        inner += '<button class="pm-entry-del" onclick="this.closest(\'.pm-entry\').remove();updateTabCounts()" title="Remove">✕</button>';
         div.innerHTML = inner;
         list.appendChild(div);
+        updateTabCounts();
     }
 
     function collectPmEntries(type) {
