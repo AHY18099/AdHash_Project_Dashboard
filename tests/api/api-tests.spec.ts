@@ -45,7 +45,7 @@ type ApiClassification = 'passed' | 'warning' | 'failed' | 'skipped';
 const PLACEHOLDER_PATTERN = /\{\{\s*([^{}]+?)\s*\}\}/g;
 const SUPABASE_HOST_PATTERN = /https?:\/\/[^/]+\.supabase\.co\//i;
 const DDP_SUPABASE_HOST = 'twfnwlccyudfgqjmmdva.supabase.co';
-const SKIPPED_SUPABASE_MESSAGE = 'Skipped in CI: SUPABASE_API_KEY secret is not configured';
+const SKIPPED_SUPABASE_MESSAGE = 'Skipped in CI: DDP auth-flow tests require user credentials not available in CI';
 const runtimeTokenStore: RuntimeTokenStore = {
   values: new Map<string, string>()
 };
@@ -114,10 +114,10 @@ function isDdpSupabaseAuthFlowRequest(endpoint: ApiEndpoint): boolean {
   return /\/auth\/v1\/token\?grant_type=password|\/auth\/v1\/user|\/functions\/v1\/send-otp/i.test(endpoint.url);
 }
 
-// For DDP auth-flow requests: skip if the DDP-specific key is absent.
-// A generic SUPABASE_API_KEY is NOT valid for DDP — using it causes 401.
+// DDP auth-flow tests require DDP user credentials (email+password) that are not
+// stored as CI secrets. Always skip these in CI to prevent 401 failures.
 function isCiDdpSecretMissing(): boolean {
-  return String(process.env.CI || '').trim().toLowerCase() === 'true' && !hasDdpSupabaseApiKey();
+  return String(process.env.CI || '').trim().toLowerCase() === 'true';
 }
 
 function isCiSupabaseSecretMissing(): boolean {
