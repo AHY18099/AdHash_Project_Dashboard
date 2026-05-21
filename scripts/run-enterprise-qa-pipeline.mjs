@@ -1,4 +1,10 @@
 import { spawnSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(__dirname, '..');
 
 function runStep(label, command, args, env = process.env) {
   console.log(`\n[qa:enterprise] ${label}`);
@@ -25,6 +31,49 @@ function runStep(label, command, args, env = process.env) {
   }
 }
 
+// Ensure local tests/api directory exists and has up-to-date spec from project-mapping.json
+function ensureLocalApiSpec() {
+  const mappingPath = path.join(ROOT, 'config', 'project-mapping.json');
+  const { projects = [] } = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
+  const apis = [];
+  projects.forEach(p =>
+    (p.apis || []).forEach(a => apis.push({
+      name: `${p.name} — ${a.name || a.url}`,
+      url: a.url,
+      method: (a.method || 'GET').toUpperCase(),
+      headers: a.headers || {},
+      body: a.body || null,
+      expectedStatus: a.expectedStatus || 200
+    }))
+  );
+  const specDir = path.join(ROOT, 'tests', 'api');
+  fs.mkdirSync(specDir, { recursive: true });
+  const spec = `// Auto-generated from config/project-mapping.json — do not edit manually
+import { test, expect } from '@playwright/test';
+
+const APIS = ${JSON.stringify(apis, null, 2)};
+
+for (const api of APIS) {
+  test(\`API: \${api.name}\`, async ({ request }) => {
+    const opts: Parameters<typeof request.get>[1] & any = {
+      timeout: 30000,
+      failOnStatusCode: false,
+    };
+    if (Object.keys(api.headers || {}).length) opts.headers = api.headers;
+    if (api.body !== null) opts.data = api.body;
+    const method = api.method.toLowerCase() as 'get' | 'post' | 'put' | 'delete' | 'patch';
+    const res = await request[method](api.url, opts);
+    expect(
+      res.status(),
+      \`Expected HTTP \${api.expectedStatus}, got \${res.status()} for \${api.url}\`
+    ).toBe(api.expectedStatus);
+  });
+}
+`;
+  fs.writeFileSync(path.join(specDir, 'api-tests.spec.ts'), spec, 'utf8');
+  console.log(`[qa:enterprise] Generated local API spec (${apis.length} endpoints)`);
+}
+
 const npmCommand = 'npm';
 const npxCommand = 'npx';
 const emailEnabled = String(process.env.ZOHO_MAIL_ENABLED || '').trim().toLowerCase() === 'true';
@@ -34,6 +83,7 @@ const previewEnv = {
 };
 
 runStep('1/6 clean artifacts', npmCommand, ['run', 'clean:artifacts']);
+ensureLocalApiSpec();
 runStep('2/6 API suite', npxCommand, ['playwright', 'test', 'tests/api/api-tests.spec.ts']);
 runStep('3/6 unified suite run', npxCommand, ['ts-node', 'run-all-tests.ts', '--skip-clean']);
 runStep('4/6 regenerate preview without send', npxCommand, ['ts-node', 'regenerate-dashboard.ts'], previewEnv);

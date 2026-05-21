@@ -1056,7 +1056,9 @@ function getProjectAppResults(project: ProjectDefinition, appRows: SuiteRow[]): 
     const normalizedTargets = normalizeProjectAppTargets(project);
 
     for (const target of normalizedTargets) {
-        const row = findSuiteRow(appRows, target.title);
+        // Try both naming conventions: old "Verify X on Y" and new "App Status: X (Y)"
+        const row = findSuiteRow(appRows, target.title) ||
+                    findSuiteRow(appRows, `App Status: ${target.appName} (${target.platform})`);
         if (!row || row.status === 'skipped') {
             continue;
         }
@@ -1199,6 +1201,32 @@ function getProjectApiResults(project: ProjectDefinition, apiDetails: ApiTestIte
         }
 
         if (row && row.status === 'skipped') {
+            // If dashboard-state detail has a definitive status, prefer it over the stale row.
+            const detailStatus = detail?.status as ItemStatus | undefined;
+            if (detail && (detailStatus === 'passed' || detailStatus === 'failed' || detailStatus === 'warning')) {
+                const expectedStatus = parseExpectedStatus(api.expectedStatus) ?? parseExpectedStatus(detail.expectedStatus) ?? parseExpectedStatus(row.expectedStatus);
+                const status = detailStatus;
+                const requestBody = normalizePayloadText(detail.requestBody) || row.requestBody || getRequestBodyFallback(normalizeApiMethod(api.method));
+                const responseBody = normalizePayloadText(detail.responseBody) || row.responseBody || getResponseBodyFallback();
+                result.total += 1;
+                result[status] += 1;
+                result.tests.push({
+                    name: api.name,
+                    projectName: project.name,
+                    url: api.url,
+                    status,
+                    type: 'apis',
+                    method: normalizeApiMethod(api.method),
+                    responseCode: detail.responseCode || row.responseCode || null,
+                    expectedStatus,
+                    durationLabel: row.durationLabel,
+                    requestBody,
+                    responseBody,
+                    reason: buildApiFailureReason(status, expectedStatus, detail.responseCode || row.responseCode || null, row.detailText, responseBody)
+                });
+                continue;
+            }
+
             const expectedStatus = parseExpectedStatus(api.expectedStatus) ?? parseExpectedStatus(row.expectedStatus) ?? parseExpectedStatus(detail?.expectedStatus);
             const requestBody = row.requestBody || normalizePayloadText(detail?.requestBody) || getRequestBodyFallback(normalizeApiMethod(api.method));
             const responseBody = row.responseBody || normalizePayloadText(detail?.responseBody) || getResponseBodyFallback();

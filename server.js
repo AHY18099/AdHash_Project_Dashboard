@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -618,8 +619,12 @@ function buildSummaryEmailHtml(summary, state) {
 }
 
 async function dispatchZohoSummaryMail(state) {
-    if (process.env.ZOHO_MAIL_ENABLED !== 'true' || !state) {
-        addLog('❌ Zoho mail not sent: mail disabled or state missing', 'error');
+    if (!state) {
+        addLog('ℹ️ Zoho mail skipped: no state available.', 'info');
+        return;
+    }
+    if (process.env.ZOHO_MAIL_ENABLED !== 'true') {
+        addLog('ℹ️ Zoho mail skipped: ZOHO_MAIL_ENABLED is not true.', 'info');
         return;
     }
 
@@ -666,7 +671,7 @@ async function dispatchZohoSummaryMail(state) {
     const emailPreviewPath = emailPreviewCandidates.find((candidate) => fs.existsSync(candidate));
 
     if (!emailPreviewPath) {
-        addLog('❌ Email report not sent: locked template missing in email-preview.', 'error');
+        addLog('ℹ️ Email template not ready yet — will send automatically after the next test run completes.', 'info');
         return;
     }
 
@@ -1014,6 +1019,15 @@ app.post('/api/run-tests', (req, res) => {
         testProcessPid = null;
         testProcessRef = null;
 
+        // Clear stale suite-row and suite-config caches so next API read uses fresh data
+        suiteConfigCache.apps = null;
+        suiteConfigCache.certificates = null;
+        suiteConfigCache.apis = null;
+        suiteConfigCache.domains = null;
+        suiteConfigCache.domainsCacheKey = null;
+        suiteConfigCache.suiteRows = {};
+        suiteConfigCache.suiteRowMtimes = {};
+
         if (code !== 0) {
             addLog(`⚠️ Test process exited with code ${code}`, 'warning');
         } else {
@@ -1046,9 +1060,42 @@ app.post('/api/run-tests', (req, res) => {
                 addLog(`📊 Results: ${state.summary.passedSuites} passed, ${state.summary.failedSuites} failed, ${state.summary.skippedSuites} skipped`, state.summary.failedSuites === 0 ? 'success' : 'warning');
                 console.log('✅ Test results parsed and stored:', testResults);
 
+                // --- Generate email-preview HTML (needed for View Report button and Zoho mail) ---
+                try {
+                    addLog('📄 Generating email report preview...', 'info');
+                    await new Promise((resolve, reject) => {
+                        const { spawn: spawnChild } = require('child_process');
+                        const regen = spawnChild('npx', ['ts-node', 'regenerate-dashboard.ts'], {
+                            cwd: __dirname,
+                            shell: true,
+                            env: { ...process.env, ZOHO_MAIL_ENABLED: 'false' }
+                        });
+                        regen.stdout.on('data', (d) => console.log('[regen]', d.toString().trim()));
+                        regen.stderr.on('data', (d) => console.error('[regen-err]', d.toString().trim()));
+                        regen.on('close', (code) => {
+                            if (code === 0) {
+                                addLog('✅ Email report preview generated.', 'success');
+                                resolve();
+                            } else {
+                                addLog('⚠️ Email preview generation exited with code ' + code, 'warning');
+                                resolve(); // don't block mail send on this
+                            }
+                        });
+                        regen.on('error', (err) => {
+                            addLog('⚠️ Could not run regenerate-dashboard: ' + err.message, 'warning');
+                            resolve();
+                        });
+                    });
+                } catch (regenErr) {
+                    addLog('⚠️ Email preview generation error: ' + (regenErr && regenErr.message), 'warning');
+                }
+                // --- End email preview generation ---
+
                 // --- Send Zoho Mail if enabled ---
                 try {
-                    await dispatchZohoSummaryMail(state);
+                    // Re-read state after regeneration in case it was updated
+                    const freshState = readDashboardState() || state;
+                    await dispatchZohoSummaryMail(freshState);
                 } catch (mailErr) {
                     addLog('❌ Failed to send Zoho Mail: ' + (mailErr && mailErr.message), 'error');
                     console.error('Failed to send Zoho Mail:', mailErr);
@@ -1584,18 +1631,15 @@ function normalizePlayStoreValue(playStore) {
         return null;
     }
 
+    // Accept full Play Store URL — extract package id from ?id= param
     if (/^https?:\/\//i.test(trimmed)) {
         try {
             const url = new URL(trimmed);
             const packageName = url.searchParams.get('id') || '';
-
-            if (!packageName) {
-                return null;
-            }
-
+            if (!packageName) return null;
             return {
                 packageName,
-                expectedUrl: trimmed
+                expectedUrl: `https://play.google.com/store/apps/details?id=${packageName}`
             };
         } catch (error) {
             return null;
@@ -1605,6 +1649,39 @@ function normalizePlayStoreValue(playStore) {
     return {
         packageName: trimmed,
         expectedUrl: `https://play.google.com/store/apps/details?id=${trimmed}`
+    };
+}
+
+function normalizeAppStoreValue(appStore) {
+    if (!appStore || typeof appStore !== 'string') {
+        return null;
+    }
+
+    const trimmed = appStore.trim();
+    if (!trimmed) return null;
+
+    // Accept full App Store URL — extract the id part
+    if (/^https?:\/\//i.test(trimmed)) {
+        try {
+            const url = new URL(trimmed);
+            // URL like https://apps.apple.com/us/app/whatsapp-messenger/id310633997
+            const idMatch = url.pathname.match(/\/(id\d+)/);
+            const appId = idMatch ? idMatch[1] : '';
+            if (!appId) return null;
+            return {
+                appId,
+                expectedUrl: `https://apps.apple.com/app/${appId}`
+            };
+        } catch (error) {
+            return null;
+        }
+    }
+
+    // Plain id like "id310633997" or "id6747385992"
+    const idVal = trimmed.startsWith('id') ? trimmed : `id${trimmed}`;
+    return {
+        appId: idVal,
+        expectedUrl: `https://apps.apple.com/app/${idVal}`
     };
 }
 
@@ -1682,21 +1759,31 @@ function loadAppSuiteDefinitions() {
     }
 
     const mapping = getProjectMapping();
-    suiteConfigCache.apps = (mapping.projects || [])
-        .flatMap((project) => project.apps || [])
-        .map((app) => {
-            const normalized = normalizePlayStoreValue(app && app.playStore);
-            if (!app || !app.name || !normalized) {
-                return null;
+    const entries = [];
+    (mapping.projects || []).forEach(project => {
+        (project.apps || []).forEach(app => {
+            if (!app || !app.name) return;
+            const play = normalizePlayStoreValue(app.playStore);
+            if (play) {
+                entries.push({
+                    appName: app.name,
+                    platform: 'Play Store',
+                    packageName: play.packageName,
+                    expectedUrl: play.expectedUrl
+                });
             }
-
-            return {
-                appName: app.name,
-                packageName: normalized.packageName,
-                expectedUrl: normalized.expectedUrl
-            };
-        })
-        .filter(Boolean);
+            const ios = normalizeAppStoreValue(app.appStore);
+            if (ios) {
+                entries.push({
+                    appName: app.name,
+                    platform: 'App Store',
+                    packageName: ios.appId,
+                    expectedUrl: ios.expectedUrl
+                });
+            }
+        });
+    });
+    suiteConfigCache.apps = entries;
 
     return suiteConfigCache.apps;
 }
@@ -2056,29 +2143,37 @@ function getAppTestResults(projectId) {
         const result = createEmptySuiteResult();
 
         project.apps.forEach((app) => {
-            const definition = definitions.find((entry) => normalizeText(entry.appName) === normalizeText(app.name));
-            if (!definition) {
+            const appDefinitions = definitions.filter((entry) => normalizeText(entry.appName) === normalizeText(app.name));
+            if (!appDefinitions.length) {
                 return;
             }
 
-            const row = findSuiteRow(rows, `Verify ${definition.appName} on Play Store`);
-            if (!row || row.status === 'skipped') {
-                return;
-            }
+            appDefinitions.forEach((definition) => {
+                const platform = definition.platform || 'Play Store';
+                // Try both naming conventions used by different spec generators
+                const row = findSuiteRow(rows, `Verify ${definition.appName} on ${platform}`) ||
+                            findSuiteRow(rows, `App Status: ${definition.appName} (${platform})`) ||
+                            findSuiteRow(rows, `App Status: ${app.name} (${platform})`);
+                if (!row || row.status === 'skipped') {
+                    return;
+                }
 
-            result.total++;
-            if (row.status === 'passed') {
-                result.passed++;
-            } else {
-                result.failed++;
-            }
+                result.total++;
+                if (row.status === 'passed') {
+                    result.passed++;
+                } else if (row.status === 'warning') {
+                    result.warning++;
+                } else {
+                    result.failed++;
+                }
 
-            result.tests.push({
-                name: definition.appName,
-                platform: 'Play Store',
-                url: definition.expectedUrl,
-                status: row.status,
-                type: 'app'
+                result.tests.push({
+                    name: definition.appName,
+                    platform,
+                    url: definition.expectedUrl,
+                    status: row.status,
+                    type: 'app'
+                });
             });
         });
 
@@ -2248,20 +2343,21 @@ function getAPITestResults(projectId) {
 
             if (row) {
                 if (row.status === 'skipped') {
-                    // If the dashboard detail recorded a definitive failure for this API,
-                    // prefer that status over the suite row's 'skipped' classification.
-                    if (detail && String(detail.status || '').toLowerCase() === 'failed') {
-                        const expectedStatus = parseExpectedStatus(api.expectedStatus) ?? parseExpectedStatus(row.expectedStatus) ?? parseExpectedStatus(detail.expectedStatus);
+                    // If the dashboard-state detail has a definitive status (passed/failed/warning),
+                    // always prefer it over the stale suite-report row's 'skipped' classification.
+                    const detailStatus = detail && String(detail.status || '').toLowerCase();
+                    if (detail && (detailStatus === 'passed' || detailStatus === 'failed' || detailStatus === 'warning')) {
+                        const expectedStatus = parseExpectedStatus(api.expectedStatus) ?? parseExpectedStatus(detail.expectedStatus) ?? parseExpectedStatus(row.expectedStatus);
                         apiResults.push({
                             name: api.name,
                             url: api.url,
                             method,
-                            duration: (detail && detail.duration) || row.duration,
+                            duration: detail.duration || row.duration,
                             requestBody: detail.requestBody || row.requestBody || (normalizeApiMethod(method) === 'GET' ? 'No request body' : 'Payload not provided'),
                             responseBody: detail.responseBody || row.responseBody || 'No response body',
                             responseCode: detail.responseCode || row.responseCode || null,
                             expectedStatus,
-                            status: 'failed',
+                            status: detailStatus,
                             type: 'api'
                         });
                         return;
@@ -2449,6 +2545,95 @@ function writeProjectMapping(data) {
     fs.writeFileSync(PROJECT_MAPPING_PATH, JSON.stringify(data, null, 2), 'utf8');
 }
 
+// Fire-and-forget: push updated spec files to all 5 GitHub repos in the background.
+// Called after every project create / update / delete so GitHub always stays in sync.
+// Commit project-mapping.json to the main AdHash_Project_Dashboard repo so GitHub
+// Actions always gets the latest project list when the workflow runs.
+// Then push updated spec files to all 5 sibling test repos.
+// Both steps run in the background — does not block the HTTP response.
+function autoPushSpecsToGitHub() {
+    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+    if (!token) {
+        addLog('⚠️ Auto-push skipped: GITHUB_TOKEN not set in .env', 'warning');
+        return;
+    }
+
+    const { execFile, spawn: spawnChild } = require('child_process');
+    const gitEnv = {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'AdHash Dashboard',
+        GIT_AUTHOR_EMAIL: 'dashboard@adhashtech.com',
+        GIT_COMMITTER_NAME: 'AdHash Dashboard',
+        GIT_COMMITTER_EMAIL: 'dashboard@adhashtech.com'
+    };
+
+    // Step 1 — commit + push project-mapping.json to this repo on GitHub
+    function commitAndPushMapping(onDone) {
+        addLog('🔄 Committing project-mapping.json to GitHub...', 'info');
+
+        // Ensure git remote uses token for authentication (no prompt)
+        const authedRemote = `https://${token}@github.com/AHY18099/AdHash_Project_Dashboard.git`;
+
+        const gitSteps = [
+            ['git', ['config', 'user.email', 'dashboard@adhashtech.com']],
+            ['git', ['config', 'user.name', 'AdHash Dashboard']],
+            ['git', ['remote', 'set-url', 'origin', authedRemote]],
+            ['git', ['add', 'config/project-mapping.json']],
+            ['git', ['commit', '-m', 'chore: sync project-mapping.json from dashboard UI', '--allow-empty']],
+            ['git', ['push', 'origin', 'HEAD']]
+        ];
+
+        let idx = 0;
+        function runNext() {
+            if (idx >= gitSteps.length) {
+                addLog('✅ project-mapping.json pushed to GitHub.', 'success');
+                onDone();
+                return;
+            }
+            const [cmd, args] = gitSteps[idx++];
+            execFile(cmd, args, { cwd: __dirname, env: gitEnv }, (err, stdout, stderr) => {
+                if (err) {
+                    // "nothing to commit" is not a real error — continue
+                    if (stderr && stderr.includes('nothing to commit')) {
+                        addLog('ℹ️ project-mapping.json unchanged — no commit needed.', 'info');
+                        // still push in case a previous commit wasn't pushed
+                        idx = gitSteps.length - 1;
+                        runNext();
+                        return;
+                    }
+                    addLog('⚠️ git step failed: ' + (stderr || err.message), 'warning');
+                    onDone(); // continue to spec push regardless
+                    return;
+                }
+                runNext();
+            });
+        }
+        runNext();
+    }
+
+    // Step 2 — push regenerated spec files to the 5 sibling test repos via GitHub API
+    function pushSpecFiles() {
+        const pushScript = path.join(__dirname, 'scripts', 'push-specs-to-github.mjs');
+        if (!fs.existsSync(pushScript)) {
+            addLog('⚠️ push-specs-to-github.mjs not found — spec push skipped', 'warning');
+            return;
+        }
+        addLog('🔄 Pushing updated test specs to sibling repos...', 'info');
+        const child = spawnChild('node', [pushScript], {
+            cwd: __dirname, shell: false, env: process.env, stdio: ['ignore', 'pipe', 'pipe']
+        });
+        child.stdout.on('data', (d) => { const l = d.toString().trim(); if (l) addLog(l, 'info'); });
+        child.stderr.on('data', (d) => { const l = d.toString().trim(); if (l) addLog('⚠️ ' + l, 'warning'); });
+        child.on('close', (code) => {
+            addLog(code === 0 ? '✅ Test specs pushed to all sibling repos.' : '⚠️ Spec push exited with code ' + code, code === 0 ? 'success' : 'warning');
+        });
+        child.on('error', (err) => { addLog('❌ Spec push error: ' + err.message, 'error'); });
+    }
+
+    // Run step 1, then step 2
+    commitAndPushMapping(pushSpecFiles);
+}
+
 // Regenerate spec files for all 5 test repositories from current project-mapping.json
 function regenerateSpecFiles() {
     const mapping = readProjectMapping();
@@ -2549,19 +2734,19 @@ for (const api of APIS) {
         const appEntries = [];
         projects.forEach(p => {
             (p.apps || []).forEach(a => {
-                if (a.playStore) appEntries.push({ name: `${a.name} (Play Store)`, store: 'play', id: a.playStore });
-                if (a.appStore) appEntries.push({ name: `${a.name} (App Store)`, store: 'app', id: a.appStore });
+                const play = normalizePlayStoreValue(a.playStore);
+                if (play) appEntries.push({ name: `${p.name} — ${a.name} (Play Store)`, url: play.expectedUrl });
+                const ios = normalizeAppStoreValue(a.appStore);
+                if (ios) appEntries.push({ name: `${p.name} — ${a.name} (App Store)`, url: ios.expectedUrl });
             });
         });
-        const appSpec = `import { test, expect } from '@playwright/test';
+        const appSpec = `// Auto-generated from config/project-mapping.json — do not edit manually
+import { test, expect } from '@playwright/test';
 const APPS = ${JSON.stringify(appEntries, null, 2)};
 for (const app of APPS) {
   test(\`App Status: \${app.name}\`, async ({ request }) => {
-    const url = app.store === 'play'
-      ? \`https://play.google.com/store/apps/details?id=\${app.id}\`
-      : \`https://apps.apple.com/app/\${app.id}\`;
-    const res = await request.get(url, { timeout: 30000 });
-    expect(res.status()).toBeLessThan(400);
+    const res = await request.get(app.url, { timeout: 30000, failOnStatusCode: false });
+    expect(res.status(), \`\${app.url} returned \${res.status()}\`).toBeLessThan(400);
   });
 }
 `;
@@ -2579,6 +2764,7 @@ for (const app of APPS) {
         fs.writeFileSync(path.join(domainRepoDir, 'domains.json'), JSON.stringify({ domains }, null, 2), 'utf8');
         logToArray('info', `Regenerated domain list (${domains.length} domains)`);
     }
+
 }
 
 // POST create project
@@ -2602,6 +2788,7 @@ app.post('/api/projects', (req, res) => {
     data.projects.push(project);
     writeProjectMapping(data);
     regenerateSpecFiles();
+    autoPushSpecsToGitHub();
     res.json({ success: true, project });
 });
 
@@ -2626,6 +2813,7 @@ app.put('/api/projects/:id', (req, res) => {
     };
     writeProjectMapping(data);
     regenerateSpecFiles();
+    autoPushSpecsToGitHub();
     res.json({ success: true, project: data.projects[idx] });
 });
 
@@ -2638,7 +2826,91 @@ app.delete('/api/projects/:id', (req, res) => {
     data.projects.splice(idx, 1);
     writeProjectMapping(data);
     regenerateSpecFiles();
+    autoPushSpecsToGitHub();
     res.json({ success: true });
+});
+
+// POST /api/push-specs — commit & push regenerated spec files to all 5 GitHub repos
+// Streams NDJSON log lines so the browser can show live progress.
+app.post('/api/push-specs', (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+    if (!token) {
+        return res.status(400).json({
+            error: 'GITHUB_TOKEN not configured',
+            hint: 'Add GITHUB_TOKEN=<your PAT> to your .env file and restart the server.'
+        });
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    function send(type, msg) {
+        res.write(`data: ${JSON.stringify({ type, msg })}\n\n`);
+    }
+
+    send('log', '🔄 Regenerating spec files from project-mapping.json…');
+    try { regenerateSpecFiles(); } catch (e) {
+        send('error', '❌ Spec regeneration failed: ' + e.message);
+        res.write('data: {"type":"done","success":false}\n\n');
+        return res.end();
+    }
+    send('log', '✅ Spec files regenerated locally.');
+    send('log', '📤 Pushing to GitHub repos…');
+
+    const { spawn } = require('child_process');
+    const pushScript = path.join(__dirname, 'scripts', 'push-specs-to-github.mjs');
+    const child = spawn(process.execPath, [pushScript], {
+        env: { ...process.env, GITHUB_TOKEN: token },
+        stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    child.stdout.on('data', d => {
+        String(d).split('\n').filter(Boolean).forEach(line => send('log', line));
+    });
+    child.stderr.on('data', d => {
+        String(d).split('\n').filter(Boolean).forEach(line => send('warn', line));
+    });
+    child.on('error', e => {
+        send('error', '❌ Push script error: ' + e.message);
+        res.write('data: {"type":"done","success":false}\n\n');
+        res.end();
+    });
+    child.on('close', code => {
+        if (code === 0) {
+            send('log', '🎉 All repos updated! GitHub Actions will pick up the changes on next run.');
+            res.write('data: {"type":"done","success":true}\n\n');
+        } else {
+            send('warn', `⚠️ Push script exited with code ${code}. Check your GITHUB_TOKEN permissions.`);
+            res.write('data: {"type":"done","success":false}\n\n');
+        }
+        res.end();
+    });
+});
+
+// Run report availability check
+app.get('/api/run-report-status', (req, res) => {
+    const candidates = [
+        path.join(__dirname, 'email-preview', 'AdHash-Projects-Dashboard.html'),
+        path.join(__dirname, 'email-preview', 'index.html')
+    ];
+    const found = candidates.find(f => fs.existsSync(f));
+    if (!found) {
+        return res.json({ available: false });
+    }
+    try {
+        const stat = fs.statSync(found);
+        const state = readDashboardState();
+        return res.json({
+            available: true,
+            generatedAt: (state && state.generatedAt) || stat.mtime.toISOString(),
+            path: path.basename(path.dirname(found)) + '/' + path.basename(found)
+        });
+    } catch (e) {
+        return res.json({ available: false });
+    }
 });
 
 // Legacy dashboard route

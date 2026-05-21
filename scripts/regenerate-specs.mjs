@@ -133,11 +133,30 @@ for (const api of APIS) {
 );
 
 // ── 4. App store status  ──────────────────────────────────────────────────────
+function normalizePlayId(val) {
+  if (!val || typeof val !== 'string') return null;
+  const t = val.trim();
+  if (/^https?:\/\//i.test(t)) {
+    try { const u = new URL(t); return u.searchParams.get('id') || null; } catch { return null; }
+  }
+  return t || null;
+}
+function normalizeAppId(val) {
+  if (!val || typeof val !== 'string') return null;
+  const t = val.trim();
+  if (/^https?:\/\//i.test(t)) {
+    try { const u = new URL(t); const m = /\/(id\d+)/.exec(u.pathname); return m ? m[1] : null; } catch { return null; }
+  }
+  return t.startsWith('id') ? t : `id${t}`;
+}
+
 const appEntries = [];
 projects.forEach(p =>
   (p.apps || []).forEach(a => {
-    if (a.playStore) appEntries.push({ name: `${p.name} — ${a.name} (Play Store)`, store: 'play', id: a.playStore });
-    if (a.appStore)  appEntries.push({ name: `${p.name} — ${a.name} (App Store)`,  store: 'app',  id: a.appStore });
+    const pid = normalizePlayId(a.playStore);
+    if (pid) appEntries.push({ name: `${p.name} — ${a.name} (Play Store)`, url: `https://play.google.com/store/apps/details?id=${pid}` });
+    const aid = normalizeAppId(a.appStore);
+    if (aid) appEntries.push({ name: `${p.name} — ${a.name} (App Store)`, url: `https://apps.apple.com/app/${aid}` });
   })
 );
 
@@ -150,11 +169,8 @@ const APPS = ${JSON.stringify(appEntries, null, 2)};
 
 for (const app of APPS) {
   test(\`App Status: \${app.name}\`, async ({ request }) => {
-    const url = app.store === 'play'
-      ? \`https://play.google.com/store/apps/details?id=\${app.id}\`
-      : \`https://apps.apple.com/app/\${app.id}\`;
-    const res = await request.get(url, { timeout: 30000, failOnStatusCode: false });
-    expect(res.status(), \`\${url} returned \${res.status()}\`).toBeLessThan(400);
+    const res = await request.get(app.url, { timeout: 30000, failOnStatusCode: false });
+    expect(res.status(), \`\${app.url} returned \${res.status()}\`).toBeLessThan(400);
   });
 }
 `,

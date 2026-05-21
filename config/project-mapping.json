@@ -220,8 +220,8 @@
       "apps": [
         {
           "name": "Auto eVantage",
-          "playStore": "https://play.google.com/store/apps/details?id=com.autoevantage",
-          "appStore": "https://apps.apple.com/us/app/id6747385992"
+          "playStore": "com.autoevantage",
+          "appStore": "id6747385992"
         }
       ],
       "servers": [],
@@ -678,7 +678,7 @@
       "apps": [
         {
           "name": "SMC",
-          "playStore": "https://play.google.com/store/apps/details?id=com.smclips",
+          "playStore": "com.smclips",
           "appStore": null
         }
       ],
@@ -1090,6 +1090,40 @@
             "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
             "Authorization": "Bearer {{Sponsor Admin - Login with Email.accessToken|DDP_SPONSOR_ADMIN_ACCESS_TOKEN}}"
           }
+        }
+      ]
+    },
+    {
+      "id": "adh_001",
+      "name": "TEST PROJECT",
+      "description": "Test Project",
+      "color": "#f7d83b",
+      "apps": [
+        {
+          "name": "WhatsApp",
+          "playStore": "com.whatsapp",
+          "appStore": "id310633997"
+        }
+      ],
+      "servers": [
+        {
+          "name": "Adhash",
+          "url": "https://adhashtech.com",
+          "type": "web"
+        }
+      ],
+      "domains": [
+        "adhashtech.com"
+      ],
+      "sslCerts": [
+        "adhashtech.com"
+      ],
+      "apis": [
+        {
+          "name": "Adhash Get",
+          "url": "https://adhashtech.com/",
+          "method": "GET",
+          "expectedStatus": 200
         }
       ]
     }

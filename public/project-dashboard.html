@@ -2034,6 +2034,165 @@
         .add-project-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,212,255,0.4); }
         body.light-mode .add-project-btn:hover { box-shadow: 0 8px 28px rgba(59,130,246,0.35); }
 
+        /* ── COMMIT & PUSH BUTTON ── */
+        .push-specs-btn {
+            display: flex; align-items: center; gap: 8px;
+            padding: 13px 22px;
+            border-radius: 50px;
+            border: 2px solid #f59e0b;
+            background: transparent;
+            color: #f59e0b;
+            font-size: 0.92rem; font-weight: 700;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            white-space: nowrap;
+        }
+        .push-specs-btn:hover { background: rgba(245,158,11,0.12); transform: translateY(-2px); box-shadow: 0 6px 22px rgba(245,158,11,0.3); }
+        .push-specs-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+        body.light-mode .push-specs-btn { border-color: #d97706; color: #d97706; }
+        body.light-mode .push-specs-btn:hover { background: rgba(217,119,6,0.08); box-shadow: 0 6px 22px rgba(217,119,6,0.2); }
+
+        /* ── VIEW REPORT BUTTON ── */
+        .view-report-btn {
+            display: flex; align-items: center; gap: 8px;
+            padding: 13px 22px;
+            border-radius: 50px;
+            border: 2px solid #6366f1;
+            background: transparent;
+            color: #6366f1;
+            font-size: 0.92rem; font-weight: 700;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            white-space: nowrap;
+            text-decoration: none;
+        }
+        .view-report-btn:hover { background: rgba(99,102,241,0.12); transform: translateY(-2px); box-shadow: 0 6px 22px rgba(99,102,241,0.3); }
+        .view-report-btn.disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; transform: none; }
+        body.light-mode .view-report-btn { border-color: #4f46e5; color: #4f46e5; }
+        body.light-mode .view-report-btn:hover { background: rgba(79,70,229,0.08); box-shadow: 0 6px 22px rgba(79,70,229,0.2); }
+
+        /* ── RUN REPORT PANEL ── */
+        .run-report-panel {
+            margin: 24px 0;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1.5px solid var(--border-color);
+            box-shadow: 0 4px 24px var(--shadow-color);
+            display: none;
+        }
+        .run-report-panel.visible { display: block; }
+        .run-report-header {
+            background: var(--bg-card);
+            padding: 14px 20px;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .run-report-header-title {
+            font-size: 1rem; font-weight: 700; color: var(--text-primary);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .run-report-header-actions { display: flex; gap: 10px; align-items: center; }
+        .run-report-open-btn {
+            padding: 6px 14px; border-radius: 20px;
+            border: 1.5px solid #6366f1; background: transparent;
+            color: #6366f1; font-size: 0.82rem; font-weight: 600;
+            cursor: pointer; transition: all 0.2s;
+            text-decoration: none; display: inline-block;
+        }
+        .run-report-open-btn:hover { background: rgba(99,102,241,0.12); }
+        .run-report-download-btn {
+            padding: 6px 14px; border-radius: 20px;
+            border: 1.5px solid #10b981; background: transparent;
+            color: #10b981; font-size: 0.82rem; font-weight: 600;
+            cursor: pointer; transition: all 0.2s;
+            text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
+        }
+        .run-report-download-btn:hover { background: rgba(16,185,129,0.12); }
+        body.light-mode .run-report-download-btn { border-color: #059669; color: #059669; }
+        .run-report-close-btn {
+            padding: 6px 12px; border-radius: 20px;
+            border: 1.5px solid var(--border-color); background: transparent;
+            color: var(--text-secondary); font-size: 0.82rem; font-weight: 600;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .run-report-close-btn:hover { border-color: var(--text-primary); color: var(--text-primary); }
+        .run-report-iframe {
+            width: 100%; border: none;
+            height: 860px;
+            background: #0f172a;
+            display: block;
+        }
+
+        /* ── PUSH LOG MODAL ── */
+        .push-modal-backdrop {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.72);
+            backdrop-filter: blur(4px);
+            z-index: 3000;
+            display: none; align-items: center; justify-content: center;
+        }
+        .push-modal-backdrop.open { display: flex; }
+        .push-modal {
+            background: var(--bg-card);
+            border: 1.5px solid var(--border-color);
+            border-radius: 18px;
+            width: min(680px, 94vw);
+            max-height: 80vh;
+            display: flex; flex-direction: column;
+            animation: pmSlideIn 0.22s ease;
+            overflow: hidden;
+        }
+        .push-modal-head {
+            display: flex; align-items: center; gap: 12px;
+            padding: 20px 24px 16px;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .push-modal-title { font-size: 1.05rem; font-weight: 800; color: var(--text-primary); flex: 1; }
+        .push-modal-body {
+            flex: 1; overflow-y: auto;
+            padding: 18px 24px;
+        }
+        .push-log-list {
+            display: flex; flex-direction: column; gap: 6px;
+            font-family: 'Courier New', monospace; font-size: 0.82rem;
+        }
+        .push-log-line {
+            padding: 5px 10px; border-radius: 6px;
+            line-height: 1.5;
+        }
+        .push-log-line.log  { background: rgba(255,255,255,0.04); color: var(--text-secondary); }
+        .push-log-line.warn { background: rgba(245,158,11,0.1);   color: #f59e0b; }
+        .push-log-line.error{ background: rgba(239,68,68,0.1);    color: #ef4444; }
+        body.light-mode .push-log-line.log  { background: rgba(0,0,0,0.04); }
+        body.light-mode .push-log-line.warn { background: rgba(245,158,11,0.08); }
+        body.light-mode .push-log-line.error{ background: rgba(239,68,68,0.08); }
+        .push-modal-foot {
+            padding: 14px 24px;
+            border-top: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0;
+            gap: 10px;
+        }
+        .push-status-text { font-size: 0.88rem; color: var(--text-muted); flex: 1; }
+        .push-close-btn {
+            padding: 9px 24px; border-radius: 50px;
+            border: 1.5px solid var(--border-color);
+            background: transparent; color: var(--text-muted);
+            font-size: 0.88rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .push-close-btn:hover { border-color: var(--text-muted); color: var(--text-primary); }
+        .push-spinner {
+            width: 16px; height: 16px;
+            border: 2px solid rgba(245,158,11,0.3);
+            border-top-color: #f59e0b;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            flex-shrink: 0;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
         /* project-card edit / delete overlay buttons */
         .card-actions {
             position: absolute; top: 12px; right: 12px;
@@ -2329,6 +2488,12 @@
                 <button class="add-project-btn" onclick="openAddProjectModal()">
                     ＋ Add Project
                 </button>
+                <button class="push-specs-btn" id="pushSpecsBtn" onclick="openPushModal()" title="Commit & push updated test specs to GitHub repos">
+                    ↑ Commit &amp; Push
+                </button>
+                <button class="view-report-btn disabled" id="viewReportBtn" onclick="toggleRunReportPanel()" title="View last run report">
+                    📊 View Report
+                </button>
                 <button class="run-all-btn" id="runAllBtn" onclick="runAllTests()">
                     ▶ Run All Tests
                 </button>
@@ -2377,6 +2542,27 @@
         <!-- Summary Tiles -->
         <div class="summary-tiles" id="summaryTiles">
             <!-- Will be populated by JavaScript -->
+        </div>
+
+        <!-- Run Report Panel -->
+        <div class="run-report-panel" id="runReportPanel">
+            <div class="run-report-header">
+                <div class="run-report-header-title">
+                    <span>📊</span>
+                    <span>Last Run Report</span>
+                    <span id="runReportTimestamp" style="font-weight:400;font-size:0.82rem;color:var(--text-secondary);margin-left:6px;"></span>
+                </div>
+                <div class="run-report-header-actions">
+                    <a class="run-report-download-btn" id="runReportDownloadBtn" href="/email-preview/AdHash-Projects-Dashboard.html" download="AdHash-Projects-Dashboard.html">
+                        ⬇ Download HTML
+                    </a>
+                    <a class="run-report-open-btn" id="runReportOpenLink" href="/email-preview/AdHash-Projects-Dashboard.html" target="_blank">
+                        ↗ Open in new tab
+                    </a>
+                    <button class="run-report-close-btn" onclick="closeRunReportPanel()">✕ Close</button>
+                </div>
+            </div>
+            <iframe class="run-report-iframe" id="runReportIframe" src="" title="Last Run Report"></iframe>
         </div>
 
         <!-- Projects Grid -->
@@ -3840,6 +4026,7 @@
                     // Reload project data and test results to get updated statuses
                     await loadProjects();
                     await fetchAllTestResults();
+                    await checkRunReportAvailable();
                 } else if (data.status === 'running') {
                     testRunning = true;
                     if (btn) {
@@ -4031,6 +4218,33 @@
         <div class="proj-modal-foot">
           <button class="pm-cancel-btn" onclick="closeProjModal()">Cancel</button>
           <button class="pm-save-btn" id="pmSaveBtn" onclick="saveProjModal()">Save Project</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ COMMIT & PUSH MODAL ══════════════════════════════════════════════ -->
+    <div class="push-modal-backdrop" id="pushModalBackdrop" onclick="closePushModal(event)">
+      <div class="push-modal" onclick="event.stopPropagation()">
+        <div class="push-modal-head">
+          <span style="font-size:1.3rem">↑</span>
+          <div class="push-modal-title">Commit &amp; Push to GitHub</div>
+          <button class="proj-modal-close" onclick="closePushModal()" id="pushModalCloseBtn">✕</button>
+        </div>
+        <div class="push-modal-body">
+          <div class="push-log-list" id="pushLogList">
+            <div class="push-log-line log" style="color:var(--text-muted);font-style:italic">
+              Click "Push Now" to commit updated test specs to all 5 GitHub repos.<br>
+              GitHub Actions will automatically pick up the changes and send an updated report.
+            </div>
+          </div>
+        </div>
+        <div class="push-modal-foot">
+          <div style="display:flex;align-items:center;gap:8px;flex:1">
+            <div class="push-spinner" id="pushSpinner" style="display:none"></div>
+            <span class="push-status-text" id="pushStatusText">Ready to push.</span>
+          </div>
+          <button class="push-close-btn" onclick="closePushModal()">Close</button>
+          <button class="pm-save-btn" id="pushNowBtn" onclick="runPushSpecs()" style="min-width:110px">Push Now</button>
         </div>
       </div>
     </div>
@@ -4345,6 +4559,164 @@
             alert('Failed to delete project: ' + err.message);
         }
     }
+
+    // ── COMMIT & PUSH MODAL ────────────────────────────────────────────────────
+    function openPushModal() {
+        const backdrop = document.getElementById('pushModalBackdrop');
+        // Reset to ready state
+        document.getElementById('pushLogList').innerHTML =
+            `<div class="push-log-line log" style="color:var(--text-muted);font-style:italic">
+               Click "Push Now" to commit updated test specs to all 5 GitHub repos.<br>
+               GitHub Actions will automatically pick up the changes and send an updated report.
+             </div>`;
+        document.getElementById('pushStatusText').textContent = 'Ready to push.';
+        document.getElementById('pushSpinner').style.display = 'none';
+        document.getElementById('pushNowBtn').disabled = false;
+        document.getElementById('pushNowBtn').textContent = 'Push Now';
+        document.getElementById('pushModalCloseBtn').disabled = false;
+        backdrop.classList.add('open');
+    }
+
+    function closePushModal(e) {
+        if (e && e.target !== document.getElementById('pushModalBackdrop')) return;
+        // Don't close while a push is in progress
+        if (document.getElementById('pushNowBtn').disabled) return;
+        document.getElementById('pushModalBackdrop').classList.remove('open');
+    }
+
+    function appendPushLog(type, msg) {
+        const list = document.getElementById('pushLogList');
+        const line = document.createElement('div');
+        line.className = `push-log-line ${type}`;
+        line.textContent = msg;
+        list.appendChild(line);
+        list.scrollTop = list.scrollHeight;
+    }
+
+    async function runPushSpecs() {
+        const btn = document.getElementById('pushNowBtn');
+        const spinner = document.getElementById('pushSpinner');
+        const statusText = document.getElementById('pushStatusText');
+        const closeBtn = document.getElementById('pushModalCloseBtn');
+
+        btn.disabled = true;
+        btn.textContent = 'Pushing…';
+        spinner.style.display = 'block';
+        closeBtn.disabled = true;
+        statusText.textContent = 'Pushing to GitHub…';
+        document.getElementById('pushLogList').innerHTML = '';
+
+        try {
+            const res = await fetch('/api/push-specs', { method: 'POST' });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                const msg = data.error || `Server error ${res.status}`;
+                const hint = data.hint ? `\n${data.hint}` : '';
+                appendPushLog('error', '❌ ' + msg + hint);
+                statusText.textContent = 'Push failed.';
+                spinner.style.display = 'none';
+                btn.disabled = false;
+                btn.textContent = 'Push Now';
+                closeBtn.disabled = false;
+                return;
+            }
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const parts = buffer.split('\n\n');
+                buffer = parts.pop(); // keep incomplete chunk
+                for (const part of parts) {
+                    const line = part.replace(/^data: /, '').trim();
+                    if (!line) continue;
+                    try {
+                        const evt = JSON.parse(line);
+                        if (evt.type === 'done') {
+                            spinner.style.display = 'none';
+                            btn.disabled = false;
+                            btn.textContent = 'Push Now';
+                            closeBtn.disabled = false;
+                            if (evt.success) {
+                                statusText.textContent = '✅ Push complete!';
+                            } else {
+                                statusText.textContent = '⚠️ Push finished with warnings.';
+                            }
+                        } else {
+                            appendPushLog(evt.type || 'log', evt.msg || '');
+                        }
+                    } catch (_) {}
+                }
+            }
+        } catch (err) {
+            appendPushLog('error', '❌ Network error: ' + err.message);
+            statusText.textContent = 'Push failed.';
+            spinner.style.display = 'none';
+            btn.disabled = false;
+            btn.textContent = 'Push Now';
+            closeBtn.disabled = false;
+        }
+    }
+
+    // ── RUN REPORT PANEL ─────────────────────────────────────────────────────
+    let runReportPanelOpen = false;
+
+    async function checkRunReportAvailable() {
+        try {
+            const res = await fetch('/api/run-report-status');
+            if (!res.ok) return;
+            const data = await res.json();
+            const btn = document.getElementById('viewReportBtn');
+            if (!btn) return;
+            if (data.available) {
+                btn.classList.remove('disabled');
+                const ts = document.getElementById('runReportTimestamp');
+                if (ts && data.generatedAt) {
+                    ts.textContent = '· ' + new Date(data.generatedAt).toLocaleString();
+                }
+            } else {
+                btn.classList.add('disabled');
+            }
+        } catch (e) { /* silent */ }
+    }
+
+    function toggleRunReportPanel() {
+        if (runReportPanelOpen) {
+            closeRunReportPanel();
+        } else {
+            openRunReportPanel();
+        }
+    }
+
+    function openRunReportPanel() {
+        const panel = document.getElementById('runReportPanel');
+        const iframe = document.getElementById('runReportIframe');
+        if (!panel || !iframe) return;
+        // Add cache-busting param so iframe always reloads latest report
+        iframe.src = '/email-preview/AdHash-Projects-Dashboard.html?t=' + Date.now();
+        panel.classList.add('visible');
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        runReportPanelOpen = true;
+        document.getElementById('viewReportBtn').textContent = '✕ Hide Report';
+    }
+
+    function closeRunReportPanel() {
+        const panel = document.getElementById('runReportPanel');
+        const iframe = document.getElementById('runReportIframe');
+        if (panel) panel.classList.remove('visible');
+        if (iframe) iframe.src = '';
+        runReportPanelOpen = false;
+        const btn = document.getElementById('viewReportBtn');
+        if (btn) btn.textContent = '📊 View Report';
+    }
+
+    // Check report availability on load and after each test run completes
+    document.addEventListener('DOMContentLoaded', () => { checkRunReportAvailable(); });
     </script>
 </body>
 </html>
