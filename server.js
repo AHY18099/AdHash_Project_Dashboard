@@ -2509,16 +2509,33 @@ for (const cert of CERTS) {
     if (fs.existsSync(apiSpecDir)) {
         const apis = [];
         projects.forEach(p => {
-            (p.apis || []).forEach(a => apis.push({ name: a.name, url: a.url, method: a.method || 'GET', body: a.body || null, expectedStatus: a.expectedStatus || 200 }));
+            (p.apis || []).forEach(a => apis.push({
+                name: a.name || a.url,
+                url: a.url,
+                method: (a.method || 'GET').toUpperCase(),
+                headers: a.headers || {},
+                body: a.body || null,
+                expectedStatus: a.expectedStatus || 200
+            }));
         });
         const apiSpec = `import { test, expect } from '@playwright/test';
+
+// Auto-generated from config/project-mapping.json — do not edit manually
 const APIS = ${JSON.stringify(apis, null, 2)};
+
 for (const api of APIS) {
   test(\`API: \${api.name}\`, async ({ request }) => {
-    const opts: any = { timeout: 30000 };
+    const opts: Parameters<typeof request.get>[1] & any = {
+      timeout: 30000,
+      failOnStatusCode: false,
+    };
+    if (Object.keys(api.headers || {}).length) opts.headers = api.headers;
     if (api.body) opts.data = api.body;
-    const res = await request[api.method.toLowerCase()](api.url, opts);
-    expect(res.status()).toBeLessThan(500);
+    const res = await request[api.method.toLowerCase() as 'get'|'post'|'put'|'delete'|'patch'](api.url, opts);
+    expect(
+      res.status(),
+      \`Expected \${api.expectedStatus}, got \${res.status()} for \${api.url}\`
+    ).toBe(api.expectedStatus);
   });
 }
 `;

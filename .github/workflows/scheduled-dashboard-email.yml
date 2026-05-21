@@ -35,6 +35,9 @@ jobs:
       - name: Install Playwright browser
         run: node node_modules/playwright/cli.js install --with-deps chromium
 
+      - name: Regenerate test specs from project-mapping.json
+        run: npm run regenerate:specs
+
       - name: Run cleaned production dashboard pipeline
         run: npm run qa:enterprise
 

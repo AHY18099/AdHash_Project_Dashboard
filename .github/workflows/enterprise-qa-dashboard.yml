@@ -36,6 +36,9 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
+      - name: Regenerate test specs from project-mapping.json
+        run: npm run regenerate:specs
+
       - name: Run enterprise QA pipeline
         run: npm run qa:enterprise
 

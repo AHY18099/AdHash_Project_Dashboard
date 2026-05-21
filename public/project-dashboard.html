@@ -2172,6 +2172,75 @@
             flex-shrink: 0;
         }
         .pm-entry-del:hover { color: #ef4444; }
+
+        /* API entry expanded sections */
+        .pm-api-section {
+            margin-top: 4px;
+        }
+        .pm-api-toggle {
+            display: flex; align-items: center; gap: 6px;
+            background: none; border: none;
+            color: var(--text-muted); cursor: pointer;
+            font-size: 0.78rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: .5px;
+            padding: 4px 0; transition: color 0.15s;
+            font-family: inherit;
+        }
+        .pm-api-toggle:hover { color: var(--gradient-start); }
+        .pm-api-toggle-arrow { font-size: 10px; transition: transform 0.2s; display: inline-block; }
+        .pm-api-toggle.open .pm-api-toggle-arrow { transform: rotate(90deg); }
+        .pm-api-collapsible { display: none; margin-top: 6px; }
+        .pm-api-collapsible.open { display: block; }
+
+        .pm-kv-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
+        .pm-kv-row { display: flex; gap: 6px; align-items: center; }
+        .pm-kv-input {
+            flex: 1; min-width: 80px;
+            padding: 5px 8px; border-radius: 6px;
+            border: 1.5px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 0.82rem; font-family: inherit;
+            outline: none;
+        }
+        .pm-kv-input:focus { border-color: var(--gradient-start); }
+        .pm-kv-del {
+            background: none; border: none; color: var(--text-muted);
+            cursor: pointer; font-size: 13px; padding: 2px 4px;
+            border-radius: 4px; transition: color 0.15s; flex-shrink: 0;
+        }
+        .pm-kv-del:hover { color: #ef4444; }
+        .pm-kv-add {
+            background: none; border: 1px dashed var(--border-color);
+            color: var(--text-muted); cursor: pointer;
+            font-size: 0.78rem; font-weight: 600;
+            padding: 4px 10px; border-radius: 6px;
+            transition: all 0.15s; font-family: inherit;
+        }
+        .pm-kv-add:hover { border-color: var(--gradient-start); color: var(--gradient-start); }
+
+        .pm-textarea {
+            width: 100%; padding: 8px 10px;
+            border-radius: 8px;
+            border: 1.5px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 0.82rem; font-family: 'Courier New', monospace;
+            resize: vertical; min-height: 72px;
+            outline: none; transition: border-color 0.2s;
+        }
+        .pm-textarea:focus { border-color: var(--gradient-start); }
+        .pm-textarea.error { border-color: #ef4444; }
+
+        .pm-status-row { display: flex; align-items: center; gap: 8px; }
+        .pm-status-label { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+        .pm-status-input {
+            width: 80px; padding: 5px 8px; border-radius: 6px;
+            border: 1.5px solid var(--border-color);
+            background: var(--bg-card); color: var(--text-primary);
+            font-size: 0.88rem; font-family: inherit; outline: none;
+        }
+        .pm-status-input:focus { border-color: var(--gradient-start); }
         .pm-add-entry {
             display: flex; align-items: center; gap: 6px;
             padding: 8px 14px; border-radius: 8px;
@@ -4090,8 +4159,25 @@
             const name = (data && data.name) || '';
             const url = (data && data.url) || '';
             const method = (data && data.method) || 'GET';
-            inner += `<div class="pm-entry-row">
-              <input class="pm-entry-input" placeholder="Endpoint name" data-key="name" value="${escapeHtml(name)}" style="flex:2" />
+            const expectedStatus = (data && data.expectedStatus) || 200;
+            const headers = (data && data.headers) ? data.headers : {};
+            const body = (data && data.body) ? (typeof data.body === 'string' ? data.body : JSON.stringify(data.body, null, 2)) : '';
+            const uid = 'api_' + Math.random().toString(36).slice(2,8);
+
+            // Build header KV rows
+            const headerRows = Object.entries(headers).map(([k,v]) => `
+              <div class="pm-kv-row">
+                <input class="pm-kv-input" placeholder="Header name" data-role="hk" value="${escapeHtml(k)}" />
+                <input class="pm-kv-input" placeholder="Value" data-role="hv" value="${escapeHtml(v)}" />
+                <button class="pm-kv-del" onclick="this.closest('.pm-kv-row').remove()" title="Remove">✕</button>
+              </div>`).join('');
+
+            const hasHeaders = Object.keys(headers).length > 0;
+            const hasBody = !!body;
+
+            inner += `
+            <div class="pm-entry-row">
+              <input class="pm-entry-input" placeholder="Endpoint name" data-key="name" value="${escapeHtml(name)}" style="flex:2 1 180px" />
               <select class="pm-select" data-key="method">
                 <option value="GET" ${method==='GET'?'selected':''}>GET</option>
                 <option value="POST" ${method==='POST'?'selected':''}>POST</option>
@@ -4100,8 +4186,31 @@
                 <option value="PATCH" ${method==='PATCH'?'selected':''}>PATCH</option>
               </select>
             </div>
-            <div class="pm-entry-row">
-              <input class="pm-entry-input" placeholder="URL (https://...)" data-key="url" value="${escapeHtml(url)}" />
+            <div class="pm-entry-row" style="align-items:center;gap:10px">
+              <input class="pm-entry-input" placeholder="URL (https://...)" data-key="url" value="${escapeHtml(url)}" style="flex:1" />
+              <div class="pm-status-row">
+                <span class="pm-status-label">Status</span>
+                <input class="pm-status-input" type="number" data-key="expectedStatus" value="${expectedStatus}" min="100" max="599" />
+              </div>
+            </div>
+
+            <div class="pm-api-section">
+              <button type="button" class="pm-api-toggle ${hasHeaders?'open':''}" id="hdr-toggle-${uid}" onclick="toggleApiSection('hdr-body-${uid}', this)">
+                <span class="pm-api-toggle-arrow">▶</span> Headers ${hasHeaders?`<span class="pm-tab-count" style="display:inline-flex">${Object.keys(headers).length}</span>`:''}
+              </button>
+              <div class="pm-api-collapsible ${hasHeaders?'open':''}" id="hdr-body-${uid}">
+                <div class="pm-kv-list" id="hdr-list-${uid}">${headerRows}</div>
+                <button type="button" class="pm-kv-add" onclick="addKvRow('hdr-list-${uid}','Header name','Value')">＋ Add Header</button>
+              </div>
+            </div>
+
+            <div class="pm-api-section">
+              <button type="button" class="pm-api-toggle ${hasBody?'open':''}" id="body-toggle-${uid}" onclick="toggleApiSection('body-area-${uid}', this)">
+                <span class="pm-api-toggle-arrow">▶</span> Request Body ${hasBody?'<span class="pm-tab-count" style="display:inline-flex">JSON</span>':''}
+              </button>
+              <div class="pm-api-collapsible ${hasBody?'open':''}" id="body-area-${uid}">
+                <textarea class="pm-textarea" data-key="body" placeholder='{"key": "value"}'>${escapeHtml(body)}</textarea>
+              </div>
             </div>`;
         }
         inner += '</div>';
@@ -4132,7 +4241,32 @@
                 const name = entry.querySelector('[data-key="name"]').value.trim();
                 const url = entry.querySelector('[data-key="url"]').value.trim();
                 const method = entry.querySelector('[data-key="method"]').value;
-                if (url) entries.push({ name, url, method });
+                const expectedStatus = parseInt(entry.querySelector('[data-key="expectedStatus"]').value) || 200;
+                // Collect headers from KV rows
+                const headers = {};
+                entry.querySelectorAll('.pm-kv-row').forEach(row => {
+                    const k = row.querySelector('[data-role="hk"]').value.trim();
+                    const v = row.querySelector('[data-role="hv"]').value.trim();
+                    if (k) headers[k] = v;
+                });
+                // Collect body (JSON textarea)
+                let body = null;
+                const bodyEl = entry.querySelector('[data-key="body"]');
+                if (bodyEl && bodyEl.value.trim()) {
+                    try {
+                        body = JSON.parse(bodyEl.value.trim());
+                        bodyEl.classList.remove('error');
+                    } catch(e) {
+                        body = bodyEl.value.trim(); // store as raw string if invalid JSON
+                        bodyEl.classList.add('error');
+                    }
+                }
+                if (url) {
+                    const api = { name, url, method, expectedStatus };
+                    if (Object.keys(headers).length) api.headers = headers;
+                    if (body !== null) api.body = body;
+                    entries.push(api);
+                }
             }
         });
         return entries;
@@ -4178,6 +4312,26 @@
             btn.disabled = false;
             btn.textContent = 'Save Project';
         }
+    }
+
+    function toggleApiSection(panelId, btn) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+        const open = panel.classList.toggle('open');
+        btn.classList.toggle('open', open);
+    }
+
+    function addKvRow(listId, keyPlaceholder, valPlaceholder) {
+        const list = document.getElementById(listId);
+        if (!list) return;
+        const row = document.createElement('div');
+        row.className = 'pm-kv-row';
+        row.innerHTML = `
+          <input class="pm-kv-input" placeholder="${escapeHtml(keyPlaceholder)}" data-role="hk" />
+          <input class="pm-kv-input" placeholder="${escapeHtml(valPlaceholder)}" data-role="hv" />
+          <button class="pm-kv-del" onclick="this.closest('.pm-kv-row').remove()" title="Remove">✕</button>`;
+        list.appendChild(row);
+        list.querySelector('.pm-kv-input').focus();
     }
 
     async function deleteProject(projectId, projectName) {
