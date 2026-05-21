@@ -68,7 +68,8 @@ function ensureLocalApiSpec() {
       method: (a.method || 'GET').toUpperCase(),
       headers: a.headers || {},
       body: a.body || null,
-      expectedStatus: a.expectedStatus || 200
+      expectedStatus: a.expectedStatus || 200,
+      skipInCI: a.skipInCI === true
     }))
   );
   const specDir = path.join(ROOT, 'tests', 'api');
@@ -76,10 +77,16 @@ function ensureLocalApiSpec() {
   const spec = `// Auto-generated from config/project-mapping.json — do not edit manually
 import { test, expect } from '@playwright/test';
 
+const IS_CI = String(process.env.CI || '').trim().toLowerCase() === 'true';
+
 const APIS = ${JSON.stringify(apis, null, 2)};
 
 for (const api of APIS) {
   test(\`API: \${api.name}\`, async ({ request }) => {
+    if (api.skipInCI && IS_CI) {
+      test.skip(true, 'Skipped in CI: login API requires credentials not available in CI');
+      return;
+    }
     const opts: Parameters<typeof request.get>[1] & any = {
       timeout: 30000,
       failOnStatusCode: false,
