@@ -14,7 +14,6 @@ jobs:
     env:
       CI: 'true'
       SUPABASE_API_KEY: ${{ secrets.SUPABASE_API_KEY }}
-      DDP_SUPABASE_API_KEY: ${{ secrets.DDP_SUPABASE_API_KEY }}
       ZOHO_MAIL_ENABLED: ${{ secrets.ZOHO_MAIL_ENABLED }}
       ZOHO_MAIL_FROM: ${{ secrets.ZOHO_MAIL_FROM }}
       ZOHO_MAIL_USER: ${{ secrets.ZOHO_MAIL_USER }}
