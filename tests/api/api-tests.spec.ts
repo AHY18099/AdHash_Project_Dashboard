@@ -45,7 +45,7 @@ type ApiClassification = 'passed' | 'warning' | 'failed' | 'skipped';
 const PLACEHOLDER_PATTERN = /\{\{\s*([^{}]+?)\s*\}\}/g;
 const SUPABASE_HOST_PATTERN = /https?:\/\/[^/]+\.supabase\.co\//i;
 const DDP_SUPABASE_HOST = 'twfnwlccyudfgqjmmdva.supabase.co';
-const SKIPPED_SUPABASE_MESSAGE = 'Skipped in CI: SUPABASE_API_KEY/DDP_SUPABASE_API_KEY/DDP_SUPABASE_PUBLISHABLE_KEY secret is not configured';
+const SKIPPED_SUPABASE_MESSAGE = 'Skipped in CI: SUPABASE_API_KEY secret is not configured';
 const runtimeTokenStore: RuntimeTokenStore = {
   values: new Map<string, string>()
 };
@@ -58,12 +58,11 @@ function hasSupabaseApiKey(): boolean {
   );
 }
 
-// DDP Supabase uses its own project key — separate from the generic SUPABASE_API_KEY.
-// Only the DDP-specific keys are valid for twfnwlccyudfgqjmmdva.supabase.co.
 function hasDdpSupabaseApiKey(): boolean {
   return Boolean(
     process.env.DDP_SUPABASE_API_KEY ||
-    process.env.DDP_SUPABASE_PUBLISHABLE_KEY
+    process.env.DDP_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.SUPABASE_API_KEY
   );
 }
 
@@ -71,17 +70,16 @@ console.log('Supabase API key configured:', hasSupabaseApiKey());
 console.log('DDP Supabase API key configured:', hasDdpSupabaseApiKey());
 
 function getSupabaseApiKey(url?: string): string {
-  // For DDP Supabase host, prefer DDP-specific keys so the wrong generic key is never used.
   if (url && url.includes(DDP_SUPABASE_HOST)) {
-    const ddpKey = process.env.DDP_SUPABASE_API_KEY || process.env.DDP_SUPABASE_PUBLISHABLE_KEY || '';
+    const ddpKey = process.env.DDP_SUPABASE_API_KEY || process.env.DDP_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_API_KEY || '';
     if (!ddpKey) {
-      throw new Error('Missing DDP_SUPABASE_API_KEY / DDP_SUPABASE_PUBLISHABLE_KEY environment variable');
+      throw new Error('Missing SUPABASE_API_KEY / DDP_SUPABASE_API_KEY environment variable');
     }
     return ddpKey;
   }
   const apiKey = process.env.SUPABASE_API_KEY || process.env.DDP_SUPABASE_API_KEY || process.env.DDP_SUPABASE_PUBLISHABLE_KEY || '';
   if (!apiKey) {
-    throw new Error('Missing SUPABASE_API_KEY/DDP_SUPABASE_API_KEY/DDP_SUPABASE_PUBLISHABLE_KEY environment variable');
+    throw new Error('Missing SUPABASE_API_KEY environment variable');
   }
   return apiKey;
 }
