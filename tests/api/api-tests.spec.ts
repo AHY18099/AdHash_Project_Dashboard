@@ -58,19 +58,36 @@ function hasSupabaseApiKey(): boolean {
   );
 }
 
-console.log('Supabase API key configured:', hasSupabaseApiKey());
+// DDP Supabase uses its own project key — separate from the generic SUPABASE_API_KEY.
+// Only the DDP-specific keys are valid for twfnwlccyudfgqjmmdva.supabase.co.
+function hasDdpSupabaseApiKey(): boolean {
+  return Boolean(
+    process.env.DDP_SUPABASE_API_KEY ||
+    process.env.DDP_SUPABASE_PUBLISHABLE_KEY
+  );
+}
 
-function getSupabaseApiKey(): string {
+console.log('Supabase API key configured:', hasSupabaseApiKey());
+console.log('DDP Supabase API key configured:', hasDdpSupabaseApiKey());
+
+function getSupabaseApiKey(url?: string): string {
+  // For DDP Supabase host, prefer DDP-specific keys so the wrong generic key is never used.
+  if (url && url.includes(DDP_SUPABASE_HOST)) {
+    const ddpKey = process.env.DDP_SUPABASE_API_KEY || process.env.DDP_SUPABASE_PUBLISHABLE_KEY || '';
+    if (!ddpKey) {
+      throw new Error('Missing DDP_SUPABASE_API_KEY / DDP_SUPABASE_PUBLISHABLE_KEY environment variable');
+    }
+    return ddpKey;
+  }
   const apiKey = process.env.SUPABASE_API_KEY || process.env.DDP_SUPABASE_API_KEY || process.env.DDP_SUPABASE_PUBLISHABLE_KEY || '';
   if (!apiKey) {
     throw new Error('Missing SUPABASE_API_KEY/DDP_SUPABASE_API_KEY/DDP_SUPABASE_PUBLISHABLE_KEY environment variable');
   }
-
   return apiKey;
 }
 
-function getSupabaseHeaders(token: string | null = null): Record<string, string> {
-  const apiKey = getSupabaseApiKey();
+function getSupabaseHeaders(token: string | null = null, url?: string): Record<string, string> {
+  const apiKey = getSupabaseApiKey(url);
 
   return {
     apikey: apiKey,
@@ -97,6 +114,12 @@ function isDdpSupabaseAuthFlowRequest(endpoint: ApiEndpoint): boolean {
   }
 
   return /\/auth\/v1\/token\?grant_type=password|\/auth\/v1\/user|\/functions\/v1\/send-otp/i.test(endpoint.url);
+}
+
+// For DDP auth-flow requests: skip if the DDP-specific key is absent.
+// A generic SUPABASE_API_KEY is NOT valid for DDP — using it causes 401.
+function isCiDdpSecretMissing(): boolean {
+  return String(process.env.CI || '').trim().toLowerCase() === 'true' && !hasDdpSupabaseApiKey();
 }
 
 function isCiSupabaseSecretMissing(): boolean {
@@ -179,7 +202,7 @@ function buildRequestHeaders(endpoint: ApiEndpoint, headers: Record<string, stri
       throw new Error(`Supabase Auth Failed for ${endpoint.name} - Missing dynamic access token`);
     }
 
-    const supabaseHeaders = getSupabaseHeaders(isSupabaseLoginRequest(endpoint.url) ? null : runtimeToken);
+    const supabaseHeaders = getSupabaseHeaders(isSupabaseLoginRequest(endpoint.url) ? null : runtimeToken, endpoint.url);
     Object.assign(nextHeaders, supabaseHeaders, nextHeaders);
   }
 
@@ -403,7 +426,7 @@ test.describe('API Tests', () => {
 
   for (const endpoint of apiEndpoints) {
     test(`${endpoint.method} ${endpoint.name}`, async () => {
-      test.skip(isDdpSupabaseAuthFlowRequest(endpoint) && isCiSupabaseSecretMissing(), SKIPPED_SUPABASE_MESSAGE);
+      test.skip(isDdpSupabaseAuthFlowRequest(endpoint) && isCiDdpSecretMissing(), SKIPPED_SUPABASE_MESSAGE);
 
       const startTime = Date.now();
       
@@ -466,7 +489,7 @@ test.describe('API Tests', () => {
   test('API Performance Summary', async () => {
     const results = await Promise.allSettled(
       apiEndpoints.map(async (endpoint) => {
-        if (isDdpSupabaseAuthFlowRequest(endpoint) && isCiSupabaseSecretMissing()) {
+        if (isDdpSupabaseAuthFlowRequest(endpoint) && isCiDdpSecretMissing()) {
           return {
             name: endpoint.name,
             status: 'skipped',
