@@ -436,6 +436,8 @@ body.dark .fb-type-badge.bug{background:rgba(255,68,68,.1);border-color:rgba(255
 .fb-status-badge.resolved{background:rgba(16,185,129,.1);color:var(--pass);border:1px solid rgba(16,185,129,.3)}
 .fb-status-badge.closed{background:rgba(148,163,184,.12);color:var(--mut);border:1px solid rgba(148,163,184,.3)}
 .fb-status-badge.wontfix{background:rgba(239,68,68,.08);color:var(--fail);border:1px solid rgba(239,68,68,.25)}
+.fb-status-badge.deferred{background:rgba(139,92,246,.1);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)}
+body.dark .fb-status-badge.deferred{background:rgba(139,92,246,.12);color:#a78bfa;border-color:rgba(139,92,246,.4)}
 body.dark .fb-status-badge.inprogress{background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.3)}
 body.dark .fb-status-badge.resolved{background:rgba(0,255,136,.1);border-color:rgba(0,255,136,.3)}
 
@@ -1110,8 +1112,8 @@ function feedbackCardHtml(p,f){
   const idx=(STORE[p].feedback||[]).indexOf(f)<0?
     (STORE[p].feedback||[]).findIndex(x=>x.id===f.id):
     (STORE[p].feedback||[]).findIndex(x=>x.id===f.id);
-  const statuses=['open','inprogress','resolved','closed','wontfix'];
-  const statusLabels={open:'Open',inprogress:'In Progress',resolved:'Resolved',closed:'Closed',wontfix:"Won't Fix"};
+  const statuses=['open','inprogress','resolved','closed','wontfix','deferred'];
+  const statusLabels={open:'Open',inprogress:'In Progress',resolved:'Resolved',closed:'Closed',wontfix:"Won't Fix",deferred:'Deferred'};
   const priorityLabel={low:'Low',medium:'Medium',high:'High',critical:'🔴 Critical'};
   const statusOpts=statuses.map(s=>`<option value="${s}" ${f.status===s?'selected':''}>${statusLabels[s]}</option>`).join('');
 
@@ -1204,7 +1206,7 @@ function openFeedbackModal(p,type,editId){
     <div>
       <label class="flbl">Status</label>
       <select class="finp" id="fb-status">
-        ${['open','inprogress','resolved','closed','wontfix'].map(v=>`<option value="${v}" ${e.status===v?'selected':''}>${{open:'Open',inprogress:'In Progress',resolved:'Resolved',closed:'Closed',wontfix:"Won't Fix"}[v]}</option>`).join('')}
+        ${['open','inprogress','resolved','closed','wontfix','deferred'].map(v=>`<option value="${v}" ${e.status===v?'selected':''}>${{open:'Open',inprogress:'In Progress',resolved:'Resolved',closed:'Closed',wontfix:"Won't Fix",deferred:'Deferred'}[v]}</option>`).join('')}
       </select>
     </div>
     ${isBug?`<div>
