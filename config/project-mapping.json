@@ -68,8 +68,7 @@
           "method": "POST",
           "body": {
             "key": "Z6bJc+TJLSyk2k2zcjRDzB1b2SUMLqPMDJ7onRlphDDf9wwCF941EGsE928j/4PLQs6wcVXsDfQsyKWO6thxZvIflmVvWtgGAe2UT/c5on37m45Ge5BUDL3PnbKo774KRf4q1kM8GoJxF5nVeqF8C5pBVwwdKkFK5MyLPqTyzlCHof+IKxJOrMRFCe+HNPsuRdkf6rxr56sMhXrPQu8OP7VMlDa89QIrl5D4zYnb1msDUgfKvjl0gVX7AkZnUMZUE5FemJnx7sS1JggiuM5lEQVKivjgElAaiFlLhfSenmUlUdL037feg6oIRCwEhMxkYr3H9CXt7VRpwfB6TBElyvdftVi3cUyNV+l1l/uMzbM1/0gj2n0qntbeWti+vwhJwV7rHKJyxST7vDSkWC4rggTEabs9gkg7x3fMKGb58t1oO4MgCdku8Gou9TPEVyNbSZ7skRONiCE55ZUkwU/tYljSFvT/ljQF6cDLibuKHW6sk4j/ZtP0jN/MtHJUozkOLVEOzt+ZXjip++f7SRokIOHdmJ5jsU/FHgfVNy3h7LuBgdBMtiY8MqmRIxFyueoL9n1FyopW5yluQnUk6ok09Z8/4V5yVsfe7e6HszOYFgScgzmQcuDiegp4pSXDYx25EleDhYtW0SLi5fnXOKPrxo0qBmjlhhOY/XNPNEamlxM="
-          },
-          "skipInCI": true
+          }
         },
         {
           "name": "WavedIn SuperAdmin UI",
@@ -209,8 +208,7 @@
           "method": "POST",
           "body": {
             "key": "o7obaAPl8Rin1yQil/fPLmfZDWV31ERB6O+us/ZdZlwAmt3brpIPLVi8W2ASbZ9dzes3tBTEjYwcayoLQ316BQ=="
-          },
-          "skipInCI": true
+          }
         }
       ]
     },
@@ -265,8 +263,7 @@
           "method": "POST",
           "body": {
             "key": "z8zY9agO/zG58XoDO6QW+mkPueQVBAGXwPCbsyAIPxmbvDYcouZ/ssu6jpPMct47MGerqC9we10NCiVzoijbNwohTjUh+ozT0NUPmK4s2hpDCXxBlqitk2TpfqwxEL2at+DW8bPJ69BBSnbG/PRM3VItB8USK2N5iBGiHaOG1ngUdOzDFJT3FU//ZQ1ATW8BBEUtJ9rGIQ2+Uqg/0f/tVk9+yGQQyITObqIPXWvIQ+AMxs/0XNELfe90Ou+D5eMuGwH3ZiMe8SpCU9Uo0ZXdXC+me/xjlyEu1uXduyTcYV2ZP9+Qe7pZgSHJrpUHsgLFVEVcZp89DQG9VeVcz8P8zwXLumfIaTacMLPWzl+j1XBWMLD2cBq4gGvVNbPKTl/OwnDMgYz0XYBR5E6VPbDk6zjAT0cns14L/vhuwIAorVmTX2fbfvDWWIQD8zy4A0vNtPe206zYNMLwWRHkonvEvpqxvL4Ri2gfjN1kV7kwxwjYOwQ+vAkfTZpEbH2CHVTVsCyKVNfGphZDdQYECe0UzwlKTdxr/jrVno4V8kRschF6E8jwXlukeNpdryN/zAdRFkRZSGbHIbIwIScwmsmBIKkbYRt9Bzrl4Xn3ksKwVRM6zh66z9YSmksvwkTmk9vQ"
-          },
-          "skipInCI": true
+          }
         },
         {
           "name": "Sparkme Web Login UI",
@@ -280,8 +277,7 @@
           "body": {
             "phone": 9999999999,
             "password": "Synctag@1"
-          },
-          "skipInCI": true
+          }
         }
       ]
     },
@@ -886,8 +882,7 @@
           },
           "capture": {
             "accessToken": "access_token"
-          },
-          "skipInCI": true
+          }
         },
         {
           "name": "Super Admin - Send OTP",
@@ -914,8 +909,7 @@
             "Content-Type": "application/json",
             "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
             "Authorization": "Bearer {{Super Admin - Login with Email.accessToken|DDP_SUPER_ADMIN_ACCESS_TOKEN}}"
-          },
-          "skipInCI": true
+          }
         },
         {
           "name": "DDP Admin - Login with Email",
@@ -933,8 +927,7 @@
           },
           "capture": {
             "accessToken": "access_token"
-          },
-          "skipInCI": true
+          }
         },
         {
           "name": "DDP Admin - Send OTP",
@@ -961,8 +954,7 @@
             "Content-Type": "application/json",
             "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
             "Authorization": "Bearer {{DDP Admin - Login with Email.accessToken|DDP_ADMIN_ACCESS_TOKEN}}"
-          },
-          "skipInCI": true
+          }
         },
         {
           "name": "Solo Admin - Login with Email",
@@ -980,8 +972,7 @@
           },
           "capture": {
             "accessToken": "access_token"
-          },
-          "skipInCI": true
+          }
         },
         {
           "name": "Solo Admin - Send OTP",
@@ -1008,8 +999,7 @@
             "Content-Type": "application/json",
             "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
             "Authorization": "Bearer {{Solo Admin - Login with Email.accessToken|DDP_SOLO_ADMIN_ACCESS_TOKEN}}"
-          },
-          "skipInCI": true
+          }
         },
         {
           "name": "Business Admin - Login with Email",
@@ -1027,8 +1017,7 @@
           },
           "capture": {
             "accessToken": "access_token"
-          },
-          "skipInCI": true
+          }
         },
         {
           "name": "Business Admin - Send OTP",
@@ -1055,8 +1044,7 @@
             "Content-Type": "application/json",
             "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
             "Authorization": "Bearer {{Business Admin - Login with Email.accessToken|DDP_BUSINESS_ADMIN_ACCESS_TOKEN}}"
-          },
-          "skipInCI": true
+          }
         },
         {
           "name": "Sponsor Admin - Login with Email",
@@ -1074,8 +1062,7 @@
           },
           "capture": {
             "accessToken": "access_token"
-          },
-          "skipInCI": true
+          }
         },
         {
           "name": "Sponsor Admin - Send OTP",
@@ -1102,8 +1089,7 @@
             "Content-Type": "application/json",
             "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}",
             "Authorization": "Bearer {{Sponsor Admin - Login with Email.accessToken|DDP_SPONSOR_ADMIN_ACCESS_TOKEN}}"
-          },
-          "skipInCI": true
+          }
         }
       ]
     },
