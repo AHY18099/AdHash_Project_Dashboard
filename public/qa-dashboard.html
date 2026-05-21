@@ -131,16 +131,52 @@ body.dark .udd-item:hover{background:rgba(0,212,255,.08)}
 .udd-item.danger{color:var(--fail)}.udd-item.danger:hover{background:rgba(239,68,68,.08)}
 .udd hr{border:none;border-top:1px solid var(--border);margin:4px 0}
 
-/* ── PROJECT NAV ── */
-.projnav{background:var(--card);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;gap:0;overflow-x:auto}
-.ptab{padding:11px 18px;cursor:pointer;font-size:13px;font-weight:500;color:var(--mut);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;white-space:nowrap;display:flex;align-items:center;gap:7px}
-.ptab:hover{color:var(--txt2)}.ptab.active{color:var(--txt);border-bottom-color:var(--grad-a);font-weight:700}
-.ptab .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.ptab .pbadge{background:var(--fail);color:#fff;border-radius:8px;font-size:9px;font-weight:800;padding:1px 5px;min-width:15px;text-align:center}
-.ptab-add{padding:9px 13px;cursor:pointer;font-size:13px;font-weight:700;background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;border:none;background-color:transparent;transition:all .2s;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px}
-.ptab-add:hover{opacity:.8}
-.ptab-users{margin-left:auto;padding:6px 14px;border-radius:50px;border:1.5px solid var(--border);background:transparent;color:var(--mut);cursor:pointer;font-size:11px;font-weight:600;transition:all .2s;margin-bottom:8px;white-space:nowrap}
-.ptab-users:hover{border-color:var(--grad-a);color:var(--grad-a)}.ptab-users.active{background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);color:#fff;border-color:transparent;font-weight:700}
+/* ── PROJECT GRID HOME ── */
+.proj-home{padding:32px 28px 48px;max-width:1280px;margin:0 auto;animation:fadeIn .3s ease}
+.proj-home-hero{text-align:center;margin-bottom:36px}
+.proj-home-hero h2{font-size:26px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.proj-home-hero p{font-size:13px;color:var(--mut);font-weight:500}
+.proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:22px}
+.pj-card{background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:0;cursor:pointer;transition:transform .22s,box-shadow .22s,border-color .22s;position:relative;overflow:hidden;box-shadow:var(--card-shadow);display:flex;flex-direction:column}
+.pj-card:hover{transform:translateY(-6px);box-shadow:0 20px 50px var(--shadow);border-color:var(--border2)}
+.pj-card-top{height:5px;width:100%;flex-shrink:0}
+.pj-card-body{padding:22px 24px;flex:1;display:flex;flex-direction:column;gap:14px}
+.pj-name-row{display:flex;align-items:center;gap:12px}
+.pj-icon{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;transition:transform .2s}
+.pj-card:hover .pj-icon{transform:scale(1.1)}
+.pj-name{font-size:18px;font-weight:800;letter-spacing:-.3px;color:var(--txt)}
+.pj-sub{font-size:12px;color:var(--mut);font-weight:500;margin-top:1px}
+.pj-stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pj-stat{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:9px 8px;text-align:center;transition:border-color .2s}
+.pj-card:hover .pj-stat{border-color:var(--border2)}
+.pj-stat-val{font-size:20px;font-weight:800;line-height:1;margin-bottom:3px}
+.pj-stat-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mut)}
+.pj-pbar{height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.pj-pbar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--grad-a),var(--grad-b));transition:width .5s ease}
+.pj-footer{display:flex;align-items:center;justify-content:space-between;padding-top:4px}
+.pj-status-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:50px;font-size:11px;font-weight:700}
+.pj-status-pill.ready{background:rgba(16,185,129,.1);color:var(--pass);border:1px solid rgba(16,185,129,.3)}
+.pj-status-pill.notready{background:rgba(239,68,68,.08);color:var(--fail);border:1px solid rgba(239,68,68,.25)}
+.pj-status-pill.progress{background:rgba(59,130,246,.08);color:var(--inp);border:1px solid rgba(59,130,246,.25)}
+body.dark .pj-status-pill.ready{box-shadow:0 0 10px rgba(0,255,136,.15)}
+body.dark .pj-status-pill.notready{box-shadow:0 0 10px rgba(255,68,68,.1)}
+.pj-arrow{width:32px;height:32px;border-radius:50%;background:var(--card2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--mut);transition:all .2s;flex-shrink:0}
+.pj-card:hover .pj-arrow{background:linear-gradient(135deg,var(--grad-a),var(--grad-b));border-color:transparent;color:#fff;transform:translateX(3px)}
+body.dark .pj-card:hover .pj-arrow{color:#000}
+.pj-grid-footer{display:flex;align-items:center;justify-content:center;margin-top:28px;gap:10px}
+.pj-add-btn{display:inline-flex;align-items:center;gap:7px;padding:10px 24px;border-radius:50px;background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 16px rgba(59,130,246,.3);transition:all .2s}
+body.dark .pj-add-btn{color:#000;box-shadow:0 4px 16px rgba(0,212,255,.3)}
+.pj-add-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(59,130,246,.4)}
+.pj-users-btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:50px;background:var(--card2);color:var(--mut);border:1.5px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
+.pj-users-btn:hover{border-color:var(--grad-a);color:var(--grad-a)}
+
+/* ── PROJECT DETAIL HEADER ── */
+.proj-detail-hdr{background:var(--card);border-bottom:1px solid var(--border);padding:10px 24px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.btn-back{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:50px;border:1.5px solid var(--border);background:transparent;color:var(--txt2);cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;transition:all .2s;white-space:nowrap}
+.btn-back:hover{border-color:var(--grad-a);color:var(--grad-a)}
+.proj-detail-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.proj-detail-name{font-size:15px;font-weight:800;color:var(--txt);letter-spacing:-.2px}
+.proj-detail-right{margin-left:auto;display:flex;align-items:center;gap:8px}
 
 /* ── APP AREA ── */
 #app{padding:0}
@@ -377,7 +413,6 @@ body.dark .appr-card{border-color:rgba(255,204,0,.3)}
 <!-- ── DASHBOARD ── -->
 <div id="dashboard" style="display:none">
   <div class="topbar" id="topbar"></div>
-  <div class="projnav" id="projnav"></div>
   <div id="app"></div>
 </div>
 
@@ -728,7 +763,7 @@ function doLogin(){
   document.getElementById('login-page').style.display='none';
   document.getElementById('dashboard').style.display='block';
   PROJECTS.forEach(p=>{curTab[p.id]=curTab[p.id]||'overview';});
-  renderTopBar();renderProjNav();renderProject(PROJECTS[0]?.id||'humee');
+  renderTopBar();renderProjectGrid();
 }
 function doLogout(){
   _session=null;
@@ -748,7 +783,7 @@ function renderTopBar(){
     <div class="topbar-right">
       <button id="theme-toggle-btn" class="theme-toggle-btn" onclick="toggleTheme()">${isDark?'☀ Light':'🌙 Dark'}</button>
       ${isAdmin()&&totalPend>0?`<button class="notif-btn" onclick="showPendingOverview()" title="Pending approvals">🔔<span class="nbadge">${totalPend}</span></button>`:''}
-      <button class="btn-home" onclick="window.location.href='/landing'">← Back to Home</button>
+      <button class="btn-home" onclick="window.location.href='/landing'">← Home</button>
       <div class="uchip" onclick="toggleUDD()">
         <div class="uava" style="background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(139,92,246,.2));color:${ava}">${initials}</div>
         <div><div class="uname">${u.name}</div><div class="urole">${u.role==='super_admin'?'super-admin':'member'}</div></div>
@@ -781,48 +816,117 @@ function updateThemeBtn(){
   btn.textContent=isDark?'☀ Light':'🌙 Dark';
 }
 
-// ══ PROJECT NAV ══
-function renderProjNav(){
-  const nav=document.getElementById('projnav');
-  const tabs=PROJECTS.map(p=>{
+// ══ PROJECT GRID HOME ══
+function renderProjectGrid(){
+  const PROJ_ICONS={humee:'🤖',synctag:'🏷️',wavedin:'🌊',ddp:'📊',aisignpro:'✍️'};
+  const PROJ_DESC={
+    humee:'AI-powered digital twin platform for intelligent business conversations.',
+    synctag:'Smart text expansion & productivity tag management system.',
+    wavedin:'Professional networking and connection platform.',
+    ddp:'Due diligence and deal pipeline management system.',
+    aisignpro:'Electronic signature and CPA client management platform.'
+  };
+  const cards=PROJECTS.map(p=>{
+    const s=calcStats(p.id);
+    const pct=s.total?Math.round(s.pass/s.total*100):0;
+    const ready=isReady(p.id);
+    const inProg=s.inp>0||s.ns>0;
+    const pillCls=ready?'ready':inProg?'progress':'notready';
+    const pillTxt=ready?'✓ Release Ready':inProg?'◌ In Progress':'✗ Not Ready';
     const pend=isAdmin()?(STORE[p.id]?.pending?.filter(x=>x.status==='pending')||[]).length:0;
-    const act=p.id===curProj&&curView==='project';
-    return`<div class="ptab${act?' active':''}" onclick="switchProj('${p.id}')"><span class="dot" style="background:${p.color}"></span>${p.name}${pend>0?`<span class="pbadge">${pend}</span>`:''}</div>`;
+    const iconBg=`${p.color}22`;
+    return`<div class="pj-card" onclick="switchProj('${p.id}')">
+      <div class="pj-card-top" style="background:linear-gradient(90deg,${p.color},${p.color}aa)"></div>
+      <div class="pj-card-body">
+        <div class="pj-name-row">
+          <div class="pj-icon" style="background:${iconBg};border:1.5px solid ${p.color}44">${PROJ_ICONS[p.id]||'📁'}</div>
+          <div>
+            <div class="pj-name">${p.name}${pend>0?`<span style="display:inline-flex;margin-left:6px;padding:1px 7px;border-radius:50px;font-size:9px;font-weight:800;background:rgba(239,68,68,.12);color:var(--fail);border:1px solid rgba(239,68,68,.3)">${pend} pending</span>`:''}</div>
+            <div class="pj-sub">${PROJ_DESC[p.id]||''}</div>
+          </div>
+        </div>
+        <div class="pj-stats-row">
+          <div class="pj-stat"><div class="pj-stat-val" style="background:linear-gradient(135deg,var(--grad-a),var(--grad-b));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">${s.total}</div><div class="pj-stat-lbl">Total</div></div>
+          <div class="pj-stat"><div class="pj-stat-val" style="color:var(--pass)">${s.pass}</div><div class="pj-stat-lbl">Passed</div></div>
+          <div class="pj-stat"><div class="pj-stat-val" style="color:${s.fail>0?'var(--fail)':'var(--ns)'}">${s.fail}</div><div class="pj-stat-lbl">Failed</div></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);font-weight:600;margin-bottom:5px"><span>Pass Rate</span><span style="font-weight:800;color:var(--txt)">${pct}%</span></div>
+          <div class="pj-pbar"><div class="pj-pbar-fill" style="width:${pct}%"></div></div>
+        </div>
+        <div class="pj-footer">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <span class="pj-status-pill ${pillCls}">${pillTxt}</span>
+            ${s.blk>0?`<span style="display:inline-flex;padding:4px 10px;border-radius:50px;font-size:11px;font-weight:700;background:rgba(245,158,11,.08);color:var(--blk);border:1px solid rgba(245,158,11,.25)">⊘ ${s.blk} Blocked</span>`:''}
+          </div>
+          <div class="pj-arrow">→</div>
+        </div>
+      </div>
+    </div>`;
   }).join('');
-  nav.innerHTML=tabs
-    +(isAdmin()?`<button class="ptab-add" onclick="openAddProject()">＋ New Project</button>`:'')
-    +(isAdmin()?`<div class="ptab-users${curView==='users'?' active':''}" onclick="showUsers()">👥 Users</div>`:'');
+  document.getElementById('app').innerHTML=`
+    <div class="proj-home">
+      <div class="proj-home-hero">
+        <h2>QA Project Workspace</h2>
+        <p>Select a project to view test cases, production checklists, reports and more</p>
+      </div>
+      <div class="proj-grid">${cards}</div>
+      ${isAdmin()?`<div class="pj-grid-footer">
+        <button class="pj-add-btn" onclick="openAddProject()">＋ New Project</button>
+        <button class="pj-users-btn" onclick="showUsers()">👥 Manage Users</button>
+      </div>`:''}
+    </div>`;
 }
-function switchProj(id){curProj=id;curView='project';if(!curTab[id])curTab[id]='smoke';renderProjNav();renderProject(id);}
+
+function switchProj(id){
+  curProj=id;curView='project';
+  if(!curTab[id])curTab[id]='smoke';
+  renderProject(id);
+}
 function switchTab(p,tab){curTab[p]=tab;renderProject(p);}
+function goHome(){curView='home';renderProjectGrid();}
 
 // ══ RENDER PROJECT ══
 function renderProject(p){
   if(curView==='users'){renderUsersPage();return;}
+  const proj=PROJECTS.find(x=>x.id===p);
   const pend=(STORE[p].pending||[]).filter(x=>x.status==='pending').length;
+  const s=calcStats(p);
+  const pct=s.total?Math.round(s.pass/s.total*100):0;
   const tabs=[
-    {id:'smoke',  label:`Smoke Tests (${STORE[p].smoke.filter(r=>!r._pending).length})`},
-    {id:'prod',   label:`Production Checklist (${STORE[p].prod.filter(r=>!r._pending).length})`},
-    {id:'testdata',label:'Test Data'},
-    {id:'releasenotes',label:'Release Notes'},
-    {id:'reports',label:`Saved Reports (${STORE[p].reports.length})`},
-    {id:'overview',label:'Overview'},
-    ...(isAdmin()&&pend>0?[{id:'approvals',label:`🔔 Approvals (${pend})`}]:[])
+    {id:'overview', label:'Overview'},
+    {id:'smoke',    label:`🔥 Smoke Tests`,   count:STORE[p].smoke.filter(r=>!r._pending).length},
+    {id:'prod',     label:`✅ Prod Checklist`, count:STORE[p].prod.filter(r=>!r._pending).length},
+    {id:'testdata', label:'🧪 Test Data'},
+    {id:'releasenotes',label:'📝 Release Notes'},
+    {id:'reports',  label:'💾 Saved Reports',  count:STORE[p].reports.length},
+    ...(isAdmin()&&pend>0?[{id:'approvals',label:`🔔 Approvals`,count:pend}]:[])
   ];
-  const tab=curTab[p]||'smoke';
+  const tab=curTab[p]||'overview';
   let content='';
-  if(tab==='smoke')      content=renderTestTable(p,'smoke');
-  else if(tab==='prod')  content=renderTestTable(p,'prod');
-  else if(tab==='testdata') content=renderTestDataTab(p);
-  else if(tab==='releasenotes') content=renderReleaseNotes(p);
-  else if(tab==='reports')  content=renderReports(p);
-  else if(tab==='overview') content=renderOverview(p);
-  else if(tab==='approvals') content=renderApprovals(p);
+  if(tab==='smoke')        content=renderTestTable(p,'smoke');
+  else if(tab==='prod')    content=renderTestTable(p,'prod');
+  else if(tab==='testdata')       content=renderTestDataTab(p);
+  else if(tab==='releasenotes')   content=renderReleaseNotes(p);
+  else if(tab==='reports')        content=renderReports(p);
+  else if(tab==='overview')       content=renderOverview(p);
+  else if(tab==='approvals')      content=renderApprovals(p);
 
-  const needsBar = tab==='smoke'||tab==='prod';
+  const needsBar=tab==='smoke'||tab==='prod';
+  const PROJ_ICONS={humee:'🤖',synctag:'🏷️',wavedin:'🌊',ddp:'📊',aisignpro:'✍️'};
   document.getElementById('app').innerHTML=`
     <div class="proj-wrap">
-      <div class="itabs">${tabs.map(t=>`<div class="itab${t.id===tab?' active':''}" onclick="switchTab('${p}','${t.id}')">${t.label}</div>`).join('')}</div>
+      <div class="proj-detail-hdr">
+        <button class="btn-back" onclick="goHome()">← All Projects</button>
+        <span class="proj-detail-dot" style="background:${proj?.color||'var(--grad-a)'}"></span>
+        <span class="proj-detail-name">${PROJ_ICONS[p]||'📁'} ${proj?.name||p}</span>
+        <div class="proj-detail-right">
+          <span style="font-size:12px;font-weight:700;padding:3px 12px;border-radius:50px;background:${isReady(p)?'rgba(16,185,129,.1)':'rgba(59,130,246,.08)'};color:${isReady(p)?'var(--pass)':'var(--inp)'};border:1px solid ${isReady(p)?'rgba(16,185,129,.3)':'rgba(59,130,246,.25)'}">${pct}% Pass Rate</span>
+          ${isAdmin()?`<button class="btn-icon" onclick="openEditProject('${p}')">✏ Edit</button>`:''}
+          ${isAdmin()?`<button class="btn-icon del" onclick="deleteProject('${p}')">✕ Remove</button>`:''}
+        </div>
+      </div>
+      <div class="itabs">${tabs.map(t=>`<div class="itab${t.id===tab?' active':''}" onclick="switchTab('${p}','${t.id}')">${t.label}${t.count!=null?` <span style="background:var(--card2);border:1px solid var(--border);border-radius:50px;padding:0 6px;font-size:10px;font-weight:700;color:var(--mut);margin-left:3px">${t.count}</span>`:''}</div>`).join('')}</div>
       <div class="tab-content" id="tab-content">${content}</div>
       ${needsBar?renderActionBar(p,tab):''}
     </div>`;
@@ -1076,8 +1180,7 @@ function updateStats(p){
       const pctEl=banner.querySelector('.sbar-pct');if(pctEl)pctEl.textContent=pct+'%';
     }
   }
-  renderProjNav();
-}
+  }
 function updateStatus(p,sec,i,sel){
   STORE[p][sec][i].status=sel.value;
   sel.className='ssel '+sel.value.replace(' ','-');
@@ -1117,13 +1220,13 @@ function searchTbl(id,q,p,sec){
 }
 function showPendingOverview(){
   const proj=PROJECTS.find(p=>(STORE[p.id]?.pending||[]).some(x=>x.status==='pending'));
-  if(proj){curProj=proj.id;curTab[proj.id]='approvals';curView='project';renderProjNav();renderProject(proj.id);}
+  if(proj){curProj=proj.id;curTab[proj.id]='approvals';curView='project';/* proj-nav removed */renderProject(proj.id);}
 }
 
 // USER MANAGEMENT PAGE
 // ══════════════════════════════════════════════════════
-function showUsers(){curView='users';renderProjNav();renderUsersPage();}
-function showProject(){curView='project';renderProjNav();renderProject(curProj);}
+function showUsers(){curView='users';renderUsersPage();}
+function showProject(){curView='project';renderProject(curProj);}
 function renderUsersPage(){
   const users=getUsers();
   const rows=users.map((u,i)=>{
@@ -1145,7 +1248,7 @@ function renderUsersPage(){
       <div><h2 style="font-size:20px;font-weight:800;background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">👥 User Management</h2><div style="font-size:13px;color:var(--mut);margin-top:3px">${users.length} user${users.length!==1?'s':''} in workspace</div></div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-primary" onclick="openAddUser()">＋ Add User</button>
-        <button class="btn btn-secondary" onclick="showProject()">← Back to Projects</button>
+        <button class="btn btn-secondary" onclick="goHome()">← Back to Projects</button>
       </div>
     </div>
     <div style="padding:0 24px 24px"><div class="user-list"><table class="utbl">
@@ -1233,8 +1336,36 @@ function openAddProject(){
     PROJECTS.push(proj);
     STORE[id]={env:mkEnv(proj),gates:[...DEFAULT_GATES],smoke:mkSmoke(id),prod:mkProd(id),testdata:[],releaseNotes:[],reports:[],pending:[]};
     curProj=id;curTab[id]='overview';curView='project';
-    saveAllState();closeModal();renderProjNav();renderProject(id);toast(`Project "${name}" created`);
+    saveAllState();closeModal();switchProj(id);toast(`Project "${name}" created`);
   });
+}
+function openEditProject(pid){
+  const proj=PROJECTS.find(x=>x.id===pid);if(!proj)return;
+  openModal('Edit Project',`
+    <div class="fg"><label>Project Name</label><input id="ep-name" value="${proj.name}"></div>
+    <div class="fg"><label>Color</label><input id="ep-color" type="color" value="${proj.color}" style="height:40px;cursor:pointer"></div>
+    <div class="fg-row">
+      <div class="fg"><label>Website URL</label><input id="ep-web" value="${proj.website||''}"></div>
+      <div class="fg"><label>Dashboard URL</label><input id="ep-dash" value="${proj.dashboard||''}"></div>
+    </div>
+    <div class="fg"><label>Release Date</label><input id="ep-date" type="date" value="${proj.releaseDate||''}"></div>
+  `,()=>{
+    const name=document.getElementById('ep-name').value.trim();
+    if(!name)return toast('Project name required','err');
+    proj.name=name;proj.color=document.getElementById('ep-color').value;
+    proj.website=document.getElementById('ep-web').value;proj.dashboard=document.getElementById('ep-dash').value;
+    proj.releaseDate=document.getElementById('ep-date').value;
+    STORE[pid].env.website=proj.website;STORE[pid].env.dashboard=proj.dashboard;STORE[pid].env.releaseDate=proj.releaseDate;
+    saveAllState();closeModal();renderProject(pid);toast('Project updated');
+  });
+}
+function deleteProject(pid){
+  const proj=PROJECTS.find(x=>x.id===pid);
+  if(!proj||!confirm(`Delete "${proj.name}"? All test data will be lost.`))return;
+  PROJECTS=PROJECTS.filter(x=>x.id!==pid);
+  delete STORE[pid];
+  try{localStorage.removeItem('qa3_'+pid);}catch(e){}
+  saveAllState();goHome();toast('Project deleted');
 }
 // ══════════════════════════════════════════════════════
 // STATS
@@ -1257,8 +1388,7 @@ function updateStats(p){
   const rs=document.getElementById(`${p}-rstatus`);if(rs)rs.textContent=ready?'🟢 Release Ready':'🔴 Not Ready';
   const rb=document.getElementById(`${p}-rbanner`);if(rb)rb.className='rbanner '+(ready?'ready':'notready');
   const rp=document.getElementById(`${p}-rpct`);if(rp)rp.textContent=`${s.pass}/${s.total} passed`;
-  renderProjNav();
-}
+  }
 function updateStatus(p,sec,i,sel){
   STORE[p][sec][i].status=sel.value;
   sel.className='ssel '+sel.value.replace(' ','-');
@@ -1373,7 +1503,7 @@ function openAddRow(p,sec){
       const visRow={...d,_id:'pend_'+Date.now().toString(36),_pending:true,_pendIdx:STORE[p].pending.length-1};
       STORE[p][sec].push(visRow);
       toast('Submitted for super admin approval 🔔');
-      closeModal();saveToLS(p);renderProjNav();renderProject(p);return;
+      closeModal();saveToLS(p);/* proj-nav removed */renderProject(p);return;
     }
     closeModal();saveToLS(p);renderProject(p);toast('Test case added');
   },isAdmin()?{}:{saveLabel:'Submit for Approval'});
@@ -1393,7 +1523,7 @@ function openEditRow(p,sec,i){
       STORE[p][sec][i]._pending=true;
       STORE[p][sec][i]._pendIdx=STORE[p].pending.length-1;
       toast('Edit request submitted for approval 🔔');
-      closeModal();saveToLS(p);renderProjNav();renderProject(p);return;
+      closeModal();saveToLS(p);/* proj-nav removed */renderProject(p);return;
     }
     closeModal();saveToLS(p);updateStats(p);renderProject(p);toast('Test case updated');
   },isAdmin()?{}:{saveLabel:'Submit for Approval'});
@@ -1418,7 +1548,7 @@ function approveItem(p,pendIdx){
     const rowIdx=item.originalIdx;
     if(rowIdx>=0&&STORE[p][item.section][rowIdx]){STORE[p][item.section][rowIdx]={...item.newData,_pending:false,_pendIdx:undefined};}
   }
-  saveToLS(p);renderProjNav();renderProject(p);updateStats(p);toast('Change approved ✓');
+  saveToLS(p);/* proj-nav removed */renderProject(p);updateStats(p);toast('Change approved ✓');
 }
 function rejectItem(p,pendIdx){
   const item=STORE[p].pending[pendIdx];if(!item)return;
@@ -1432,7 +1562,7 @@ function rejectItem(p,pendIdx){
     const rowIdx=item.originalIdx;
     if(rowIdx>=0&&STORE[p][item.section][rowIdx]){STORE[p][item.section][rowIdx]._pending=false;STORE[p][item.section][rowIdx]._pendIdx=undefined;}
   }
-  saveToLS(p);renderProjNav();renderProject(p);toast('Change rejected');
+  saveToLS(p);/* proj-nav removed */renderProject(p);toast('Change rejected');
 }
 // inline approve/reject from table row
 function approveRow(p,sec,i){
@@ -1450,7 +1580,7 @@ function rejectRow(p,sec,i){
 function showPendingOverview(){
   // navigate to approvals tab of first project with pending
   const proj=PROJECTS.find(p=>(STORE[p.id]?.pending||[]).some(x=>x.status==='pending'));
-  if(proj){curProj=proj.id;curTab[proj.id]='approvals';curView='project';renderProjNav();renderProject(proj.id);}
+  if(proj){curProj=proj.id;curTab[proj.id]='approvals';curView='project';/* proj-nav removed */renderProject(proj.id);}
 }
 // ══════════════════════════════════════════════════════
 // TEST DATA MODALS
@@ -1487,7 +1617,7 @@ function saveState(p){
   const now=new Date();
   const snap={datetime:now.toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})+' '+now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),label:STORE[p].env.releaseVersion||'',summary:s,env:JSON.parse(JSON.stringify(STORE[p].env)),gates:[...STORE[p].gates],smoke:JSON.parse(JSON.stringify(STORE[p].smoke)),prod:JSON.parse(JSON.stringify(STORE[p].prod)),testdata:JSON.parse(JSON.stringify(STORE[p].testdata||[])),releaseNotes:JSON.parse(JSON.stringify(STORE[p].releaseNotes||[]))};
   STORE[p].reports.push(snap);
-  saveToLS(p);renderProjNav();renderProject(p);
+  saveToLS(p);/* proj-nav removed */renderProject(p);
   toast(`✓ Snapshot #${STORE[p].reports.length} saved`);
 }
 function saveToLS(p){try{localStorage.setItem('qa3_'+p,JSON.stringify(STORE[p]));}catch(e){}}
@@ -1756,7 +1886,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
     document.getElementById('login-page').style.display='none';
     document.getElementById('dashboard').style.display='block';
     PROJECTS.forEach(p=>{curTab[p.id]=curTab[p.id]||'overview';});
-    renderTopBar();renderProjNav();renderProject(PROJECTS[0]?.id||'humee');
+    renderTopBar();renderProjectGrid();
   }
 });
 
