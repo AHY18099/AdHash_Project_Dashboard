@@ -91,7 +91,7 @@
         {
           "name": "AlgoMax",
           "playStore": "com.algomax",
-          "appStore": "id6498886667"
+          "appStore": "https://apps.apple.com/in/app/algomax/id6498886667"
         }
       ],
       "servers": [
@@ -102,7 +102,6 @@
         }
       ],
       "domains": [
-        "algomax.co",
         "gopocket.algomax.co"
       ],
       "sslCerts": [
@@ -1102,7 +1101,7 @@
         {
           "name": "WhatsApp",
           "playStore": "com.whatsapp",
-          "appStore": "id310633997"
+          "appStore": "id31063366666"
         }
       ],
       "servers": [
@@ -1121,7 +1120,7 @@
       "apis": [
         {
           "name": "Adhash Get",
-          "url": "https://adhashtech.com/",
+          "url": "https://adhashtch.com/",
           "method": "GET",
           "expectedStatus": 200
         }
