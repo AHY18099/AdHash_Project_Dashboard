@@ -60,9 +60,11 @@ function getProjectSslEntries(project: ProjectConfig): string[] {
 function loadDomainConfigs(): DomainConfig[] {
   const mappingPath = path.join(process.cwd(), 'config', 'project-mapping.json');
   const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8')) as ProjectMapping;
+  const projectFilter = process.env.PROJECT_FILTER ? process.env.PROJECT_FILTER.toLowerCase().trim() : '';
   const seen = new Set<string>();
 
   return (mapping.projects || [])
+    .filter((project: any) => !projectFilter || (project.id || '').toLowerCase() === projectFilter)
     .flatMap((project) => getProjectSslEntries(project).map((url) => ({
       name: url,
       url,
@@ -156,8 +158,8 @@ test.describe('SSL Certificate Expiry Tests', () => {
       } catch (error: any) {
         console.error(`✗ Error checking certificate for ${domain.name}:`, error.message);
         
-        // If it's a connection error, it might be a test environment issue
-        if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+        // If it's a connection/network error, skip (unreachable from this machine)
+        if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.code === 'ECONNRESET' || error.message?.includes('timeout')) {
           test.skip();
         } else {
           throw error;

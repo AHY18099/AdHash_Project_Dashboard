@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -68,8 +68,10 @@ function normalizeAppStoreValue(appStore: string): { appId: string; expectedUrl:
 function loadAppData(): AppData[] {
   const mappingPath = path.join(process.cwd(), 'config', 'project-mapping.json');
   const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8')) as ProjectMapping;
+  const projectFilter = process.env.PROJECT_FILTER ? process.env.PROJECT_FILTER.toLowerCase().trim() : '';
 
   return (mapping.projects || [])
+    .filter((project: any) => !projectFilter || (project.id || '').toLowerCase() === projectFilter)
     .flatMap((project) => {
       const apps = project.apps || [];
       const playStoreCount = apps.filter((app) => Boolean(app?.playStore)).length;
@@ -121,45 +123,36 @@ test.describe('App Storefront Verification', () => {
     test(`Verify ${app.appName} on ${app.platform}`, async ({ page }) => {
       test.setTimeout(60000);
 
+      let appStatus: 'passed' | 'failed' = 'failed';
+      let appReason = '';
       try {
-        // Navigate to the configured store page
-        await page.goto(app.expectedUrl, { 
-          waitUntil: 'domcontentloaded',
-          timeout: 30000 
-        });
+        await page.goto(app.expectedUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.waitForFunction(() => document.title.length > 0, { timeout: 15000 }).catch(() => {});
 
-        // Wait for the page to load
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-        // Check if app exists (page doesn't show 404)
         const pageTitle = await page.title();
-        expect(pageTitle).not.toContain('Not Found');
-        expect(pageTitle).not.toContain('404');
+        const titleLower = pageTitle.toLowerCase();
+        const appNameLower = app.appName.toLowerCase();
 
-        // Try to find app name on the page
-        const appNameLocator = page.locator(`text=${app.appName}`).first();
-        const isVisible = await appNameLocator.isVisible({ timeout: 5000 }).catch(() => false);
+        // Split app name into words, check if any significant word (>2 chars) appears in the title
+        const words = appNameLower.split(/\s+/).filter(w => w.length > 2);
+        const titleMatches = words.some(w => titleLower.includes(w));
 
-        if (isVisible) {
-          console.log(`✓ ${app.appName} found on ${app.platform}`);
+        if (titleMatches) {
+          appStatus = 'passed';
+          appReason = pageTitle;
         } else {
-          console.log(`⚠ ${app.appName} ${app.platform} page loaded but name not immediately visible`);
+          appReason = `App name words not found in page title: "${pageTitle}"`;
         }
+      } catch (error: any) {
+        appStatus = 'failed';
+        appReason = error.message || String(error);
+      }
 
-        // Take screenshot for verification
-        const screenshotDir = path.join(process.cwd(), 'test-results', 'screenshots', app.platform === 'Play Store' ? 'playstore' : 'appstore');
-        if (!fs.existsSync(screenshotDir)) {
-          fs.mkdirSync(screenshotDir, { recursive: true });
-        }
-        
-        await page.screenshot({ 
-          path: path.join(screenshotDir, `${app.storeId}.png`),
-          fullPage: true 
-        });
+      // Emit structured marker for server to parse
+      console.log(`__APP_RESULT__${JSON.stringify({ appName: app.appName, platform: app.platform, status: appStatus, reason: appReason })}`);
 
-      } catch (error) {
-        console.error(`✗ Error verifying ${app.appName} on ${app.platform}:`, error);
-        throw error;
+      if (appStatus === 'failed') {
+        throw new Error(appReason);
       }
     });
   }

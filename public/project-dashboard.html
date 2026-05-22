@@ -164,11 +164,50 @@
 
         .controls {
             display: flex;
+            flex-direction: column;
+            margin-bottom: 30px;
+            gap: 12px;
+        }
+
+        .controls-top-row {
+            display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 30px;
             gap: 20px;
             flex-wrap: wrap;
+        }
+
+        .controls-action-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .back-home-btn {
+            padding: 10px 22px;
+            background: transparent;
+            color: var(--text-secondary);
+            border: 2px solid rgba(148, 163, 184, 0.4);
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .back-home-btn:hover {
+            border-color: var(--gradient-start);
+            color: var(--gradient-start);
+            box-shadow: 0 2px 12px rgba(0, 212, 255, 0.2);
+        }
+        body.light-mode .back-home-btn:hover {
+            border-color: #3b82f6;
+            color: #3b82f6;
+            box-shadow: 0 2px 12px rgba(59, 130, 246, 0.2);
         }
 
         .search-box {
@@ -1228,6 +1267,13 @@
             font-weight: 700;
         }
 
+        .count-skipped {
+            background: #f0f0f0;
+            color: #4b5563;
+            border-color: #4b5563;
+            font-weight: 700;
+        }
+
         /* Light Mode Count Badges - Silver white background with colored text and borders */
         body.light-mode .count-total {
             background: #f0f0f0; /* Silver white */
@@ -1255,6 +1301,13 @@
             color: #ef4444; /* Red */
             border-color: #ef4444; /* Red */
             box-shadow: 0 2px 6px rgba(239, 68, 68, 0.15);
+        }
+
+        body.light-mode .count-skipped {
+            background: #f0f0f0;
+            color: #4b5563;
+            border-color: #4b5563;
+            box-shadow: 0 2px 6px rgba(75, 85, 99, 0.15);
         }
 
         /* Failed Status Item Highlighting */
@@ -2034,6 +2087,23 @@
         .add-project-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,212,255,0.4); }
         body.light-mode .add-project-btn:hover { box-shadow: 0 8px 28px rgba(59,130,246,0.35); }
 
+        /* ── CLEAR RESULTS BUTTON ── */
+        .clear-results-btn {
+            display: flex; align-items: center; gap: 8px;
+            padding: 13px 22px;
+            border-radius: 50px;
+            border: 2px solid #6b7280;
+            background: transparent;
+            color: #9ca3af;
+            font-size: 0.92rem; font-weight: 700;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            white-space: nowrap;
+        }
+        .clear-results-btn:hover { background: rgba(107,114,128,0.12); border-color: #9ca3af; color: #d1d5db; transform: translateY(-2px); box-shadow: 0 6px 22px rgba(107,114,128,0.25); }
+        body.light-mode .clear-results-btn { border-color: #9ca3af; color: #6b7280; }
+        body.light-mode .clear-results-btn:hover { background: rgba(107,114,128,0.08); color: #374151; }
+
         /* ── COMMIT & PUSH BUTTON ── */
         .push-specs-btn {
             display: flex; align-items: center; gap: 8px;
@@ -2211,8 +2281,98 @@
         }
         .card-action-btn.edit { background: rgba(0,212,255,0.15); color: #00d4ff; }
         .card-action-btn.del  { background: rgba(239,68,68,0.15);  color: #ef4444; }
+        .card-action-btn.run  { background: rgba(34,197,94,0.15);  color: #22c55e; }
         body.light-mode .card-action-btn.edit { background: rgba(59,130,246,0.15); color: #3b82f6; }
+        body.light-mode .card-action-btn.run  { background: rgba(22,163,74,0.15);  color: #16a34a; }
         .card-action-btn:hover { transform: scale(1.1); }
+
+        /* per-card run status badge */
+        .card-run-status {
+            display: none;
+            margin-top: 8px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+        }
+        .card-run-status.running  { display: block; background: rgba(34,197,94,0.12);  color: #22c55e; }
+        .card-run-status.passed   { display: block; background: rgba(34,197,94,0.12);  color: #22c55e; }
+        .card-run-status.failed   { display: block; background: rgba(239,68,68,0.12);  color: #ef4444; }
+        .card-run-status.warning  { display: block; background: rgba(251,191,36,0.12); color: #fbbf24; }
+        .card-run-status span     { font-weight: 700; }
+
+        /* password gate modal */
+        .pw-gate-backdrop {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.55);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 99999;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .pw-gate-backdrop.open { opacity: 1; pointer-events: auto; }
+        .pw-gate-modal {
+            background: #1a1e2e;
+            border: 1.5px solid rgba(255,255,255,0.12);
+            border-radius: 16px;
+            padding: 28px 32px;
+            width: 360px;
+            display: flex; flex-direction: column; gap: 14px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+            position: relative; z-index: 1;
+        }
+        .pw-gate-title {
+            font-size: 1.05rem; font-weight: 700;
+            color: #ffffff;
+        }
+        .pw-gate-input {
+            width: 100%; padding: 11px 14px; border-radius: 8px;
+            border: 1.5px solid rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.07);
+            color: #ffffff;
+            font-size: 15px; outline: none;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+            cursor: text;
+        }
+        .pw-gate-input::placeholder { color: rgba(255,255,255,0.4); }
+        .pw-gate-input:focus { border-color: #3b82f6; background: rgba(255,255,255,0.1); }
+        .pw-gate-error { color: #f87171; font-size: 13px; min-height: 18px; }
+        .pw-gate-actions { display: flex; gap: 10px; justify-content: flex-end; }
+        .pw-gate-cancel {
+            padding: 9px 20px; border-radius: 8px;
+            border: 1.5px solid rgba(255,255,255,0.15);
+            background: transparent; color: rgba(255,255,255,0.7);
+            cursor: pointer; font-size: 14px;
+            transition: background 0.15s;
+        }
+        .pw-gate-cancel:hover { background: rgba(255,255,255,0.08); }
+        .pw-gate-confirm {
+            padding: 9px 24px; border-radius: 8px; border: none;
+            background: #3b82f6; color: #fff;
+            cursor: pointer; font-weight: 600; font-size: 14px;
+            transition: background 0.15s;
+        }
+        .pw-gate-confirm:hover { background: #2563eb; }
+        body.light-mode .pw-gate-modal {
+            background: #ffffff;
+            border: 1.5px solid rgba(148,163,184,0.3);
+            box-shadow: 0 20px 60px rgba(100,116,139,0.2);
+        }
+        body.light-mode .pw-gate-title  { color: #1e293b; }
+        body.light-mode .pw-gate-input  { color: #1e293b; border-color: rgba(148,163,184,0.4); background: #f8fafc; }
+        body.light-mode .pw-gate-input::placeholder { color: #94a3b8; }
+        body.light-mode .pw-gate-cancel { color: #475569; border-color: rgba(148,163,184,0.4); background: transparent; }
+        body.light-mode .pw-gate-cancel:hover { background: #f1f5f9; }
+        body.light-mode #secretsModalBackdrop { color: #1e293b; }
+        body.light-mode #secretsModalBackdrop .pw-gate-title { color: #1e293b; }
+        body.light-mode #secretsModalBackdrop div[style*="color:#9ca3af"] { color: #64748b !important; }
+        body.light-mode #secretsModalBackdrop div[style*="color:#6b7280"] { color: #64748b !important; }
+        body.light-mode #secretsModalBackdrop code { background: rgba(148,163,184,0.15) !important; color: #475569 !important; }
+        body.light-mode #secretsModalBackdrop input { color: #1e293b !important; background: #f8fafc !important; border-color: rgba(148,163,184,0.4) !important; }
+        body.light-mode #secretsModalBackdrop input::placeholder { color: #94a3b8 !important; }
+        body.light-mode #secretsModalBackdrop button[onclick*="addSecretField"] { background: rgba(59,130,246,0.08) !important; color: #3b82f6 !important; border-color: rgba(59,130,246,0.35) !important; }
 
         /* ── PROJECT MODAL ── */
         .proj-modal-backdrop {
@@ -2457,7 +2617,7 @@
                 grid-template-columns: 1fr;
             }
 
-            .controls {
+            .controls-top-row {
                 flex-direction: column;
             }
 
@@ -2481,24 +2641,37 @@
 
         <!-- Controls -->
         <div class="controls">
-            <div class="search-box">
-                <input type="text" id="searchInput" placeholder="🔍 Search projects..." onkeyup="filterProjects()">
+            <div class="controls-top-row">
+                <div class="search-box">
+                    <input type="search" id="searchInput" placeholder="🔍 Search projects..." onkeyup="filterProjects()" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" name="project-search-x">
+                </div>
+                <div class="run-all-btn-container">
+                    <button class="run-all-btn" id="runAllBtn" onclick="runAllTests()">
+                        ▶ Run All Tests
+                    </button>
+                    <button class="info-btn" onclick="showInfoModal()" title="Learn about Run All Tests">
+                        ℹ️
+                    </button>
+                    <button class="info-btn" onclick="openSecretsModal()" title="Environment Secrets / API Keys" style="margin-left:4px;">
+                        ⚙️
+                    </button>
+                </div>
             </div>
-            <div class="run-all-btn-container">
+            <div class="controls-action-row">
+                <button class="back-home-btn" onclick="window.location.href='/'" title="Back to Home">
+                    ← Back to Home
+                </button>
                 <button class="add-project-btn" onclick="openAddProjectModal()">
                     ＋ Add Project
+                </button>
+                <button class="clear-results-btn" id="clearResultsBtn" onclick="clearAllResults()" title="Clear all project test results">
+                    🗑 Clear Results
                 </button>
                 <button class="push-specs-btn" id="pushSpecsBtn" onclick="openPushModal()" title="Commit & push updated test specs to GitHub repos">
                     ↑ Commit &amp; Push
                 </button>
                 <button class="view-report-btn disabled" id="viewReportBtn" onclick="toggleRunReportPanel()" title="View last run report">
                     📊 View Report
-                </button>
-                <button class="run-all-btn" id="runAllBtn" onclick="runAllTests()">
-                    ▶ Run All Tests
-                </button>
-                <button class="info-btn" onclick="showInfoModal()" title="Learn about Run All Tests">
-                    ℹ️
                 </button>
             </div>
         </div>
@@ -2646,6 +2819,11 @@
         // Load projects on page load
         document.addEventListener('DOMContentLoaded', async () => {
             loadTheme(); // Load theme preference first
+            // Clear search immediately and again after autofill timing window
+            const si = document.getElementById('searchInput');
+            si.value = '';
+            setTimeout(() => { si.value = ''; }, 100);
+            setTimeout(() => { si.value = ''; }, 500);
             await loadProjects();
             await fetchAllTestResults(); // Fetch real test results
             await loadTestStatus();
@@ -2722,11 +2900,18 @@
             const grid = document.getElementById('projectsGrid');
 
             if (projects.length === 0) {
-                grid.innerHTML = buildFailedListHtml() + `
-                    <div class="loading">
-                        <p>No projects found</p>
-                    </div>
-                `;
+                const searchTerm = document.getElementById('searchInput').value.trim();
+                if (searchTerm) {
+                    // Only show "no results" message when actively filtering
+                    grid.innerHTML = buildFailedListHtml() + `
+                        <div class="loading">
+                            <p>No projects match "<strong>${searchTerm.replace(/</g,'&lt;')}</strong>"</p>
+                        </div>
+                    `;
+                } else {
+                    // No search active — show all projects (re-render with full list)
+                    renderProjects(projectsData);
+                }
                 return;
             }
 
@@ -2771,9 +2956,11 @@
                 return `
                 <div class="project-card ${cardStyleClass}" style="--project-color: ${project.color}; position:relative;" onclick="openProjectDetail('${project.id}')">
                     <div class="card-actions" onclick="event.stopPropagation()">
+                        <button class="card-action-btn run" onclick="runProjectTests('${project.id}')" title="Run tests for this project">▶</button>
                         <button class="card-action-btn edit" onclick="openEditProjectModal('${project.id}')" title="Edit project">✏️</button>
                         <button class="card-action-btn del" onclick="deleteProject('${project.id}','${escapeHtml(project.name)}')" title="Delete project">🗑️</button>
                     </div>
+                    <div class="card-run-status" id="run-status-${project.id}"></div>
                     <div class="project-header">
                         <div class="project-name">${project.name}</div>
                         <div class="project-description">${project.description}</div>
@@ -2805,7 +2992,7 @@
                         ${stats.total > 0 ? `
                             <span class="count-badge count-pass" title="Passed">${stats.passed}</span>
                             <span class="count-badge count-warning" title="Warning">${stats.warning}</span>
-                            <span class="count-badge count-warning" title="Skipped">${stats.skipped || 0}</span>
+                            <span class="count-badge count-skipped" title="Skipped">${stats.skipped || 0}</span>
                             <span class="count-badge count-fail" title="Failed">${stats.failed}</span>
                         ` : ''}
                     </div>
@@ -3138,10 +3325,14 @@
         }
 
         function filterProjects() {
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+            if (!searchTerm) {
+                renderProjects(projectsData);
+                return;
+            }
             const filtered = projectsData.filter(project =>
                 project.name.toLowerCase().includes(searchTerm) ||
-                project.description.toLowerCase().includes(searchTerm)
+                (project.description || '').toLowerCase().includes(searchTerm)
             );
             renderProjects(filtered);
         }
@@ -3979,6 +4170,23 @@
             return `<span style="display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600; background: ${style.bg}; color: ${style.color};">${status.toUpperCase()}</span>`;
         }
 
+        async function clearAllResults() {
+            const btn = document.getElementById('clearResultsBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Clearing…';
+            try {
+                await fetch('/api/clear-results', { method: 'POST' });
+                await loadProjects();
+                await fetchAllTestResults();
+                renderSummaryTiles();
+            } catch (e) {
+                console.error('Clear results failed:', e);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🗑 Clear Results';
+            }
+        }
+
         async function runAllTests() {
             if (testRunning) return;
 
@@ -4222,6 +4430,44 @@
       </div>
     </div>
 
+    <!-- ══ SECRETS / ENV SETTINGS MODAL ════════════════════════════════════ -->
+    <div class="pw-gate-backdrop" id="secretsModalBackdrop" onclick="closeSecretsModal()">
+      <div class="pw-gate-modal" onclick="event.stopPropagation()" style="width:520px;max-width:96vw;padding:28px 28px 24px;">
+        <div class="pw-gate-title" style="font-size:1.1rem;margin-bottom:4px;">⚙️ Environment Secrets</div>
+        <div style="color:#9ca3af;font-size:0.8rem;margin-bottom:18px;line-height:1.5;">Saved to the local <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;">.env</code> file and loaded when running tests. Never commit this file to git.</div>
+
+        <!-- Column headers -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 32px;gap:8px;margin-bottom:6px;padding:0 2px;">
+          <div style="color:#6b7280;font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Variable Name</div>
+          <div style="color:#6b7280;font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Value</div>
+          <div></div>
+        </div>
+
+        <div id="secretsFieldList" style="display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow-y:auto;margin-bottom:14px;"></div>
+
+        <button onclick="addSecretField()" style="display:flex;align-items:center;justify-content:center;gap:6px;background:rgba(99,102,241,0.1);color:#a5b4fc;border:1.5px dashed rgba(99,102,241,0.5);border-radius:8px;padding:9px 0;width:100%;cursor:pointer;font-size:0.85rem;font-weight:600;margin-bottom:18px;transition:background 0.15s;">+ Add Variable</button>
+
+        <div class="pw-gate-error" id="secretsError" style="margin-bottom:8px;"></div>
+        <div class="pw-gate-actions">
+          <button class="pw-gate-cancel" onclick="closeSecretsModal()">Cancel</button>
+          <button class="pw-gate-confirm" onclick="saveSecrets()">Save to .env</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PASSWORD GATE MODAL ═════════════════════════════════════════════ -->
+    <div class="pw-gate-backdrop" id="pwGateBackdrop">
+      <div class="pw-gate-modal" onclick="event.stopPropagation()">
+        <div class="pw-gate-title" id="pwGateTitle">Enter Password</div>
+        <input class="pw-gate-input" type="password" id="pwGateInput" placeholder="Password" autocomplete="off" />
+        <div class="pw-gate-error" id="pwGateError"></div>
+        <div class="pw-gate-actions">
+          <button class="pw-gate-cancel" onclick="closePwGate()">Cancel</button>
+          <button class="pw-gate-confirm" onclick="confirmPwGate()">Confirm</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ══ COMMIT & PUSH MODAL ══════════════════════════════════════════════ -->
     <div class="push-modal-backdrop" id="pushModalBackdrop" onclick="closePushModal(event)">
       <div class="push-modal" onclick="event.stopPropagation()">
@@ -4340,8 +4586,8 @@
               <input class="pm-entry-input" placeholder="App name" data-key="name" value="${escapeHtml(name)}" />
             </div>
             <div class="pm-entry-row">
-              <input class="pm-entry-input" placeholder="Play Store ID (e.g. com.example.app)" data-key="playStore" value="${escapeHtml(ps)}" />
-              <input class="pm-entry-input" placeholder="App Store ID (e.g. id123456)" data-key="appStore" value="${escapeHtml(as)}" />
+              <input class="pm-entry-input" placeholder="Play Store — full URL or package ID (e.g. com.example.app)" data-key="playStore" value="${escapeHtml(ps)}" />
+              <input class="pm-entry-input" placeholder="App Store — full URL or ID (e.g. id123456)" data-key="appStore" value="${escapeHtml(as)}" />
             </div>`;
         } else if (type === 'servers') {
             const name = (data && data.name) || '';
@@ -4548,8 +4794,125 @@
         list.querySelector('.pm-kv-input').focus();
     }
 
+    // ── PASSWORD GATE ─────────────────────────────────────────────────────────
+    let _pwGateResolve = null;
+
+    function openPwGate(title) {
+        return new Promise((resolve) => {
+            _pwGateResolve = resolve;
+            document.getElementById('pwGateTitle').textContent = title;
+            document.getElementById('pwGateInput').value = '';
+            document.getElementById('pwGateError').textContent = '';
+            document.getElementById('pwGateBackdrop').classList.add('open');
+            setTimeout(() => document.getElementById('pwGateInput').focus(), 50);
+        });
+    }
+
+    // ── SECRETS MODAL ──────────────────────────────────────────────────────
+    const PROTECTED_ENV_KEYS = ['GITHUB_TOKEN','ZOHO_MAIL_PASS','ZOHO_MAIL_USER','ZOHO_MAIL_FROM','ZOHO_MAIL_TO','ZOHO_MAIL_ENABLED'];
+
+    async function openSecretsModal() {
+        document.getElementById('secretsError').textContent = '';
+        const list = document.getElementById('secretsFieldList');
+        list.innerHTML = '<div style="color:#9ca3af;font-size:0.82rem;text-align:center;padding:8px;">Loading…</div>';
+        document.getElementById('secretsModalBackdrop').classList.add('open');
+        try {
+            const res = await fetch('/api/env-secrets');
+            const data = await res.json();
+            list.innerHTML = '';
+            const entries = Object.entries(data.secrets || {});
+            if (entries.length === 0) {
+                addSecretField();
+            } else {
+                entries.forEach(([k, v]) => addSecretField(k, v));
+            }
+        } catch (e) {
+            list.innerHTML = '';
+            addSecretField();
+        }
+    }
+
+    function closeSecretsModal() {
+        document.getElementById('secretsModalBackdrop').classList.remove('open');
+    }
+
+    function addSecretField(key = '', value = '') {
+        const list = document.getElementById('secretsFieldList');
+        const row = document.createElement('div');
+        row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 32px;gap:8px;align-items:center;';
+        const inputStyle = 'width:100%;box-sizing:border-box;background:rgba(255,255,255,0.07);color:#f1f5f9;border:1px solid rgba(255,255,255,0.13);border-radius:8px;padding:8px 10px;font-size:0.84rem;outline:none;';
+        row.innerHTML = `
+            <input placeholder="VARIABLE_NAME" value="${escapeHtml(key)}"
+                style="${inputStyle}font-family:monospace;" />
+            <input placeholder="value" type="text" value="${escapeHtml(value)}"
+                style="${inputStyle}" />
+            <button onclick="this.closest('div').remove()" title="Remove"
+                style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.25);border-radius:6px;cursor:pointer;font-size:0.9rem;flex-shrink:0;">✕</button>`;
+        list.appendChild(row);
+    }
+
+    async function saveSecrets() {
+        const list = document.getElementById('secretsFieldList');
+        const rows = list.querySelectorAll('div');
+        const secrets = {};
+        for (const row of rows) {
+            const inputs = row.querySelectorAll('input');
+            const k = inputs[0]?.value.trim();
+            const v = inputs[1]?.value;
+            if (k) secrets[k] = v || '';
+        }
+        document.getElementById('secretsError').textContent = '';
+        try {
+            const res = await fetch('/api/env-secrets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ secrets })
+            });
+            const data = await res.json();
+            if (data.status === 'saved') {
+                closeSecretsModal();
+            } else {
+                document.getElementById('secretsError').textContent = data.error || 'Failed to save.';
+            }
+        } catch (e) {
+            document.getElementById('secretsError').textContent = 'Network error.';
+        }
+    }
+
+    function closePwGate() {
+        document.getElementById('pwGateBackdrop').classList.remove('open');
+        if (_pwGateResolve) { _pwGateResolve(null); _pwGateResolve = null; }
+    }
+
+    function confirmPwGate() {
+        const val = document.getElementById('pwGateInput').value;
+        document.getElementById('pwGateBackdrop').classList.remove('open');
+        if (_pwGateResolve) { _pwGateResolve(val); _pwGateResolve = null; }
+    }
+
+    // Allow Enter key to confirm the gate
+    document.getElementById('pwGateInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') confirmPwGate();
+        if (e.key === 'Escape') closePwGate();
+    });
+
     async function deleteProject(projectId, projectName) {
-        if (!confirm(`Delete project "${projectName}"?\n\nThis will remove it from all test suites.`)) return;
+        const pw = await openPwGate(`Delete "${projectName}" — enter password`);
+        if (pw === null) return;
+        if (pw !== 'Qadelete@321') {
+            document.getElementById('pwGateError').textContent = 'Incorrect password.';
+            document.getElementById('pwGateBackdrop').classList.add('open');
+            document.getElementById('pwGateInput').value = '';
+            document.getElementById('pwGateInput').focus();
+            // Rebind resolve so user can try again without reopening
+            const retryPromise = new Promise((resolve) => { _pwGateResolve = resolve; });
+            const pw2 = await retryPromise;
+            if (pw2 !== 'Qadelete@321') { closePwGate(); return; }
+        }
+        await _doDeleteProject(projectId);
+    }
+
+    async function _doDeleteProject(projectId) {
         try {
             const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
             const data = await res.json();
@@ -4560,8 +4923,93 @@
         }
     }
 
+    // ── PER-CARD PROJECT RUN ───────────────────────────────────────────────────
+    async function runProjectTests(projectId) {
+        const statusEl = document.getElementById(`run-status-${projectId}`);
+        if (!statusEl) return;
+        setCardRunStatus(statusEl, 'running', '⏳ Starting tests…');
+        try {
+            const res = await fetch(`/api/run-project/${projectId}`, { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) {
+                setCardRunStatus(statusEl, 'failed', '❌ ' + (data.error || 'Failed to start'));
+                return;
+            }
+            if (data.status === 'already-running') {
+                setCardRunStatus(statusEl, 'running', '⏳ Already running…');
+            }
+            pollProjectRunStatus(projectId, statusEl);
+        } catch (err) {
+            setCardRunStatus(statusEl, 'failed', '❌ Network error');
+        }
+    }
+
+    function setCardRunStatus(el, state, text) {
+        el.className = 'card-run-status ' + state;
+        el.innerHTML = text;
+    }
+
+    function buildResultLabel(d) {
+        const parts = [];
+        if (d.passed  > 0) parts.push(`<span style="color:#22c55e">✅ ${d.passed} passed</span>`);
+        if (d.failed  > 0) parts.push(`<span style="color:#ef4444">❌ ${d.failed} failed</span>`);
+        if (d.warning > 0) parts.push(`<span style="color:#fbbf24">⚠️ ${d.warning} warning</span>`);
+        if (d.skipped > 0) parts.push(`<span style="color:#94a3b8">⏭ ${d.skipped} skipped</span>`);
+        return parts.length ? parts.join(' &nbsp; ') : '⚠️ No results';
+    }
+
+    async function pollProjectRunStatus(projectId, statusEl) {
+        const maxPolls = 72; // up to 6 minutes at 5s interval
+        let polls = 0;
+        const interval = setInterval(async () => {
+            polls++;
+            try {
+                const res = await fetch(`/api/run-project/${projectId}/status`);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.running) {
+                    const msg = (data.message || 'Running…').replace(/</g,'&lt;');
+                    setCardRunStatus(statusEl, 'running', `⏳ ${msg}`);
+                } else {
+                    clearInterval(interval);
+                    const total = (data.passed||0) + (data.failed||0) + (data.warning||0) + (data.skipped||0);
+                    if (total === 0) {
+                        setCardRunStatus(statusEl, 'warning', '⚠️ No API results');
+                    } else {
+                        const state = data.failed > 0 ? 'failed' : (data.warning > 0 ? 'warning' : 'passed');
+                        setCardRunStatus(statusEl, state, 'API: ' + buildResultLabel(data));
+                    }
+                    // Refresh both project list and test results so all card counters update
+                    await loadProjects();
+                    await fetchAllTestResults();
+                    // Re-attach status el reference since renderProjects re-creates the DOM
+                    const refreshed = document.getElementById(`run-status-${projectId}`);
+                    if (refreshed && total > 0) {
+                        const state = data.failed > 0 ? 'failed' : (data.warning > 0 ? 'warning' : 'passed');
+                        setCardRunStatus(refreshed, state, 'API: ' + buildResultLabel(data));
+                    }
+                }
+            } catch (_) {}
+            if (polls >= maxPolls) {
+                clearInterval(interval);
+                setCardRunStatus(statusEl, 'warning', '⚠️ Timed out');
+            }
+        }, 5000);
+    }
+
     // ── COMMIT & PUSH MODAL ────────────────────────────────────────────────────
-    function openPushModal() {
+    async function openPushModal() {
+        const pw = await openPwGate('Enter password to Commit & Push');
+        if (pw === null) return;
+        if (pw !== 'Qagithub@321') {
+            document.getElementById('pwGateError').textContent = 'Incorrect password.';
+            document.getElementById('pwGateBackdrop').classList.add('open');
+            document.getElementById('pwGateInput').value = '';
+            document.getElementById('pwGateInput').focus();
+            const retryPromise = new Promise((resolve) => { _pwGateResolve = resolve; });
+            const pw2 = await retryPromise;
+            if (pw2 !== 'Qagithub@321') { closePwGate(); return; }
+        }
         const backdrop = document.getElementById('pushModalBackdrop');
         // Reset to ready state
         document.getElementById('pushLogList').innerHTML =

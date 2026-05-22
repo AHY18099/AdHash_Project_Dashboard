@@ -35,9 +35,11 @@ function isSkippedServer(server: ServerConfig): boolean {
 function loadServers(): ServerConfig[] {
   const mappingPath = path.join(process.cwd(), 'config', 'project-mapping.json');
   const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8')) as ProjectMapping;
+  const projectFilter = process.env.PROJECT_FILTER ? process.env.PROJECT_FILTER.toLowerCase().trim() : '';
   const seen = new Set<string>();
 
   return (mapping.projects || [])
+    .filter((project: any) => !projectFilter || (project.id || '').toLowerCase() === projectFilter)
     .flatMap((project) => project.servers || [])
     .filter((server): server is ProjectServerConfig & { name: string; url: string } => Boolean(server?.name && server?.url))
     .map((server) => ({

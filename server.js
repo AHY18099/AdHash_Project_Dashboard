@@ -931,6 +931,609 @@ app.post('/api/run-single-suite/:suite', (req, res) => {
     });
 });
 
+// Per-project run state
+const projectRunState = {};
+// In-memory override: after a per-project run, store live results here so card
+// counters update immediately without waiting for a full pipeline run.
+// Shape: { [projectId]: { apps, servers, ssl, domains, apis } } — each is a suiteResult
+const projectResultOverride = {};
+// When true, all get*TestResults functions return empty — set by /api/clear-results
+let resultsCleared = false;
+
+// Start tests for a single project
+app.post('/api/run-project/:projectId', (req, res) => {
+    const { spawn } = require('child_process');
+    const { projectId } = req.params;
+
+    const mappingPath = path.join(__dirname, 'config', 'project-mapping.json');
+    if (!fs.existsSync(mappingPath)) return res.status(404).json({ error: 'project-mapping.json not found' });
+    const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
+    const project = (mapping.projects || []).find(p => p.id === projectId);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    if (projectRunState[projectId] && projectRunState[projectId].running) {
+        return res.json({ status: 'already-running', message: 'Tests already running for this project' });
+    }
+
+    // Determine which suites have config for this project
+    const hasApps    = project.apps    && project.apps.length    > 0;
+    const hasServers = project.servers && project.servers.length > 0;
+    const hasSsl     = (project.ssl    && project.ssl.length    > 0) || (project.sslCerts && project.sslCerts.length > 0);
+    const hasDomains = project.domains && project.domains.length > 0;
+    const hasApis    = project.apis    && project.apis.length    > 0;
+
+    const suitesToRun = [
+        hasApis    && { label: 'API',    spec: 'tests/api/api-tests.spec.ts',               category: 'apis'    },
+        hasServers && { label: 'Server', spec: 'tests/server-health/server-check.spec.ts',  category: 'servers' },
+        hasSsl     && { label: 'SSL',    spec: 'tests/certificate/cert-expiry.spec.ts',     category: 'ssl'     },
+        hasApps    && { label: 'App',    spec: 'tests/app-status/playstore.spec.ts',        category: 'apps'    },
+    ].filter(Boolean);
+
+    // Domain is checked via server-check or a separate check — skip for now if no spec
+    const totalSuites = suitesToRun.length || 1;
+    resultsCleared = false;
+    projectRunState[projectId] = { running: true, message: `Starting tests for ${project.name}…`, passed: 0, failed: 0, warning: 0, skipped: 0, suitesDone: 0, totalSuites };
+    res.json({ status: 'started' });
+
+    addLog(`🚀 [${project.name}] Running ${totalSuites} suite(s): ${suitesToRun.map(s=>s.label).join(', ') || 'none'}`, 'info');
+
+    const grepPattern = project.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const suiteResults = {}; // category -> { total, passed, failed, warning, skipped, tests:[] }
+
+    function makeEmptySuiteResult() { return { total: 0, passed: 0, failed: 0, warning: 0, skipped: 0, tests: [] }; }
+
+    // Collect API details for dashboard-state update
+    let currentApi = null;
+    const collectedApiDetails = [];
+    const collectedAppResults = []; // parsed from __APP_RESULT__ markers
+
+    function parseApiLine(line) {
+        const apiNameMatch = line.match(/^=== (.+) ===$/);
+        const urlMatch     = line.match(/^URL: (.+)$/);
+        const methodMatch  = line.match(/^Method: (.+)$/);
+        const codeMatch    = line.match(/__API_RESPONSE_CODE__(\d+)/);
+        const reqMatch     = line.match(/__API_REQUEST_BODY__(.+)/);
+        const respMatch    = line.match(/__API_RESPONSE_BODY__(.+)/);
+        if (apiNameMatch) {
+            if (currentApi) collectedApiDetails.push(currentApi);
+            currentApi = { name: apiNameMatch[1].trim(), url: '', method: 'GET', responseCode: null, requestBody: '', responseBody: '' };
+        }
+        if (currentApi) {
+            if (urlMatch)    currentApi.url    = urlMatch[1].trim();
+            if (methodMatch) currentApi.method = methodMatch[1].trim().toUpperCase();
+            if (codeMatch)   currentApi.responseCode = parseInt(codeMatch[1]);
+            if (reqMatch)  { try { currentApi.requestBody  = Buffer.from(reqMatch[1].trim(),  'base64').toString('utf8'); } catch(_) {} }
+            if (respMatch) { try { currentApi.responseBody = Buffer.from(respMatch[1].trim(), 'base64').toString('utf8'); } catch(_) {} }
+        }
+    }
+
+    function runSuite(suiteIndex) {
+        if (suiteIndex >= suitesToRun.length) {
+            // All done — finalise
+            onAllSuitesDone();
+            return;
+        }
+
+        const suite = suitesToRun[suiteIndex];
+        addLog(`[${project.name}] ▶ Running ${suite.label} suite (${suiteIndex + 1}/${suitesToRun.length})…`, 'info');
+        projectRunState[projectId].message = `Running ${suite.label} suite (${suiteIndex + 1}/${suitesToRun.length})…`;
+
+        const suiteResult = makeEmptySuiteResult();
+        suiteResults[suite.category] = suiteResult;
+
+        const proc = spawn('npx', [
+            'playwright', 'test', suite.spec,
+            '--reporter', 'list'
+        ], { cwd: __dirname, shell: true, env: { ...process.env, PROJECT_FILTER: projectId } });
+
+        function parseLine(line) {
+            const passMatch = line.match(/(\d+)\s+passed/);
+            const failMatch = line.match(/(\d+)\s+failed/);
+            const skipMatch = line.match(/(\d+)\s+skipped/);
+            if (passMatch) suiteResult.passed = parseInt(passMatch[1]);
+            if (failMatch) suiteResult.failed = parseInt(failMatch[1]);
+            if (skipMatch) suiteResult.skipped = parseInt(skipMatch[1]);
+            suiteResult.total = suiteResult.passed + suiteResult.failed + suiteResult.skipped;
+            if (suite.category === 'apis') parseApiLine(line);
+            if (suite.category === 'apps') {
+                const appResultMatch = line.match(/__APP_RESULT__(.+)/);
+                if (appResultMatch) {
+                    try { collectedAppResults.push(JSON.parse(appResultMatch[1])); } catch(_) {}
+                }
+            }
+
+            // Parse individual test results from Playwright list reporter lines
+            // Format after trim: "✓  1 [chromium] › Describe › Test title  123ms"
+            const testLineMatch = line.match(/^(✓|✘|×|✗|-|–)\s+\d+\s+(.*?)(?:\s+\d+(?:\.\d+)?(?:ms|s))?$/);
+            if (testLineMatch) {
+                const icon = testLineMatch[1];
+                // Strip browser tag and describe prefix: "[chromium] › Describe › title" → "title"
+                let testTitle = testLineMatch[2].replace(/^\[.*?\]\s*›\s*/, '').trim();
+                const lastArrow = testTitle.lastIndexOf(' › ');
+                if (lastArrow >= 0) testTitle = testTitle.slice(lastArrow + 3).trim();
+                const testStatus = (icon === '✓') ? 'passed' : (icon === '-' || icon === '–') ? 'skipped' : 'failed';
+                suiteResult.tests.push({ _title: testTitle, _status: testStatus });
+            }
+        }
+
+        proc.stdout.on('data', (data) => {
+            data.toString().split('\n').filter(l => l.trim()).forEach(line => {
+                addLog(`[${project.name}][${suite.label}] ${line}`, 'info');
+                if (!line.startsWith('  ') && !line.startsWith('·')) projectRunState[projectId].message = `${suite.label}: ${line.trim().slice(0, 60)}`;
+                parseLine(line.trim());
+            });
+        });
+        proc.stderr.on('data', (data) => {
+            data.toString().split('\n').filter(l => l.trim()).forEach(line => {
+                addLog(`[${project.name}][${suite.label}] ${line}`, 'info');
+                parseLine(line.trim());
+            });
+        });
+        proc.on('exit', () => {
+            addLog(`[${project.name}] ${suite.label} done — ✅${suiteResult.passed} ❌${suiteResult.failed} ⏭${suiteResult.skipped}`, suiteResult.failed > 0 ? 'error' : 'success');
+            projectRunState[projectId].suitesDone = suiteIndex + 1;
+            // Update totals incrementally
+            projectRunState[projectId].passed  += suiteResult.passed;
+            projectRunState[projectId].failed  += suiteResult.failed;
+            projectRunState[projectId].skipped += suiteResult.skipped;
+            runSuite(suiteIndex + 1);
+        });
+    }
+
+    function onAllSuitesDone() {
+        if (currentApi) collectedApiDetails.push(currentApi);
+
+        // Classify API details
+        collectedApiDetails.forEach(d => {
+            const code = d.responseCode;
+            if (code === null) { d.status = 'failed'; return; }
+            d.status = code >= 200 && code < 300 ? 'passed' : code >= 300 && code < 400 ? 'warning' : 'failed';
+        });
+
+        // Update dashboard-state.json with fresh API details
+        if (collectedApiDetails.length > 0) {
+            try {
+                const state = fs.existsSync(DASHBOARD_STATE_PATH) ? JSON.parse(fs.readFileSync(DASHBOARD_STATE_PATH, 'utf8')) : { suites: {} };
+                if (!state.suites) state.suites = {};
+                if (!state.suites.api) state.suites.api = { details: [] };
+                if (!Array.isArray(state.suites.api.details)) state.suites.api.details = [];
+                const projectApiNames = new Set((project.apis || []).map(a => String(a.name || '').toLowerCase().trim()));
+                state.suites.api.details = state.suites.api.details.filter(d => !projectApiNames.has(String(d.name || '').toLowerCase().trim()));
+                state.suites.api.details.push(...collectedApiDetails);
+                // Do NOT update generatedAt — that would bust the shared SSL/domain cache for all projects
+                fs.mkdirSync(path.dirname(DASHBOARD_STATE_PATH), { recursive: true });
+                fs.writeFileSync(DASHBOARD_STATE_PATH, JSON.stringify(state, null, 2));
+            } catch (e) {
+                addLog(`⚠️ [${project.name}] Could not update dashboard state: ${e.message}`, 'warn');
+            }
+        }
+
+        // Enrich parsed tests[] with structured data from project config
+        function enrichSuiteTests() {
+            // Servers
+            if (suiteResults['servers']) {
+                const rawTests = suiteResults['servers'].tests || [];
+                suiteResults['servers'].tests = (project.servers || []).map((srv) => {
+                    const name = srv.name || '';
+                    const matched = rawTests.find(t => t._title && t._title.toLowerCase().includes(name.toLowerCase()));
+                    const status = matched ? matched._status : (suiteResults['servers'].failed > 0 ? 'failed' : 'passed');
+                    return { name, url: srv.url || '', status, type: srv.type || 'service' };
+                });
+            }
+            // SSL — cert data populated separately in fetchSslCertData()
+            if (suiteResults['ssl'] && !suiteResults['ssl']._certEnriched) {
+                const rawTests = suiteResults['ssl'].tests || [];
+                const sslList = (project.ssl && project.ssl.length > 0) ? project.ssl : (project.sslCerts || []);
+                suiteResults['ssl'].tests = sslList.map((entry) => {
+                    const hostname = String(entry).replace(/^https?:\/\//i,'').split('/')[0].toLowerCase();
+                    const matched = rawTests.find(t => t._title && t._title.toLowerCase().includes(hostname));
+                    const status = matched ? matched._status : (suiteResults['ssl'].failed > 0 ? 'failed' : 'passed');
+                    return { name: hostname, url: `https://${hostname}`, status, daysRemaining: null, expiryDate: null, expiryDateIST: null };
+                });
+            }
+            // Apps — build full store URLs, use per-test status from Playwright output
+            if (suiteResults['apps']) {
+                suiteResults['apps'].tests = (project.apps || []).flatMap((app) => {
+                    const items = [];
+                    if (app.playStore) {
+                        const raw = String(app.playStore).trim();
+                        const url = /^https?:\/\//i.test(raw) ? raw : `https://play.google.com/store/apps/details?id=${raw}`;
+                        const result = collectedAppResults.find(r =>
+                            r.appName === app.name && r.platform === 'Play Store');
+                        items.push({ name: app.name, url, status: result ? result.status : 'skipped', platform: 'Play Store' });
+                    }
+                    if (app.appStore) {
+                        const raw = String(app.appStore).trim();
+                        const url = /^https?:\/\//i.test(raw) ? raw : `https://apps.apple.com/app/${raw.startsWith('id') ? raw : 'id' + raw}`;
+                        const result = collectedAppResults.find(r =>
+                            r.appName === app.name && r.platform === 'App Store');
+                        items.push({ name: app.name, url, status: result ? result.status : 'skipped', platform: 'App Store' });
+                    }
+                    return items;
+                });
+            }
+            // APIs — populate from collectedApiDetails (parsed from spec stdout)
+            if (suiteResults['apis']) {
+                if (collectedApiDetails.length > 0) {
+                    suiteResults['apis'].tests = collectedApiDetails.map(d => ({
+                        name: d.name,
+                        url: d.url,
+                        method: d.method || 'GET',
+                        status: d.status || 'failed',
+                        responseCode: d.responseCode,
+                        requestBody: d.requestBody || '',
+                        responseBody: d.responseBody || ''
+                    }));
+                } else {
+                    // No stdout markers parsed — synthesize from project config with overall pass/fail
+                    suiteResults['apis'].tests = (project.apis || []).map(api => ({
+                        name: api.name || '',
+                        url: api.url || '',
+                        method: (api.method || 'GET').toUpperCase(),
+                        status: suiteResults['apis'].failed > 0 ? 'failed' : 'passed',
+                        responseCode: null,
+                        requestBody: '',
+                        responseBody: ''
+                    }));
+                }
+            }
+        }
+
+        // Fetch SSL certificate expiry data inline using raw tls.connect
+        function fetchSslCertData(callback) {
+            if (!suiteResults['ssl']) { callback(); return; }
+            const tlsMod = require('tls');
+            const sslList = (project.ssl && project.ssl.length > 0) ? project.ssl : (project.sslCerts || []);
+
+            function parseCertFields(cert) {
+                if (!cert || !cert.valid_to) return { daysRemaining: null, expiryDate: null, expiryDateIST: null, certStatus: 'failed' };
+                const validTo = new Date(cert.valid_to);
+                const daysRemaining = Math.ceil((validTo.getTime() - Date.now()) / 86400000);
+                const expiryDate = validTo.toUTCString();
+                const istOffset = 5.5 * 60 * 60000;
+                const expiryDateIST = new Date(validTo.getTime() + istOffset).toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' IST');
+                const certStatus = daysRemaining > 7 ? 'passed' : daysRemaining > 0 ? 'warning' : 'failed';
+                return { daysRemaining, expiryDate, expiryDateIST, certStatus };
+            }
+
+            // Pre-build tests array
+            suiteResults['ssl'].tests = sslList.map(e => {
+                const h = String(e).replace(/^https?:\/\//i, '').split('/')[0].toLowerCase();
+                return { name: h, url: `https://${h}`, status: 'passed', daysRemaining: null, expiryDate: null, expiryDateIST: null };
+            });
+
+            function checkCert(index) {
+                if (index >= sslList.length) {
+                    suiteResults['ssl']._certEnriched = true;
+                    callback();
+                    return;
+                }
+                const hostname = String(sslList[index]).replace(/^https?:\/\//i, '').split('/')[0].toLowerCase();
+                let done = false;
+
+                const tlsSocket = tlsMod.connect(
+                    { host: hostname, port: 443, rejectUnauthorized: false, servername: hostname },
+                    () => {
+                        if (done) return;
+                        done = true;
+                        const cert = tlsSocket.getPeerCertificate();
+                        tlsSocket.destroy();
+                        const { daysRemaining, expiryDate, expiryDateIST, certStatus } = parseCertFields(cert);
+                        const idx = suiteResults['ssl'].tests.findIndex(t => t.name === hostname);
+                        const entry = { name: hostname, url: `https://${hostname}`, status: certStatus, daysRemaining, expiryDate, expiryDateIST };
+                        if (idx >= 0) suiteResults['ssl'].tests[idx] = entry; else suiteResults['ssl'].tests.push(entry);
+                        checkCert(index + 1);
+                    }
+                );
+                tlsSocket.setTimeout(8000, () => {
+                    if (done) return;
+                    done = true;
+                    tlsSocket.destroy();
+                    const idx = suiteResults['ssl'].tests.findIndex(t => t.name === hostname);
+                    const entry = { name: hostname, url: `https://${hostname}`, status: 'warning', daysRemaining: null, expiryDate: null, expiryDateIST: null, reason: 'Unreachable from this machine (TCP timeout)' };
+                    if (idx >= 0) suiteResults['ssl'].tests[idx] = entry; else suiteResults['ssl'].tests.push(entry);
+                    checkCert(index + 1);
+                });
+                tlsSocket.on('error', (err) => {
+                    if (done) return;
+                    done = true;
+                    tlsSocket.destroy();
+                    const idx = suiteResults['ssl'].tests.findIndex(t => t.name === hostname);
+                    const entry = { name: hostname, url: `https://${hostname}`, status: 'warning', daysRemaining: null, expiryDate: null, expiryDateIST: null, reason: `Unreachable: ${err.message}` };
+                    if (idx >= 0) suiteResults['ssl'].tests[idx] = entry; else suiteResults['ssl'].tests.push(entry);
+                    checkCert(index + 1);
+                });
+            }
+            checkCert(0);
+        }
+
+        // Inline domain availability check (no Playwright spec exists for domains)
+        function finalizeSuites() {
+            enrichSuiteTests();
+            // Build override results for each category so card counters update immediately
+            const override = {};
+            for (const [category, result] of Object.entries(suiteResults)) {
+                override[category] = result;
+            }
+            projectResultOverride[projectId] = { ...projectResultOverride[projectId], ...override };
+
+            const { passed, failed, skipped } = projectRunState[projectId];
+            projectRunState[projectId] = { running: false, passed, failed, warning: 0, skipped };
+            addLog(`✅ [${project.name}] All suites complete — Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped}`, failed > 0 ? 'error' : 'success');
+        }
+
+        // Fetch SSL cert expiry data, then proceed to domain check / finalize
+        fetchSslCertData(() => {
+            if (!hasDomains) {
+                finalizeSuites();
+                return;
+            }
+
+        const tlsNode = require('tls');
+        const domainList = project.domains || [];
+        addLog(`[${project.name}] ▶ Running Domain check for ${domainList.length} domain(s)…`, 'info');
+        projectRunState[projectId].message = `Running Domain check…`;
+
+        const domainResult = { total: domainList.length, passed: 0, failed: 0, warning: 0, skipped: 0, tests: [] };
+
+        function parseCertExpiry(cert) {
+            if (!cert || !cert.valid_to) return { daysRemaining: null, expiryDate: null, expiryDateIST: null };
+            const validTo = new Date(cert.valid_to);
+            const daysRemaining = Math.ceil((validTo.getTime() - Date.now()) / 86400000);
+            const expiryDate = validTo.toUTCString();
+            const istOffset = 5.5 * 60 * 60000;
+            const expiryDateIST = new Date(validTo.getTime() + istOffset).toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' IST');
+            return { daysRemaining, expiryDate, expiryDateIST };
+        }
+
+        // HTTP fallback: check if domain is reachable on port 80 when HTTPS/TLS unavailable
+        function httpReachabilityCheck(hostname, url, onResult) {
+            const httpMod = require('http');
+            let done = false;
+            const req = httpMod.request({ host: hostname, port: 80, method: 'HEAD', path: '/', timeout: 8000 }, (res) => {
+                if (done) return; done = true; req.destroy();
+                const reachable = res.statusCode >= 200 && res.statusCode < 600;
+                onResult(reachable);
+            });
+            req.on('timeout', () => { if (done) return; done = true; req.destroy(); onResult(false); });
+            req.on('error', () => { if (done) return; done = true; onResult(false); });
+            req.end();
+        }
+
+        function checkDomain(index) {
+            if (index >= domainList.length) {
+                suiteResults['domains'] = domainResult;
+                projectRunState[projectId].passed += domainResult.passed;
+                projectRunState[projectId].failed += domainResult.failed;
+                addLog(`[${project.name}] Domain done — ✅${domainResult.passed} ❌${domainResult.failed}`, domainResult.failed > 0 ? 'error' : 'success');
+                finalizeSuites();
+                return;
+            }
+
+            const rawDomain = domainList[index];
+            const hostname = rawDomain.replace(/^https?:\/\//i, '').split('/')[0].split(':')[0].toLowerCase();
+            const url = `https://${hostname}`;
+            let done = false;
+
+            function onTlsFail(reason) {
+                // Try www.{hostname} as fallback — many bare domains have cert on www
+                const wwwHost = hostname.startsWith('www.') ? null : `www.${hostname}`;
+                if (wwwHost) {
+                    let wwwDone = false;
+                    const wwwSocket = tlsNode.connect(
+                        { host: wwwHost, port: 443, rejectUnauthorized: false, servername: wwwHost },
+                        () => {
+                            if (wwwDone) return; wwwDone = true;
+                            const cert = wwwSocket.getPeerCertificate();
+                            wwwSocket.destroy();
+                            const { daysRemaining, expiryDate, expiryDateIST } = parseCertExpiry(cert);
+                            const certStatus = daysRemaining === null ? 'passed' : daysRemaining > 7 ? 'passed' : daysRemaining > 0 ? 'warning' : 'failed';
+                            if (certStatus === 'passed') domainResult.passed++;
+                            else if (certStatus === 'warning') { domainResult.warning++; domainResult.passed++; }
+                            else domainResult.failed++;
+                            domainResult.tests.push({ name: hostname, url, status: certStatus, daysRemaining, expiryDate, expiryDateIST });
+                            addLog(`[${project.name}][Domain] ${hostname} (via ${wwwHost}) cert ${daysRemaining !== null ? daysRemaining + 'd' : 'unknown'} ✅`, 'info');
+                            checkDomain(index + 1);
+                        }
+                    );
+                    wwwSocket.setTimeout(6000, () => {
+                        if (wwwDone) return; wwwDone = true; wwwSocket.destroy();
+                        // www also failed — fall back to HTTP reachability, no cert dates
+                        httpReachabilityCheck(hostname, url, (reachable) => {
+                            if (reachable) {
+                                domainResult.passed++;
+                                domainResult.tests.push({ name: hostname, url: `http://${hostname}`, status: 'passed', daysRemaining: null, expiryDate: null, expiryDateIST: null });
+                                addLog(`[${project.name}][Domain] ${hostname} → reachable via HTTP only ✅`, 'info');
+                            } else {
+                                domainResult.failed++;
+                                domainResult.tests.push({ name: hostname, url, status: 'failed', daysRemaining: null, expiryDate: null, expiryDateIST: null, error: reason });
+                                addLog(`[${project.name}][Domain] ${hostname} → unreachable ❌`, 'error');
+                            }
+                            checkDomain(index + 1);
+                        });
+                    });
+                    wwwSocket.on('error', () => {
+                        if (wwwDone) return; wwwDone = true; wwwSocket.destroy();
+                        httpReachabilityCheck(hostname, url, (reachable) => {
+                            if (reachable) {
+                                domainResult.passed++;
+                                domainResult.tests.push({ name: hostname, url: `http://${hostname}`, status: 'passed', daysRemaining: null, expiryDate: null, expiryDateIST: null });
+                                addLog(`[${project.name}][Domain] ${hostname} → reachable via HTTP only ✅`, 'info');
+                            } else {
+                                domainResult.failed++;
+                                domainResult.tests.push({ name: hostname, url, status: 'failed', daysRemaining: null, expiryDate: null, expiryDateIST: null, error: reason });
+                                addLog(`[${project.name}][Domain] ${hostname} → unreachable ❌`, 'error');
+                            }
+                            checkDomain(index + 1);
+                        });
+                    });
+                } else {
+                    // Already a www domain — go straight to HTTP fallback
+                    httpReachabilityCheck(hostname, url, (reachable) => {
+                        if (reachable) {
+                            domainResult.passed++;
+                            domainResult.tests.push({ name: hostname, url: `http://${hostname}`, status: 'passed', daysRemaining: null, expiryDate: null, expiryDateIST: null });
+                            addLog(`[${project.name}][Domain] ${hostname} → reachable via HTTP only ✅`, 'info');
+                        } else {
+                            domainResult.failed++;
+                            domainResult.tests.push({ name: hostname, url, status: 'failed', daysRemaining: null, expiryDate: null, expiryDateIST: null, error: reason });
+                            addLog(`[${project.name}][Domain] ${hostname} → unreachable ❌`, 'error');
+                        }
+                        checkDomain(index + 1);
+                    });
+                }
+            }
+
+            // Use raw tls.connect to reliably get the peer certificate
+            const tlsSocket = tlsNode.connect(
+                { host: hostname, port: 443, rejectUnauthorized: false, servername: hostname },
+                () => {
+                    if (done) return;
+                    done = true;
+                    const cert = tlsSocket.getPeerCertificate();
+                    tlsSocket.destroy();
+                    const { daysRemaining, expiryDate, expiryDateIST } = parseCertExpiry(cert);
+                    const certStatus = daysRemaining === null ? 'passed' : daysRemaining > 7 ? 'passed' : daysRemaining > 0 ? 'warning' : 'failed';
+                    if (certStatus === 'passed') domainResult.passed++;
+                    else if (certStatus === 'warning') { domainResult.warning++; domainResult.passed++; }
+                    else domainResult.failed++;
+                    domainResult.tests.push({ name: hostname, url, status: certStatus, daysRemaining, expiryDate, expiryDateIST });
+                    addLog(`[${project.name}][Domain] ${hostname} cert ${daysRemaining !== null ? daysRemaining + 'd' : 'unknown'} ${certStatus === 'failed' ? '❌' : certStatus === 'warning' ? '⚠️' : '✅'}`, certStatus === 'failed' ? 'error' : 'info');
+                    checkDomain(index + 1);
+                }
+            );
+            tlsSocket.setTimeout(8000, () => {
+                if (done) return;
+                done = true;
+                tlsSocket.destroy();
+                onTlsFail('TLS timeout');
+            });
+            tlsSocket.on('error', (err) => {
+                if (done) return;
+                done = true;
+                tlsSocket.destroy();
+                onTlsFail(err.message);
+            });
+        }
+
+        checkDomain(0);
+        }); // end fetchSslCertData callback
+    }
+
+    if (suitesToRun.length === 0) {
+        projectRunState[projectId] = { running: false, passed: 0, failed: 0, warning: 0, skipped: 0 };
+        addLog(`⚠️ [${project.name}] No testable suites configured`, 'warn');
+        return;
+    }
+
+    runSuite(0);
+});
+
+// Protected keys that must never be exposed or overwritten via the secrets UI
+const PROTECTED_ENV_KEYS = new Set(['GITHUB_TOKEN','ZOHO_MAIL_PASS','ZOHO_MAIL_USER','ZOHO_MAIL_FROM','ZOHO_MAIL_TO','ZOHO_MAIL_ENABLED']);
+
+function readEnvFile() {
+    const envPath = path.join(__dirname, '.env');
+    if (!fs.existsSync(envPath)) return {};
+    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+    const result = {};
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eq = trimmed.indexOf('=');
+        if (eq < 0) continue;
+        const key = trimmed.slice(0, eq).trim();
+        const val = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '');
+        result[key] = val;
+    }
+    return result;
+}
+
+function writeEnvFile(vars) {
+    const envPath = path.join(__dirname, '.env');
+    const lines = Object.entries(vars).map(([k, v]) => {
+        const needsQuotes = /[\s#"']/.test(v);
+        return `${k}=${needsQuotes ? `"${v.replace(/"/g, '\\"')}"` : v}`;
+    });
+    fs.writeFileSync(envPath, lines.join('\n') + '\n');
+}
+
+// GET /api/env-secrets — return non-protected env vars
+app.get('/api/env-secrets', (req, res) => {
+    const all = readEnvFile();
+    const secrets = {};
+    for (const [k, v] of Object.entries(all)) {
+        if (!PROTECTED_ENV_KEYS.has(k)) secrets[k] = v;
+    }
+    res.json({ secrets });
+});
+
+// POST /api/env-secrets — merge new values into .env (protected keys untouched)
+app.post('/api/env-secrets', (req, res) => {
+    const { secrets } = req.body || {};
+    if (!secrets || typeof secrets !== 'object') return res.status(400).json({ error: 'Invalid payload' });
+    const existing = readEnvFile();
+    // Merge: keep protected keys, overwrite/add rest
+    const merged = { ...existing };
+    for (const [k, v] of Object.entries(secrets)) {
+        if (PROTECTED_ENV_KEYS.has(k)) continue; // silently skip protected keys
+        if (k) merged[k] = v;
+    }
+    try {
+        writeEnvFile(merged);
+        // Reload into current process.env so next test run picks them up immediately
+        for (const [k, v] of Object.entries(merged)) {
+            if (!PROTECTED_ENV_KEYS.has(k)) process.env[k] = v;
+        }
+        addLog('⚙️ .env secrets updated', 'info');
+        res.json({ status: 'saved' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Clear all cached per-project run results
+app.post('/api/clear-results', (req, res) => {
+    // Wipe in-memory override cache
+    for (const key of Object.keys(projectResultOverride)) delete projectResultOverride[key];
+    for (const key of Object.keys(projectRunState)) delete projectRunState[key];
+    // Wipe suite row cache so HTML report data is not served from memory
+    suiteConfigCache.apps = null;
+    suiteConfigCache.certificates = null;
+    suiteConfigCache.apis = null;
+    suiteConfigCache.domains = null;
+    suiteConfigCache.domainsCacheKey = null;
+    suiteConfigCache.ssl = null;
+    suiteConfigCache.sslCacheKey = null;
+    suiteConfigCache.suiteRows = {};
+    suiteConfigCache.suiteRowMtimes = {};
+    // Clear dashboard-state.json
+    try {
+        fs.mkdirSync(path.dirname(DASHBOARD_STATE_PATH), { recursive: true });
+        fs.writeFileSync(DASHBOARD_STATE_PATH, JSON.stringify({ suites: {}, generatedAt: new Date().toISOString() }, null, 2));
+    } catch (e) { /* ignore */ }
+    // Delete suite HTML report files so readSuiteRows returns empty
+    const suiteReportsDir = path.join(__dirname, 'suite-reports');
+    try {
+        if (fs.existsSync(suiteReportsDir)) {
+            fs.readdirSync(suiteReportsDir).forEach(f => {
+                try { fs.unlinkSync(path.join(suiteReportsDir, f)); } catch (_) {}
+            });
+        }
+    } catch (e) { /* ignore */ }
+    resultsCleared = true;
+    addLog('🗑️ All project results cleared', 'info');
+    res.json({ status: 'cleared' });
+});
+
+// Poll status for a single project run
+app.get('/api/run-project/:projectId/status', (req, res) => {
+    const { projectId } = req.params;
+    const state = projectRunState[projectId];
+    if (!state) return res.json({ running: false, passed: 0, failed: 0, warning: 0, skipped: 0 });
+    res.json(state);
+});
+
 // API endpoint to trigger test run
 app.post('/api/run-tests', (req, res) => {
     const { spawn } = require('child_process');
@@ -940,6 +1543,7 @@ app.post('/api/run-tests', (req, res) => {
     }
 
     console.log('\n🚀 Starting test execution...');
+    resultsCleared = false;
     testRunning = true;
     testResults = null;
     testLogs = [];
@@ -1025,6 +1629,8 @@ app.post('/api/run-tests', (req, res) => {
         suiteConfigCache.apis = null;
         suiteConfigCache.domains = null;
         suiteConfigCache.domainsCacheKey = null;
+        suiteConfigCache.ssl = null;
+        suiteConfigCache.sslCacheKey = null;
         suiteConfigCache.suiteRows = {};
         suiteConfigCache.suiteRowMtimes = {};
 
@@ -1264,6 +1870,8 @@ const suiteConfigCache = {
     apis: null,
     domains: null,
     domainsCacheKey: null,
+    ssl: null,
+    sslCacheKey: null,
     suiteRows: {},
     suiteRowMtimes: {}
 };
@@ -1541,7 +2149,10 @@ function normalizeDomainDetail(detail) {
 
 function normalizeSslDetail(detail) {
     const daysRemaining = normalizeDaysRemaining(detail && detail.daysRemaining);
-    const status = getExpiryStatus(daysRemaining, detail && detail.status === 'failed' && daysRemaining === null);
+    const isTimeoutWarning = detail && detail.status === 'warning' && daysRemaining === null;
+    const status = isTimeoutWarning
+        ? 'warning'
+        : getExpiryStatus(daysRemaining, detail && detail.status === 'failed' && daysRemaining === null);
 
     return {
         ...detail,
@@ -2029,14 +2640,17 @@ function loadSslReportEntries() {
 
             const domain = normalizeSslHost(decodeHtml(nameMatch[1]) || fields.URL);
             const statusText = decodeHtml((badgeMatch && badgeMatch[1]) || '').toLowerCase();
+            const reasonText = fields['Reason'] || fields['Certificate Status'] || statusText;
+            const isTimeoutReason = /ETIMEDOUT|ECONNRESET|TCP.*timeout|timeout.*TCP|Unreachable.*machine/i.test(reasonText);
+            const resolvedStatus = isTimeoutReason ? 'warning' : (statusText === 'failed' ? 'failed' : statusText === 'warning' ? 'warning' : 'passed');
             htmlEntries.push({
                 domain,
                 url: fields.URL || `https://${domain}`,
-                status: statusText === 'failed' ? 'failed' : statusText === 'warning' ? 'warning' : 'passed',
+                status: resolvedStatus,
                 expiryDate: fields['Expiry Date (UTC)'] || null,
                 expiryDateIST: fields['Expiry Date (IST)'] || formatToIST(fields['Expiry Date (UTC)']),
                 daysRemaining: normalizeDaysRemaining(fields['Days Remaining']),
-                reason: fields['Certificate Status'] || statusText
+                reason: isTimeoutReason ? 'Unreachable from this machine (TCP timeout)' : (fields['Certificate Status'] || statusText)
             });
         }
     }
@@ -2130,6 +2744,10 @@ function attachProjectServerStatuses(projects) {
 }
 
 function getAppTestResults(projectId) {
+    if (resultsCleared && !projectResultOverride[projectId]?.apps) return createEmptySuiteResult();
+    if (projectResultOverride[projectId] && projectResultOverride[projectId].apps) return projectResultOverride[projectId].apps;
+    const state = readDashboardState();
+    if (!state || !state.generatedAt) return createEmptySuiteResult();
     try {
         const mapping = getProjectMapping();
         const project = mapping.projects.find((entry) => entry.id === projectId);
@@ -2185,6 +2803,10 @@ function getAppTestResults(projectId) {
 }
 
 function getServerTestResults(projectId) {
+    if (resultsCleared && !projectResultOverride[projectId]?.servers) return createEmptySuiteResult();
+    if (projectResultOverride[projectId] && projectResultOverride[projectId].servers) return projectResultOverride[projectId].servers;
+    const state = readDashboardState();
+    if (!state || !state.generatedAt) return createEmptySuiteResult();
     try {
         const mapping = getProjectMapping();
         const project = mapping.projects.find((entry) => entry.id === projectId);
@@ -2234,6 +2856,11 @@ function getServerTestResults(projectId) {
 }
 
 function getSSLTestResults(projectId) {
+    if (resultsCleared && !projectResultOverride[projectId]?.ssl) return createEmptySuiteResult();
+    if (projectResultOverride[projectId] && projectResultOverride[projectId].ssl) return projectResultOverride[projectId].ssl;
+    // Only read shared report files if a full run has been completed (generatedAt set)
+    const state = readDashboardState();
+    if (!state || !state.generatedAt) return createEmptySuiteResult();
     try {
         const sslDetails = dedupeTrackedResults('ssl', loadSslReportEntries().map(normalizeSslDetail));
         const mapping = getProjectMapping();
@@ -2276,6 +2903,11 @@ function getSSLTestResults(projectId) {
 }
 
 function getDomainTestResults(projectId) {
+    if (resultsCleared && !projectResultOverride[projectId]?.domains) return createEmptySuiteResult();
+    if (projectResultOverride[projectId] && projectResultOverride[projectId].domains) return projectResultOverride[projectId].domains;
+    // Only read shared report files if a full run has been completed (generatedAt set)
+    const state = readDashboardState();
+    if (!state || !state.generatedAt) return createEmptySuiteResult();
     try {
         const domainDetails = dedupeTrackedResults('domain', loadDomainReportEntries().map(normalizeDomainDetail));
         const mapping = getProjectMapping();
@@ -2313,8 +2945,12 @@ function getDomainTestResults(projectId) {
 }
 
 function getAPITestResults(projectId) {
+    if (resultsCleared && !projectResultOverride[projectId]?.apis) return createEmptySuiteResult();
+    if (projectResultOverride[projectId] && projectResultOverride[projectId].apis) return projectResultOverride[projectId].apis;
+    const state = readDashboardState();
+    if (!state || !state.generatedAt) return createEmptySuiteResult();
     try {
-        const dashboardState = readDashboardState();
+        const dashboardState = state;
         const apiSuite = dashboardState && dashboardState.suites ? dashboardState.suites.api : null;
         const apiDetails = apiSuite && Array.isArray(apiSuite.details) ? apiSuite.details : [];
         const mapping = getProjectMapping();
@@ -2920,6 +3556,73 @@ app.get('/dashboard.html', (req, res) => {
 
 app.get('/favicon.ico', (req, res) => {
     res.status(204).end();
+});
+
+// ── QA Dashboard API Proxy (bypasses browser CORS restrictions) ──
+app.post('/api/qa-proxy', async (req, res) => {
+    const { url, method, headers, body } = req.body || {};
+    if (!url) return res.status(400).json({ error: 'url is required' });
+
+    const t0 = Date.now();
+    try {
+        const fetchOpts = {
+            method: (method || 'GET').toUpperCase(),
+            headers: headers || {}
+        };
+        const hasBody = fetchOpts.method !== 'GET' && fetchOpts.method !== 'HEAD' && body;
+        if (hasBody) {
+            fetchOpts.body = typeof body === 'string' ? body : JSON.stringify(body);
+            if (!fetchOpts.headers['Content-Type'] && !fetchOpts.headers['content-type']) {
+                fetchOpts.headers['Content-Type'] = 'application/json';
+            }
+        }
+
+        // Use Node.js built-in fetch (Node 18+) or fallback to https module
+        let statusCode, responseBody, responseHeaders = {};
+        if (typeof fetch !== 'undefined') {
+            const resp = await fetch(url, fetchOpts);
+            statusCode = resp.status;
+            resp.headers.forEach((v, k) => { responseHeaders[k] = v; });
+            responseBody = await resp.text();
+        } else {
+            // Fallback: use https/http module
+            const { request: nodeRequest } = require(url.startsWith('https') ? 'https' : 'http');
+            const parsed = new URL(url);
+            await new Promise((resolve, reject) => {
+                const opts = {
+                    hostname: parsed.hostname,
+                    port: parsed.port || (url.startsWith('https') ? 443 : 80),
+                    path: parsed.pathname + parsed.search,
+                    method: fetchOpts.method,
+                    headers: fetchOpts.headers,
+                    timeout: 15000
+                };
+                const req2 = nodeRequest(opts, (r) => {
+                    statusCode = r.statusCode;
+                    r.headers && Object.assign(responseHeaders, r.headers);
+                    const chunks = [];
+                    r.on('data', d => chunks.push(d));
+                    r.on('end', () => { responseBody = Buffer.concat(chunks).toString('utf8'); resolve(); });
+                });
+                req2.on('error', reject);
+                req2.on('timeout', () => { req2.destroy(); reject(new Error('Request timed out')); });
+                if (hasBody) req2.write(fetchOpts.body);
+                req2.end();
+            });
+        }
+
+        const elapsed = Date.now() - t0;
+        // Try to pretty-print JSON response
+        let prettyBody = responseBody;
+        const ct = (responseHeaders['content-type'] || '');
+        if (ct.includes('json')) {
+            try { prettyBody = JSON.stringify(JSON.parse(responseBody), null, 2); } catch (_) {}
+        }
+
+        res.json({ statusCode, body: prettyBody, elapsed, headers: responseHeaders });
+    } catch (err) {
+        res.json({ statusCode: null, body: `Error: ${err.message}`, elapsed: Date.now() - t0, error: true });
+    }
 });
 
 // Serve static files with no-cache headers (MUST be last to not override API routes)

@@ -381,7 +381,10 @@ function loadApiEndpoints(): ApiEndpoint[] {
       .filter(Boolean)
   );
 
+  const projectFilter = process.env.PROJECT_FILTER ? process.env.PROJECT_FILTER.toLowerCase().trim() : '';
+
   return (mapping.projects || [])
+    .filter((project: any) => !projectFilter || (project.id || '').toLowerCase() === projectFilter)
     .flatMap((project) => project.apis || [])
     .filter((api): api is ProjectApiConfig & { name: string; url: string; method: 'GET' | 'POST' | 'PUT' | 'DELETE' } => Boolean(api?.name && api?.url && api?.method))
     .map((api) => ({
