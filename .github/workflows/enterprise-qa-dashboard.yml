@@ -2,6 +2,9 @@ name: Enterprise QA Dashboard
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+    - cron: '0 10 * * *'
   push:
     branches:
       - main
