@@ -1091,40 +1091,6 @@
           }
         }
       ]
-    },
-    {
-      "id": "adh_001",
-      "name": "TEST PROJECT",
-      "description": "Test Project",
-      "color": "#f7d83b",
-      "apps": [
-        {
-          "name": "WhatsApp Messenger",
-          "playStore": "com.whatsapp",
-          "appStore": "id31063366666"
-        }
-      ],
-      "servers": [
-        {
-          "name": "Adhash",
-          "url": "https://adhashtech.com",
-          "type": "web"
-        }
-      ],
-      "domains": [
-        "adhashtech.com"
-      ],
-      "sslCerts": [
-        "adhashtech.com"
-      ],
-      "apis": [
-        {
-          "name": "Adhash Get",
-          "url": "https://adhashtch.com/",
-          "method": "GET",
-          "expectedStatus": 200
-        }
-      ]
     }
   ]
 }
