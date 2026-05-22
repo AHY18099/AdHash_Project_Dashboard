@@ -3634,6 +3634,61 @@ app.use(express.static(__dirname, {
     }
 }));
 
+// API proxy endpoint — forwards request to any URL and returns full response (follows redirects)
+app.post('/api/proxy', async (req, res) => {
+    const { url, method } = req.body || {};
+    if (!url) return res.status(400).json({ error: 'url is required' });
+    const m = (method || 'GET').toUpperCase();
+    const allowedMethods = ['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS'];
+    if (!allowedMethods.includes(m)) return res.status(400).json({ error: 'Invalid method' });
+
+    const https = require('https');
+    const http  = require('http');
+    const { URL } = require('url');
+    const startTs = Date.now();
+
+    function doRequest(targetUrl, redirectsLeft, callback) {
+        let parsed;
+        try { parsed = new URL(targetUrl); } catch(e) { return callback({ status: 0, statusText: 'Invalid URL', headers: {}, body: '', timing: Date.now() - startTs, error: e.message }); }
+        const isHttps = parsed.protocol === 'https:';
+        const mod = isHttps ? https : http;
+        const options = {
+            hostname: parsed.hostname,
+            port: parsed.port || (isHttps ? 443 : 80),
+            path: (parsed.pathname || '/') + (parsed.search || ''),
+            method: m,
+            headers: { 'User-Agent': 'AdHash-Dashboard/1.0' },
+            rejectUnauthorized: false,
+            timeout: 10000
+        };
+        const proxyReq = mod.request(options, (proxyRes) => {
+            const sc = proxyRes.statusCode;
+            // Follow redirects (301, 302, 303, 307, 308) for GET/HEAD only, up to 5 hops
+            if ([301,302,303,307,308].includes(sc) && redirectsLeft > 0 && (m === 'GET' || m === 'HEAD')) {
+                const location = proxyRes.headers['location'];
+                proxyRes.resume(); // drain
+                if (location) {
+                    const next = location.startsWith('http') ? location : new URL(location, targetUrl).href;
+                    return doRequest(next, redirectsLeft - 1, callback);
+                }
+            }
+            let body = '';
+            proxyRes.setEncoding('utf8');
+            proxyRes.on('data', chunk => { if (body.length < 50000) body += chunk; });
+            proxyRes.on('end', () => callback({ status: sc, statusText: proxyRes.statusMessage || '', headers: proxyRes.headers, body, timing: Date.now() - startTs }));
+        });
+        proxyReq.on('timeout', () => { proxyReq.destroy(); callback({ status: 0, statusText: 'Timeout', headers: {}, body: '', timing: Date.now() - startTs, error: 'Request timed out' }); });
+        proxyReq.on('error', (err) => callback({ status: 0, statusText: 'Error', headers: {}, body: '', timing: Date.now() - startTs, error: err.message }));
+        proxyReq.end();
+    }
+
+    try {
+        doRequest(url, 5, (result) => res.json(result));
+    } catch (err) {
+        res.json({ status: 0, statusText: 'Error', headers: {}, body: '', timing: Date.now() - startTs, error: err.message });
+    }
+});
+
 // Start server
 app.listen(PORT, () => {
     testRunning = false;
