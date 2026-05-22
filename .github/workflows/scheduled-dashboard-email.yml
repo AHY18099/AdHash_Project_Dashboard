@@ -2,9 +2,9 @@ name: Scheduled Dashboard Email
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 2 * * *'
-    - cron: '0 10 * * *'
+  # schedule:
+  #   - cron: '0 2 * * *'
+  #   - cron: '0 10 * * *'
 
 jobs:
   generate-and-send:
