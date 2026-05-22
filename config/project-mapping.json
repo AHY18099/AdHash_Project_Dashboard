@@ -676,9 +676,9 @@
       "color": "#14b8a6",
       "apps": [
         {
-          "name": "SMC",
+          "name": "Send Movie Clips",
           "playStore": "com.smclips",
-          "appStore": null
+          "appStore": ""
         }
       ],
       "servers": [
@@ -699,7 +699,8 @@
         {
           "name": "SMC API",
           "url": "https://api.sendmovieclips.com/",
-          "method": "GET"
+          "method": "GET",
+          "expectedStatus": 200
         }
       ]
     },
