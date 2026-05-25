@@ -14,8 +14,9 @@ dotenv.config();
 
 const execAsync = promisify(exec);
 
-// Use local binary path directly to avoid npx permission issues on Linux (Railway)
-const PLAYWRIGHT_BIN = path.join(process.cwd(), 'node_modules', '.bin', 'playwright');
+// Use node + playwright CLI directly — avoids npx permission issues on Railway Linux
+const PLAYWRIGHT_CLI = path.join(process.cwd(), 'node_modules', '@playwright', 'test', 'cli.js');
+const PLAYWRIGHT_BIN = `"${process.execPath}" "${PLAYWRIGHT_CLI}"`;
 
 const DASHBOARD_STATE_PATH = path.join(process.cwd(), 'test-results', 'dashboard-state.json');
 const DOMAIN_REPORT_WORKING_DIRECTORY = path.join(process.cwd(), 'godaddy');
@@ -226,7 +227,7 @@ function getSuiteExecutionConfig(definition: SuiteDefinition): SuiteExecutionCon
   }
 
   return {
-    command: `"${PLAYWRIGHT_BIN}" test ${definition.specPath}`,
+    command: `${PLAYWRIGHT_BIN} test ${definition.specPath}`,
     cwd: process.cwd(),
     fallbackTotal: countSuiteTests(definition)
   };

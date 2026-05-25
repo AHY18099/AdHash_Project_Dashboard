@@ -240,7 +240,7 @@ function isSuiteConfigured(config) {
   if (!config) return false;
 
   if (config.id === 'domain') {
-    return fs.existsSync('D:\\Automation\\AdHash_Domain_Report_Standalone\\godaddy\\package.json');
+    return fs.existsSync(path.join(__dirname, 'godaddy', 'package.json'));
   }
 
   return !!(config.specPath && fs.existsSync(path.join(__dirname, config.specPath)));
