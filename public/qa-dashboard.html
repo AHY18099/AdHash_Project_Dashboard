@@ -197,6 +197,13 @@ body.dark .pj-today-tasks-label::before{background:var(--grad-a)}
 .pj-today-chip.todo{background:rgba(100,116,139,.08);color:var(--mut);border:1px solid var(--border)}
 .pj-today-chip.hold{background:rgba(245,158,11,.08);color:var(--blk);border:1px solid rgba(245,158,11,.25)}
 .pj-today-none{font-size:11.5px;color:var(--mut);font-style:italic}
+/* Section card stat rows — label left, value right */
+.pj-statlist{display:flex;flex-direction:column;gap:5px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.pj-statrow{display:flex;align-items:center;justify-content:space-between;min-height:20px}
+.pj-statrow-lbl{font-size:11.5px;color:var(--mut);font-weight:500}
+.pj-statrow-val{font-size:13px;font-weight:800;letter-spacing:-.2px}
+.pj-pbar{height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.pj-pbar-fill{height:100%;border-radius:3px;transition:width .5s ease}
 
 /* Footer */
 .pj-footer{display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid var(--border);margin-top:auto}
@@ -1923,21 +1930,21 @@ function renderProjOverview(p){
   const trPct=allTestRows.length?Math.round(allTestRows.filter(r=>r.status==='Pass').length/allTestRows.length*100):0;
   const trFail=allTestRows.filter(r=>r.status==='Fail'||r.status==='Blocked').length;
 
-  // Each card: color bar, icon, name, 3 stat boxes, progress bar, status pill — same structure as home page
+  // Each card: color bar, icon, name, 3 stat rows (label left / value right), progress bar, status pill
   const mkCard=(tab,color,icon,name,stat1,stat2,stat3,barPct,pillCls,pillTxt)=>`
     <div class="pj-card" onclick="switchTab('${p}','${tab}')">
-      <div class="pj-card-top" style="background:linear-gradient(90deg,${color},${color}aa)"></div>
+      <div class="pj-card-top" style="background:linear-gradient(90deg,${color},${color}88)"></div>
       <div class="pj-card-body">
-        <div class="pj-name-row">
+        <div class="pj-name-row" style="margin-bottom:12px">
           <div class="pj-icon" style="background:${color}22;border:1.5px solid ${color}44;font-size:22px">${icon}</div>
           <div><div class="pj-name" style="font-size:15px">${name}</div></div>
         </div>
-        <div class="pj-stats-row">
-          <div class="pj-stat"><div class="pj-stat-val" style="color:${stat1.c||'var(--txt)'}">${stat1.v}</div><div class="pj-stat-lbl">${stat1.l}</div></div>
-          <div class="pj-stat"><div class="pj-stat-val" style="color:${stat2.c||'var(--txt)'}">${stat2.v}</div><div class="pj-stat-lbl">${stat2.l}</div></div>
-          <div class="pj-stat"><div class="pj-stat-val" style="color:${stat3.c||'var(--txt)'}">${stat3.v}</div><div class="pj-stat-lbl">${stat3.l}</div></div>
+        <div class="pj-statlist">
+          <div class="pj-statrow"><span class="pj-statrow-lbl">${stat1.l}</span><span class="pj-statrow-val" style="color:${stat1.c||'var(--txt)'}">${stat1.v}</span></div>
+          <div class="pj-statrow"><span class="pj-statrow-lbl">${stat2.l}</span><span class="pj-statrow-val" style="color:${stat2.c||'var(--txt)'}">${stat2.v}</span></div>
+          <div class="pj-statrow"><span class="pj-statrow-lbl">${stat3.l}</span><span class="pj-statrow-val" style="color:${stat3.c||'var(--txt)'}">${stat3.v}</span></div>
         </div>
-        ${barPct!==null?`<div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);font-weight:600;margin-bottom:5px"><span>Progress</span><span style="font-weight:800;color:var(--txt)">${barPct}%</span></div><div class="pj-pbar"><div class="pj-pbar-fill" style="width:${barPct}%;background:linear-gradient(90deg,${color},${color}cc)"></div></div></div>`:''}
+        ${barPct!==null?`<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mut);font-weight:600;margin-bottom:4px"><span>Progress</span><span style="font-weight:800;color:var(--txt)">${barPct}%</span></div><div class="pj-pbar"><div class="pj-pbar-fill" style="width:${barPct}%;background:linear-gradient(90deg,${color},${color}cc)"></div></div></div>`:''}
         <div class="pj-footer">
           <span class="pj-status-pill ${pillCls}">${pillTxt}</span>
           <div class="pj-arrow">→</div>
