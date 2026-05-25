@@ -1576,20 +1576,20 @@ const PROJ_GATES={
 const STATUS_OPTS=['Not Started','In Progress','Pass','Fail','Blocked'];
 const PRI_OPTS=['Critical','High','Medium','Low'];
 const DEFAULT_PROJ=[
-  {id:'adhash',    name:'Ad-Hash',     color:'#ef4444',website:'',dashboard:'',releaseDate:''},
-  {id:'aisignpro', name:'Ai Sign Pro', color:'#ec4899',website:'https://ddp.aisignpro.com/',dashboard:'https://cpa.aisignpro.com/',releaseDate:'2026-04-10'},
-  {id:'algomax',   name:'Algomax',     color:'#374151',website:'',dashboard:'',releaseDate:''},
-  {id:'autochecker',name:'Auto Checker',color:'#6b7280',website:'',dashboard:'',releaseDate:''},
-  {id:'ddp',       name:'DDP',         color:'#f97316',website:'',dashboard:'',releaseDate:''},
-  {id:'humee',     name:'Humee',       color:'#eab308',website:'https://humee.com/',dashboard:'https://dashboard.humee.com/',releaseDate:'2026-04-15'},
-  {id:'metcalf',   name:'Metcalf',     color:'#ca8a04',website:'',dashboard:'',releaseDate:''},
-  {id:'smc',       name:'SMC',         color:'#0ea5e9',website:'',dashboard:'',releaseDate:''},
-  {id:'sparkme',   name:'Spark me',    color:'#6366f1',website:'',dashboard:'',releaseDate:''},
-  {id:'synctag',   name:'SyncTag',     color:'#ef4444',website:'',dashboard:'',releaseDate:''},
-  {id:'synctrade', name:'SyncTrade',   color:'#dc2626',website:'',dashboard:'',releaseDate:''},
-  {id:'wavedin',   name:'WavedIn',     color:'#3b82f6',website:'',dashboard:'',releaseDate:''},
-  {id:'zapai',     name:'ZapAI',       color:'#10b981',website:'',dashboard:'',releaseDate:''},
-  {id:'zapcrm',    name:'ZapCRM',      color:'#7c3aed',website:'',dashboard:'',releaseDate:''}
+  {id:'adhash',    name:'Ad-Hash',     color:'#ef4444',website:'',dashboard:'',releaseDate:'',defaultAssignee:'Prakash Raj'},
+  {id:'aisignpro', name:'Ai Sign Pro', color:'#ec4899',website:'https://ddp.aisignpro.com/',dashboard:'https://cpa.aisignpro.com/',releaseDate:'2026-04-10',defaultAssignee:'Yogesh'},
+  {id:'algomax',   name:'Algomax',     color:'#374151',website:'',dashboard:'',releaseDate:'',defaultAssignee:'Deepa'},
+  {id:'autochecker',name:'Auto Checker',color:'#6b7280',website:'',dashboard:'',releaseDate:'',defaultAssignee:'Deepa'},
+  {id:'ddp',       name:'DDP',         color:'#f97316',website:'',dashboard:'',releaseDate:'',defaultAssignee:'Prakash Raj'},
+  {id:'humee',     name:'Humee',       color:'#eab308',website:'https://humee.com/',dashboard:'https://dashboard.humee.com/',releaseDate:'2026-04-15',defaultAssignee:'Yogesh'},
+  {id:'metcalf',   name:'Metcalf',     color:'#ca8a04',website:'',dashboard:'',releaseDate:'',defaultAssignee:'Yogesh'},
+  {id:'smc',       name:'SMC',         color:'#0ea5e9',website:'',dashboard:'',releaseDate:'',defaultAssignee:'Prakash Raj'},
+  {id:'sparkme',   name:'Spark me',    color:'#6366f1',website:'',dashboard:'',releaseDate:'',defaultAssignee:'Deepa'},
+  {id:'synctag',   name:'SyncTag',     color:'#ef4444',website:'',dashboard:'',releaseDate:'',defaultAssignee:'Raghuram'},
+  {id:'synctrade', name:'SyncTrade',   color:'#dc2626',website:'',dashboard:'',releaseDate:'',defaultAssignee:'Raghuram'},
+  {id:'wavedin',   name:'WavedIn',     color:'#3b82f6',website:'',dashboard:'',releaseDate:'',defaultAssignee:'Deepa'},
+  {id:'zapai',     name:'ZapAI',       color:'#10b981',website:'',dashboard:'',releaseDate:'',defaultAssignee:'Prakash Raj'},
+  {id:'zapcrm',    name:'ZapCRM',      color:'#7c3aed',website:'',dashboard:'',releaseDate:'',defaultAssignee:'Raghuram'}
 ];
 // ══════════════════════════════════════════════════════
 // RUNTIME STATE
@@ -3537,10 +3537,15 @@ function dtEnsureProjectRows(dateStr){
   let changed=false;
   PROJECTS.forEach(p=>{
     const exists=DAILY_TASKS.find(t=>t.date===dateStr&&t.projectId===p.id);
+    const defAssignee=p.defaultAssignee||'';
     if(!exists){
-      const entry={date:dateStr,projectId:p.id,assignedBy:''};
+      const entry={date:dateStr,projectId:p.id,assignedBy:defAssignee};
       DT_COLS.forEach(c=>{entry[c.key]='';});
       DAILY_TASKS.push(entry);
+      changed=true;
+    } else if(!exists.assignedBy&&defAssignee){
+      // backfill empty assignedBy with project default
+      exists.assignedBy=defAssignee;
       changed=true;
     }
   });
@@ -3554,6 +3559,12 @@ function dtEnsureMonth(ym){
 }
 
 function dtAssignedSelect(taskIdx,val){
+  if(!isAdmin()){
+    // Members see a read-only badge
+    return val
+      ?`<span style="font-size:12px;font-weight:600;color:var(--txt2);padding:4px 10px;background:var(--card2);border:1px solid var(--border);border-radius:7px;display:inline-block;white-space:nowrap">${escH(val)}</span>`
+      :`<span style="font-size:11px;color:var(--mut)">—</span>`;
+  }
   const opts=`<option value="">— Assign —</option>`
     +getTeamMembers().map(n=>`<option value="${escH(n)}" ${n===val?'selected':''}>${escH(n)}</option>`).join('');
   return`<select class="dt-cell-select val-blank" style="min-width:110px" onchange="dtAssignedChange(${taskIdx},this)">${opts}</select>`;
