@@ -23,6 +23,13 @@ const PORT = Number(process.env.PORT) || 7777;
 const IS_PROD = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
 const SUPER_ADMIN_EMAIL = process.env.QA_ADMIN_EMAIL || 'thenilavan@adhashtech.com';
 const SUPER_ADMIN_PASSWORD = process.env.QA_ADMIN_PASSWORD || 'Qateam@123';
+
+// Apply Zoho mail defaults so email works on Railway without manual env var setup
+if (!process.env.ZOHO_MAIL_ENABLED)  process.env.ZOHO_MAIL_ENABLED  = 'true';
+if (!process.env.ZOHO_MAIL_FROM)     process.env.ZOHO_MAIL_FROM     = 'thenilavan@adhashtech.com';
+if (!process.env.ZOHO_MAIL_USER)     process.env.ZOHO_MAIL_USER     = 'thenilavan@adhashtech.com';
+if (!process.env.ZOHO_MAIL_PASS)     process.env.ZOHO_MAIL_PASS     = 'G8sYN8MRCWpM';
+if (!process.env.ZOHO_MAIL_TO)       process.env.ZOHO_MAIL_TO       = 'qateam@adhashtech.com';
 const SUPER_ADMIN_ROLE = 'super-admin';
 const AUTH_COOKIE_NAME = 'adhash_auth';
 const AUTH_COOKIE_VALUE = Buffer.from(`${SUPER_ADMIN_EMAIL}:${SUPER_ADMIN_PASSWORD}`).toString('base64url');
