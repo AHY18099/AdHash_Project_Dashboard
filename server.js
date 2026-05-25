@@ -756,11 +756,16 @@ async function dispatchZohoSummaryMail(state) {
         return;
     }
 
-    const mailDispatchKey = [state.generatedAt || '', summary.passedSuites || 0, summary.failedSuites || 0, summary.skippedSuites || 0, summary.totalSuites || 0].join('|');
-    if (!mailDispatchKey || mailDispatchKey === lastMailDispatchKey) {
-        addLog('ℹ️ Zoho mail not sent: already sent for this summary.', 'info');
+    // Use timestamp + counts as dedup key; always include a wall-clock component so
+    // repeated runs with the same counts still send (generatedAt changes each run).
+    const runTs = state.generatedAt || new Date().toISOString();
+    const mailDispatchKey = [runTs, summary.passedSuites || 0, summary.failedSuites || 0, summary.skippedSuites || 0, summary.totalSuites || 0].join('|');
+    if (mailDispatchKey === lastMailDispatchKey) {
+        addLog('ℹ️ Zoho mail not sent: already sent for this exact run.', 'info');
         return;
     }
+
+    addLog(`📧 Preparing email report (passed:${summary.passedSuites} failed:${summary.failedSuites} total:${summary.totalSuites})...`, 'info');
 
     // Permanently locked to Email Preview style. Inject live failed-module data at placeholder.
     const emailPreviewCandidates = [
@@ -770,9 +775,11 @@ async function dispatchZohoSummaryMail(state) {
     const emailPreviewPath = emailPreviewCandidates.find((candidate) => fs.existsSync(candidate));
 
     if (!emailPreviewPath) {
-        addLog('ℹ️ Email template not ready yet — will send automatically after the next test run completes.', 'info');
+        addLog('⚠️ Email template file not found — checked email-preview/AdHash-Projects-Dashboard.html and email-preview/index.html', 'warning');
         return;
     }
+
+    addLog(`📄 Using email template: ${emailPreviewPath}`, 'info');
 
     let html = fs.readFileSync(emailPreviewPath, 'utf8');
     // Inject live failed-module cards so the Failed Details section always reflects current run
@@ -780,13 +787,14 @@ async function dispatchZohoSummaryMail(state) {
         html = html.replace('<!--LIVE_FAILED_MODULES-->', buildFailedModulesHtmlForTemplate(state));
     }
 
+    addLog(`📤 Sending via Zoho SMTP to ${process.env.ZOHO_MAIL_TO} from ${process.env.ZOHO_MAIL_FROM}...`, 'info');
     try {
         await sendZohoMail({
-            subject: `AdHash Test Report: ${summary.passedSuites} Passed, ${summary.failedSuites} Failed`,
+            subject: `AdHash QA Report — ${summary.passedSuites} Passed, ${summary.failedSuites} Failed | ${new Date().toLocaleDateString('en-IN')}`,
             html
         });
         lastMailDispatchKey = mailDispatchKey;
-        addLog('📧 Test report sent via Zoho Mail', 'info');
+        addLog(`✅ Test report email sent to ${process.env.ZOHO_MAIL_TO}`, 'success');
     } catch (err) {
         addLog('❌ Failed to send Zoho Mail: ' + (err && err.message), 'error');
         console.error('Failed to send Zoho Mail:', err);
