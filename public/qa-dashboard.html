@@ -1657,6 +1657,7 @@ function platformSwitcher(p,currentTab){
 const QA_SA_EMAIL='thenilavan@adhashtech.com';
 function getUsers(){try{const d=localStorage.getItem('qa_users');if(d)return JSON.parse(d);}catch(e){}return[];}
 function saveUsers(u){try{localStorage.setItem('qa_users',JSON.stringify(u));}catch(e){}syncToServer('qa_users',u);}
+const DEFAULT_MEMBER_PASSWORD='Adhashq@786';
 const DEFAULT_TEAM_MEMBERS=[
   {id:'u_deepa',      name:'Deepa',      email:'deepa@adhashtech.com',      role:'member'},
   {id:'u_prakashraj', name:'Prakash Raj', email:'prakashraj@adhashtech.com', role:'member'},
@@ -1673,8 +1674,12 @@ function initUsers(){
   }
   DEFAULT_TEAM_MEMBERS.forEach(m=>{
     if(!users.find(u=>u.id===m.id)){
-      users.push({...m,password:'',createdAt:new Date().toISOString()});
+      users.push({...m,password:DEFAULT_MEMBER_PASSWORD,createdAt:new Date().toISOString()});
       changed=true;
+    } else {
+      // Ensure existing members without a password get the default
+      const existing=users.find(u=>u.id===m.id);
+      if(!existing.password){existing.password=DEFAULT_MEMBER_PASSWORD;changed=true;}
     }
   });
   if(changed)saveUsers(users);
@@ -4995,6 +5000,7 @@ async function tpRunAllFromTab(p,acctIdx,btnEl){
 // ADD PROJECT
 // ══════════════════════════════════════════════════════
 function openAddProject(){
+  if(!isAdmin()){toast('Permission denied','err');return;}
   openModal('Add New Project',`
     <div class="fg-row">
       <div class="fg"><label>Project Name</label><input id="np-name" placeholder="e.g. MyApp"></div>
@@ -5034,6 +5040,7 @@ function openEditProject(pid){
   });
 }
 function deleteProject(pid){
+  if(!isAdmin()){toast('Permission denied','err');return;}
   const proj=PROJECTS.find(x=>x.id===pid);
   if(!proj)return;
   const body=`

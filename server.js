@@ -5,6 +5,19 @@ const fs = require('fs');
 const { readLatestApiResultsPayload } = require('./utils/latest-api-results.js');
 const { sendZohoMail } = require('./utils/zoho-mail');
 
+// ── SHARED DATA (must be defined before login handler uses it) ──
+const QA_DATA_PATH = path.join(__dirname, 'data', 'qa-shared.json');
+function readQaData() {
+    try {
+        if (fs.existsSync(QA_DATA_PATH)) return JSON.parse(fs.readFileSync(QA_DATA_PATH, 'utf8'));
+    } catch (e) { console.error('readQaData error:', e.message); }
+    return {};
+}
+function writeQaData(data) {
+    fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
+    fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
+}
+
 const app = express();
 const PORT = Number(process.env.PORT) || 7777;
 const IS_PROD = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
@@ -37,11 +50,6 @@ function parseCookies(req) {
         cookies[rawKey] = decodeURIComponent(rest.join('='));
         return cookies;
     }, {});
-}
-
-function isAuthenticated(req) {
-    const cookies = parseCookies(req);
-    return cookies[AUTH_COOKIE_NAME] === AUTH_COOKIE_VALUE;
 }
 
 function setAuthCookie(res) {
@@ -79,30 +87,86 @@ app.use('/api', (req, res, next) => {
     next();
 });
 
+// Cookie value encodes email:password for super admin, or email:role:member for members
+const MEMBER_COOKIE_PREFIX = 'member:';
+
+function isMemberAuthenticated(req) {
+    const cookies = parseCookies(req);
+    const val = cookies[AUTH_COOKIE_NAME] || '';
+    try {
+        const decoded = Buffer.from(val, 'base64url').toString('utf8');
+        return decoded.startsWith(MEMBER_COOKIE_PREFIX);
+    } catch (_) { return false; }
+}
+
+function getSessionFromCookie(req) {
+    const cookies = parseCookies(req);
+    const val = cookies[AUTH_COOKIE_NAME] || '';
+    if (val === AUTH_COOKIE_VALUE) return { role: SUPER_ADMIN_ROLE, email: SUPER_ADMIN_EMAIL };
+    try {
+        const decoded = Buffer.from(val, 'base64url').toString('utf8');
+        if (decoded.startsWith(MEMBER_COOKIE_PREFIX)) {
+            const parts = decoded.slice(MEMBER_COOKIE_PREFIX.length).split(':');
+            return { role: 'member', email: parts[0], name: parts.slice(1).join(':') };
+        }
+    } catch (_) {}
+    return null;
+}
+
+function isAuthenticated(req) {
+    const cookies = parseCookies(req);
+    const val = cookies[AUTH_COOKIE_NAME] || '';
+    if (val === AUTH_COOKIE_VALUE) return true;
+    try {
+        const decoded = Buffer.from(val, 'base64url').toString('utf8');
+        return decoded.startsWith(MEMBER_COOKIE_PREFIX);
+    } catch (_) { return false; }
+}
+
+function setMemberCookie(res, email, name) {
+    const secure = IS_PROD ? '; Secure' : '';
+    const cookieVal = Buffer.from(`${MEMBER_COOKIE_PREFIX}${email}:${name}`).toString('base64url');
+    res.setHeader('Set-Cookie',
+        `${AUTH_COOKIE_NAME}=${encodeURIComponent(cookieVal)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200${secure}`
+    );
+}
+
 app.post('/api/auth/login', (req, res) => {
     const email = String(req.body?.email || '').trim().toLowerCase();
     const password = String(req.body?.password || '');
 
-    if (email === SUPER_ADMIN_EMAIL && password === SUPER_ADMIN_PASSWORD) {
+    // Super admin check
+    if (email === SUPER_ADMIN_EMAIL.toLowerCase() && password === SUPER_ADMIN_PASSWORD) {
         setAuthCookie(res);
-        return res.json({
-            success: true,
-            role: SUPER_ADMIN_ROLE,
-            redirectTo: '/project-dashboard'
-        });
+        return res.json({ success: true, role: SUPER_ADMIN_ROLE, redirectTo: '/landing' });
     }
 
-    return res.status(401).json({
-        success: false,
-        message: 'Invalid email or password.'
-    });
+    // Member check — look up in shared data file
+    try {
+        const data = readQaData();
+        const users = Array.isArray(data['qa_users']) ? data['qa_users'] : [];
+        const user = users.find(u =>
+            u.email && u.email.toLowerCase() === email &&
+            u.password === password &&
+            u.role === 'member'
+        );
+        if (user) {
+            setMemberCookie(res, user.email, user.name);
+            return res.json({ success: true, role: 'member', name: user.name, redirectTo: '/landing' });
+        }
+    } catch (_) {}
+
+    return res.status(401).json({ success: false, message: 'Invalid email or password.' });
 });
 
 app.get('/api/auth/session', (req, res) => {
-    const authenticated = isAuthenticated(req);
+    const session = getSessionFromCookie(req);
+    const authenticated = !!session;
     res.json({
         authenticated,
-        role: authenticated ? SUPER_ADMIN_ROLE : null
+        role: session ? session.role : null,
+        email: session ? session.email : null,
+        name: session ? session.name : null
     });
 });
 
@@ -3730,20 +3794,7 @@ app.post('/api/proxy', async (req, res) => {
     }
 });
 
-// ── SHARED DATA (replaces per-browser localStorage with a shared JSON file) ──
-const QA_DATA_PATH = path.join(__dirname, 'data', 'qa-shared.json');
-
-function readQaData() {
-    try {
-        if (fs.existsSync(QA_DATA_PATH)) return JSON.parse(fs.readFileSync(QA_DATA_PATH, 'utf8'));
-    } catch (e) { console.error('readQaData error:', e.message); }
-    return {};
-}
-
-function writeQaData(data) {
-    fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
-    fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
-}
+// ── SHARED DATA API endpoints ──
 
 // GET /api/qa-data — return all shared keys
 app.get('/api/qa-data', (req, res) => {
