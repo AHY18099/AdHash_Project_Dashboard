@@ -24,7 +24,8 @@ const IS_PROD = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_E
 const SUPER_ADMIN_EMAIL = process.env.QA_ADMIN_EMAIL || 'thenilavan@adhashtech.com';
 const SUPER_ADMIN_PASSWORD = process.env.QA_ADMIN_PASSWORD || 'Qateam@123';
 
-// Apply Zoho mail defaults so email works on Railway without manual env var setup
+// Apply defaults so all features work on Railway without manual env var setup
+if (!process.env.GITHUB_TOKEN)       process.env.GITHUB_TOKEN       = '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';
 if (!process.env.ZOHO_MAIL_ENABLED)  process.env.ZOHO_MAIL_ENABLED  = 'true';
 if (!process.env.ZOHO_MAIL_FROM)     process.env.ZOHO_MAIL_FROM     = 'thenilavan@adhashtech.com';
 if (!process.env.ZOHO_MAIL_USER)     process.env.ZOHO_MAIL_USER     = 'thenilavan@adhashtech.com';
