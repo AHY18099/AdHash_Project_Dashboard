@@ -1006,7 +1006,7 @@ app.post('/api/run-single-suite/:suite', (req, res) => {
     try { regenerateSpecFiles(); } catch (e) { addLog('⚠️ Spec regeneration warning: ' + e.message, 'warn'); }
 
     // Run the suite through the workspace-root runner
-    const testProcess = exec(`npx ts-node run-all-tests.ts --suite ${suite}`, { cwd: __dirname });
+    const testProcess = exec(`"${process.execPath}" -r ts-node/register run-all-tests.ts --suite ${suite}`, { cwd: __dirname });
 
     testProcess.stdout.on('data', (data) => {
         console.log(data.toString());
@@ -1650,9 +1650,9 @@ app.post('/api/run-tests', (req, res) => {
     addLog('🚀 Starting sequential test execution...', 'info');
     addLog('📋 Running configured suites, including external domain monitoring...', 'info');
     // Run the unified test framework with streaming output (no exec buffer cap)
-    const testProcess = spawn('npx', ['ts-node', 'run-all-tests.ts'], {
+    const testProcess = spawn(process.execPath, ['-r', 'ts-node/register', 'run-all-tests.ts'], {
         cwd: __dirname,
-        shell: true
+        shell: false
     });
 
     // Store the process PID for state recovery
@@ -1762,9 +1762,9 @@ app.post('/api/run-tests', (req, res) => {
                     addLog('📄 Generating email report preview...', 'info');
                     await new Promise((resolve, reject) => {
                         const { spawn: spawnChild } = require('child_process');
-                        const regen = spawnChild('npx', ['ts-node', 'regenerate-dashboard.ts'], {
+                        const regen = spawnChild(process.execPath, ['-r', 'ts-node/register', 'regenerate-dashboard.ts'], {
                             cwd: __dirname,
-                            shell: true,
+                            shell: false,
                             env: { ...process.env, ZOHO_MAIL_ENABLED: 'false' }
                         });
                         regen.stdout.on('data', (d) => console.log('[regen]', d.toString().trim()));
