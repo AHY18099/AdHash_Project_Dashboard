@@ -2714,13 +2714,15 @@ function renderTestTable(p,sec){
   <div class="fbar">
     ${['all','Pass','Fail','Blocked','Not Started','In Progress'].map((f,i)=>`<button class="fb${i===0?' active':''}" data-f="${f}" onclick="applyFlt('${p}','${sec}','${f}',this)">${f==='all'?`All ${s.total}`:f+' '+data.filter(r=>r.status===f).length}</button>`).join('')}
     <input class="srch" type="text" placeholder="Search..." oninput="searchTbl('${p}-${sec}-tbl',this.value,'${p}','${sec}')">
+    ${isAdmin()?`<button class="btn-bulk-del" id="${p}-${sec}-bulkdel" style="display:none;margin-left:auto;padding:5px 14px;font-size:11px;font-weight:700;border-radius:8px;border:1.5px solid rgba(239,68,68,.4);background:rgba(239,68,68,.08);color:#ef4444;cursor:pointer" onclick="bulkDeleteRows('${p}','${sec}')">🗑 Delete Selected (<span id="${p}-${sec}-selcount">0</span>)</button>`:''}
   </div>
   <div class="tbl-outer"><table class="qa" id="${p}-${sec}-tbl">
     <thead><tr>
+      ${isAdmin()?`<th style="width:32px;padding:4px 8px"><input type="checkbox" title="Select all" onchange="toggleSelectAll('${p}','${sec}',this)" style="cursor:pointer"></th>`:''}
       <th>ID</th><th>MODULE</th><th>${isSm?'TEST STEP':'CHECKLIST ITEM'}</th>
       <th>${isSm?'ACTION':'EXPECTED OUTCOME'}</th><th>${isSm?'EXPECTED':'COMPLIANCE CHECK'}</th>
       <th>${isSm?'EDGE CASE':'—'}</th><th>PRIORITY</th><th>STATUS</th>
-      ${isAdmin()?'<th>OWNER</th><th>NOTES</th><th>ACTIONS</th>':'<th>OWNER</th>'}
+      ${isAdmin()?'<th>NOTES</th><th>ACTIONS</th>':''}
     </tr></thead>
     <tbody id="${p}-${sec}-body">${rows}</tbody>
   </table></div>`;
@@ -2731,6 +2733,7 @@ function rowHtml(p,sec,r,i,isSm){
   const isPend=r._pending;
   const ptag=isPend?`<span class="ptag">⏳ Pending</span>`:'';
   return`<tr data-idx="${i}" data-status="${r.status}" class="${isPend?'prow':''}">
+    ${isAdmin()?`<td style="width:32px;padding:4px 8px;text-align:center"><input type="checkbox" class="row-chk" data-idx="${i}" onchange="updateBulkDelBtn('${p}','${sec}')" style="cursor:pointer"></td>`:''}
     <td class="idc">${r.id}${ptag}</td>
     <td class="mod">${r.module}</td>
     <td class="step">${isSm?r.step:r.item}</td>
@@ -2740,12 +2743,11 @@ function rowHtml(p,sec,r,i,isSm){
     <td><span class="badge ${(r.priority||'').toLowerCase()}">${r.priority||''}</span></td>
     <td><select class="ssel ${sc}" ${isPend&&!isAdmin()?'disabled':''} onchange="updateStatus('${p}','${sec}',${i},this)">${opts}</select></td>
     ${isAdmin()?`
-    <td><input class="inp-sm" value="${r.owner||''}" placeholder="Owner" onchange="STORE['${p}']['${sec}'][${i}].owner=this.value"></td>
     <td><input class="inp-sm" style="width:110px" value="${r.comment||''}" placeholder="Note…" onchange="STORE['${p}']['${sec}'][${i}].comment=this.value"></td>
     <td class="acell">
       ${isPend?`<button class="btn-icon apr" onclick="approveRow('${p}','${sec}',${i})">✓</button><button class="btn-icon rej" onclick="rejectRow('${p}','${sec}',${i})">✗</button>`:
         `<button class="btn-icon" onclick="openEditRow('${p}','${sec}',${i})">✏</button><button class="btn-icon del" onclick="deleteRow('${p}','${sec}',${i})">✕</button>`}
-    </td>`:`<td><input class="inp-sm" value="${r.owner||''}" placeholder="Owner" onchange="STORE['${p}']['${sec}'][${i}].owner=this.value"></td>`}
+    </td>`:''}
   </tr>`;
 }
 
@@ -5794,6 +5796,33 @@ function deleteRow(p,sec,i){
   if(!isAdmin()){toast('Only super admin can delete test cases','err');return;}
   if(!confirm('Delete this test case?'))return;
   STORE[p][sec].splice(i,1);saveToLS(p);renderProject(p);updateStats(p);toast('Deleted');
+}
+function toggleSelectAll(p,sec,chk){
+  const tbl=document.getElementById(`${p}-${sec}-tbl`);
+  if(!tbl)return;
+  tbl.querySelectorAll('tbody .row-chk').forEach(c=>{c.checked=chk.checked;});
+  updateBulkDelBtn(p,sec);
+}
+function updateBulkDelBtn(p,sec){
+  const tbl=document.getElementById(`${p}-${sec}-tbl`);
+  const btn=document.getElementById(`${p}-${sec}-bulkdel`);
+  const cnt=document.getElementById(`${p}-${sec}-selcount`);
+  if(!tbl||!btn)return;
+  const selected=tbl.querySelectorAll('tbody .row-chk:checked').length;
+  btn.style.display=selected>0?'inline-flex':'none';
+  if(cnt)cnt.textContent=selected;
+}
+function bulkDeleteRows(p,sec){
+  if(!isAdmin()){toast('Permission denied','err');return;}
+  const tbl=document.getElementById(`${p}-${sec}-tbl`);
+  if(!tbl)return;
+  const checked=[...tbl.querySelectorAll('tbody .row-chk:checked')];
+  if(!checked.length)return;
+  if(!confirm(`Delete ${checked.length} selected test case${checked.length!==1?'s':''}? This cannot be undone.`))return;
+  const idxs=checked.map(c=>Number(c.dataset.idx)).sort((a,b)=>b-a);
+  idxs.forEach(i=>STORE[p][sec].splice(i,1));
+  saveToLS(p);renderProject(p);updateStats(p);
+  toast(`Deleted ${checked.length} test case${checked.length!==1?'s':''}`);
 }
 // ══════════════════════════════════════════════════════
 // APPROVAL WORKFLOW
