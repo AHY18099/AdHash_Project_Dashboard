@@ -1277,8 +1277,8 @@ body.dark .tcl-stat{background:rgba(12,17,32,.8);border-color:rgba(255,255,255,.
       <div class="login-logo"><span class="brand">AdHash</span><span class="qa-badge">QA</span></div>
       <div class="login-sub">Sign in to your workspace</div>
       <div id="login-err" class="login-err"></div>
-      <div class="fg"><label>Email Address</label><input type="email" id="l-email" placeholder="you@company.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
-      <div class="fg"><label>Password</label><input type="password" id="l-pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div class="fg"><label>Email Address</label><input type="email" id="l-email" placeholder="you@company.com" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div class="fg"><label>Password</label><input type="password" id="l-pwd" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
       <button class="btn btn-primary" style="width:100%;padding:12px;justify-content:center;font-size:14px;margin-top:4px" onclick="doLogin()">Sign In →</button>
     </div>
   </div>
@@ -3254,7 +3254,7 @@ function openCredentialModal(p,editIdx){
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
     <div>
       <label class="flbl">Name *</label>
-      <input class="finp" id="cr-name" value="${escH(e.name)}" placeholder="e.g. Admin Account" />
+      <input class="finp" id="cr-name" value="${escH(e.name)}" placeholder="e.g. Admin Account" autocomplete="off" />
     </div>
     <div>
       <label class="flbl">Environment</label>
@@ -3265,12 +3265,12 @@ function openCredentialModal(p,editIdx){
   </div>
   <div style="margin-bottom:12px">
     <label class="flbl">URL</label>
-    <input class="finp" id="cr-url" value="${escH(e.url)}" placeholder="https://app.example.com/login" />
+    <input class="finp" id="cr-url" value="${escH(e.url)}" placeholder="https://app.example.com/login" autocomplete="off" />
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
     <div>
       <label class="flbl">Username / Phone Number</label>
-      <input class="finp" id="cr-user" value="${escH(e.username)}" placeholder="user@example.com or +91..." />
+      <input class="finp" id="cr-user" value="${escH(e.username)}" placeholder="user@example.com or +91..." autocomplete="off" />
     </div>
     <div>
       <label class="flbl">Auth Type</label>
@@ -3283,7 +3283,7 @@ function openCredentialModal(p,editIdx){
   <div style="margin-bottom:4px">
     <label class="flbl" id="cr-pw-lbl">${e.authType==='OTP'?'OTP / PIN':'Password'}</label>
     <div style="position:relative">
-      <input class="finp" id="cr-pw" type="password" value="${escH(e.password)}" placeholder="${e.authType==='OTP'?'Enter OTP or PIN if static':'Enter password'}" style="padding-right:40px" />
+      <input class="finp" id="cr-pw" type="password" value="${escH(e.password)}" placeholder="${e.authType==='OTP'?'Enter OTP or PIN if static':'Enter password'}" style="padding-right:40px" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')" />
       <button type="button" onclick="toggleModalPw()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--mut);padding:2px" title="Show/hide">${EYE_CLOSED}</button>
     </div>
   </div>
@@ -4703,13 +4703,13 @@ function renderUsersPage(){
 function openAddUser(){
   openModal('Add New User',`
     <div class="fg-row">
-      <div class="fg"><label>Full Name</label><input id="u-name" placeholder="e.g. John Smith"></div>
+      <div class="fg"><label>Full Name</label><input id="u-name" placeholder="e.g. John Smith" autocomplete="off"></div>
       <div class="fg"><label>Role</label><select id="u-role"><option value="member">Member</option><option value="super_admin">Super Admin</option></select></div>
     </div>
-    <div class="fg"><label>Email Address</label><input type="email" id="u-email" placeholder="user@company.com"></div>
+    <div class="fg"><label>Email Address</label><input type="email" id="u-email" placeholder="user@company.com" autocomplete="off"></div>
     <div class="fg-row">
-      <div class="fg"><label>Password</label><input type="password" id="u-pwd" placeholder="Set a password"></div>
-      <div class="fg"><label>Confirm Password</label><input type="password" id="u-pwd2" placeholder="Repeat password"></div>
+      <div class="fg"><label>Password</label><input type="password" id="u-pwd" placeholder="Set a password" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"></div>
+      <div class="fg"><label>Confirm Password</label><input type="password" id="u-pwd2" placeholder="Repeat password" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"></div>
     </div>`,()=>{
     const name=document.getElementById('u-name').value.trim();
     const email=document.getElementById('u-email').value.trim().toLowerCase();
@@ -4729,13 +4729,13 @@ function openEditUser(i){
   const users=getUsers();const u=users[i];
   openModal('Edit User',`
     <div class="fg-row">
-      <div class="fg"><label>Full Name</label><input id="eu-name" value="${u.name}"></div>
+      <div class="fg"><label>Full Name</label><input id="eu-name" value="${u.name}" autocomplete="off"></div>
       <div class="fg"><label>Role</label><select id="eu-role"><option value="member"${u.role==='member'?' selected':''}>Member</option><option value="super_admin"${u.role==='super_admin'?' selected':''}>Super Admin</option></select></div>
     </div>
-    <div class="fg"><label>Email Address</label><input type="email" id="eu-email" value="${u.email}" ${u.id==='u_sa'?'readonly':''}></div>
+    <div class="fg"><label>Email Address</label><input type="email" id="eu-email" value="${u.email}" autocomplete="off" ${u.id==='u_sa'?'readonly':''}></div>
     <div class="fg-row">
-      <div class="fg"><label>New Password <span style="color:var(--mut)">(leave blank to keep)</span></label><input type="password" id="eu-pwd" placeholder="New password"></div>
-      <div class="fg"><label>Confirm New Password</label><input type="password" id="eu-pwd2" placeholder="Repeat"></div>
+      <div class="fg"><label>New Password <span style="color:var(--mut)">(leave blank to keep)</span></label><input type="password" id="eu-pwd" placeholder="New password" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"></div>
+      <div class="fg"><label>Confirm New Password</label><input type="password" id="eu-pwd2" placeholder="Repeat" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"></div>
     </div>`,()=>{
     const name=document.getElementById('eu-name').value.trim();
     const email=document.getElementById('eu-email').value.trim().toLowerCase();
@@ -5405,16 +5405,16 @@ function tclDownloadReport(p,platformFilter){
 
 function _tpFormFields(acct){acct=acct||{};return`
     <div class="fg-row">
-      <div class="fg"><label>Account Name *</label><input class="finp" id="tp-name" placeholder="e.g. Stripe, Twilio" value="${escH(acct.name||'')}"></div>
-      <div class="fg"><label>URL</label><input class="finp" id="tp-url" placeholder="https://" value="${escH(acct.url||'')}"></div>
+      <div class="fg"><label>Account Name *</label><input class="finp" id="tp-name" placeholder="e.g. Stripe, Twilio" value="${escH(acct.name||'')}" autocomplete="off"></div>
+      <div class="fg"><label>URL</label><input class="finp" id="tp-url" placeholder="https://" value="${escH(acct.url||'')}" autocomplete="off"></div>
     </div>
     <div class="fg-row">
       <div class="fg"><label>Username</label><input class="finp" id="tp-username" placeholder="login username" value="${escH(acct.username||'')}" autocomplete="off"></div>
-      <div class="fg"><label>Password</label><input class="finp" id="tp-password" placeholder="••••••••" type="password" value="${escH(acct.tpPassword||'')}" autocomplete="new-password"></div>
+      <div class="fg"><label>Password</label><input class="finp" id="tp-password" placeholder="••••••••" type="password" value="${escH(acct.tpPassword||'')}" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"></div>
     </div>
     <div class="fg-row">
-      <div class="fg"><label>Credentials Used</label><input class="finp" id="tp-creds" placeholder="e.g. API Key, OAuth2" value="${escH(acct.credentials||'')}"></div>
-      <div class="fg"><label>Payment Balance</label><input class="finp" id="tp-balance" placeholder="e.g. $50.00" value="${escH(acct.paymentBalance||'')}"></div>
+      <div class="fg"><label>Credentials Used</label><input class="finp" id="tp-creds" placeholder="e.g. API Key, OAuth2" value="${escH(acct.credentials||'')}" autocomplete="off"></div>
+      <div class="fg"><label>Payment Balance</label><input class="finp" id="tp-balance" placeholder="e.g. $50.00" value="${escH(acct.paymentBalance||'')}" autocomplete="off"></div>
     </div>
     <div class="fg-row">
       <div class="fg"><label>Renewal Date</label><input type="date" class="finp" id="tp-renewal" value="${escH(acct.renewalDate||'')}"></div>
@@ -5578,11 +5578,11 @@ function openAddProject(){
 function openEditProject(pid){
   const proj=PROJECTS.find(x=>x.id===pid);if(!proj)return;
   openModal('Edit Project',`
-    <div class="fg"><label>Project Name</label><input id="ep-name" value="${proj.name}"></div>
+    <div class="fg"><label>Project Name</label><input id="ep-name" value="${proj.name}" autocomplete="off"></div>
     <div class="fg"><label>Color</label><input id="ep-color" type="color" value="${proj.color}" style="height:40px;cursor:pointer"></div>
     <div class="fg-row">
-      <div class="fg"><label>Website URL</label><input id="ep-web" value="${proj.website||''}"></div>
-      <div class="fg"><label>Dashboard URL</label><input id="ep-dash" value="${proj.dashboard||''}"></div>
+      <div class="fg"><label>Website URL</label><input id="ep-web" value="${proj.website||''}" autocomplete="off"></div>
+      <div class="fg"><label>Dashboard URL</label><input id="ep-dash" value="${proj.dashboard||''}" autocomplete="off"></div>
     </div>
     <div class="fg"><label>Release Date</label><input id="ep-date" type="date" value="${proj.releaseDate||''}"></div>
   `,()=>{
@@ -5877,10 +5877,10 @@ function showPendingOverview(){
 // TEST DATA MODALS
 // ══════════════════════════════════════════════════════
 function tdFormHtml(r){r=r||{};return`
-  <div class="fg-row"><div class="fg"><label>Account Name</label><input id="td-n" value="${r.accountName||''}" placeholder="e.g. Test Account 1"></div><div class="fg"><label>Login Method</label><select id="td-m">${['Phone','Email','Google','Other'].map(o=>`<option${o===(r.loginMethod||'Phone')?' selected':''}>${o}</option>`).join('')}</select></div></div>
-  <div class="fg"><label>Credential Used (Phone/Email)</label><input id="td-c" value="${r.credential||''}" placeholder="e.g. +1 (555) 123-4567 or user@test.com"></div>
-  <div class="fg-row"><div class="fg"><label>User Role</label><input id="td-r" value="${r.role||''}" placeholder="e.g. Admin, End User"></div><div class="fg"><label>Environment</label><input id="td-e" value="${r.environment||'Production'}"></div></div>
-  <div class="fg-row"><div class="fg"><label>Test Date</label><input type="date" id="td-d" value="${r.testDate||''}"></div><div class="fg"><label>Tested By</label><input id="td-t" value="${r.testedBy||''}" placeholder="Your name"></div></div>
+  <div class="fg-row"><div class="fg"><label>Account Name</label><input id="td-n" value="${r.accountName||''}" placeholder="e.g. Test Account 1" autocomplete="off"></div><div class="fg"><label>Login Method</label><select id="td-m">${['Phone','Email','Google','Other'].map(o=>`<option${o===(r.loginMethod||'Phone')?' selected':''}>${o}</option>`).join('')}</select></div></div>
+  <div class="fg"><label>Credential Used (Phone/Email)</label><input id="td-c" value="${r.credential||''}" placeholder="e.g. +1 (555) 123-4567 or user@test.com" autocomplete="off"></div>
+  <div class="fg-row"><div class="fg"><label>User Role</label><input id="td-r" value="${r.role||''}" placeholder="e.g. Admin, End User" autocomplete="off"></div><div class="fg"><label>Environment</label><input id="td-e" value="${r.environment||'Production'}" autocomplete="off"></div></div>
+  <div class="fg-row"><div class="fg"><label>Test Date</label><input type="date" id="td-d" value="${r.testDate||''}"></div><div class="fg"><label>Tested By</label><input id="td-t" value="${r.testedBy||''}" placeholder="Your name" autocomplete="off"></div></div>
   <div class="fg"><label>Notes</label><textarea id="td-o" placeholder="Any notes about this test account…">${r.notes||''}</textarea></div>`;}
 function getTDData(){return{accountName:document.getElementById('td-n').value.trim(),loginMethod:document.getElementById('td-m').value,credential:document.getElementById('td-c').value.trim(),role:document.getElementById('td-r').value.trim(),environment:document.getElementById('td-e').value.trim(),testDate:document.getElementById('td-d').value,testedBy:document.getElementById('td-t').value.trim(),notes:document.getElementById('td-o').value.trim()};}
 function openAddTD(p){openModal('Add Test Data Entry',tdFormHtml(null),()=>{const d=getTDData();if(!d.accountName){toast('Account name is required','err');return;}STORE[p].testdata.push(d);closeModal();renderProject(p);toast('Entry added');});}
