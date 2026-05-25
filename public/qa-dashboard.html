@@ -1144,6 +1144,15 @@ body.dark .tcl-table tbody tr:hover{background:rgba(126,179,255,.04)}
 .tcl-btn-save:hover:not([disabled]){transform:translateY(-1px);box-shadow:0 6px 18px rgba(124,58,237,.38)}
 .tcl-btn-save[disabled]{cursor:not-allowed;opacity:.45}
 body.dark .tcl-inline-sel{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);color:var(--txt)}
+.tcl-dl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}
+.tcl-dl-card{border:1.5px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .18s,box-shadow .18s;background:var(--card)}
+.tcl-dl-card:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(100,116,139,.18)}
+.tcl-dl-card-top{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 12px;gap:8px}
+.tcl-dl-card-body{padding:0 16px 16px}
+.tcl-dl-card-name{font-size:14px;font-weight:800;color:var(--txt);margin-bottom:3px}
+.tcl-dl-card-meta{font-size:11px;color:var(--mut);margin-bottom:8px}
+.tcl-dl-card-pills{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;font-weight:700}
+body.dark .tcl-dl-card{background:rgba(255,255,255,.04)}
 .tcl-link{color:var(--inp);font-size:11px;text-decoration:none;white-space:nowrap}
 .tcl-link:hover{text-decoration:underline}
 .tcl-links-list{display:flex;flex-direction:column;gap:2px}
@@ -5051,7 +5060,7 @@ function renderTaskChecklist(p){
       </div>
       <div class="tcl-actions">
         ${hasItems?`<button id="tcl-save-btn-${p}" class="tcl-btn tcl-btn-save" onclick="tclSaveReport('${p}')" ${saveDisabled?'disabled style="opacity:.45"':''}>💾 Save Report</button>`:''}
-        ${hasItems?`<button class="tcl-btn tcl-btn-dl" onclick="tclDownloadReport('${p}')">⬇ Download Report</button>`:''}
+        ${hasItems?`<button class="tcl-btn tcl-btn-dl" onclick="tclShowDownloadPicker('${p}')">⬇ Download Report</button>`:''}
         <button class="tcl-btn tcl-btn-outline" onclick="switchTab('${p}','releasenotes')">📝 Release Notes</button>
         <button class="tcl-btn tcl-btn-primary" onclick="tclOpenAdd('${p}')">＋ Add</button>
       </div>
@@ -5126,25 +5135,84 @@ function tclDelete(p,i){
   STORE[p].taskchecklist.splice(i,1);saveToLS(p);renderProject(p);toast('Item deleted');
 }
 
-function tclDownloadReport(p){
+function tclShowDownloadPicker(p){
+  const allItems=STORE[p].taskchecklist||[];
+  const platforms=[...new Set(allItems.map(r=>r.platform).filter(Boolean))].sort();
+  const platColor={Web:'#3b82f6',iOS:'#8b5cf6',Android:'#10b981'};
+  const platIcon={Web:'🌐',iOS:'🍎',Android:'🤖'};
+
+  // mini donut for a set of items
+  function miniDonut(items,platClr){
+    const s=tclStats(items);
+    const passRate=s.total?Math.round((s.pass/s.total)*100):0;
+    const r=36,cx=44,cy=44,sw=12,C=2*Math.PI*r;
+    const segs=[{v:s.pass,c:'#059669'},{v:s.fail,c:'#dc2626'},{v:s.pending,c:'#d97706'},{v:s.na,c:'#94a3b8'}].filter(x=>x.v>0);
+    if(!segs.length)return`<svg width="88" height="88"><circle cx="44" cy="44" r="36" fill="none" stroke="#e2e8f0" stroke-width="12"/><text x="44" y="49" text-anchor="middle" font-size="13" font-weight="800" fill="#94a3b8">0%</text></svg>`;
+    let offset=0;
+    const arcs=segs.map(sg=>{const dash=(sg.v/s.total)*C;const arc=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${sg.c}" stroke-width="${sw}" stroke-dasharray="${dash} ${C-dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;offset+=dash;return arc;}).join('');
+    return`<svg width="88" height="88">${arcs}<text x="${cx}" y="${cy+5}" text-anchor="middle" font-size="14" font-weight="800" fill="${platClr||'#1e293b'}">${passRate}%</text></svg>`;
+  }
+
+  // card for each platform option
+  function platCard(plat,items,isAll){
+    const s=tclStats(items);
+    const clr=isAll?'#6366f1':(platColor[plat]||'#64748b');
+    const icon=isAll?'📊':(platIcon[plat]||'📱');
+    const label=isAll?'All Combined':plat;
+    const passRate=s.total?Math.round((s.pass/s.total)*100):0;
+    return`<div class="tcl-dl-card" onclick="tclDownloadReport('${p}','${isAll?'ALL':plat}');closeModal()" style="border-color:${clr}22">
+      <div class="tcl-dl-card-top" style="background:${clr}10">
+        <div style="font-size:28px;line-height:1">${icon}</div>
+        ${miniDonut(items,clr)}
+      </div>
+      <div class="tcl-dl-card-body">
+        <div class="tcl-dl-card-name" style="color:${clr}">${label}</div>
+        <div class="tcl-dl-card-meta">${s.total} items &nbsp;·&nbsp; ${passRate}% pass</div>
+        <div class="tcl-dl-card-pills">
+          <span style="color:#059669">✓ ${s.pass}</span>
+          <span style="color:#dc2626">✗ ${s.fail}</span>
+          <span style="color:#d97706">⏳ ${s.pending}</span>
+          <span style="color:#64748b">— ${s.na}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  let cards=platforms.map(pl=>platCard(pl,allItems.filter(r=>r.platform===pl),false));
+  if(platforms.length>1||platforms.length===0){
+    cards=[platCard('ALL',allItems,true),...cards];
+  }
+
+  showModal(`<div style="padding:8px 0 4px">
+    <h3 style="font-size:17px;font-weight:800;color:var(--txt);margin:0 0 4px">⬇ Download Report</h3>
+    <p style="font-size:12px;color:var(--mut);margin:0 0 20px">Choose which platform report to download</p>
+    <div class="tcl-dl-grid">${cards.join('')}</div>
+  </div>`);
+}
+
+function tclDownloadReport(p,platformFilter){
   const proj=PROJECTS.find(x=>x.id===p);
-  const items=STORE[p].taskchecklist||[];
+  const allItems=STORE[p].taskchecklist||[];
+  const items=(platformFilter&&platformFilter!=='ALL')?allItems.filter(r=>r.platform===platformFilter):allItems;
   const rns=STORE[p].releaseNotes||[];
   const s=tclStats(items);
   const passRate=s.total?Math.round((s.pass/s.total)*100):0;
   const now=new Date();
   const dateStr=now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const platLabel=(platformFilter&&platformFilter!=='ALL')?` — ${platformFilter}`:'';
+  const platColor={Web:'#3b82f6',iOS:'#8b5cf6',Android:'#10b981'};
+  const platAccent=(platformFilter&&platformFilter!=='ALL')?(platColor[platformFilter]||'#6366f1'):'#6366f1';
 
   const statusColor={Pass:'#059669',Fail:'#dc2626',NA:'#64748b',Pending:'#d97706'};
-  const platColor={Web:'#3b82f6',iOS:'#8b5cf6',Android:'#10b981'};
   const envColor={Staging:'#f97316',Production:'#6366f1'};
 
+  // full donut for the report
   const donutSvg=(()=>{
     const r=70,cx=90,cy=90,sw=22,C=2*Math.PI*r;
     const segs=[{v:s.pass,c:'#059669'},{v:s.fail,c:'#dc2626'},{v:s.pending,c:'#d97706'},{v:s.na,c:'#94a3b8'}].filter(x=>x.v>0);
     if(!segs.length)return`<svg width="180" height="180"><circle cx="90" cy="90" r="70" fill="none" stroke="#e2e8f0" stroke-width="22"/><text x="90" y="96" text-anchor="middle" font-size="22" font-weight="800" fill="#64748b">0%</text></svg>`;
     let offset=0;
-    const arcs=segs.map(sg=>{const pct=sg.v/s.total;const dash=pct*C;const arc=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${sg.c}" stroke-width="${sw}" stroke-dasharray="${dash} ${C-dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;offset+=dash;return arc;}).join('');
+    const arcs=segs.map(sg=>{const dash=(sg.v/s.total)*C;const arc=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${sg.c}" stroke-width="${sw}" stroke-dasharray="${dash} ${C-dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;offset+=dash;return arc;}).join('');
     return`<svg width="180" height="180">${arcs}<text x="${cx}" y="${cy+7}" text-anchor="middle" font-size="24" font-weight="800" fill="#1e293b">${passRate}%</text><text x="${cx}" y="${cy+24}" text-anchor="middle" font-size="11" fill="#64748b">Pass Rate</text></svg>`;
   })();
 
@@ -5174,12 +5242,13 @@ function tclDownloadReport(p){
     </div>`).join('')}
   </div>`:'';
 
-  const html=`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Task Checklist — ${escH(proj?.name||p)}</title>
+  const html=`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Task Checklist${platLabel} — ${escH(proj?.name||p)}</title>
   <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#1e293b;padding:32px}
   .report-wrap{max-width:1100px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(100,116,139,.12);overflow:hidden}
-  .report-hdr{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:32px 36px;color:#fff}
+  .report-hdr{background:linear-gradient(135deg,${platAccent} 0%,#0f172a 100%);padding:32px 36px;color:#fff}
   .report-hdr h1{font-size:24px;font-weight:800;margin-bottom:6px}
-  .report-hdr p{font-size:13px;opacity:.7}
+  .report-hdr p{font-size:13px;opacity:.75}
+  .plat-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);margin-top:10px}
   .report-body{padding:32px 36px}
   .overview-grid{display:grid;grid-template-columns:auto 1fr;gap:32px;align-items:center;margin-bottom:32px;padding:24px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0}
   .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
@@ -5198,8 +5267,9 @@ function tclDownloadReport(p){
   </style></head><body>
   <div class="report-wrap">
     <div class="report-hdr">
-      <h1>✔ Task Checklist Report</h1>
+      <h1>✔ Task Checklist Report${platLabel}</h1>
       <p>Project: ${escH(proj?.name||p)} &nbsp;·&nbsp; Generated: ${dateStr} &nbsp;·&nbsp; Total Items: ${s.total}</p>
+      ${platLabel?`<div class="plat-badge">${platLabel.trim()} Platform</div>`:''}
     </div>
     <div class="report-body">
       <div class="overview-grid">
@@ -5216,23 +5286,24 @@ function tclDownloadReport(p){
           <div class="stat-card"><div class="val" style="color:#22c55e">${s.low}</div><div class="lbl">Low Bugs</div></div>
         </div>
       </div>
-      <h2>📋 Checklist Items</h2>
+      <h2>📋 Checklist Items${platLabel}</h2>
       <table>
         <thead><tr><th>Module</th><th>Functionalities</th><th>Platform</th><th>Environment</th><th>Status</th><th>Tested By</th><th>Bugs</th><th>Priority</th><th>Jira Links</th><th>Comments</th></tr></thead>
         <tbody>${tableRows}</tbody>
       </table>
       ${rnSection}
     </div>
-    <div class="report-footer">AdHash QA Dashboard &nbsp;·&nbsp; ${escH(proj?.name||p)} &nbsp;·&nbsp; ${dateStr}</div>
+    <div class="report-footer">AdHash QA Dashboard &nbsp;·&nbsp; ${escH(proj?.name||p)}${platLabel} &nbsp;·&nbsp; ${dateStr}</div>
   </div>
   </body></html>`;
 
   const blob=new Blob([html],{type:'text/html'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download=`TaskChecklist_${(proj?.name||p).replace(/\s+/g,'-')}_${now.toISOString().slice(0,10)}.html`;
+  const platSuffix=(platformFilter&&platformFilter!=='ALL')?`_${platformFilter}`:'_All';
+  a.download=`TaskChecklist_${(proj?.name||p).replace(/\s+/g,'-')}${platSuffix}_${now.toISOString().slice(0,10)}.html`;
   a.click();URL.revokeObjectURL(a.href);
-  toast('Report downloaded');
+  toast(`Report downloaded${platLabel}`);
 }
 
 function _tpFormFields(acct){acct=acct||{};return`
