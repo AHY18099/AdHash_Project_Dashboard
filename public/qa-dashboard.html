@@ -1656,7 +1656,7 @@ function platformSwitcher(p,currentTab){
 // ══ AUTH ══
 const QA_SA_EMAIL='thenilavan@adhashtech.com';
 function getUsers(){try{const d=localStorage.getItem('qa_users');if(d)return JSON.parse(d);}catch(e){}return[];}
-function saveUsers(u){try{localStorage.setItem('qa_users',JSON.stringify(u));}catch(e){}}
+function saveUsers(u){try{localStorage.setItem('qa_users',JSON.stringify(u));}catch(e){}syncToServer('qa_users',u);}
 const DEFAULT_TEAM_MEMBERS=[
   {id:'u_deepa',      name:'Deepa',      email:'deepa@adhashtech.com',      role:'member'},
   {id:'u_prakashraj', name:'Prakash Raj', email:'prakashraj@adhashtech.com', role:'member'},
@@ -3401,7 +3401,7 @@ function dtCellSelect(taskIdx,colKey,val){
 // ── Day-level assigned-by: stored separately keyed by date ──
 // Format: DT_DAY_META[dateStr] = { assignedBy: '' }
 let DT_DAY_META={};
-function saveDayMeta(){try{localStorage.setItem('qa3_day_meta',JSON.stringify(DT_DAY_META));}catch(e){}}
+function saveDayMeta(){try{localStorage.setItem('qa3_day_meta',JSON.stringify(DT_DAY_META));}catch(e){}syncToServer('qa3_day_meta',DT_DAY_META);}
 function loadDayMeta(){try{const d=localStorage.getItem('qa3_day_meta');if(d)DT_DAY_META=JSON.parse(d);}catch(e){}}
 
 // Ensure all projects have a row for the given date (auto-create if missing)
@@ -3704,7 +3704,7 @@ let _ttWeekOpen={};
 let _ttProjFilter='all';
 let _ttTodayStr=(()=>{const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`})();
 
-function saveTeamTasks(){try{localStorage.setItem('qa3_team_tasks',JSON.stringify(TEAM_TASKS));}catch(e){}}
+function saveTeamTasks(){try{localStorage.setItem('qa3_team_tasks',JSON.stringify(TEAM_TASKS));}catch(e){}syncToServer('qa3_team_tasks',TEAM_TASKS);}
 function loadTeamTasks(){try{const d=localStorage.getItem('qa3_team_tasks');if(d)TEAM_TASKS=JSON.parse(d);}catch(e){}}
 
 function showTeamTasks(){
@@ -4170,7 +4170,7 @@ const RL_TEST_STATUS=[
   'Bugs Reported','Waiting for Dev Build','Waiting for Prod Build'
 ];
 
-function saveReleases(){try{localStorage.setItem('qa3_releases',JSON.stringify(RELEASES));}catch(e){}}
+function saveReleases(){try{localStorage.setItem('qa3_releases',JSON.stringify(RELEASES));}catch(e){}syncToServer('qa3_releases',RELEASES);}
 function loadReleases(){try{const d=localStorage.getItem('qa3_releases');if(d)RELEASES=JSON.parse(d);}catch(e){}}
 
 function rlTodayStr(){
@@ -5316,13 +5316,38 @@ function saveState(p){
   saveToLS(p);/* proj-nav removed */renderProject(p);
   toast(`✓ Snapshot #${STORE[p].reports.length} saved`);
 }
-function saveToLS(p){try{localStorage.setItem('qa3_'+p,JSON.stringify(STORE[p]));}catch(e){}}
-function saveAllState(){PROJECTS.forEach(p=>saveToLS(p.id));try{localStorage.setItem('qa3_projects',JSON.stringify(PROJECTS));}catch(e){}}
+function saveToLS(p){try{localStorage.setItem('qa3_'+p,JSON.stringify(STORE[p]));}catch(e){}syncToServer('qa3_'+p,STORE[p]);}
+function saveAllState(){PROJECTS.forEach(p=>saveToLS(p.id));try{localStorage.setItem('qa3_projects',JSON.stringify(PROJECTS));}catch(e){}syncToServer('qa3_projects',PROJECTS);}
 
 // ── DAILY TASKS GLOBAL STATE ──
 let DAILY_TASKS=[];
-function saveDailyTasks(){try{localStorage.setItem('qa3_daily_tasks',JSON.stringify(DAILY_TASKS));}catch(e){}}
+function saveDailyTasks(){try{localStorage.setItem('qa3_daily_tasks',JSON.stringify(DAILY_TASKS));}catch(e){}syncToServer('qa3_daily_tasks',DAILY_TASKS);}
 function loadDailyTasks(){try{const d=localStorage.getItem('qa3_daily_tasks');if(d)DAILY_TASKS=JSON.parse(d);}catch(e){}}
+
+// ── SERVER SYNC ──
+// Fire-and-forget push to shared JSON file on the server
+function syncToServer(key,value){
+  try{
+    fetch('/api/qa-data/'+encodeURIComponent(key),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({value})
+    }).catch(()=>{});
+  }catch(e){}
+}
+
+// Pull all shared data from server, merge into localStorage and in-memory vars
+async function syncFromServer(){
+  try{
+    const r=await fetch('/api/qa-data',{cache:'no-store'});
+    if(!r.ok)return;
+    const data=await r.json();
+    // Merge each key into localStorage so loadAllState picks it up
+    for(const [k,v] of Object.entries(data)){
+      try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}
+    }
+  }catch(e){}
+}
 
 function loadAllState(){
   try{const cp=localStorage.getItem('qa3_projects');if(cp){const loaded=JSON.parse(cp);if(loaded&&loaded.length>0)PROJECTS=loaded;}}catch(e){}
@@ -5569,6 +5594,7 @@ function previewSavedReport(p,i){const snap=STORE[p].reports[i];const html=build
 // ══════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded',async()=>{
   initTheme();
+  await syncFromServer();  // pull shared data before loading state
   initUsers();
   loadAllState();
   // restore QA session from sessionStorage first

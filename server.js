@@ -3689,6 +3689,49 @@ app.post('/api/proxy', async (req, res) => {
     }
 });
 
+// ── SHARED DATA (replaces per-browser localStorage with a shared JSON file) ──
+const QA_DATA_PATH = path.join(__dirname, 'data', 'qa-shared.json');
+
+function readQaData() {
+    try {
+        if (fs.existsSync(QA_DATA_PATH)) return JSON.parse(fs.readFileSync(QA_DATA_PATH, 'utf8'));
+    } catch (e) { console.error('readQaData error:', e.message); }
+    return {};
+}
+
+function writeQaData(data) {
+    fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
+    fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
+}
+
+// GET /api/qa-data — return all shared keys
+app.get('/api/qa-data', (req, res) => {
+    res.json(readQaData());
+});
+
+// GET /api/qa-data/:key — return one key
+app.get('/api/qa-data/:key', (req, res) => {
+    const data = readQaData();
+    const key = req.params.key;
+    if (!(key in data)) return res.status(404).json({ error: 'Key not found' });
+    res.json({ key, value: data[key] });
+});
+
+// POST /api/qa-data/:key — save one key's value
+app.post('/api/qa-data/:key', (req, res) => {
+    const key = req.params.key;
+    const { value } = req.body;
+    if (value === undefined) return res.status(400).json({ error: 'Missing value' });
+    const data = readQaData();
+    data[key] = value;
+    try {
+        writeQaData(data);
+        res.json({ status: 'saved', key });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Start server
 app.listen(PORT, () => {
     testRunning = false;
