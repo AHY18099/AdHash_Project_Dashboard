@@ -1007,6 +1007,8 @@ body.dark .dt-assigned-chip{background:rgba(139,92,246,.15);color:#a78bfa}
 .dt-cell-select.val-fail{color:var(--fail)}
 .dt-cell-select.val-na{color:var(--inp)}
 .dt-cell-select.val-blank{color:var(--mut)}
+.dt-cell-select.val-assignee{font-weight:700}
+.dt-assignee-badge{font-size:12px;font-weight:700;padding:3px 10px;border-radius:7px;display:inline-block;white-space:nowrap;border:1.5px solid}
 .dt-day-nodata{font-size:11px;color:var(--mut);padding:12px 18px;font-style:italic}
 .dt-assigned-day-sel{padding:4px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--card2);color:var(--txt);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;outline:none;transition:border-color .2s;min-width:130px}
 .dt-assigned-day-sel:focus{border-color:var(--grad-a)}
@@ -3519,6 +3521,18 @@ function getTeamMembers(){
   return users.map(u=>u.name).sort((a,b)=>a.localeCompare(b));
 }
 
+// Per-member accent colors for Assigned By highlights
+const ASSIGNEE_COLORS={
+  'Deepa':      {color:'#db2777',bg:'rgba(219,39,119,.08)',border:'rgba(219,39,119,.45)'},
+  'Prakash Raj':{color:'#2563eb',bg:'rgba(37,99,235,.08)', border:'rgba(37,99,235,.45)'},
+  'Raghuram':   {color:'#d97706',bg:'rgba(217,119,6,.08)', border:'rgba(217,119,6,.45)'},
+  'Thenilavan': {color:'#7c3aed',bg:'rgba(124,58,237,.08)',border:'rgba(124,58,237,.45)'},
+  'Yogesh':     {color:'#059669',bg:'rgba(5,150,105,.08)', border:'rgba(5,150,105,.45)'},
+};
+function assigneeStyle(name){
+  return ASSIGNEE_COLORS[name]||{color:'#64748b',bg:'rgba(100,116,139,.07)',border:'rgba(100,116,139,.3)'};
+}
+
 // Build inline-editable cell select
 function dtCellSelect(taskIdx,colKey,val){
   const cls=val==='PASS'?'val-pass':val==='FAIL'?'val-fail':val==='NA'?'val-na':'val-blank';
@@ -3559,20 +3573,27 @@ function dtEnsureMonth(ym){
 }
 
 function dtAssignedSelect(taskIdx,val){
+  const ac=assigneeStyle(val);
   if(!isAdmin()){
-    // Members see a read-only badge
     return val
-      ?`<span style="font-size:12px;font-weight:600;color:var(--txt2);padding:4px 10px;background:var(--card2);border:1px solid var(--border);border-radius:7px;display:inline-block;white-space:nowrap">${escH(val)}</span>`
+      ?`<span class="dt-assignee-badge" style="color:${ac.color};background:${ac.bg};border-color:${ac.border}">${escH(val)}</span>`
       :`<span style="font-size:11px;color:var(--mut)">—</span>`;
   }
   const opts=`<option value="">— Assign —</option>`
     +getTeamMembers().map(n=>`<option value="${escH(n)}" ${n===val?'selected':''}>${escH(n)}</option>`).join('');
-  return`<select class="dt-cell-select val-blank" style="min-width:110px" onchange="dtAssignedChange(${taskIdx},this)">${opts}</select>`;
+  const inlineStyle=val?`color:${ac.color};border-color:${ac.border};background:${ac.bg}`:'';
+  return`<select class="dt-cell-select val-assignee" style="min-width:110px;${inlineStyle}" onchange="dtAssignedChange(${taskIdx},this)">${opts}</select>`;
 }
 
 function dtAssignedChange(taskIdx,sel){
   if(taskIdx<0||taskIdx>=DAILY_TASKS.length)return;
   DAILY_TASKS[taskIdx].assignedBy=sel.value;
+  const ac=assigneeStyle(sel.value);
+  if(sel.value){
+    sel.style.color=ac.color;sel.style.borderColor=ac.border;sel.style.background=ac.bg;
+  } else {
+    sel.style.color='';sel.style.borderColor='';sel.style.background='';
+  }
   const date=DAILY_TASKS[taskIdx].date;
   const saveBtn=document.getElementById('dt-save-'+date);
   if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 Save';}
