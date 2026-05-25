@@ -4,6 +4,7 @@
   "description": "AdHash Projects Status Dashboard - Unified Test Execution & Monitoring",
   "main": "server.js",
   "scripts": {
+    "postinstall": "node node_modules/.bin/playwright install --with-deps chromium 2>/dev/null || true",
     "clean:artifacts": "node scripts/clean-artifacts.mjs",
     "clean:workflow": "node -e \"const fs=require('fs');['suite-reports','test-results','unified-dashboard','final-dashboard-bundle','email-preview'].forEach((target)=>fs.rmSync(target,{recursive:true,force:true}));\"",
     "start": "node server.js",
@@ -27,6 +28,7 @@
   "author": "AdHash Team",
   "license": "ISC",
   "dependencies": {
+    "@playwright/test": "^1.41.0",
     "@types/nodemailer": "^7.0.9",
     "@types/node": "^20.11.0",
     "axios": "^1.13.4",
@@ -36,7 +38,5 @@
     "ts-node": "^10.9.0",
     "typescript": "^5.3.3"
   },
-  "devDependencies": {
-    "@playwright/test": "^1.41.0"
-  }
+  "devDependencies": {}
 }

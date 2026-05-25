@@ -13,6 +13,10 @@ const { buildLatestApiResultsPayload, writeLatestApiResultsPayload } = require('
 dotenv.config();
 
 const execAsync = promisify(exec);
+
+// Use local binary path directly to avoid npx permission issues on Linux (Railway)
+const PLAYWRIGHT_BIN = path.join(process.cwd(), 'node_modules', '.bin', 'playwright');
+
 const DASHBOARD_STATE_PATH = path.join(process.cwd(), 'test-results', 'dashboard-state.json');
 const DOMAIN_REPORT_WORKING_DIRECTORY = path.join(process.cwd(), 'godaddy');
 const DOMAIN_REPORT_ENTRY_PATH = path.join(DOMAIN_REPORT_WORKING_DIRECTORY, 'index.js');
@@ -222,7 +226,7 @@ function getSuiteExecutionConfig(definition: SuiteDefinition): SuiteExecutionCon
   }
 
   return {
-    command: `npx playwright test ${definition.specPath}`,
+    command: `"${PLAYWRIGHT_BIN}" test ${definition.specPath}`,
     cwd: process.cwd(),
     fallbackTotal: countSuiteTests(definition)
   };
