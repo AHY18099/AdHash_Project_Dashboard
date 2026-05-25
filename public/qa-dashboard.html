@@ -1134,6 +1134,16 @@ body.dark .tcl-table tbody tr:hover{background:rgba(126,179,255,.04)}
 .tcl-badge-android{color:#10b981;background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.25)}
 .tcl-badge-staging{color:#f97316;background:rgba(249,115,22,.1);border-color:rgba(249,115,22,.25)}
 .tcl-badge-prod{color:#6366f1;background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25)}
+.tcl-inline-sel{background:var(--card2);border:1.5px solid var(--border);border-radius:7px;padding:4px 7px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;outline:none;transition:border-color .18s,color .18s;min-width:90px;color:var(--txt)}
+.tcl-inline-sel:hover,.tcl-inline-sel:focus{border-color:var(--grad-a)}
+.tcl-inline-pass{color:#059669;border-color:rgba(5,150,105,.4);background:rgba(5,150,105,.08)}
+.tcl-inline-fail{color:#dc2626;border-color:rgba(220,38,38,.35);background:rgba(220,38,38,.07)}
+.tcl-inline-na{color:#64748b;border-color:rgba(100,116,139,.35);background:rgba(100,116,139,.08)}
+.tcl-inline-pending{color:#d97706;border-color:rgba(217,119,6,.35);background:rgba(217,119,6,.08)}
+.tcl-btn-save{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;box-shadow:0 3px 10px rgba(124,58,237,.25)}
+.tcl-btn-save:hover:not([disabled]){transform:translateY(-1px);box-shadow:0 6px 18px rgba(124,58,237,.38)}
+.tcl-btn-save[disabled]{cursor:not-allowed;opacity:.45}
+body.dark .tcl-inline-sel{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);color:var(--txt)}
 .tcl-link{color:var(--inp);font-size:11px;text-decoration:none;white-space:nowrap}
 .tcl-link:hover{text-decoration:underline}
 .tcl-links-list{display:flex;flex-direction:column;gap:2px}
@@ -4900,7 +4910,57 @@ function tclStats(items){
   const fail=items.filter(r=>r.status==='Fail').length;
   const na=items.filter(r=>r.status==='NA').length;
   const pending=items.filter(r=>r.status==='Pending').length;
-  return{total,pass,fail,na,pending};
+  const high=items.reduce((a,r)=>a+(r.priorityHigh||0),0);
+  const medium=items.reduce((a,r)=>a+(r.priorityMedium||0),0);
+  const low=items.reduce((a,r)=>a+(r.priorityLow||0),0);
+  return{total,pass,fail,na,pending,high,medium,low};
+}
+
+// track inline edit dirty state per project
+const _tclDirty={};
+
+function tclInlineChange(p){
+  _tclDirty[p]=true;
+  // enable Save Report button
+  const btn=document.getElementById('tcl-save-btn-'+p);
+  if(btn){btn.disabled=false;btn.style.opacity='1';}
+}
+
+function tclInlineSave(p,i,field,val){
+  if(!STORE[p].taskchecklist[i])return;
+  STORE[p].taskchecklist[i][field]=val;
+  _tclDirty[p]=true;
+  const btn=document.getElementById('tcl-save-btn-'+p);
+  if(btn){btn.disabled=false;btn.style.opacity='1';}
+}
+
+function tclSaveReport(p){
+  const items=STORE[p].taskchecklist||[];
+  const proj=PROJECTS.find(x=>x.id===p);
+  const rns=STORE[p].releaseNotes||[];
+  const s=tclStats(items);
+  const passRate=s.total?Math.round((s.pass/s.total)*100):0;
+  const now=new Date();
+  const dateStr=now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const snap={
+    type:'checklist',
+    datetime:now.toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})+' '+now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),
+    label:`Task Checklist — ${proj?.name||p}`,
+    passRate,stats:s,
+    items:JSON.parse(JSON.stringify(items)),
+    releaseNotes:JSON.parse(JSON.stringify(rns))
+  };
+  if(!STORE[p].reports)STORE[p].reports=[];
+  STORE[p].reports.push(snap);
+  // clear the live checklist after saving
+  STORE[p].taskchecklist=[];
+  _tclDirty[p]=false;
+  saveToLS(p);
+  renderProject(p);
+  // navigate to saved reports
+  curTab[p]='reports';
+  renderProject(p);
+  toast(`✓ Checklist saved to Reports`);
 }
 
 function renderTaskChecklist(p){
@@ -4910,6 +4970,8 @@ function renderTaskChecklist(p){
   const s=tclStats(items);
   const passRate=s.total?Math.round((s.pass/s.total)*100):0;
   const hasItems=items.length>0;
+  const allResolved=hasItems&&items.every(r=>r.status==='Pass'||r.status==='Fail'||r.status==='NA');
+  const members=getTeamMembers();
 
   const statsBar=`<div class="tcl-stats-bar">
     <div class="tcl-stat"><div class="tcl-stat-val" style="color:var(--txt)">${s.total}</div><div class="tcl-stat-lbl">Total</div></div>
@@ -4917,13 +4979,12 @@ function renderTaskChecklist(p){
     <div class="tcl-stat"><div class="tcl-stat-val" style="color:#dc2626">${s.fail}</div><div class="tcl-stat-lbl">Fail</div></div>
     <div class="tcl-stat"><div class="tcl-stat-val" style="color:#d97706">${s.pending}</div><div class="tcl-stat-lbl">Pending</div></div>
     <div class="tcl-stat"><div class="tcl-stat-val" style="color:#64748b">${s.na}</div><div class="tcl-stat-lbl">N/A</div></div>
+    <div class="tcl-stat"><div class="tcl-stat-val" style="color:#ef4444">${s.high}</div><div class="tcl-stat-lbl">🔴 High</div></div>
+    <div class="tcl-stat"><div class="tcl-stat-val" style="color:#f97316">${s.medium}</div><div class="tcl-stat-lbl">🟠 Medium</div></div>
+    <div class="tcl-stat"><div class="tcl-stat-val" style="color:#22c55e">${s.low}</div><div class="tcl-stat-lbl">🟢 Low</div></div>
     <div class="tcl-stat"><div class="tcl-stat-val" style="color:${passRate>=80?'#059669':passRate>=50?'#d97706':'#dc2626'}">${passRate}%</div><div class="tcl-stat-lbl">Pass Rate</div></div>
   </div>`;
 
-  const statusBadge=r=>{
-    const cls={Pass:'pass',Fail:'fail',NA:'na',Pending:'pending'}[r.status]||'na';
-    return`<span class="tcl-badge tcl-badge-${cls}">${r.status||'—'}</span>`;
-  };
   const platBadge=r=>{
     const cls={Web:'web',iOS:'ios',Android:'android'}[r.platform]||'na';
     return r.platform?`<span class="tcl-badge tcl-badge-${cls}">${r.platform}</span>`:'—';
@@ -4938,14 +4999,33 @@ function renderTaskChecklist(p){
     return`<div class="tcl-links-list">${links.map((l,i)=>`<a href="${escH(l)}" target="_blank" class="tcl-link">🔗 Jira ${i+1}</a>`).join('')}</div>`;
   };
 
+  // inline status dropdown
+  const statusSel=(r,i)=>{
+    const cls={Pass:'pass',Fail:'fail',NA:'na',Pending:'pending'}[r.status]||'pending';
+    return`<select class="tcl-inline-sel tcl-inline-${cls}" onchange="tclInlineSave('${p}',${i},'status',this.value);this.className='tcl-inline-sel tcl-inline-'+({'Pass':'pass','Fail':'fail','NA':'na','Pending':'pending'}[this.value]||'pending')">
+      ${TCL_STATUSES.map(v=>`<option${r.status===v?' selected':''}>${v}</option>`).join('')}
+    </select>`;
+  };
+  // inline tester dropdown
+  const testerSel=(r,i)=>`<select class="tcl-inline-sel" onchange="tclInlineSave('${p}',${i},'testedBy',this.value)">
+    <option value="">— Select —</option>
+    ${members.map(m=>`<option${r.testedBy===m?' selected':''}>${escH(m)}</option>`).join('')}
+  </select>`;
+
   const rows=items.map((r,i)=>`<tr>
     <td style="font-weight:600;color:var(--txt)">${escH(r.module||'—')}</td>
     <td>${escH(r.functionalities||'—')}</td>
     <td>${platBadge(r)}</td>
     <td>${envBadge(r)}</td>
-    <td>${statusBadge(r)}</td>
-    <td>${escH(r.testedBy||'—')}</td>
+    <td>${statusSel(r,i)}</td>
+    <td>${testerSel(r,i)}</td>
     <td style="text-align:center">${r.bugsCount||0}</td>
+    <td style="text-align:center">
+      ${r.priorityHigh?`<span class="tcl-badge" style="color:#ef4444;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3)">H:${r.priorityHigh}</span> `:''}
+      ${r.priorityMedium?`<span class="tcl-badge" style="color:#f97316;background:rgba(249,115,22,.1);border-color:rgba(249,115,22,.3)">M:${r.priorityMedium}</span> `:''}
+      ${r.priorityLow?`<span class="tcl-badge" style="color:#22c55e;background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.3)">L:${r.priorityLow}</span>`:''}
+      ${!r.priorityHigh&&!r.priorityMedium&&!r.priorityLow?'—':''}
+    </td>
     <td>${linksHtml(r)}</td>
     <td style="font-size:11px;color:var(--mut)">${escH(r.comments||'—')}</td>
     <td><div class="tcl-row-actions">
@@ -4957,11 +5037,12 @@ function renderTaskChecklist(p){
   const table=hasItems?`<div class="tcl-table-wrap"><table class="tcl-table">
     <thead><tr>
       <th>Module</th><th>Functionalities</th><th>Platform</th><th>Environment</th>
-      <th>Status</th><th>Tested By</th><th>Bugs</th><th>Jira Links</th><th>Comments</th><th>Actions</th>
+      <th>Status</th><th>Tested By</th><th>Bugs</th><th>Priority</th><th>Jira Links</th><th>Comments</th><th>Actions</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`:`<div class="tcl-empty"><div class="ico">✔</div><div>No checklist items yet. Click "+ Add" to start tracking.</div></div>`;
 
+  const saveDisabled=!_tclDirty[p]&&!allResolved;
   return`<div class="tcl-wrap">
     <div class="tcl-hdr">
       <div class="tcl-hdr-left">
@@ -4969,6 +5050,7 @@ function renderTaskChecklist(p){
         <p>${items.length} item${items.length!==1?'s':''} · ${passRate}% pass rate</p>
       </div>
       <div class="tcl-actions">
+        ${hasItems?`<button id="tcl-save-btn-${p}" class="tcl-btn tcl-btn-save" onclick="tclSaveReport('${p}')" ${saveDisabled?'disabled style="opacity:.45"':''}>💾 Save Report</button>`:''}
         ${hasItems?`<button class="tcl-btn tcl-btn-dl" onclick="tclDownloadReport('${p}')">⬇ Download Report</button>`:''}
         <button class="tcl-btn tcl-btn-outline" onclick="switchTab('${p}','releasenotes')">📝 Release Notes</button>
         <button class="tcl-btn tcl-btn-primary" onclick="tclOpenAdd('${p}')">＋ Add</button>
@@ -4996,6 +5078,11 @@ function tclForm(r){r=r||{};const members=getTeamMembers();return`
     <div class="fg"><label>Bugs Count</label><input class="finp" type="number" min="0" id="tcl-bugs" value="${r.bugsCount||0}"></div>
     <div class="fg"><label>Comments</label><input class="finp" id="tcl-comments" placeholder="Optional notes" value="${escH(r.comments||'')}"></div>
   </div>
+  <div class="fg-row">
+    <div class="fg"><label>🔴 High Priority Bugs</label><input class="finp" type="number" min="0" id="tcl-high" value="${r.priorityHigh||0}"></div>
+    <div class="fg"><label>🟠 Medium Priority Bugs</label><input class="finp" type="number" min="0" id="tcl-medium" value="${r.priorityMedium||0}"></div>
+    <div class="fg"><label>🟢 Low Priority Bugs</label><input class="finp" type="number" min="0" id="tcl-low" value="${r.priorityLow||0}"></div>
+  </div>
   <div class="fg"><label>Jira Links <span style="font-weight:400;color:var(--mut)">(one per line)</span></label><textarea class="finp" id="tcl-jira" rows="3" placeholder="https://jira.example.com/browse/PROJ-123">${escH(r.jiraLinks||'')}</textarea></div>`;}
 
 function tclRead(base){return{...(base||{}),
@@ -5006,6 +5093,9 @@ function tclRead(base){return{...(base||{}),
   status:document.getElementById('tcl-status')?.value||'Pending',
   testedBy:document.getElementById('tcl-tester')?.value||'',
   bugsCount:parseInt(document.getElementById('tcl-bugs')?.value||'0')||0,
+  priorityHigh:parseInt(document.getElementById('tcl-high')?.value||'0')||0,
+  priorityMedium:parseInt(document.getElementById('tcl-medium')?.value||'0')||0,
+  priorityLow:parseInt(document.getElementById('tcl-low')?.value||'0')||0,
   comments:document.getElementById('tcl-comments')?.value.trim()||'',
   jiraLinks:document.getElementById('tcl-jira')?.value.trim()||'',
   updatedAt:new Date().toISOString()
@@ -5017,6 +5107,7 @@ function tclOpenAdd(p){
     if(!mod){toast('Module is required','err');return;}
     if(!STORE[p].taskchecklist)STORE[p].taskchecklist=[];
     STORE[p].taskchecklist.push(tclRead());
+    _tclDirty[p]=true;
     saveToLS(p);closeModal();renderProject(p);toast('Item added');
   },{saveLabel:'Add Item'});
 }
@@ -5026,6 +5117,7 @@ function tclOpenEdit(p,i){
     const mod=document.getElementById('tcl-module')?.value.trim();
     if(!mod){toast('Module is required','err');return;}
     STORE[p].taskchecklist[i]=tclRead(r);
+    _tclDirty[p]=true;
     saveToLS(p);closeModal();renderProject(p);toast('Item updated');
   },{saveLabel:'Update'});
 }
@@ -5064,6 +5156,7 @@ function tclDownloadReport(p){
     <td><span style="padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700;background:${statusColor[r.status]||'#94a3b8'}18;color:${statusColor[r.status]||'#64748b'};border:1px solid ${statusColor[r.status]||'#94a3b8'}44">${r.status||'—'}</span></td>
     <td>${escH(r.testedBy||'—')}</td>
     <td style="text-align:center;font-weight:700;color:${r.bugsCount>0?'#dc2626':'#059669'}">${r.bugsCount||0}</td>
+    <td>${[r.priorityHigh?`<span style="padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)">H:${r.priorityHigh}</span>`:'',r.priorityMedium?`<span style="padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.3)">M:${r.priorityMedium}</span>`:'',r.priorityLow?`<span style="padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(34,197,94,.1);color:#22c55e;border:1px solid rgba(34,197,94,.3)">L:${r.priorityLow}</span>`:''].filter(Boolean).join(' ')||'—'}</td>
     <td>${(r.jiraLinks||'').split('\n').filter(Boolean).map((l,i)=>`<a href="${escH(l)}" style="color:#3b82f6;font-size:11px;display:block">Jira ${i+1}</a>`).join('')||'—'}</td>
     <td style="color:#64748b;font-size:11px">${escH(r.comments||'—')}</td>
   </tr>`).join('');
@@ -5118,11 +5211,14 @@ function tclDownloadReport(p){
           <div class="stat-card"><div class="val" style="color:#d97706">${s.pending}</div><div class="lbl">Pending</div></div>
           <div class="stat-card"><div class="val" style="color:#64748b">${s.na}</div><div class="lbl">N/A</div></div>
           <div class="stat-card"><div class="val" style="color:${passRate>=80?'#059669':passRate>=50?'#d97706':'#dc2626'}">${passRate}%</div><div class="lbl">Pass Rate</div></div>
+          <div class="stat-card"><div class="val" style="color:#ef4444">${s.high}</div><div class="lbl">High Bugs</div></div>
+          <div class="stat-card"><div class="val" style="color:#f97316">${s.medium}</div><div class="lbl">Med Bugs</div></div>
+          <div class="stat-card"><div class="val" style="color:#22c55e">${s.low}</div><div class="lbl">Low Bugs</div></div>
         </div>
       </div>
       <h2>📋 Checklist Items</h2>
       <table>
-        <thead><tr><th>Module</th><th>Functionalities</th><th>Platform</th><th>Environment</th><th>Status</th><th>Tested By</th><th>Bugs</th><th>Jira Links</th><th>Comments</th></tr></thead>
+        <thead><tr><th>Module</th><th>Functionalities</th><th>Platform</th><th>Environment</th><th>Status</th><th>Tested By</th><th>Bugs</th><th>Priority</th><th>Jira Links</th><th>Comments</th></tr></thead>
         <tbody>${tableRows}</tbody>
       </table>
       ${rnSection}
@@ -5145,8 +5241,8 @@ function _tpFormFields(acct){acct=acct||{};return`
       <div class="fg"><label>URL</label><input class="finp" id="tp-url" placeholder="https://" value="${escH(acct.url||'')}"></div>
     </div>
     <div class="fg-row">
-      <div class="fg"><label>Username</label><input class="finp" id="tp-username" placeholder="login username" value="${escH(acct.username||'')}"></div>
-      <div class="fg"><label>Password</label><input class="finp" id="tp-password" placeholder="••••••••" type="password" value="${escH(acct.tpPassword||'')}"></div>
+      <div class="fg"><label>Username</label><input class="finp" id="tp-username" placeholder="login username" value="${escH(acct.username||'')}" autocomplete="off"></div>
+      <div class="fg"><label>Password</label><input class="finp" id="tp-password" placeholder="••••••••" type="password" value="${escH(acct.tpPassword||'')}" autocomplete="new-password"></div>
     </div>
     <div class="fg-row">
       <div class="fg"><label>Credentials Used</label><input class="finp" id="tp-creds" placeholder="e.g. API Key, OAuth2" value="${escH(acct.credentials||'')}"></div>
