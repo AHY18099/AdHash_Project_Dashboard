@@ -25,7 +25,7 @@ const SUPER_ADMIN_EMAIL = process.env.QA_ADMIN_EMAIL || 'thenilavan@adhashtech.c
 const SUPER_ADMIN_PASSWORD = process.env.QA_ADMIN_PASSWORD || 'Qateam@123';
 
 // Apply defaults so all features work on Railway without manual env var setup
-if (!process.env.GITHUB_TOKEN)       process.env.GITHUB_TOKEN       = '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';
+// GITHUB_TOKEN must be set as a Railway environment variable — no hardcoded fallback
 if (!process.env.ZOHO_MAIL_ENABLED)  process.env.ZOHO_MAIL_ENABLED  = 'true';
 if (!process.env.ZOHO_MAIL_FROM)     process.env.ZOHO_MAIL_FROM     = 'thenilavan@adhashtech.com';
 if (!process.env.ZOHO_MAIL_USER)     process.env.ZOHO_MAIL_USER     = 'thenilavan@adhashtech.com';
@@ -774,17 +774,44 @@ async function dispatchZohoSummaryMail(state) {
     ];
     const emailPreviewPath = emailPreviewCandidates.find((candidate) => fs.existsSync(candidate));
 
-    if (!emailPreviewPath) {
-        addLog('⚠️ Email template file not found — checked email-preview/AdHash-Projects-Dashboard.html and email-preview/index.html', 'warning');
-        return;
-    }
-
-    addLog(`📄 Using email template: ${emailPreviewPath}`, 'info');
-
-    let html = fs.readFileSync(emailPreviewPath, 'utf8');
-    // Inject live failed-module cards so the Failed Details section always reflects current run
-    if (html.includes('<!--LIVE_FAILED_MODULES-->')) {
-        html = html.replace('<!--LIVE_FAILED_MODULES-->', buildFailedModulesHtmlForTemplate(state));
+    let html;
+    if (emailPreviewPath) {
+        addLog(`📄 Using email template: ${emailPreviewPath}`, 'info');
+        html = fs.readFileSync(emailPreviewPath, 'utf8');
+        if (html.includes('<!--LIVE_FAILED_MODULES-->')) {
+            html = html.replace('<!--LIVE_FAILED_MODULES-->', buildFailedModulesHtmlForTemplate(state));
+        }
+    } else {
+        addLog('ℹ️ Email template not found — generating inline summary email.', 'info');
+        const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const suites = (state && state.suites) || {};
+        const suiteRows = ['app','server','cert','api','domain'].map(k => {
+            const s = suites[k] || {};
+            const st = String(s.status||'').toLowerCase();
+            const color = st.includes('pass') ? '#059669' : st.includes('fail') ? '#dc2626' : '#d97706';
+            return `<tr><td style="padding:8px 12px;border:1px solid #e5e7eb;font-size:13px">${k.toUpperCase()}</td><td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:${color}">${s.status||'—'}</td><td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:center">${s.total||0}</td><td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:center;color:#059669">${s.passed||s.pass||0}</td><td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:center;color:#dc2626">${s.failed||s.fail||0}</td></tr>`;
+        }).join('');
+        html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;background:#f1f5f9;margin:0;padding:32px">
+<div style="max-width:680px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.1)">
+  <div style="background:linear-gradient(135deg,#1e3a5f 0%,#0f172a 100%);padding:28px 32px;color:#fff">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;opacity:.6;margin-bottom:8px">AdHash QA Dashboard</div>
+    <div style="font-size:24px;font-weight:800;margin-bottom:6px">Test Run Complete</div>
+    <div style="font-size:13px;opacity:.7">${dateStr}</div>
+  </div>
+  <div style="padding:28px 32px">
+    <div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap">
+      <div style="flex:1;min-width:120px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;text-align:center"><div style="font-size:28px;font-weight:800;color:#059669">${summary.passedSuites||0}</div><div style="font-size:11px;color:#059669;font-weight:700;text-transform:uppercase">Passed</div></div>
+      <div style="flex:1;min-width:120px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:16px;text-align:center"><div style="font-size:28px;font-weight:800;color:#dc2626">${summary.failedSuites||0}</div><div style="font-size:11px;color:#dc2626;font-weight:700;text-transform:uppercase">Failed</div></div>
+      <div style="flex:1;min-width:120px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;text-align:center"><div style="font-size:28px;font-weight:800;color:#475569">${summary.totalSuites||0}</div><div style="font-size:11px;color:#475569;font-weight:700;text-transform:uppercase">Total</div></div>
+    </div>
+    <table width="100%" style="border-collapse:collapse;font-size:13px;margin-top:8px">
+      <thead><tr style="background:#f8fafc"><th style="padding:10px 12px;border:1px solid #e5e7eb;text-align:left;font-size:11px;text-transform:uppercase;color:#64748b">Suite</th><th style="padding:10px 12px;border:1px solid #e5e7eb;text-align:center;font-size:11px;text-transform:uppercase;color:#64748b">Status</th><th style="padding:10px 12px;border:1px solid #e5e7eb;text-align:center;font-size:11px;text-transform:uppercase;color:#64748b">Total</th><th style="padding:10px 12px;border:1px solid #e5e7eb;text-align:center;font-size:11px;text-transform:uppercase;color:#059669">Pass</th><th style="padding:10px 12px;border:1px solid #e5e7eb;text-align:center;font-size:11px;text-transform:uppercase;color:#dc2626">Fail</th></tr></thead>
+      <tbody>${suiteRows}</tbody>
+    </table>
+    ${buildFailedModulesHtmlForTemplate(state)}
+  </div>
+  <div style="padding:14px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center">Generated by AdHash QA Dashboard &nbsp;·&nbsp; ${dateStr}</div>
+</div></body></html>`;
     }
 
     addLog(`📤 Sending via Zoho SMTP to ${process.env.ZOHO_MAIL_TO} from ${process.env.ZOHO_MAIL_FROM}...`, 'info');
@@ -3569,6 +3596,24 @@ app.delete('/api/projects/:id', (req, res) => {
     data.projects.splice(idx, 1);
     writeProjectMapping(data);
     regenerateSpecFiles();
+    autoPushSpecsToGitHub();
+    res.json({ success: true });
+});
+
+// POST /api/projects/:id/env — update display fields (website, dashboard, color, name) from UI edit modal
+// Merges into project-mapping.json and triggers auto-push so spec files stay in sync.
+app.post('/api/projects/:id/env', (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    const data = readProjectMapping();
+    const idx = data.projects.findIndex(p => p.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Project not found' });
+    const { website, dashboard, color, name } = req.body || {};
+    const proj = data.projects[idx];
+    if (name)      proj.name = name;
+    if (color)     proj.color = color;
+    if (website !== undefined) proj.website = website;
+    if (dashboard !== undefined) proj.dashboard = dashboard;
+    writeProjectMapping(data);
     autoPushSpecsToGitHub();
     res.json({ success: true });
 });

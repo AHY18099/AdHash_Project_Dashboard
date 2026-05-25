@@ -1975,12 +1975,21 @@ function renderProject(p){
 
   const needsBar=tab==='smoke'||tab==='prod';
   const PROJ_ICONS={humee:'🤖',synctag:'🏷️',wavedin:'🌊',ddp:'📊',aisignpro:'✍️'};
+  const _hdrWebsite=STORE[p]?.env?.website||proj?.website||'';
+  const _hdrFavicon=(()=>{
+    if(!_hdrWebsite)return`<span style="font-size:18px">${PROJ_ICONS[p]||'📁'}</span>`;
+    try{
+      const _dom=new URL(_hdrWebsite).hostname;
+      const _src=`https://www.google.com/s2/favicons?domain=${_dom}&sz=64`;
+      return`<img src="${_src}" width="22" height="22" style="border-radius:4px;object-fit:contain;vertical-align:middle;margin-right:2px" onerror="this.style.display='none'" alt="">`;
+    }catch(e){return`<span style="font-size:18px">${PROJ_ICONS[p]||'📁'}</span>`;}
+  })();
   document.getElementById('app').innerHTML=`
     <div class="proj-wrap">
       <div class="proj-detail-hdr">
         <button class="btn-back" onclick="goHome()">← All Projects</button>
         <span class="proj-detail-dot" style="background:${proj?.color||'var(--grad-a)'}"></span>
-        <span class="proj-detail-name">${PROJ_ICONS[p]||'📁'} ${proj?.name||p}</span>
+        <span class="proj-detail-name">${_hdrFavicon} ${proj?.name||p}</span>
         <div class="proj-detail-right">
           <span style="font-size:12px;font-weight:700;padding:3px 12px;border-radius:50px;background:${isReady(p)?'rgba(16,185,129,.1)':'rgba(59,130,246,.08)'};color:${isReady(p)?'var(--pass)':'var(--inp)'};border:1px solid ${isReady(p)?'rgba(16,185,129,.3)':'rgba(59,130,246,.25)'}">${pct}% Pass Rate</span>
           ${isAdmin()?`<button class="btn-icon" onclick="openEditProject('${p}')">✏ Edit</button>`:''}
@@ -5582,6 +5591,11 @@ function openEditProject(pid){
     proj.releaseDate=document.getElementById('ep-date').value;
     STORE[pid].env.website=proj.website;STORE[pid].env.dashboard=proj.dashboard;STORE[pid].env.releaseDate=proj.releaseDate;
     saveAllState();closeModal();renderProject(pid);toast('Project updated');
+    // Sync website/dashboard URL to project-mapping.json and trigger git push
+    fetch('/api/projects/'+encodeURIComponent(pid)+'/env',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({website:proj.website,dashboard:proj.dashboard,color:proj.color,name:proj.name})
+    }).catch(()=>{});
   });
 }
 function deleteProject(pid){
@@ -6216,6 +6230,7 @@ function _buildChecklistReportHtml(p,snap,platformFilter){
   </style></head><body>
   <div class="report-wrap">
     <div class="report-hdr">
+      ${(()=>{const ws=STORE[p]?.env?.website||proj?.website||'';try{if(!ws)return'';const dom=new URL(ws).hostname;return`<img src="https://www.google.com/s2/favicons?domain=${dom}&sz=64" width="36" height="36" style="border-radius:8px;object-fit:contain;float:right;margin-left:16px;opacity:.85" onerror="this.style.display='none'" alt="">`;}catch(e){return'';}})()}
       <h1>✔ Task Checklist Report${platLabel}</h1>
       <p>Project: ${escH(proj?.name||p)} &nbsp;·&nbsp; Saved: ${dateStr} &nbsp;·&nbsp; Total Items: ${s.total}</p>
       ${platLabel?`<div class="plat-badge">${platLabel.trim()} Platform</div>`:''}
