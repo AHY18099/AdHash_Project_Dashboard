@@ -1045,6 +1045,9 @@ body.dark .dt-assigned-chip{background:rgba(139,92,246,.15);color:#a78bfa}
 .tt-task-meta-chip{display:inline-flex;align-items:center;gap:4px;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--mut);font-weight:600;white-space:nowrap}
 .tt-task-meta-chip.hrs{color:var(--inp);font-weight:700;background:rgba(37,99,235,.08);border-color:rgba(37,99,235,.2)}
 .tt-task-meta-chip.date{color:var(--txt2)}
+.tt-env-chip.production{background:rgba(16,185,129,.1);color:var(--pass);border-color:rgba(16,185,129,.3);font-weight:700}
+.tt-env-chip.staging{background:rgba(245,158,11,.1);color:var(--blk);border-color:rgba(245,158,11,.3);font-weight:700}
+.tt-env-chip.dev{background:rgba(139,92,246,.1);color:#8b5cf6;border-color:rgba(139,92,246,.3);font-weight:700}
 .tt-task-card-actions{display:flex;gap:5px;margin-left:auto;flex-shrink:0}
 .tt-task-card-cmts{background:var(--card2);border-radius:7px;padding:6px 10px;font-size:11px;color:var(--txt2);margin-top:6px}
 .tt-task-card-cmt-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-bottom:2px}
@@ -3842,6 +3845,7 @@ function renderTTRowTable(dateStr){
           </span>
           <span class="tt-task-meta-chip">${escH(t.projectType||'Website')}</span>
           <span class="tt-task-meta-chip">${escH(t.platform||'Web')}</span>
+          ${t.envType?`<span class="tt-task-meta-chip tt-env-chip ${(t.envType||'').toLowerCase()}">${escH(t.envType)}</span>`:''}
           ${t.estimationHrs?`<span class="tt-task-meta-chip hrs">⏱ ${escH(t.estimationHrs)}</span>`:''}
           ${t.completionDate?`<span class="tt-task-meta-chip date">📅 ${escH(t.completionDate.replace('T',' ').substring(0,16))}</span>`:''}
           ${jiraHtml}
@@ -3997,6 +4001,7 @@ function ttBuildModalBody(entry,prefillDate){
   const projOpts=PROJECTS.map(p=>`<option value="${p.id}" ${e.projectId===p.id?'selected':''}>${escH(p.name)}</option>`).join('');
   const ptOpts=TT_PROJ_TYPES.map(v=>`<option value="${v}" ${e.projectType===v?'selected':''}>${v}</option>`).join('');
   const platOpts=TT_PLATFORMS.map(v=>`<option value="${v}" ${e.platform===v?'selected':''}>${v}</option>`).join('');
+  const envOpts=`<option value="">— Select —</option>`+RL_ENV_TYPES.map(v=>`<option value="${v}" ${e.envType===v?'selected':''}>${v}</option>`).join('');
   const csOpts=TT_CURR_STATUS.map(v=>`<option value="${v}" ${e.currentStatus===v?'selected':''}>${v}</option>`).join('');
   const tsOpts=TT_TEST_STATUS.map(v=>`<option value="${v}" ${e.testingStatus===v?'selected':''}>${v}</option>`).join('');
   const assignedOpts=`<option value="">— Select —</option>`+getTeamMembers().map(n=>`<option value="${escH(n)}" ${e.assignedBy===n?'selected':''}>${escH(n)}</option>`).join('');
@@ -4012,6 +4017,7 @@ function ttBuildModalBody(entry,prefillDate){
       <div class="fg-row">
         <div class="fg"><label>Project URL</label><input id="tt-url" placeholder="https://..." value="${escH(e.projectUrl||'')}"></div>
         <div class="fg"><label>Platform Type</label><select id="tt-platform">${platOpts}</select></div>
+        <div class="fg"><label>Environment Type</label><select id="tt-env">${envOpts}</select></div>
       </div>
     </div>
     <div class="tt-form-section">
@@ -4086,6 +4092,7 @@ function ttSaveEntry(editIdx){
     projectType:g('tt-ptype'),
     projectUrl:g('tt-url'),
     platform:g('tt-platform'),
+    envType:g('tt-env'),
     taskSummary:g('tt-summary'),
     taskDescription:g('tt-desc'),
     jiraUrl:g('tt-jira'),
@@ -4123,7 +4130,7 @@ function ttOpenEdit(idx){
 // ══════════════════════════════════════════════════════════════════
 let RELEASES=[];
 let _rlCardOpen={}; // releaseId -> bool
-const RL_ENV_TYPES=['Staging','Production'];
+const RL_ENV_TYPES=['Staging','Production','Dev'];
 const RL_PROJ_TYPES=['Website','Admin','Client','User','Dashboard'];
 const RL_PLATFORMS=['Web','Android','iOS'];
 const RL_CURR_STATUS=['To Do','In Progress','Partially Done','Done','Skipped','Hold'];
