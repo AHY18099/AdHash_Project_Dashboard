@@ -1743,9 +1743,9 @@ function renderProjectGrid(){
     const s=calcStats(p.id);
     const pct=s.total?Math.round(s.pass/s.total*100):0;
     const ready=isReady(p.id);
-    const inProg=s.inp>0||s.ns>0;
-    const pillCls=ready?'ready':inProg?'progress':'notready';
-    const pillTxt=ready?'✓ Release Ready':inProg?'◌ In Progress':'✗ Not Ready';
+    const hasStarted=(s.pass>0||s.fail>0||s.inp>0);
+    const pillCls=s.total===0?'progress':ready?'ready':s.fail>0?'notready':hasStarted?'progress':'progress';
+    const pillTxt=s.total===0?'— No Tests':ready?'✓ Release Ready':s.fail>0?`✗ ${s.fail} Failed`:hasStarted?`◌ ${pct}% In Progress`:'— Not Started';
     const pend=isAdmin()?(STORE[p.id]?.pending?.filter(x=>x.status==='pending')||[]).length:0;
     const iconBg=`${p.color}22`;
     const websiteUrl=STORE[p.id]?.env?.website||p.website||'';
