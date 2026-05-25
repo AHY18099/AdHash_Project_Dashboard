@@ -5233,11 +5233,10 @@ function tclShowDownloadPicker(p){
     cards=[platCard('ALL',allItems,true),...cards];
   }
 
-  showModal(`<div style="padding:8px 0 4px">
-    <h3 style="font-size:17px;font-weight:800;color:var(--txt);margin:0 0 4px">⬇ Download Report</h3>
-    <p style="font-size:12px;color:var(--mut);margin:0 0 20px">Choose which platform report to download</p>
+  openModal('⬇ Download Report',`
+    <p style="font-size:12px;color:var(--mut);margin:0 0 16px">Choose which platform report to download</p>
     <div class="tcl-dl-grid">${cards.join('')}</div>
-  </div>`);
+  `,null,{noSave:true});
 }
 
 function tclDownloadReport(p,platformFilter){
