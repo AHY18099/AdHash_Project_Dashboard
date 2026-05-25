@@ -2809,28 +2809,81 @@ function renderApprovals(p){
 // ══ SAVED REPORTS ══
 function renderReports(p){
   const reps=STORE[p].reports||[];
-  if(!reps.length)return`<div class="empty"><div class="ico">💾</div>No saved snapshots yet.<div style="margin-top:6px;font-size:12px">Click <b>Save Report</b> to create a timestamped snapshot.</div></div>`;
+  if(!reps.length)return`<div class="empty"><div class="ico">💾</div>No saved reports yet.<div style="margin-top:6px;font-size:12px">Use <b>Save Report</b> in Task Checklist or Smoke/Prod tests to create snapshots.</div></div>`;
+  const proj=PROJECTS.find(x=>x.id===p);
+
   const cards=[...reps].reverse().map((rep,ri)=>{
-    const idx=reps.length-1-ri;const s=rep.summary;const pct=s.total?Math.round(s.pass/s.total*100):0;
+    const idx=reps.length-1-ri;
+
+    // ── Checklist-type report ──
+    if(rep.type==='checklist'){
+      const s=rep.stats||{};
+      const pct=rep.passRate||0;
+      const platforms=[...new Set((rep.items||[]).map(r=>r.platform).filter(Boolean))];
+      const platColor={Web:'#3b82f6',iOS:'#8b5cf6',Android:'#10b981'};
+      const platBadges=platforms.map(pl=>`<span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${platColor[pl]||'#94a3b8'}18;color:${platColor[pl]||'#64748b'};border:1px solid ${platColor[pl]||'#94a3b8'}44">${pl}</span>`).join(' ');
+      const total=s.total||0;
+      const passClr=pct>=80?'#059669':pct>=50?'#d97706':'#dc2626';
+      return`<div class="rep-card" style="border-left:4px solid #7c3aed">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+          <div>
+            <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">
+              <span style="font-size:11px;font-weight:800;color:#7c3aed;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.25);padding:2px 8px;border-radius:8px">✔ CHECKLIST</span>
+              ${platBadges}
+            </div>
+            <div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:2px">${escH(proj?.name||p)}</div>
+            <div style="font-size:11px;color:var(--mut)">🕐 ${rep.datetime} &nbsp;·&nbsp; ${total} item${total!==1?'s':''}</div>
+          </div>
+          ${isAdmin()?`<button class="btn-icon del" onclick="deleteReport('${p}',${idx})" title="Delete">✕</button>`:''}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">
+          <span class="rcs p">✓ ${s.pass||0} Pass</span>
+          ${(s.fail||0)?`<span class="rcs f">✗ ${s.fail} Fail</span>`:''}
+          ${(s.pending||0)?`<span class="rcs b">⏳ ${s.pending} Pending</span>`:''}
+          ${(s.na||0)?`<span class="rcs n">— ${s.na} N/A</span>`:''}
+        </div>
+        ${(s.high||s.medium||s.low)?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">
+          ${s.high?`<span style="padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.25)">H:${s.high}</span>`:''}
+          ${s.medium?`<span style="padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.25)">M:${s.medium}</span>`:''}
+          ${s.low?`<span style="padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;background:rgba(34,197,94,.1);color:#22c55e;border:1px solid rgba(34,197,94,.25)">L:${s.low}</span>`:''}
+        </div>`:''}
+        <div class="rc-pbar" style="margin-bottom:8px"><div class="rc-pb-f" style="width:${pct}%;background:linear-gradient(90deg,#7c3aed,#5b21b6)"></div></div>
+        <div style="font-size:11px;font-weight:700;margin-bottom:12px;color:${passClr}">${pct}% Pass Rate</div>
+        <div class="acell">
+          ${platforms.length>1?`<button class="btn btn-primary" style="font-size:11px;padding:6px 16px" onclick="downloadChecklistReport('${p}',${idx},'ALL')">⬇ All Platforms</button>
+          ${platforms.map(pl=>`<button class="btn btn-secondary" style="font-size:11px;padding:6px 14px" onclick="downloadChecklistReport('${p}',${idx},'${pl}')">${pl}</button>`).join('')}`
+          :`<button class="btn btn-primary" style="font-size:11px;padding:6px 16px" onclick="downloadChecklistReport('${p}',${idx},'ALL')">⬇ Download Report</button>`}
+          <button class="btn btn-secondary" style="font-size:11px;padding:6px 14px" onclick="previewChecklistReport('${p}',${idx},'ALL')">👁 Preview</button>
+          ${isAdmin()?`<button class="btn btn-secondary" style="font-size:11px;padding:6px 14px" onclick="restoreChecklistReport('${p}',${idx})">↩ Restore</button>`:''}
+        </div>
+      </div>`;
+    }
+
+    // ── Legacy smoke/prod report ──
+    const s=rep.summary||{};const pct=s.total?Math.round(s.pass/s.total*100):0;
     const ready=s.fail===0&&s.blocked===0&&pct===100;
     return`<div class="rep-card">
       <div style="display:flex;align-items:flex-start;justify-content:space-between">
-        <div><div style="font-size:13px;font-weight:800;background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">${PROJECTS.find(x=>x.id===p)?.name||p}${rep.label?` — ${rep.label}`:''}</div>
+        <div><div style="font-size:13px;font-weight:800;background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">${escH(proj?.name||p)}${rep.label?` — ${rep.label}`:''}</div>
         <div style="font-size:11px;color:var(--mut)">🕐 ${rep.datetime}</div></div>
         ${isAdmin()?`<button class="btn-icon del" onclick="deleteReport('${p}',${idx})">✕</button>`:''}
       </div>
       <div style="display:flex;gap:5px;flex-wrap:wrap;margin:9px 0">
-        <span class="rcs p">✓ ${s.pass}</span>${s.fail?`<span class="rcs f">✗ ${s.fail}</span>`:''}${s.blocked?`<span class="rcs b">⊘ ${s.blocked}</span>`:''}<span class="rcs n">◌ ${s.ns}</span>
+        <span class="rcs p">✓ ${s.pass||0}</span>${s.fail?`<span class="rcs f">✗ ${s.fail}</span>`:''}${s.blocked?`<span class="rcs b">⊘ ${s.blocked}</span>`:''}<span class="rcs n">◌ ${s.ns||0}</span>
       </div>
       <div class="rc-pbar"><div class="rc-pb-f" style="width:${pct}%"></div></div>
-      <div style="font-size:11px;font-weight:700;margin-bottom:12px;color:${ready?'var(--pass)':'var(--fail)'};text-shadow:0 0 10px ${ready?'rgba(0,255,136,.3)':'rgba(255,68,68,.3)'}">${ready?'🟢 Release Ready':'🔴 Not Ready'} — ${pct}%</div>
+      <div style="font-size:11px;font-weight:700;margin-bottom:12px;color:${ready?'var(--pass)':'var(--fail)'}">${ready?'🟢 Release Ready':'🔴 Not Ready'} — ${pct}%</div>
       <div class="acell">
         <button class="btn btn-primary" style="font-size:11px;padding:6px 16px" onclick="downloadSavedReport('${p}',${idx})">⬇ Download</button>
         <button class="btn btn-secondary" style="font-size:11px;padding:6px 14px" onclick="previewSavedReport('${p}',${idx})">👁 Preview</button>
       </div>
     </div>`;
   }).join('');
-  return`<div class="sec-hdr"><h3>💾 Saved Reports</h3><span style="font-size:12px;color:var(--mut);background:rgba(0,212,255,.1);padding:3px 10px;border-radius:50px;border:1px solid rgba(0,212,255,.2)">${reps.length} snapshot${reps.length!==1?'s':''}</span></div><div class="rep-grid">${cards}</div>`;
+
+  const checklistCount=reps.filter(r=>r.type==='checklist').length;
+  const smokeCount=reps.length-checklistCount;
+  const typeInfo=checklistCount&&smokeCount?` (${checklistCount} checklist, ${smokeCount} test)`:checklistCount?` (checklist)`:'';
+  return`<div class="sec-hdr"><h3>💾 Saved Reports</h3><span style="font-size:12px;color:var(--mut);background:rgba(0,212,255,.1);padding:3px 10px;border-radius:50px;border:1px solid rgba(0,212,255,.2)">${reps.length} saved${typeInfo}</span></div><div class="rep-grid">${cards}</div>`;
 }
 
 // ══ API TESTS ══
@@ -4961,15 +5014,12 @@ function tclSaveReport(p){
   };
   if(!STORE[p].reports)STORE[p].reports=[];
   STORE[p].reports.push(snap);
-  // clear the live checklist after saving
   STORE[p].taskchecklist=[];
   _tclDirty[p]=false;
   saveToLS(p);
-  renderProject(p);
-  // navigate to saved reports
   curTab[p]='reports';
   renderProject(p);
-  toast(`✓ Checklist saved to Reports`);
+  toast(`✓ Checklist saved — view in Saved Reports tab`);
 }
 
 function renderTaskChecklist(p){
@@ -6055,6 +6105,138 @@ function downloadSavedReport(p,i){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download=n+'_Snapshot_'+snap.datetime.replace(/[: ,]/g,'_')+'.html';a.click();URL.revokeObjectURL(a.href);
 }
 function previewSavedReport(p,i){const snap=STORE[p].reports[i];const html=buildReport(p,snap);const w=window.open('','_blank');if(w){w.document.write(html);w.document.close();}}
+
+function _buildChecklistReportHtml(p,snap,platformFilter){
+  const proj=PROJECTS.find(x=>x.id===p);
+  const allItems=snap.items||[];
+  const items=(platformFilter&&platformFilter!=='ALL')?allItems.filter(r=>r.platform===platformFilter):allItems;
+  const rns=snap.releaseNotes||[];
+  const s=tclStats(items);
+  const passRate=s.total?Math.round((s.pass/s.total)*100):0;
+  const dateStr=snap.datetime||new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const platLabel=(platformFilter&&platformFilter!=='ALL')?` — ${platformFilter}`:'';
+  const platColor={Web:'#3b82f6',iOS:'#8b5cf6',Android:'#10b981'};
+  const platAccent=(platformFilter&&platformFilter!=='ALL')?(platColor[platformFilter]||'#6366f1'):'#7c3aed';
+  const statusColor={Pass:'#059669',Fail:'#dc2626',NA:'#64748b',Pending:'#d97706'};
+  const envColor={Staging:'#f97316',Production:'#6366f1'};
+
+  const donutSvg=(()=>{
+    const r=70,cx=90,cy=90,sw=22,C=2*Math.PI*r;
+    const segs=[{v:s.pass,c:'#059669'},{v:s.fail,c:'#dc2626'},{v:s.pending,c:'#d97706'},{v:s.na,c:'#94a3b8'}].filter(x=>x.v>0);
+    if(!segs.length)return`<svg width="180" height="180"><circle cx="90" cy="90" r="70" fill="none" stroke="#e2e8f0" stroke-width="22"/><text x="90" y="96" text-anchor="middle" font-size="22" font-weight="800" fill="#64748b">0%</text></svg>`;
+    let offset=0;
+    const arcs=segs.map(sg=>{const dash=(sg.v/s.total)*C;const arc=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${sg.c}" stroke-width="${sw}" stroke-dasharray="${dash} ${C-dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;offset+=dash;return arc;}).join('');
+    return`<svg width="180" height="180">${arcs}<text x="${cx}" y="${cy+7}" text-anchor="middle" font-size="24" font-weight="800" fill="#1e293b">${passRate}%</text><text x="${cx}" y="${cy+24}" text-anchor="middle" font-size="11" fill="#64748b">Pass Rate</text></svg>`;
+  })();
+
+  const tableRows=items.map(r=>`<tr>
+    <td>${escH(r.module||'—')}</td>
+    <td>${escH(r.functionalities||'—')}</td>
+    <td><span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:${platColor[r.platform]||'#94a3b8'}22;color:${platColor[r.platform]||'#64748b'};border:1px solid ${platColor[r.platform]||'#94a3b8'}44">${r.platform||'—'}</span></td>
+    <td><span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:${envColor[r.environment]||'#94a3b8'}22;color:${envColor[r.environment]||'#64748b'};border:1px solid ${envColor[r.environment]||'#94a3b8'}44">${r.environment||'—'}</span></td>
+    <td><span style="padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700;background:${statusColor[r.status]||'#94a3b8'}18;color:${statusColor[r.status]||'#64748b'};border:1px solid ${statusColor[r.status]||'#94a3b8'}44">${r.status||'—'}</span></td>
+    <td>${escH(r.testedBy||'—')}</td>
+    <td style="text-align:center;font-weight:700;color:${(r.bugsCount||0)>0?'#dc2626':'#059669'}">${r.bugsCount||0}</td>
+    <td>${[r.priorityHigh?`<span style="padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)">H:${r.priorityHigh}</span>`:'',r.priorityMedium?`<span style="padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.3)">M:${r.priorityMedium}</span>`:'',r.priorityLow?`<span style="padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(34,197,94,.1);color:#22c55e;border:1px solid rgba(34,197,94,.3)">L:${r.priorityLow}</span>`:''].filter(Boolean).join(' ')||'—'}</td>
+    <td>${(r.jiraLinks||'').split('\n').filter(Boolean).map((l,i)=>`<a href="${escH(l)}" style="color:#3b82f6;font-size:11px;display:block">Jira ${i+1}</a>`).join('')||'—'}</td>
+    <td style="color:#64748b;font-size:11px">${escH(r.comments||'—')}</td>
+  </tr>`).join('');
+
+  const rnSection=rns.length?`<div style="margin-top:40px">
+    <h2 style="font-size:18px;font-weight:800;color:#1e293b;margin:0 0 16px;padding-bottom:10px;border-bottom:2px solid #e2e8f0">📝 Release Notes</h2>
+    ${[...rns].reverse().map(rn=>`<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:15px;font-weight:800;color:#1e293b">v${escH(rn.version||'')}</span>
+        <span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:${rn.status==='Published'?'rgba(5,150,105,.12)':'rgba(100,116,139,.12)'};color:${rn.status==='Published'?'#059669':'#64748b'}">${rn.status||'Draft'}</span>
+        <span style="font-size:12px;color:#64748b">${rn.releaseDate||''}</span>
+      </div>
+      ${rn.summary?`<div style="font-size:13px;color:#334155;margin-bottom:8px">${escH(rn.summary)}</div>`:''}
+      ${(rn.changes||[]).length?`<ul style="margin:0;padding-left:18px">${rn.changes.map(c=>`<li style="font-size:12px;color:#475569;margin-bottom:4px">${escH(c)}</li>`).join('')}</ul>`:''}
+    </div>`).join('')}
+  </div>`:'';
+
+  return`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Task Checklist${platLabel} — ${escH(proj?.name||p)}</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#1e293b;padding:32px}
+  .report-wrap{max-width:1100px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(100,116,139,.12);overflow:hidden}
+  .report-hdr{background:linear-gradient(135deg,${platAccent} 0%,#0f172a 100%);padding:32px 36px;color:#fff}
+  .report-hdr h1{font-size:24px;font-weight:800;margin-bottom:6px}
+  .report-hdr p{font-size:13px;opacity:.75}
+  .plat-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);margin-top:10px}
+  .report-body{padding:32px 36px}
+  .overview-grid{display:grid;grid-template-columns:auto 1fr;gap:32px;align-items:center;margin-bottom:32px;padding:24px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0}
+  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .stat-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;text-align:center;box-shadow:0 2px 8px rgba(100,116,139,.08)}
+  .stat-card .val{font-size:26px;font-weight:800;line-height:1}
+  .stat-card .lbl{font-size:10px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+  h2{font-size:16px;font-weight:700;margin:0 0 14px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  thead tr{background:#f8fafc;border-bottom:2px solid #e2e8f0}
+  th{padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;white-space:nowrap}
+  td{padding:10px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top;color:#334155}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#f8fafc}
+  .report-footer{padding:16px 36px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center}
+  @media print{body{background:#fff;padding:0}.report-wrap{box-shadow:none;border-radius:0}}
+  </style></head><body>
+  <div class="report-wrap">
+    <div class="report-hdr">
+      <h1>✔ Task Checklist Report${platLabel}</h1>
+      <p>Project: ${escH(proj?.name||p)} &nbsp;·&nbsp; Saved: ${dateStr} &nbsp;·&nbsp; Total Items: ${s.total}</p>
+      ${platLabel?`<div class="plat-badge">${platLabel.trim()} Platform</div>`:''}
+    </div>
+    <div class="report-body">
+      <div class="overview-grid">
+        <div>${donutSvg}</div>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="val" style="color:#1e293b">${s.total}</div><div class="lbl">Total</div></div>
+          <div class="stat-card"><div class="val" style="color:#059669">${s.pass}</div><div class="lbl">Pass</div></div>
+          <div class="stat-card"><div class="val" style="color:#dc2626">${s.fail}</div><div class="lbl">Fail</div></div>
+          <div class="stat-card"><div class="val" style="color:#d97706">${s.pending}</div><div class="lbl">Pending</div></div>
+          <div class="stat-card"><div class="val" style="color:#64748b">${s.na}</div><div class="lbl">N/A</div></div>
+          <div class="stat-card"><div class="val" style="color:${passRate>=80?'#059669':passRate>=50?'#d97706':'#dc2626'}">${passRate}%</div><div class="lbl">Pass Rate</div></div>
+          <div class="stat-card"><div class="val" style="color:#ef4444">${s.high||0}</div><div class="lbl">High Bugs</div></div>
+          <div class="stat-card"><div class="val" style="color:#f97316">${s.medium||0}</div><div class="lbl">Med Bugs</div></div>
+          <div class="stat-card"><div class="val" style="color:#22c55e">${s.low||0}</div><div class="lbl">Low Bugs</div></div>
+        </div>
+      </div>
+      <h2>📋 Checklist Items${platLabel}</h2>
+      <table>
+        <thead><tr><th>Module</th><th>Functionalities</th><th>Platform</th><th>Environment</th><th>Status</th><th>Tested By</th><th>Bugs</th><th>Priority</th><th>Jira Links</th><th>Comments</th></tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+      ${rnSection}
+    </div>
+    <div class="report-footer">AdHash QA Dashboard &nbsp;·&nbsp; ${escH(proj?.name||p)}${platLabel} &nbsp;·&nbsp; ${dateStr}</div>
+  </div>
+  </body></html>`;
+}
+
+function downloadChecklistReport(p,i,platformFilter){
+  const snap=STORE[p].reports[i];
+  const html=_buildChecklistReportHtml(p,snap,platformFilter||'ALL');
+  const proj=PROJECTS.find(x=>x.id===p);
+  const platSuffix=(platformFilter&&platformFilter!=='ALL')?`_${platformFilter}`:'_All';
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));
+  a.download=`TaskChecklist_${(proj?.name||p).replace(/\s+/g,'-')}${platSuffix}_${snap.datetime.replace(/[: ,\/]/g,'_')}.html`;
+  a.click();URL.revokeObjectURL(a.href);
+  toast('Report downloaded');
+}
+function previewChecklistReport(p,i,platformFilter){
+  const snap=STORE[p].reports[i];
+  const html=_buildChecklistReportHtml(p,snap,platformFilter||'ALL');
+  const w=window.open('','_blank');if(w){w.document.write(html);w.document.close();}
+}
+function restoreChecklistReport(p,i){
+  if(!confirm('This will replace the current live checklist with this saved snapshot. Continue?'))return;
+  const snap=STORE[p].reports[i];
+  STORE[p].taskchecklist=JSON.parse(JSON.stringify(snap.items||[]));
+  _tclDirty[p]=false;
+  saveToLS(p);
+  curTab[p]='taskchecklist';
+  renderProject(p);
+  toast('✓ Checklist restored');
+}
 // ══════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════
