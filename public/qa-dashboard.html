@@ -456,7 +456,7 @@ body.dark .badge.low{color:#00ff88;background:rgba(0,255,136,.1);border-color:rg
 .inp-sm:hover,.inp-sm:focus{border-color:var(--border);background:var(--card2)}
 
 /* ── ACTION CELL ── */
-.acell{display:flex;gap:4px;white-space:nowrap}
+.acell{display:flex;gap:4px;flex-wrap:wrap}
 
 /* ── BOTTOM ACTION BAR ── */
 .abar{background:var(--card);border-top:1px solid var(--border);padding:13px 24px;display:flex;align-items:center;gap:8px;flex-shrink:0;position:sticky;bottom:0;backdrop-filter:blur(10px);box-shadow:0 -4px 20px var(--shadow)}
@@ -539,8 +539,8 @@ body.dark .tdt tbody tr:hover{background:rgba(0,212,170,.05)}
 .rn-change{font-size:13px;color:var(--txt2);padding:3px 0;display:flex;gap:7px;align-items:flex-start}
 .rn-change::before{content:'•';background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;flex-shrink:0;font-weight:700}
 .rep-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:16px}
-.rep-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;transition:all .15s;box-shadow:var(--card-shadow);position:relative;overflow:hidden}
-.rep-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--grad-a),var(--grad-b))}
+.rep-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;transition:all .15s;box-shadow:var(--card-shadow);position:relative;overflow:visible}
+.rep-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--grad-a),var(--grad-b));border-radius:12px 12px 0 0}
 .rep-card:hover{border-color:var(--border2);transform:translateY(-4px);box-shadow:0 12px 36px var(--shadow)}
 .rc-pbar{height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin:10px 0}
 .rc-pb-f{height:100%;background:linear-gradient(90deg,var(--grad-a),var(--grad-b));border-radius:3px}
