@@ -1,6 +1,14 @@
 node_modules/
 package-lock.json
 
+# Secrets — never commit
+.env
+.env.local
+.env.production
+
+# Shared runtime data — lives on the server, not in git
+/data/
+
 # Generated dashboard and test artifacts
 /suite-reports/
 /playwright-report/
@@ -10,7 +18,6 @@ package-lock.json
 /unified-report/
 /email-preview/
 /godaddy/report.html
-/.env
 
 # Temporary logs and scratch files
 /logs/

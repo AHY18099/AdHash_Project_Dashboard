@@ -7,14 +7,27 @@ const { sendZohoMail } = require('./utils/zoho-mail');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 7777;
-const SUPER_ADMIN_EMAIL = 'thenilavan@adhashtech.com';
-const SUPER_ADMIN_PASSWORD = 'Qateam@123';
+const IS_PROD = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
+const SUPER_ADMIN_EMAIL = process.env.QA_ADMIN_EMAIL || 'thenilavan@adhashtech.com';
+const SUPER_ADMIN_PASSWORD = process.env.QA_ADMIN_PASSWORD || 'Qateam@123';
 const SUPER_ADMIN_ROLE = 'super-admin';
 const AUTH_COOKIE_NAME = 'adhash_auth';
 const AUTH_COOKIE_VALUE = Buffer.from(`${SUPER_ADMIN_EMAIL}:${SUPER_ADMIN_PASSWORD}`).toString('base64url');
 
 // Parse JSON bodies
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
+
+// Security headers on every response
+app.use((req, res, next) => {
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('X-Frame-Options', 'DENY');
+    res.set('X-XSS-Protection', '1; mode=block');
+    res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    if (IS_PROD) {
+        res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+});
 
 function parseCookies(req) {
     const header = req.headers.cookie || '';
@@ -32,16 +45,18 @@ function isAuthenticated(req) {
 }
 
 function setAuthCookie(res) {
+    const secure = IS_PROD ? '; Secure' : '';
     res.setHeader(
         'Set-Cookie',
-        `${AUTH_COOKIE_NAME}=${encodeURIComponent(AUTH_COOKIE_VALUE)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200`
+        `${AUTH_COOKIE_NAME}=${encodeURIComponent(AUTH_COOKIE_VALUE)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200${secure}`
     );
 }
 
 function clearAuthCookie(res) {
+    const secure = IS_PROD ? '; Secure' : '';
     res.setHeader(
         'Set-Cookie',
-        `${AUTH_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
+        `${AUTH_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`
     );
 }
 
@@ -49,6 +64,18 @@ app.use('/api', (req, res, next) => {
     res.set('Cache-Control', 'no-store');
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
+    next();
+});
+
+// Routes that don't require authentication
+const PUBLIC_API_ROUTES = new Set(['/api/auth/login', '/api/auth/session', '/api/auth/logout']);
+
+// Guard all non-public API routes
+app.use('/api', (req, res, next) => {
+    const route = req.path === '/' ? '/api' : '/api' + req.path;
+    // Allow auth routes through
+    if (PUBLIC_API_ROUTES.has('/api' + req.path)) return next();
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     next();
 });
 
@@ -3625,9 +3652,23 @@ app.post('/api/qa-proxy', async (req, res) => {
     }
 });
 
-// Serve static files with no-cache headers (MUST be last to not override API routes)
-app.use(express.static(__dirname, {
-    setHeaders: (res, path) => {
+// Block direct access to sensitive files and directories
+app.use((req, res, next) => {
+    const blocked = [
+        /^\/(\.env|server\.js|package\.json|package-lock\.json)/i,
+        /^\/(data|config|utils|test-results|suite-reports|godaddy)\//i,
+        /^\/data\//i,
+    ];
+    if (blocked.some(r => r.test(req.path))) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    next();
+});
+
+// Serve only the public/ directory as static (login page assets, etc.)
+app.use(express.static(path.join(__dirname, 'public'), {
+    index: false, // don't auto-serve index.html — routes above handle auth
+    setHeaders: (res) => {
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
         res.set('Pragma', 'no-cache');
         res.set('Expires', '0');
