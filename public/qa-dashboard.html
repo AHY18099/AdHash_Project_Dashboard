@@ -1035,22 +1035,47 @@ body.dark .dt-assigned-chip{background:rgba(139,92,246,.15);color:#a78bfa}
 .tt-day-add-btn{display:inline-flex;align-items:center;gap:4px;padding:5px 13px;border-radius:20px;background:linear-gradient(135deg,#f97316,#ef4444);color:#fff;border:none;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}
 .tt-day-add-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(249,115,22,.3)}
 .tt-table-wrap{background:transparent}
-.tt-task-cards{display:flex;flex-direction:column;gap:8px;padding:10px 0}
-.tt-task-card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--card-shadow);border-left:3px solid transparent}
-.tt-task-card-body{padding:10px 14px}
-.tt-task-card-line1{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap}
-.tt-task-card-line2{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.tt-task-card-line2 .tt-sel{width:auto;min-width:110px;max-width:160px}
-.tt-task-summary-txt{font-size:13px;font-weight:700;color:var(--txt);flex:1;min-width:160px}
-.tt-task-meta-chip{display:inline-flex;align-items:center;gap:4px;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--mut);font-weight:600;white-space:nowrap}
+.tt-task-cards{display:flex;flex-direction:column;gap:10px;padding:12px 0}
+
+/* ── Task Card ── */
+.tt-task-card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(15,23,42,0.06),0 1px 2px rgba(15,23,42,0.04);border-left:4px solid transparent;transition:box-shadow .18s,transform .18s}
+.tt-task-card:hover{box-shadow:0 6px 20px rgba(15,23,42,0.1),0 2px 6px rgba(15,23,42,0.06);transform:translateY(-1px)}
+body.dark .tt-task-card{box-shadow:0 2px 12px rgba(0,0,0,0.35),0 0 0 1px rgba(255,255,255,0.03)}
+body.dark .tt-task-card:hover{box-shadow:0 8px 28px rgba(0,0,0,0.5),0 0 0 1px rgba(126,179,255,0.1)}
+
+.tt-task-card-body{padding:0}
+
+/* Top row: chips + actions */
+.tt-task-card-top{display:flex;align-items:center;gap:7px;padding:9px 14px 0;flex-wrap:wrap}
+.tt-task-card-actions{display:flex;gap:5px;margin-left:auto;flex-shrink:0}
+
+/* Main content row */
+.tt-task-card-main{padding:8px 14px 10px;display:flex;align-items:flex-start;gap:12px}
+.tt-task-card-content{flex:1;min-width:0}
+.tt-task-summary-txt{font-size:14px;font-weight:700;color:var(--txt);line-height:1.35;margin-bottom:4px;display:block}
+.tt-task-desc-txt{font-size:11.5px;color:var(--mut);line-height:1.4;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+
+/* Status controls row */
+.tt-task-card-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:0 14px 10px}
+.tt-task-card-controls .tt-sel{width:auto;min-width:120px;max-width:170px;font-size:11.5px;border-radius:8px;padding:5px 10px}
+.tt-task-card-divider{width:1px;height:20px;background:var(--border);flex-shrink:0}
+
+/* Bugs inline */
+.tt-bugs-inline{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;background:var(--card2);border:1px solid var(--border);font-size:11px;font-weight:700}
+
+/* Chips */
+.tt-task-meta-chip{display:inline-flex;align-items:center;gap:4px;background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:3px 9px;font-size:11px;color:var(--mut);font-weight:600;white-space:nowrap}
 .tt-task-meta-chip.hrs{color:var(--inp);font-weight:700;background:rgba(37,99,235,.08);border-color:rgba(37,99,235,.2)}
-.tt-task-meta-chip.date{color:var(--txt2)}
+.tt-task-meta-chip.date{color:var(--txt2);background:rgba(100,116,139,.06)}
 .tt-env-chip.production{background:rgba(16,185,129,.1);color:var(--pass);border-color:rgba(16,185,129,.3);font-weight:700}
 .tt-env-chip.staging{background:rgba(245,158,11,.1);color:var(--blk);border-color:rgba(245,158,11,.3);font-weight:700}
 .tt-env-chip.dev{background:rgba(139,92,246,.1);color:#8b5cf6;border-color:rgba(139,92,246,.3);font-weight:700}
-.tt-task-card-actions{display:flex;gap:5px;margin-left:auto;flex-shrink:0}
-.tt-task-card-cmts{background:var(--card2);border-radius:7px;padding:6px 10px;font-size:11px;color:var(--txt2);margin-top:6px}
-.tt-task-card-cmt-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-bottom:2px}
+
+/* Comments */
+.tt-task-card-cmts{background:var(--card2);border-top:1px solid var(--border);padding:8px 14px;display:flex;gap:12px;flex-wrap:wrap}
+.tt-task-card-cmt-item{flex:1;min-width:160px}
+.tt-task-card-cmt-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);margin-bottom:3px}
+.tt-task-card-cmt-txt{font-size:11.5px;color:var(--txt2);line-height:1.4}
 .pt-card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--card-shadow);margin-bottom:10px}
 .pt-card-hdr{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--card2)}
 .pt-card-title{font-weight:700;font-size:13px;color:var(--txt);flex:1}
@@ -1108,9 +1133,9 @@ body.dark .dt-assigned-chip{background:rgba(139,92,246,.15);color:#a78bfa}
 .tt-bug-tag.low{background:rgba(16,185,129,.12);color:#10b981}
 .tt-comment-cell{font-size:11px;color:var(--txt2);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
 .tt-comment-cell:hover{white-space:normal;overflow:visible}
-.tt-action-btn{background:none;border:1.5px solid var(--border);border-radius:7px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer;color:var(--mut);font-family:inherit;transition:all .2s;margin-right:3px}
-.tt-action-btn:hover{border-color:var(--inp);color:var(--inp)}
-.tt-action-btn.del:hover{border-color:var(--fail);color:var(--fail)}
+.tt-action-btn{background:var(--card2);border:1.5px solid var(--border);border-radius:8px;padding:4px 10px;font-size:10.5px;font-weight:700;cursor:pointer;color:var(--mut);font-family:inherit;transition:all .18s;white-space:nowrap}
+.tt-action-btn:hover{border-color:var(--inp);color:var(--inp);background:rgba(37,99,235,.06)}
+.tt-action-btn.del:hover{border-color:var(--fail);color:var(--fail);background:rgba(239,68,68,.06)}
 .tt-empty{padding:22px 20px;text-align:center;font-size:12px;color:var(--mut);font-style:italic}
 .tt-bug-modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .tt-bug-modal-section{background:var(--card2);border-radius:10px;padding:12px 14px;border:1px solid var(--border)}
@@ -3838,8 +3863,8 @@ function renderTTRowTable(dateStr){
       </span>`:'';
     return`<div class="tt-task-card" style="border-left-color:${pColor}">
       <div class="tt-task-card-body">
-        <!-- Line 1: meta info row -->
-        <div class="tt-task-card-line1">
+        <!-- Top: chips + actions -->
+        <div class="tt-task-card-top">
           <span class="tt-proj-badge" style="background:${pColor}18;color:${pColor};border:1px solid ${pColor}44;flex-shrink:0">
             <span class="tt-proj-dot" style="background:${pColor}"></span>${escH(pName)}
           </span>
@@ -3854,17 +3879,24 @@ function renderTTRowTable(dateStr){
             ${isAdmin()?`<button class="tt-action-btn del" onclick="ttDeleteTask(${idx})">✕</button>`:''}
           </div>
         </div>
-        <!-- Line 2: summary + status dropdowns + bugs -->
-        <div class="tt-task-card-line2">
-          <span class="tt-task-summary-txt">${escH(t.taskSummary||'(no summary)')}</span>
-          <select class="tt-sel" style="font-size:11px;flex-shrink:0" onchange="ttInlineChange(${idx},'assignedBy',this)">${assignedOpts}</select>
-          <select class="tt-sel ${ttCurrStatusClass(t.currentStatus)}" style="flex-shrink:0" onchange="ttInlineChange(${idx},'currentStatus',this)">${csOpts}</select>
-          <select class="tt-sel ${ttTestStatusClass(t.testingStatus)}" style="flex-shrink:0" onchange="ttInlineChange(${idx},'testingStatus',this)">${tsOpts}</select>
-          ${bugsHtml}
+        <!-- Main: summary + description -->
+        <div class="tt-task-card-main">
+          <div class="tt-task-card-content">
+            <span class="tt-task-summary-txt">${escH(t.taskSummary||'(no summary)')}</span>
+            ${t.taskDescription?`<div class="tt-task-desc-txt">${escH(t.taskDescription)}</div>`:''}
+          </div>
         </div>
-        ${(t.assigneeComments||t.assignerComments)?`<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
-          ${t.assigneeComments?`<div class="tt-task-card-cmts" style="flex:1;min-width:180px"><div class="tt-task-card-cmt-lbl">Assignee</div>${escH(t.assigneeComments)}</div>`:''}
-          ${t.assignerComments?`<div class="tt-task-card-cmts" style="flex:1;min-width:180px"><div class="tt-task-card-cmt-lbl">Assigner</div>${escH(t.assignerComments)}</div>`:''}
+        <!-- Controls: assignee + statuses + bugs -->
+        <div class="tt-task-card-controls">
+          <select class="tt-sel" onchange="ttInlineChange(${idx},'assignedBy',this)">${assignedOpts}</select>
+          <div class="tt-task-card-divider"></div>
+          <select class="tt-sel ${ttCurrStatusClass(t.currentStatus)}" onchange="ttInlineChange(${idx},'currentStatus',this)">${csOpts}</select>
+          <select class="tt-sel ${ttTestStatusClass(t.testingStatus)}" onchange="ttInlineChange(${idx},'testingStatus',this)">${tsOpts}</select>
+          ${bugsHtml?`<div class="tt-task-card-divider"></div>${bugsHtml}`:''}
+        </div>
+        ${(t.assigneeComments||t.assignerComments)?`<div class="tt-task-card-cmts">
+          ${t.assigneeComments?`<div class="tt-task-card-cmt-item"><div class="tt-task-card-cmt-lbl">💬 Assignee Note</div><div class="tt-task-card-cmt-txt">${escH(t.assigneeComments)}</div></div>`:''}
+          ${t.assignerComments?`<div class="tt-task-card-cmt-item"><div class="tt-task-card-cmt-lbl">📋 Assigner Note</div><div class="tt-task-card-cmt-txt">${escH(t.assignerComments)}</div></div>`:''}
         </div>`:''}
       </div>
     </div>`;
