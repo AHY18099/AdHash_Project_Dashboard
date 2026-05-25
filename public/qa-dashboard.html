@@ -1098,6 +1098,49 @@ body.dark .tt-task-card:hover{box-shadow:0 8px 28px rgba(0,0,0,0.5),0 0 0 1px rg
 .tp-resp-toggle:hover{color:var(--txt)}
 .tp-api-modal-resp{margin-top:6px}
 .tp-section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+/* ── TASK CHECKLIST ── */
+.tcl-wrap{padding:16px}
+.tcl-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px}
+.tcl-hdr-left h3{font-size:18px;font-weight:800;color:var(--txt);margin:0}
+.tcl-hdr-left p{font-size:12px;color:var(--mut);margin:3px 0 0}
+.tcl-actions{display:flex;gap:8px;flex-wrap:wrap}
+.tcl-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .18s}
+.tcl-btn-primary{background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;box-shadow:0 3px 10px rgba(59,130,246,.25)}
+.tcl-btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(59,130,246,.35)}
+.tcl-btn-dl{background:linear-gradient(135deg,#10b981,#059669);color:#fff;box-shadow:0 3px 10px rgba(16,185,129,.25)}
+.tcl-btn-dl:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(16,185,129,.35)}
+.tcl-btn-outline{background:var(--card);color:var(--mut);border:1.5px solid var(--border)}
+.tcl-btn-outline:hover{border-color:var(--grad-a);color:var(--grad-a)}
+body.dark .tcl-btn-outline{background:rgba(255,255,255,.04)}
+.tcl-stats-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:18px}
+.tcl-stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;text-align:center;box-shadow:var(--card-shadow)}
+.tcl-stat-val{font-size:22px;font-weight:800;line-height:1}
+.tcl-stat-lbl{font-size:10px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.tcl-table-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--card-shadow)}
+.tcl-table{width:100%;border-collapse:collapse;font-size:12px}
+.tcl-table thead tr{background:var(--card2);border-bottom:1.5px solid var(--border)}
+.tcl-table th{padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);white-space:nowrap}
+.tcl-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--txt2)}
+.tcl-table tr:last-child td{border-bottom:none}
+.tcl-table tbody tr:hover{background:rgba(59,130,246,.03)}
+body.dark .tcl-table tbody tr:hover{background:rgba(126,179,255,.04)}
+.tcl-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid}
+.tcl-badge-pass{color:#059669;background:rgba(5,150,105,.1);border-color:rgba(5,150,105,.3)}
+.tcl-badge-fail{color:#dc2626;background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.2)}
+.tcl-badge-na{color:#64748b;background:rgba(100,116,139,.1);border-color:rgba(100,116,139,.25)}
+.tcl-badge-pending{color:#d97706;background:rgba(217,119,6,.1);border-color:rgba(217,119,6,.25)}
+.tcl-badge-web{color:#3b82f6;background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.25)}
+.tcl-badge-ios{color:#8b5cf6;background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.25)}
+.tcl-badge-android{color:#10b981;background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.25)}
+.tcl-badge-staging{color:#f97316;background:rgba(249,115,22,.1);border-color:rgba(249,115,22,.25)}
+.tcl-badge-prod{color:#6366f1;background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25)}
+.tcl-link{color:var(--inp);font-size:11px;text-decoration:none;white-space:nowrap}
+.tcl-link:hover{text-decoration:underline}
+.tcl-links-list{display:flex;flex-direction:column;gap:2px}
+.tcl-row-actions{display:flex;gap:4px;white-space:nowrap}
+.tcl-empty{padding:40px;text-align:center;color:var(--mut)}
+.tcl-empty .ico{font-size:36px;margin-bottom:10px}
+body.dark .tcl-stat{background:rgba(12,17,32,.8);border-color:rgba(255,255,255,.06)}
 .tt-proj-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
 .tt-proj-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .tt-sel{width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:8px;padding:5px 8px;color:var(--txt);font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;outline:none;transition:border-color .2s;min-width:120px}
@@ -1610,7 +1653,7 @@ function initStore(){
     if(!STORE[p.id])STORE[p.id]={
       env:mkEnv(p),gates:PROJ_GATES[p.id]?[...PROJ_GATES[p.id]]:[...DEFAULT_GATES],
       smoke:mkSmoke(p.id),prod:mkProd(p.id),
-      testdata:[],releaseNotes:[],reports:[],pending:[],feedback:[],wfdocs:[],credentials:[],envDetails:{production:[],staging:[]},apitests:[],pendingtasks:[],thirdparty:[]
+      testdata:[],releaseNotes:[],reports:[],pending:[],feedback:[],wfdocs:[],credentials:[],envDetails:{production:[],staging:[]},apitests:[],pendingtasks:[],thirdparty:[],taskchecklist:[]
     };
     if(!STORE[p.id].feedback)STORE[p.id].feedback=[];
     if(!STORE[p.id].wfdocs)STORE[p.id].wfdocs=[];
@@ -1619,6 +1662,7 @@ function initStore(){
     if(!STORE[p.id].apitests)STORE[p.id].apitests=[];
     if(!STORE[p.id].pendingtasks)STORE[p.id].pendingtasks=[];
     if(!STORE[p.id].thirdparty)STORE[p.id].thirdparty=[];
+    if(!STORE[p.id].taskchecklist)STORE[p.id].taskchecklist=[];
   });
 }
 
@@ -1886,6 +1930,7 @@ function renderProject(p){
     {id:'feedback',     label:'💬 Client Feedback',  count:fbCount||null},
     {id:'pendingtasks',label:'📋 Pending Tasks',count:(STORE[p].pendingtasks||[]).length},
     {id:'thirdparty',label:'🔗 Third Party',count:(STORE[p].thirdparty||[]).length},
+    {id:'taskchecklist',label:'✔ Task Checklist',count:(STORE[p].taskchecklist||[]).length||null},
     ...(isAdmin()&&pend>0?[{id:'approvals',label:`🔔 Approvals`,count:pend}]:[])
   ];
   const tab=curTab[p]||'projoverview';
@@ -1899,6 +1944,7 @@ function renderProject(p){
   else if(tab==='projoverview') content=renderProjOverview(p);
   else if(tab==='pendingtasks') content=renderPendingTasksTab(p);
   else if(tab==='thirdparty')   content=renderThirdPartyTab(p);
+  else if(tab==='taskchecklist')content=renderTaskChecklist(p);
   else if(tab==='feedback')     content=renderFeedback(p);
   else if(tab==='wfdocs')       content=renderWorkflowDocs(p);
   else if(tab==='credentials')  content=renderCredentials(p);
@@ -4731,6 +4777,8 @@ function renderThirdPartyTab(p){
       <div class="tp-card-body">
         <div class="tp-field-grid">
           ${acct.url?`<div class="tp-field"><div class="tp-field-lbl">URL</div><a href="${escH(acct.url)}" target="_blank" class="tt-link-cell" style="font-size:11px">${escH(acct.url.replace(/^https?:\/\//,'').substring(0,40))}</a></div>`:''}
+          ${acct.username?`<div class="tp-field"><div class="tp-field-lbl">Username</div><div class="tp-field-val">${escH(acct.username)}</div></div>`:''}
+          ${acct.tpPassword?`<div class="tp-field"><div class="tp-field-lbl">Password</div><div class="tp-field-val" style="letter-spacing:2px">••••••••</div></div>`:''}
           ${acct.credentials?`<div class="tp-field"><div class="tp-field-lbl">Credentials Used</div><div class="tp-field-val">${escH(acct.credentials)}</div></div>`:''}
           ${acct.paymentBalance?`<div class="tp-field"><div class="tp-field-lbl">Payment Balance</div><div class="tp-field-val" style="font-weight:700;color:var(--pass)">${escH(acct.paymentBalance)}</div></div>`:''}
           ${acct.renewalDate?`<div class="tp-field"><div class="tp-field-lbl">Renewal Date</div><div class="tp-field-val">${escH(acct.renewalDate)}</div></div>`:''}
@@ -4839,25 +4887,282 @@ function _tpApiSection(existingApis){
     </div>
   </div>`;
 }
+// ══════════════════════════════════════════════════════
+// TASK CHECKLIST
+// ══════════════════════════════════════════════════════
+const TCL_STATUSES=['Pass','Fail','NA','Pending'];
+const TCL_PLATFORMS=['Web','iOS','Android'];
+const TCL_ENVS=['Staging','Production'];
+
+function tclStats(items){
+  const total=items.length;
+  const pass=items.filter(r=>r.status==='Pass').length;
+  const fail=items.filter(r=>r.status==='Fail').length;
+  const na=items.filter(r=>r.status==='NA').length;
+  const pending=items.filter(r=>r.status==='Pending').length;
+  return{total,pass,fail,na,pending};
+}
+
+function renderTaskChecklist(p){
+  if(!STORE[p].taskchecklist)STORE[p].taskchecklist=[];
+  const items=STORE[p].taskchecklist;
+  const proj=PROJECTS.find(x=>x.id===p);
+  const s=tclStats(items);
+  const passRate=s.total?Math.round((s.pass/s.total)*100):0;
+  const hasItems=items.length>0;
+
+  const statsBar=`<div class="tcl-stats-bar">
+    <div class="tcl-stat"><div class="tcl-stat-val" style="color:var(--txt)">${s.total}</div><div class="tcl-stat-lbl">Total</div></div>
+    <div class="tcl-stat"><div class="tcl-stat-val" style="color:#059669">${s.pass}</div><div class="tcl-stat-lbl">Pass</div></div>
+    <div class="tcl-stat"><div class="tcl-stat-val" style="color:#dc2626">${s.fail}</div><div class="tcl-stat-lbl">Fail</div></div>
+    <div class="tcl-stat"><div class="tcl-stat-val" style="color:#d97706">${s.pending}</div><div class="tcl-stat-lbl">Pending</div></div>
+    <div class="tcl-stat"><div class="tcl-stat-val" style="color:#64748b">${s.na}</div><div class="tcl-stat-lbl">N/A</div></div>
+    <div class="tcl-stat"><div class="tcl-stat-val" style="color:${passRate>=80?'#059669':passRate>=50?'#d97706':'#dc2626'}">${passRate}%</div><div class="tcl-stat-lbl">Pass Rate</div></div>
+  </div>`;
+
+  const statusBadge=r=>{
+    const cls={Pass:'pass',Fail:'fail',NA:'na',Pending:'pending'}[r.status]||'na';
+    return`<span class="tcl-badge tcl-badge-${cls}">${r.status||'—'}</span>`;
+  };
+  const platBadge=r=>{
+    const cls={Web:'web',iOS:'ios',Android:'android'}[r.platform]||'na';
+    return r.platform?`<span class="tcl-badge tcl-badge-${cls}">${r.platform}</span>`:'—';
+  };
+  const envBadge=r=>{
+    const cls={Staging:'staging',Production:'prod'}[r.environment]||'na';
+    return r.environment?`<span class="tcl-badge tcl-badge-${cls}">${r.environment}</span>`:'—';
+  };
+  const linksHtml=r=>{
+    const links=(r.jiraLinks||'').split('\n').map(l=>l.trim()).filter(Boolean);
+    if(!links.length)return'—';
+    return`<div class="tcl-links-list">${links.map((l,i)=>`<a href="${escH(l)}" target="_blank" class="tcl-link">🔗 Jira ${i+1}</a>`).join('')}</div>`;
+  };
+
+  const rows=items.map((r,i)=>`<tr>
+    <td style="font-weight:600;color:var(--txt)">${escH(r.module||'—')}</td>
+    <td>${escH(r.functionalities||'—')}</td>
+    <td>${platBadge(r)}</td>
+    <td>${envBadge(r)}</td>
+    <td>${statusBadge(r)}</td>
+    <td>${escH(r.testedBy||'—')}</td>
+    <td style="text-align:center">${r.bugsCount||0}</td>
+    <td>${linksHtml(r)}</td>
+    <td style="font-size:11px;color:var(--mut)">${escH(r.comments||'—')}</td>
+    <td><div class="tcl-row-actions">
+      <button class="tt-action-btn" onclick="tclOpenEdit('${p}',${i})">✏</button>
+      ${isAdmin()?`<button class="tt-action-btn del" onclick="tclDelete('${p}',${i})">✕</button>`:''}
+    </div></td>
+  </tr>`).join('');
+
+  const table=hasItems?`<div class="tcl-table-wrap"><table class="tcl-table">
+    <thead><tr>
+      <th>Module</th><th>Functionalities</th><th>Platform</th><th>Environment</th>
+      <th>Status</th><th>Tested By</th><th>Bugs</th><th>Jira Links</th><th>Comments</th><th>Actions</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`:`<div class="tcl-empty"><div class="ico">✔</div><div>No checklist items yet. Click "+ Add" to start tracking.</div></div>`;
+
+  return`<div class="tcl-wrap">
+    <div class="tcl-hdr">
+      <div class="tcl-hdr-left">
+        <h3>✔ Task Checklist — ${escH(proj?.name||p)}</h3>
+        <p>${items.length} item${items.length!==1?'s':''} · ${passRate}% pass rate</p>
+      </div>
+      <div class="tcl-actions">
+        ${hasItems?`<button class="tcl-btn tcl-btn-dl" onclick="tclDownloadReport('${p}')">⬇ Download Report</button>`:''}
+        <button class="tcl-btn tcl-btn-outline" onclick="switchTab('${p}','releasenotes')">📝 Release Notes</button>
+        <button class="tcl-btn tcl-btn-primary" onclick="tclOpenAdd('${p}')">＋ Add</button>
+      </div>
+    </div>
+    ${hasItems?statsBar:''}
+    ${table}
+  </div>`;
+}
+
+function tclForm(r){r=r||{};const members=getTeamMembers();return`
+  <div class="fg-row">
+    <div class="fg"><label>Platform Type *</label><select class="finp" id="tcl-platform"><option value="">— Select —</option>${TCL_PLATFORMS.map(v=>`<option${r.platform===v?' selected':''}>${v}</option>`).join('')}</select></div>
+    <div class="fg"><label>Environment Type *</label><select class="finp" id="tcl-env"><option value="">— Select —</option>${TCL_ENVS.map(v=>`<option${r.environment===v?' selected':''}>${v}</option>`).join('')}</select></div>
+  </div>
+  <div class="fg-row">
+    <div class="fg"><label>Module *</label><input class="finp" id="tcl-module" placeholder="e.g. Authentication" value="${escH(r.module||'')}"></div>
+    <div class="fg"><label>Functionalities</label><input class="finp" id="tcl-func" placeholder="e.g. Login, Logout" value="${escH(r.functionalities||'')}"></div>
+  </div>
+  <div class="fg-row">
+    <div class="fg"><label>Status</label><select class="finp" id="tcl-status">${TCL_STATUSES.map(v=>`<option${r.status===v?' selected':''}>${v}</option>`).join('')}</select></div>
+    <div class="fg"><label>Tested By</label><select class="finp" id="tcl-tester"><option value="">— Select —</option>${members.map(m=>`<option${r.testedBy===m?' selected':''}>${escH(m)}</option>`).join('')}</select></div>
+  </div>
+  <div class="fg-row">
+    <div class="fg"><label>Bugs Count</label><input class="finp" type="number" min="0" id="tcl-bugs" value="${r.bugsCount||0}"></div>
+    <div class="fg"><label>Comments</label><input class="finp" id="tcl-comments" placeholder="Optional notes" value="${escH(r.comments||'')}"></div>
+  </div>
+  <div class="fg"><label>Jira Links <span style="font-weight:400;color:var(--mut)">(one per line)</span></label><textarea class="finp" id="tcl-jira" rows="3" placeholder="https://jira.example.com/browse/PROJ-123">${escH(r.jiraLinks||'')}</textarea></div>`;}
+
+function tclRead(base){return{...(base||{}),
+  platform:document.getElementById('tcl-platform')?.value||'',
+  environment:document.getElementById('tcl-env')?.value||'',
+  module:document.getElementById('tcl-module')?.value.trim()||'',
+  functionalities:document.getElementById('tcl-func')?.value.trim()||'',
+  status:document.getElementById('tcl-status')?.value||'Pending',
+  testedBy:document.getElementById('tcl-tester')?.value||'',
+  bugsCount:parseInt(document.getElementById('tcl-bugs')?.value||'0')||0,
+  comments:document.getElementById('tcl-comments')?.value.trim()||'',
+  jiraLinks:document.getElementById('tcl-jira')?.value.trim()||'',
+  updatedAt:new Date().toISOString()
+};}
+
+function tclOpenAdd(p){
+  openModal('Add Checklist Item',tclForm(),()=>{
+    const mod=document.getElementById('tcl-module')?.value.trim();
+    if(!mod){toast('Module is required','err');return;}
+    if(!STORE[p].taskchecklist)STORE[p].taskchecklist=[];
+    STORE[p].taskchecklist.push(tclRead());
+    saveToLS(p);closeModal();renderProject(p);toast('Item added');
+  },{saveLabel:'Add Item'});
+}
+function tclOpenEdit(p,i){
+  const r=STORE[p].taskchecklist[i];
+  openModal('Edit Checklist Item',tclForm(r),()=>{
+    const mod=document.getElementById('tcl-module')?.value.trim();
+    if(!mod){toast('Module is required','err');return;}
+    STORE[p].taskchecklist[i]=tclRead(r);
+    saveToLS(p);closeModal();renderProject(p);toast('Item updated');
+  },{saveLabel:'Update'});
+}
+function tclDelete(p,i){
+  if(!confirm('Delete this checklist item?'))return;
+  STORE[p].taskchecklist.splice(i,1);saveToLS(p);renderProject(p);toast('Item deleted');
+}
+
+function tclDownloadReport(p){
+  const proj=PROJECTS.find(x=>x.id===p);
+  const items=STORE[p].taskchecklist||[];
+  const rns=STORE[p].releaseNotes||[];
+  const s=tclStats(items);
+  const passRate=s.total?Math.round((s.pass/s.total)*100):0;
+  const now=new Date();
+  const dateStr=now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+
+  const statusColor={Pass:'#059669',Fail:'#dc2626',NA:'#64748b',Pending:'#d97706'};
+  const platColor={Web:'#3b82f6',iOS:'#8b5cf6',Android:'#10b981'};
+  const envColor={Staging:'#f97316',Production:'#6366f1'};
+
+  const donutSvg=(()=>{
+    const r=70,cx=90,cy=90,sw=22,C=2*Math.PI*r;
+    const segs=[{v:s.pass,c:'#059669'},{v:s.fail,c:'#dc2626'},{v:s.pending,c:'#d97706'},{v:s.na,c:'#94a3b8'}].filter(x=>x.v>0);
+    if(!segs.length)return`<svg width="180" height="180"><circle cx="90" cy="90" r="70" fill="none" stroke="#e2e8f0" stroke-width="22"/><text x="90" y="96" text-anchor="middle" font-size="22" font-weight="800" fill="#64748b">0%</text></svg>`;
+    let offset=0;
+    const arcs=segs.map(sg=>{const pct=sg.v/s.total;const dash=pct*C;const arc=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${sg.c}" stroke-width="${sw}" stroke-dasharray="${dash} ${C-dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;offset+=dash;return arc;}).join('');
+    return`<svg width="180" height="180">${arcs}<text x="${cx}" y="${cy+7}" text-anchor="middle" font-size="24" font-weight="800" fill="#1e293b">${passRate}%</text><text x="${cx}" y="${cy+24}" text-anchor="middle" font-size="11" fill="#64748b">Pass Rate</text></svg>`;
+  })();
+
+  const tableRows=items.map(r=>`<tr>
+    <td>${escH(r.module||'—')}</td>
+    <td>${escH(r.functionalities||'—')}</td>
+    <td><span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:${platColor[r.platform]||'#94a3b8'}22;color:${platColor[r.platform]||'#64748b'};border:1px solid ${platColor[r.platform]||'#94a3b8'}44">${r.platform||'—'}</span></td>
+    <td><span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:${envColor[r.environment]||'#94a3b8'}22;color:${envColor[r.environment]||'#64748b'};border:1px solid ${envColor[r.environment]||'#94a3b8'}44">${r.environment||'—'}</span></td>
+    <td><span style="padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700;background:${statusColor[r.status]||'#94a3b8'}18;color:${statusColor[r.status]||'#64748b'};border:1px solid ${statusColor[r.status]||'#94a3b8'}44">${r.status||'—'}</span></td>
+    <td>${escH(r.testedBy||'—')}</td>
+    <td style="text-align:center;font-weight:700;color:${r.bugsCount>0?'#dc2626':'#059669'}">${r.bugsCount||0}</td>
+    <td>${(r.jiraLinks||'').split('\n').filter(Boolean).map((l,i)=>`<a href="${escH(l)}" style="color:#3b82f6;font-size:11px;display:block">Jira ${i+1}</a>`).join('')||'—'}</td>
+    <td style="color:#64748b;font-size:11px">${escH(r.comments||'—')}</td>
+  </tr>`).join('');
+
+  const rnSection=rns.length?`<div style="margin-top:40px">
+    <h2 style="font-size:18px;font-weight:800;color:#1e293b;margin:0 0 16px;padding-bottom:10px;border-bottom:2px solid #e2e8f0">📝 Release Notes — Modules Covered</h2>
+    ${[...rns].reverse().map(rn=>`<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:15px;font-weight:800;color:#1e293b">v${escH(rn.version||'')}</span>
+        <span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:${rn.status==='Published'?'rgba(5,150,105,.12)':'rgba(100,116,139,.12)'};color:${rn.status==='Published'?'#059669':'#64748b'}">${rn.status||'Draft'}</span>
+        <span style="font-size:12px;color:#64748b">${rn.releaseDate||''}</span>
+      </div>
+      ${rn.summary?`<div style="font-size:13px;color:#334155;margin-bottom:8px">${escH(rn.summary)}</div>`:''}
+      ${(rn.changes||[]).length?`<ul style="margin:0;padding-left:18px">${rn.changes.map(c=>`<li style="font-size:12px;color:#475569;margin-bottom:4px">${escH(c)}</li>`).join('')}</ul>`:''}
+    </div>`).join('')}
+  </div>`:'';
+
+  const html=`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Task Checklist — ${escH(proj?.name||p)}</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#1e293b;padding:32px}
+  .report-wrap{max-width:1100px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(100,116,139,.12);overflow:hidden}
+  .report-hdr{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:32px 36px;color:#fff}
+  .report-hdr h1{font-size:24px;font-weight:800;margin-bottom:6px}
+  .report-hdr p{font-size:13px;opacity:.7}
+  .report-body{padding:32px 36px}
+  .overview-grid{display:grid;grid-template-columns:auto 1fr;gap:32px;align-items:center;margin-bottom:32px;padding:24px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0}
+  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .stat-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;text-align:center;box-shadow:0 2px 8px rgba(100,116,139,.08)}
+  .stat-card .val{font-size:26px;font-weight:800;line-height:1}
+  .stat-card .lbl{font-size:10px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+  h2{font-size:16px;font-weight:700;margin:0 0 14px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  thead tr{background:#f8fafc;border-bottom:2px solid #e2e8f0}
+  th{padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;white-space:nowrap}
+  td{padding:10px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top;color:#334155}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#f8fafc}
+  .report-footer{padding:16px 36px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center}
+  @media print{body{background:#fff;padding:0}.report-wrap{box-shadow:none;border-radius:0}}
+  </style></head><body>
+  <div class="report-wrap">
+    <div class="report-hdr">
+      <h1>✔ Task Checklist Report</h1>
+      <p>Project: ${escH(proj?.name||p)} &nbsp;·&nbsp; Generated: ${dateStr} &nbsp;·&nbsp; Total Items: ${s.total}</p>
+    </div>
+    <div class="report-body">
+      <div class="overview-grid">
+        <div>${donutSvg}</div>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="val" style="color:#1e293b">${s.total}</div><div class="lbl">Total</div></div>
+          <div class="stat-card"><div class="val" style="color:#059669">${s.pass}</div><div class="lbl">Pass</div></div>
+          <div class="stat-card"><div class="val" style="color:#dc2626">${s.fail}</div><div class="lbl">Fail</div></div>
+          <div class="stat-card"><div class="val" style="color:#d97706">${s.pending}</div><div class="lbl">Pending</div></div>
+          <div class="stat-card"><div class="val" style="color:#64748b">${s.na}</div><div class="lbl">N/A</div></div>
+          <div class="stat-card"><div class="val" style="color:${passRate>=80?'#059669':passRate>=50?'#d97706':'#dc2626'}">${passRate}%</div><div class="lbl">Pass Rate</div></div>
+        </div>
+      </div>
+      <h2>📋 Checklist Items</h2>
+      <table>
+        <thead><tr><th>Module</th><th>Functionalities</th><th>Platform</th><th>Environment</th><th>Status</th><th>Tested By</th><th>Bugs</th><th>Jira Links</th><th>Comments</th></tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+      ${rnSection}
+    </div>
+    <div class="report-footer">AdHash QA Dashboard &nbsp;·&nbsp; ${escH(proj?.name||p)} &nbsp;·&nbsp; ${dateStr}</div>
+  </div>
+  </body></html>`;
+
+  const blob=new Blob([html],{type:'text/html'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`TaskChecklist_${(proj?.name||p).replace(/\s+/g,'-')}_${now.toISOString().slice(0,10)}.html`;
+  a.click();URL.revokeObjectURL(a.href);
+  toast('Report downloaded');
+}
+
+function _tpFormFields(acct){acct=acct||{};return`
+    <div class="fg-row">
+      <div class="fg"><label>Account Name *</label><input class="finp" id="tp-name" placeholder="e.g. Stripe, Twilio" value="${escH(acct.name||'')}"></div>
+      <div class="fg"><label>URL</label><input class="finp" id="tp-url" placeholder="https://" value="${escH(acct.url||'')}"></div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>Username</label><input class="finp" id="tp-username" placeholder="login username" value="${escH(acct.username||'')}"></div>
+      <div class="fg"><label>Password</label><input class="finp" id="tp-password" placeholder="••••••••" type="password" value="${escH(acct.tpPassword||'')}"></div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>Credentials Used</label><input class="finp" id="tp-creds" placeholder="e.g. API Key, OAuth2" value="${escH(acct.credentials||'')}"></div>
+      <div class="fg"><label>Payment Balance</label><input class="finp" id="tp-balance" placeholder="e.g. $50.00" value="${escH(acct.paymentBalance||'')}"></div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>Renewal Date</label><input type="date" class="finp" id="tp-renewal" value="${escH(acct.renewalDate||'')}"></div>
+      <div class="fg"><label>Expiry Date</label><input type="date" class="finp" id="tp-expiry" value="${escH(acct.expiryDate||'')}"></div>
+    </div>`;}
+function _tpReadFields(base){return{...(base||{}),name:document.getElementById('tp-name')?.value.trim()||'',url:document.getElementById('tp-url')?.value.trim()||'',username:document.getElementById('tp-username')?.value.trim()||'',tpPassword:document.getElementById('tp-password')?.value||'',credentials:document.getElementById('tp-creds')?.value.trim()||'',paymentBalance:document.getElementById('tp-balance')?.value.trim()||'',renewalDate:document.getElementById('tp-renewal')?.value||'',expiryDate:document.getElementById('tp-expiry')?.value||''};}
 function tpOpenAdd(p){
-  const body=`
-    <div class="fg-row">
-      <div class="fg"><label>Account Name *</label><input class="finp" id="tp-name" placeholder="e.g. Stripe, Twilio"></div>
-      <div class="fg"><label>URL</label><input class="finp" id="tp-url" placeholder="https://"></div>
-    </div>
-    <div class="fg-row">
-      <div class="fg"><label>Credentials Used</label><input class="finp" id="tp-creds" placeholder="e.g. API Key, OAuth2"></div>
-      <div class="fg"><label>Payment Balance</label><input class="finp" id="tp-balance" placeholder="e.g. $50.00"></div>
-    </div>
-    <div class="fg-row">
-      <div class="fg"><label>Renewal Date</label><input type="date" class="finp" id="tp-renewal"></div>
-      <div class="fg"><label>Expiry Date</label><input type="date" class="finp" id="tp-expiry"></div>
-    </div>
-    ${_tpApiSection([])}`;
+  const body=_tpFormFields()+_tpApiSection([]);
   openModal('Add Third Party Account',body,()=>{
     const name=document.getElementById('tp-name')?.value.trim();
     if(!name){toast('Account name is required','err');return;}
-    const entry={name,url:document.getElementById('tp-url')?.value.trim()||'',credentials:document.getElementById('tp-creds')?.value.trim()||'',paymentBalance:document.getElementById('tp-balance')?.value.trim()||'',renewalDate:document.getElementById('tp-renewal')?.value||'',expiryDate:document.getElementById('tp-expiry')?.value||'',apis:[..._tpApiRows]};
+    const entry={..._tpReadFields(),apis:[..._tpApiRows]};
     if(!STORE[p].thirdparty)STORE[p].thirdparty=[];
     STORE[p].thirdparty.push(entry);saveToLS(p);closeModal();renderProject(p);toast('Account added');
   },{saveLabel:'Add Account'});
@@ -4865,24 +5170,11 @@ function tpOpenAdd(p){
 }
 function tpOpenEdit(p,i){
   const acct=STORE[p].thirdparty[i];
-  const body=`
-    <div class="fg-row">
-      <div class="fg"><label>Account Name *</label><input class="finp" id="tp-name" value="${escH(acct.name||'')}"></div>
-      <div class="fg"><label>URL</label><input class="finp" id="tp-url" value="${escH(acct.url||'')}"></div>
-    </div>
-    <div class="fg-row">
-      <div class="fg"><label>Credentials Used</label><input class="finp" id="tp-creds" value="${escH(acct.credentials||'')}"></div>
-      <div class="fg"><label>Payment Balance</label><input class="finp" id="tp-balance" value="${escH(acct.paymentBalance||'')}"></div>
-    </div>
-    <div class="fg-row">
-      <div class="fg"><label>Renewal Date</label><input type="date" class="finp" id="tp-renewal" value="${escH(acct.renewalDate||'')}"></div>
-      <div class="fg"><label>Expiry Date</label><input type="date" class="finp" id="tp-expiry" value="${escH(acct.expiryDate||'')}"></div>
-    </div>
-    ${_tpApiSection(acct.apis||[])}`;
+  const body=_tpFormFields(acct)+_tpApiSection(acct.apis||[]);
   openModal('Edit Third Party Account',body,()=>{
     const name=document.getElementById('tp-name')?.value.trim();
     if(!name){toast('Account name is required','err');return;}
-    STORE[p].thirdparty[i]={...acct,name,url:document.getElementById('tp-url')?.value.trim()||'',credentials:document.getElementById('tp-creds')?.value.trim()||'',paymentBalance:document.getElementById('tp-balance')?.value.trim()||'',renewalDate:document.getElementById('tp-renewal')?.value||'',expiryDate:document.getElementById('tp-expiry')?.value||'',apis:[..._tpApiRows]};
+    STORE[p].thirdparty[i]={..._tpReadFields(acct),apis:[..._tpApiRows]};
     saveToLS(p);closeModal();renderProject(p);toast('Account updated');
   },{saveLabel:'Update'});
   setTimeout(()=>_tpApiRender(),80);
