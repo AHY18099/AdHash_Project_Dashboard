@@ -3741,6 +3741,14 @@ app.get('/dashboard.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
+// Data restore tool — no auth required (needs localStorage access before login)
+app.get('/restore-tool', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'restore-tool.html'));
+});
+app.get('/restore-tool.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'restore-tool.html'));
+});
+
 app.get('/favicon.ico', (req, res) => {
     res.status(204).end();
 });
