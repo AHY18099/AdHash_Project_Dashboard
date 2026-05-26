@@ -16,6 +16,40 @@ function readQaData() {
 function writeQaData(data) {
     fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
     fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
+    schedulePersistQaData();
+}
+
+// Debounced: commit+push qa-shared.json to GitHub at most once every 30s
+let _persistQaTimer = null;
+function schedulePersistQaData() {
+    if (_persistQaTimer) clearTimeout(_persistQaTimer);
+    _persistQaTimer = setTimeout(() => { _persistQaTimer = null; persistQaDataToGitHub(); }, 30000);
+}
+
+function persistQaDataToGitHub() {
+    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+    if (!token) return;
+    const { execFile } = require('child_process');
+    const gitEnv = { ...process.env, GIT_AUTHOR_NAME: 'AdHash Dashboard', GIT_AUTHOR_EMAIL: 'dashboard@adhashtech.com', GIT_COMMITTER_NAME: 'AdHash Dashboard', GIT_COMMITTER_EMAIL: 'dashboard@adhashtech.com' };
+    const authedRemote = `https://${token}@github.com/AHY18099/AdHash_Project_Dashboard.git`;
+    const steps = [
+        ['git', ['config', 'user.email', 'dashboard@adhashtech.com']],
+        ['git', ['config', 'user.name', 'AdHash Dashboard']],
+        ['git', ['remote', 'set-url', 'origin', authedRemote]],
+        ['git', ['add', 'data/qa-shared.json']],
+        ['git', ['commit', '-m', 'chore: persist qa-shared.json', '--allow-empty']],
+        ['git', ['push', 'origin', 'HEAD']]
+    ];
+    let i = 0;
+    function next() {
+        if (i >= steps.length) return;
+        const [cmd, args] = steps[i++];
+        execFile(cmd, args, { cwd: __dirname, env: gitEnv }, (err, _out, stderr) => {
+            if (err && stderr && stderr.includes('nothing to commit')) { i = steps.length - 1; }
+            next();
+        });
+    }
+    next();
 }
 
 const app = express();
@@ -3853,6 +3887,75 @@ app.post('/api/proxy', async (req, res) => {
         doRequest(url, 5, (result) => res.json(result));
     } catch (err) {
         res.json({ status: 0, statusText: 'Error', headers: {}, body: '', timing: Date.now() - startTs, error: err.message });
+    }
+});
+
+// ── WORKFLOW DOCS FILE STORAGE ──
+const WF_DOCS_DIR = path.join(__dirname, 'data', 'wfdocs');
+fs.mkdirSync(WF_DOCS_DIR, { recursive: true });
+
+// POST /api/wfdocs/:projectId — upload a file (base64 JSON body)
+app.post('/api/wfdocs/:projectId', (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    const { name, data: b64data, size } = req.body || {};
+    if (!name || !b64data) return res.status(400).json({ error: 'Missing name or data' });
+    const projectDir = path.join(WF_DOCS_DIR, req.params.projectId);
+    fs.mkdirSync(projectDir, { recursive: true });
+    const fileId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    const metaPath = path.join(projectDir, fileId + '.meta.json');
+    // Strip data URL prefix and save raw binary
+    const base64 = b64data.replace(/^data:[^;]+;base64,/, '');
+    const filePath = path.join(projectDir, fileId + '.bin');
+    try {
+        fs.writeFileSync(filePath, Buffer.from(base64, 'base64'));
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        const uploadedAt = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+        fs.writeFileSync(metaPath, JSON.stringify({ name, size, fileId, uploadedAt, mimeType: b64data.split(';')[0].replace('data:', '') || 'application/octet-stream' }));
+        res.json({ success: true, fileId });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/wfdocs/:projectId — list files for a project
+app.get('/api/wfdocs/:projectId', (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    const projectDir = path.join(WF_DOCS_DIR, req.params.projectId);
+    if (!fs.existsSync(projectDir)) return res.json([]);
+    const files = fs.readdirSync(projectDir).filter(f => f.endsWith('.meta.json')).map(f => {
+        try { return JSON.parse(fs.readFileSync(path.join(projectDir, f), 'utf8')); } catch { return null; }
+    }).filter(Boolean);
+    res.json(files);
+});
+
+// GET /api/wfdocs/:projectId/:fileId — download a file
+app.get('/api/wfdocs/:projectId/:fileId', (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    const { projectId, fileId } = req.params;
+    const projectDir = path.join(WF_DOCS_DIR, projectId);
+    const metaPath = path.join(projectDir, fileId + '.meta.json');
+    const filePath = path.join(projectDir, fileId + '.bin');
+    if (!fs.existsSync(filePath) || !fs.existsSync(metaPath)) return res.status(404).json({ error: 'Not found' });
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+    res.setHeader('Content-Type', meta.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(meta.name)}"`);
+    res.send(fs.readFileSync(filePath));
+});
+
+// DELETE /api/wfdocs/:projectId/:fileId — delete a file
+app.delete('/api/wfdocs/:projectId/:fileId', (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    const { projectId, fileId } = req.params;
+    const projectDir = path.join(WF_DOCS_DIR, projectId);
+    const metaPath = path.join(projectDir, fileId + '.meta.json');
+    const filePath = path.join(projectDir, fileId + '.bin');
+    try {
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        if (fs.existsSync(metaPath)) fs.unlinkSync(metaPath);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
 

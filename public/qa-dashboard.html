@@ -3120,7 +3120,6 @@ function renderWorkflowDocs(p){
   };
   const list=docs.length?[...docs].reverse().map((d,ri)=>{
     const idx=docs.length-1-ri;
-    const ext=(d.name.split('.').pop()||'').toLowerCase();
     const sizeTxt=d.size<1024?d.size+' B':d.size<1048576?(d.size/1024).toFixed(1)+' KB':(d.size/1048576).toFixed(2)+' MB';
     return`<div class="wfd-row">
       <span class="wfd-icon">${iconFor(d.name)}</span>
@@ -3135,7 +3134,7 @@ function renderWorkflowDocs(p){
     </div>`;
   }).join(''):`<div class="empty"><div class="ico">📁</div>No documents uploaded yet.<div style="margin-top:6px;font-size:12px">Upload PDF, Excel, Word, or TXT files.</div></div>`;
 
-  const uploadBtn=isAdmin()?`<label class="btn btn-primary wfd-upload-lbl" title="Upload document">
+  const uploadBtn=isAdmin()?`<label class="btn btn-primary wfd-upload-lbl" title="Upload document" id="wfd-upload-lbl-${p}">
     ＋ Upload Document
     <input type="file" accept=".pdf,.xls,.xlsx,.doc,.docx,.txt" style="display:none" onchange="handleWfDocUpload('${p}',this)">
   </label>`:'';
@@ -3155,15 +3154,28 @@ function handleWfDocUpload(p,input){
   if(!file)return;
   const maxMB=100;
   if(file.size>maxMB*1024*1024){alert(`File too large. Max ${maxMB} MB allowed.`);input.value='';return;}
+  const lbl=document.getElementById('wfd-upload-lbl-'+p);
+  if(lbl)lbl.textContent='Uploading…';
   const reader=new FileReader();
-  reader.onload=e=>{
+  reader.onload=async e=>{
     const now=new Date();
     const pad=n=>String(n).padStart(2,'0');
     const uploadedAt=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-    if(!STORE[p].wfdocs)STORE[p].wfdocs=[];
-    STORE[p].wfdocs.push({name:file.name,size:file.size,uploadedAt,data:e.target.result});
-    saveToLS(p);
-    switchTab(p,'wfdocs');
+    try{
+      const resp=await fetch('/api/wfdocs/'+encodeURIComponent(p),{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name:file.name,size:file.size,data:e.target.result})
+      });
+      const result=await resp.json();
+      if(!resp.ok||!result.success)throw new Error(result.error||'Upload failed');
+      if(!STORE[p].wfdocs)STORE[p].wfdocs=[];
+      STORE[p].wfdocs.push({name:file.name,size:file.size,uploadedAt,serverId:result.fileId});
+      saveToLS(p);
+      switchTab(p,'wfdocs');
+    }catch(err){
+      toast('Upload failed: '+err.message,'err');
+      if(lbl){lbl.innerHTML='＋ Upload Document<input type="file" accept=".pdf,.xls,.xlsx,.doc,.docx,.txt" style="display:none" onchange="handleWfDocUpload(\''+p+'\',this)">';}
+    }
   };
   reader.readAsDataURL(file);
   input.value='';
@@ -3172,14 +3184,30 @@ function handleWfDocUpload(p,input){
 function downloadWfDoc(p,idx){
   const doc=(STORE[p].wfdocs||[])[idx];
   if(!doc)return;
-  const a=document.createElement('a');
-  a.href=doc.data;
-  a.download=doc.name;
-  a.click();
+  if(doc.serverId){
+    // Server-stored file
+    const a=document.createElement('a');
+    a.href='/api/wfdocs/'+encodeURIComponent(p)+'/'+encodeURIComponent(doc.serverId);
+    a.download=doc.name;
+    a.click();
+  }else if(doc.data){
+    // Legacy base64 stored file
+    const a=document.createElement('a');
+    a.href=doc.data;
+    a.download=doc.name;
+    a.click();
+  }
 }
 
-function deleteWfDoc(p,idx){
-  if(!confirm(`Delete "${(STORE[p].wfdocs||[])[idx]?.name}"?`))return;
+async function deleteWfDoc(p,idx){
+  const doc=(STORE[p].wfdocs||[])[idx];
+  if(!doc)return;
+  if(!confirm(`Delete "${doc.name}"?`))return;
+  if(doc.serverId){
+    try{
+      await fetch('/api/wfdocs/'+encodeURIComponent(p)+'/'+encodeURIComponent(doc.serverId),{method:'DELETE'});
+    }catch(e){}
+  }
   (STORE[p].wfdocs||[]).splice(idx,1);
   saveToLS(p);
   switchTab(p,'wfdocs');
@@ -5955,9 +5983,38 @@ async function syncFromServer(){
     if(!r.ok)return;
     const data=await r.json();
     // Merge each key into localStorage so loadAllState picks it up
+    // Strip any base64 wfdoc data to avoid bloating localStorage
     for(const [k,v] of Object.entries(data)){
+      if(k.startsWith('qa3_')&&v&&v.wfdocs){
+        v.wfdocs=(v.wfdocs||[]).map(d=>{const c={...d};delete c.data;return c;});
+      }
       try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}
     }
+  }catch(e){}
+}
+
+// Pull wfdocs file metadata from server for all projects and merge into STORE
+async function syncWfDocsFromServer(){
+  try{
+    await Promise.all(PROJECTS.map(async proj=>{
+      try{
+        const r=await fetch('/api/wfdocs/'+encodeURIComponent(proj.id),{cache:'no-store'});
+        if(!r.ok)return;
+        const serverFiles=await r.json();
+        if(!Array.isArray(serverFiles)||!serverFiles.length)return;
+        if(!STORE[proj.id].wfdocs)STORE[proj.id].wfdocs=[];
+        // Merge server files — add any not already tracked by serverId
+        const existingIds=new Set((STORE[proj.id].wfdocs||[]).map(d=>d.serverId).filter(Boolean));
+        for(const sf of serverFiles){
+          if(!existingIds.has(sf.fileId)){
+            STORE[proj.id].wfdocs.push({name:sf.name,size:sf.size||0,uploadedAt:sf.uploadedAt||'',serverId:sf.fileId});
+          }
+        }
+        // Remove entries whose serverId no longer exists on server
+        const serverIds=new Set(serverFiles.map(sf=>sf.fileId));
+        STORE[proj.id].wfdocs=STORE[proj.id].wfdocs.filter(d=>!d.serverId||serverIds.has(d.serverId));
+      }catch(e){}
+    }));
   }catch(e){}
 }
 
@@ -6363,6 +6420,12 @@ window.addEventListener('DOMContentLoaded',async()=>{
     document.getElementById('dashboard').style.display='block';
     PROJECTS.forEach(p=>{curTab[p.id]=curTab[p.id]||'projoverview';});
     renderTopBar();renderProjectGrid();
+    // sync wfdocs from server (after render so UI appears fast)
+    syncWfDocsFromServer().then(()=>{
+      // re-render any open wfdocs tab
+      PROJECTS.forEach(p=>{if(curTab[p.id]==='wfdocs')renderProject(p.id);});
+      renderProjectGrid();
+    });
   }
 });
 

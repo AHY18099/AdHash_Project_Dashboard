@@ -6,8 +6,9 @@ package-lock.json
 .env.local
 .env.production
 
-# Shared runtime data — lives on the server, not in git
-/data/
+# Shared runtime data — data/ is tracked in git so qa-shared.json survives Railway redeploys
+# Wfdoc binaries are excluded (too large for git)
+/data/wfdocs/
 
 # Generated dashboard and test artifacts
 /suite-reports/
