@@ -4904,6 +4904,7 @@ function renderThirdPartyTab(p){
           ${acct.renewalDate?`<div class="tp-field"><div class="tp-field-lbl">Renewal Date</div><div class="tp-field-val">${escH(acct.renewalDate)}</div></div>`:''}
           ${acct.expiryDate?`<div class="tp-field"><div class="tp-field-lbl">Expiry Date</div><div class="tp-field-val">${escH(acct.expiryDate)}</div></div>`:''}
         </div>
+        ${acct.note?`<div style="margin-top:10px;padding:8px 12px;background:var(--card2);border-radius:8px;border:1px solid var(--border);font-size:12px;color:var(--mut)"><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-right:8px">Note</span>${escH(acct.note)}</div>`:''}
         ${apisHtml}
       </div>
     </div>`;
@@ -5419,8 +5420,15 @@ function _tpFormFields(acct){acct=acct||{};return`
     <div class="fg-row">
       <div class="fg"><label>Renewal Date</label><input type="date" class="finp" id="tp-renewal" value="${escH(acct.renewalDate||'')}"></div>
       <div class="fg"><label>Expiry Date</label><input type="date" class="finp" id="tp-expiry" value="${escH(acct.expiryDate||'')}"></div>
+    </div>
+    <div class="fg">
+      <label>Note <span style="font-size:10px;color:var(--mut);font-weight:400">(max 100 chars)</span></label>
+      <div style="position:relative">
+        <input class="finp" id="tp-note" maxlength="100" placeholder="Optional note about this account…" value="${escH(acct.note||'')}" autocomplete="off" oninput="document.getElementById('tp-note-cnt').textContent=100-this.value.length+' left'">
+        <span id="tp-note-cnt" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--mut);pointer-events:none">${100-(acct.note||'').length} left</span>
+      </div>
     </div>`;}
-function _tpReadFields(base){return{...(base||{}),name:document.getElementById('tp-name')?.value.trim()||'',url:document.getElementById('tp-url')?.value.trim()||'',username:document.getElementById('tp-username')?.value.trim()||'',tpPassword:document.getElementById('tp-password')?.value||'',credentials:document.getElementById('tp-creds')?.value.trim()||'',paymentBalance:document.getElementById('tp-balance')?.value.trim()||'',renewalDate:document.getElementById('tp-renewal')?.value||'',expiryDate:document.getElementById('tp-expiry')?.value||''};}
+function _tpReadFields(base){return{...(base||{}),name:document.getElementById('tp-name')?.value.trim()||'',url:document.getElementById('tp-url')?.value.trim()||'',username:document.getElementById('tp-username')?.value.trim()||'',tpPassword:document.getElementById('tp-password')?.value||'',credentials:document.getElementById('tp-creds')?.value.trim()||'',paymentBalance:document.getElementById('tp-balance')?.value.trim()||'',renewalDate:document.getElementById('tp-renewal')?.value||'',expiryDate:document.getElementById('tp-expiry')?.value||'',note:document.getElementById('tp-note')?.value.trim()||''};}
 function tpOpenAdd(p){
   const body=_tpFormFields()+_tpApiSection([]);
   openModal('Add Third Party Account',body,()=>{
