@@ -3903,6 +3903,27 @@ app.post('/api/proxy', async (req, res) => {
 const WF_DOCS_DIR = path.join(__dirname, 'data', 'wfdocs');
 fs.mkdirSync(WF_DOCS_DIR, { recursive: true });
 
+// Helper: persist wfdoc metadata list for a project into qa-shared.json so it survives redeploys
+function _persistWfDocMeta(projectId) {
+    try {
+        const projectDir = path.join(WF_DOCS_DIR, projectId);
+        const metaList = fs.existsSync(projectDir)
+            ? fs.readdirSync(projectDir).filter(f => f.endsWith('.meta.json')).map(f => {
+                try { return JSON.parse(fs.readFileSync(path.join(projectDir, f), 'utf8')); } catch { return null; }
+              }).filter(Boolean)
+            : [];
+        // Merge into qa-shared.json under the project's wfdocs key
+        const shared = readQaData();
+        const projKey = 'qa3_' + projectId;
+        if (!shared[projKey]) shared[projKey] = {};
+        // Keep only metadata (no base64 data), mark with serverId
+        shared[projKey].wfdocs = metaList.map(m => ({
+            name: m.name, size: m.size || 0, uploadedAt: m.uploadedAt || '', serverId: m.fileId
+        }));
+        writeQaData(shared);
+    } catch (e) { console.error('_persistWfDocMeta error:', e.message); }
+}
+
 // POST /api/wfdocs/:projectId — upload a file (base64 JSON body)
 app.post('/api/wfdocs/:projectId', (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
@@ -3912,7 +3933,6 @@ app.post('/api/wfdocs/:projectId', (req, res) => {
     fs.mkdirSync(projectDir, { recursive: true });
     const fileId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     const metaPath = path.join(projectDir, fileId + '.meta.json');
-    // Strip data URL prefix and save raw binary
     const base64 = b64data.replace(/^data:[^;]+;base64,/, '');
     const filePath = path.join(projectDir, fileId + '.bin');
     try {
@@ -3920,7 +3940,10 @@ app.post('/api/wfdocs/:projectId', (req, res) => {
         const now = new Date();
         const pad = n => String(n).padStart(2, '0');
         const uploadedAt = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-        fs.writeFileSync(metaPath, JSON.stringify({ name, size, fileId, uploadedAt, mimeType: b64data.split(';')[0].replace('data:', '') || 'application/octet-stream' }));
+        const meta = { name, size, fileId, uploadedAt, mimeType: b64data.split(';')[0].replace('data:', '') || 'application/octet-stream' };
+        fs.writeFileSync(metaPath, JSON.stringify(meta));
+        // Persist metadata list to qa-shared.json so it survives redeploys
+        _persistWfDocMeta(req.params.projectId);
         res.json({ success: true, fileId });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -3928,14 +3951,30 @@ app.post('/api/wfdocs/:projectId', (req, res) => {
 });
 
 // GET /api/wfdocs/:projectId — list files for a project
+// Merges disk metadata with qa-shared.json metadata so list survives even if .bin files are gone
 app.get('/api/wfdocs/:projectId', (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     const projectDir = path.join(WF_DOCS_DIR, req.params.projectId);
-    if (!fs.existsSync(projectDir)) return res.json([]);
-    const files = fs.readdirSync(projectDir).filter(f => f.endsWith('.meta.json')).map(f => {
-        try { return JSON.parse(fs.readFileSync(path.join(projectDir, f), 'utf8')); } catch { return null; }
-    }).filter(Boolean);
-    res.json(files);
+    // Files that still have their .bin on disk
+    const diskFiles = fs.existsSync(projectDir)
+        ? fs.readdirSync(projectDir).filter(f => f.endsWith('.meta.json')).map(f => {
+            try { return JSON.parse(fs.readFileSync(path.join(projectDir, f), 'utf8')); } catch { return null; }
+          }).filter(Boolean)
+        : [];
+    // Also check qa-shared.json for metadata of files whose .bin may have been lost
+    const shared = readQaData();
+    const projKey = 'qa3_' + req.params.projectId;
+    const sharedMeta = (shared[projKey]?.wfdocs || []).filter(m => m.serverId);
+    // Merge: disk is authoritative, fill in any from shared that aren't on disk
+    const diskIds = new Set(diskFiles.map(f => f.fileId));
+    const merged = [...diskFiles];
+    for (const sm of sharedMeta) {
+        if (!diskIds.has(sm.serverId)) {
+            // File was lost from disk — include metadata but mark as unavailable
+            merged.push({ name: sm.name, size: sm.size, uploadedAt: sm.uploadedAt, fileId: sm.serverId, unavailable: true });
+        }
+    }
+    res.json(merged);
 });
 
 // GET /api/wfdocs/:projectId/:fileId — download a file
@@ -3945,7 +3984,7 @@ app.get('/api/wfdocs/:projectId/:fileId', (req, res) => {
     const projectDir = path.join(WF_DOCS_DIR, projectId);
     const metaPath = path.join(projectDir, fileId + '.meta.json');
     const filePath = path.join(projectDir, fileId + '.bin');
-    if (!fs.existsSync(filePath) || !fs.existsSync(metaPath)) return res.status(404).json({ error: 'Not found' });
+    if (!fs.existsSync(filePath) || !fs.existsSync(metaPath)) return res.status(404).json({ error: 'File not found. It may have been lost in a server redeploy — please re-upload.' });
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
     res.setHeader('Content-Type', meta.mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(meta.name)}"`);
@@ -3962,6 +4001,8 @@ app.delete('/api/wfdocs/:projectId/:fileId', (req, res) => {
     try {
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
         if (fs.existsSync(metaPath)) fs.unlinkSync(metaPath);
+        // Update qa-shared.json metadata after delete
+        _persistWfDocMeta(projectId);
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -4013,6 +4054,7 @@ app.post('/api/qa-data-bulk', (req, res) => {
 
 // POST /api/qa-data/:key — save one key's value
 app.post('/api/qa-data/:key', (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     const key = req.params.key;
     const { value } = req.body;
     if (value === undefined) return res.status(400).json({ error: 'Missing value' });

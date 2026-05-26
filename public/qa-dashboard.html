@@ -3141,7 +3141,9 @@ function renderWorkflowDocs(p){
         <div class="wfd-meta">${sizeTxt} &nbsp;·&nbsp; Uploaded ${d.uploadedAt}</div>
       </div>
       <div class="wfd-actions">
-        <button class="btn btn-primary" style="font-size:11px;padding:5px 14px" onclick="downloadWfDoc('${p}',${idx})">⬇ Download</button>
+        ${d.unavailable
+          ?`<span style="font-size:11px;color:var(--fail);font-weight:600" title="File was lost in a server redeploy — please re-upload">⚠ Re-upload needed</span>`
+          :`<button class="btn btn-primary" style="font-size:11px;padding:5px 14px" onclick="downloadWfDoc('${p}',${idx})">⬇ Download</button>`}
         ${isAdmin()?`<button class="btn-icon del" title="Delete" onclick="deleteWfDoc('${p}',${idx})">✕</button>`:''}
       </div>
     </div>`;
@@ -6036,15 +6038,49 @@ function saveState(p){
 // All reads come from here; all writes go straight to the server.
 let _serverData={};
 
-// Fire-and-forget POST of a single key to the server
+// Track consecutive save failures to warn user
+let _saveFailCount=0;
+
+// POST to server — updates in-memory mirror immediately, retries once on failure
 function serverPost(key,value){
-  fetch('/api/qa-data/'+encodeURIComponent(key),{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({value})
-  }).catch(()=>{});
-  // keep in-memory mirror updated so subsequent reads within same page session are instant
-  _serverData[key]=value;
+  _serverData[key]=value; // update mirror immediately for instant UI reads
+  _doServerPost(key,value,true);
+}
+async function _doServerPost(key,value,retry){
+  try{
+    const r=await fetch('/api/qa-data/'+encodeURIComponent(key),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({value})
+    });
+    if(r.ok){
+      _saveFailCount=0;
+      // Remove any save-error banner
+      document.getElementById('_save-err-banner')?.remove();
+    } else if(r.status===401){
+      // Session expired — redirect to login
+      window.location.href='/';
+    } else {
+      throw new Error('HTTP '+r.status);
+    }
+  }catch(e){
+    if(retry){
+      // Wait 2s and retry once
+      setTimeout(()=>_doServerPost(key,value,false),2000);
+    } else {
+      _saveFailCount++;
+      if(_saveFailCount>=2) _showSaveErrorBanner();
+    }
+  }
+}
+
+function _showSaveErrorBanner(){
+  if(document.getElementById('_save-err-banner'))return;
+  const b=document.createElement('div');
+  b.id='_save-err-banner';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#ef4444;color:#fff;text-align:center;padding:10px 16px;font-size:13px;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:12px';
+  b.innerHTML='⚠ Data save failed — check your connection. <button onclick="location.reload()" style="background:rgba(255,255,255,.25);border:none;color:#fff;font-weight:700;padding:4px 14px;border-radius:50px;cursor:pointer;font-family:inherit">Reload</button><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#fff;cursor:pointer;font-size:16px;padding:0 4px">✕</button>';
+  document.body.prepend(b);
 }
 
 // Fire-and-forget DELETE of a key from the server
