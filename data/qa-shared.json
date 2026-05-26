@@ -1862,8 +1862,8 @@
       "estimationHrs": "4h",
       "completionDate": "2026-05-26T20:00",
       "assignedBy": "Deepa",
-      "currentStatus": "To Do",
-      "testingStatus": "To Do",
+      "currentStatus": "Done",
+      "testingStatus": "Bugs Raised",
       "openBugs": {
         "total": 0,
         "high": 0,
@@ -1897,8 +1897,8 @@
       "estimationHrs": "4h",
       "completionDate": "2026-05-26T20:00",
       "assignedBy": "Deepa",
-      "currentStatus": "To Do",
-      "testingStatus": "To Do",
+      "currentStatus": "Done",
+      "testingStatus": "Bugs Raised",
       "openBugs": {
         "total": 0,
         "high": 0,
@@ -1932,8 +1932,8 @@
       "estimationHrs": "4h",
       "completionDate": "2026-05-26T20:00",
       "assignedBy": "Yogesh",
-      "currentStatus": "To Do",
-      "testingStatus": "To Do",
+      "currentStatus": "Done",
+      "testingStatus": "Bugs Raised",
       "openBugs": {
         "total": 0,
         "high": 0,
@@ -1967,8 +1967,8 @@
       "estimationHrs": "4h",
       "completionDate": "2026-05-26T20:00",
       "assignedBy": "Yogesh",
-      "currentStatus": "To Do",
-      "testingStatus": "To Do",
+      "currentStatus": "Done",
+      "testingStatus": "Bugs Raised",
       "openBugs": {
         "total": 0,
         "high": 0,
@@ -2002,8 +2002,8 @@
       "estimationHrs": "4h",
       "completionDate": "2026-05-26T20:00",
       "assignedBy": "Raghuram",
-      "currentStatus": "To Do",
-      "testingStatus": "To Do",
+      "currentStatus": "In Progress",
+      "testingStatus": "Bugs Raised",
       "openBugs": {
         "total": 0,
         "high": 0,
@@ -2037,8 +2037,8 @@
       "estimationHrs": "4h",
       "completionDate": "2026-05-26T20:00",
       "assignedBy": "Raghuram",
-      "currentStatus": "To Do",
-      "testingStatus": "To Do",
+      "currentStatus": "In Progress",
+      "testingStatus": "Bugs Raised",
       "openBugs": {
         "total": 0,
         "high": 0,
@@ -2072,8 +2072,8 @@
       "estimationHrs": "4h",
       "completionDate": "2026-05-26T20:00",
       "assignedBy": "Prakash Raj",
-      "currentStatus": "To Do",
-      "testingStatus": "To Do",
+      "currentStatus": "Done",
+      "testingStatus": "Bugs Raised",
       "openBugs": {
         "total": 0,
         "high": 0,
@@ -2107,8 +2107,8 @@
       "estimationHrs": "4h",
       "completionDate": "2026-05-26T20:00",
       "assignedBy": "Prakash Raj",
-      "currentStatus": "To Do",
-      "testingStatus": "To Do",
+      "currentStatus": "Done",
+      "testingStatus": "Bugs Raised",
       "openBugs": {
         "total": 0,
         "high": 0,
@@ -7022,6 +7022,18 @@
         "name": "Autochecker SOW.pdf",
         "size": 696399,
         "uploadedAt": "2026-05-26 03:26:34"
+      },
+      {
+        "name": "AutoChecker_AdminPanel_Documentation.docx",
+        "size": 29015347,
+        "uploadedAt": "2026-05-26 13:37:25",
+        "serverId": "1779817064844_qyxuf4"
+      },
+      {
+        "name": "AutoChecker_MobileApp_Documentation.docx",
+        "size": 7273069,
+        "uploadedAt": "2026-05-26 13:37:50",
+        "serverId": "1779817074571_4s5757"
       }
     ],
     "credentials": [
@@ -8763,6 +8775,18 @@
         "name": "Synctag Product Document - 20 Feb 2026.pdf",
         "size": 367700,
         "uploadedAt": "2026-05-26 03:30:37"
+      },
+      {
+        "name": "Synctag_Website_V2_22_APR_2026.pdf",
+        "size": 225143,
+        "uploadedAt": "2026-05-26 13:39:31",
+        "serverId": "1779817174730_bu7f5l"
+      },
+      {
+        "name": "Synctag_Product_Document_V2_22_APR_26.pdf",
+        "size": 6991488,
+        "uploadedAt": "2026-05-26 13:39:42",
+        "serverId": "1779817187366_rpq5ce"
       }
     ],
     "credentials": [
