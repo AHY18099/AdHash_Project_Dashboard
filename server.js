@@ -19,11 +19,57 @@ function writeQaData(data) {
     schedulePersistQaData();
 }
 
-// Debounced: commit+push qa-shared.json to GitHub — 5s debounce so rapid saves batch up
+// On startup: pull latest qa-shared.json from GitHub so redeploys never lose data.
+// Railway wipes the disk on every deploy — this fetches the freshest committed version
+// before the server starts accepting requests.
+async function pullQaDataFromGitHub() {
+    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+    if (!token) { console.log('[startup] No GITHUB_TOKEN — skipping GitHub data pull'); return; }
+    try {
+        const https = require('https');
+        const options = {
+            hostname: 'api.github.com',
+            path: '/repos/AHY18099/AdHash_Project_Dashboard/contents/data/qa-shared.json',
+            headers: { 'Authorization': `token ${token}`, 'User-Agent': 'AdHash-Dashboard', 'Accept': 'application/vnd.github.v3+json' }
+        };
+        const ghData = await new Promise((resolve, reject) => {
+            const req = https.get(options, res => {
+                let body = '';
+                res.on('data', d => body += d);
+                res.on('end', () => {
+                    try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
+                });
+            });
+            req.on('error', reject);
+            req.setTimeout(10000, () => { req.destroy(); reject(new Error('timeout')); });
+        });
+        if (ghData.content) {
+            const decoded = Buffer.from(ghData.content.replace(/\n/g, ''), 'base64').toString('utf8');
+            const remoteData = JSON.parse(decoded);
+            // Merge: remote wins unless local disk file is newer (has more keys)
+            const localData = readQaData();
+            const localKeys = Object.keys(localData).length;
+            const remoteKeys = Object.keys(remoteData).length;
+            if (remoteKeys >= localKeys) {
+                fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
+                fs.writeFileSync(QA_DATA_PATH, JSON.stringify(remoteData, null, 2));
+                console.log(`[startup] Pulled qa-shared.json from GitHub (${remoteKeys} keys)`);
+            } else {
+                console.log(`[startup] Local data (${localKeys} keys) newer than GitHub (${remoteKeys} keys) — keeping local`);
+            }
+        } else {
+            console.log('[startup] GitHub returned no content for qa-shared.json:', ghData.message || JSON.stringify(ghData).slice(0, 100));
+        }
+    } catch (e) {
+        console.error('[startup] Failed to pull qa-shared.json from GitHub:', e.message);
+    }
+}
+
+// Debounced: commit+push qa-shared.json to GitHub — 1s debounce so data reaches GitHub quickly
 let _persistQaTimer = null;
 function schedulePersistQaData(urgent = false) {
     if (_persistQaTimer) clearTimeout(_persistQaTimer);
-    const delay = urgent ? 2000 : 5000;
+    const delay = urgent ? 500 : 1000;
     _persistQaTimer = setTimeout(() => { _persistQaTimer = null; persistQaDataToGitHub(); }, delay);
 }
 
@@ -4068,7 +4114,8 @@ app.post('/api/qa-data/:key', (req, res) => {
     }
 });
 
-// Start server
+// Start server — pull latest data from GitHub first so redeploys never lose data
+pullQaDataFromGitHub().catch(e => console.error('[startup] pullQaDataFromGitHub failed:', e.message)).finally(() => {
 app.listen(PORT, () => {
     testRunning = false;
     testResults = null;
@@ -4103,5 +4150,28 @@ app.listen(PORT, () => {
             console.error('Startup recovery/mail dispatch failed:', error);
         }
     })();
+});
+}); // end pullQaDataFromGitHub().finally
+
+// On Railway redeploy, SIGTERM is sent before the process is killed.
+// Do a final synchronous git push so any unsaved data reaches GitHub before shutdown.
+process.on('SIGTERM', () => {
+    console.log('[shutdown] SIGTERM received — pushing qa-shared.json to GitHub before exit');
+    if (_persistQaTimer) { clearTimeout(_persistQaTimer); _persistQaTimer = null; }
+    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+    if (!token) { process.exit(0); return; }
+    const { execFileSync } = require('child_process');
+    const gitEnv = { ...process.env, GIT_AUTHOR_NAME: 'AdHash Dashboard', GIT_AUTHOR_EMAIL: 'dashboard@adhashtech.com', GIT_COMMITTER_NAME: 'AdHash Dashboard', GIT_COMMITTER_EMAIL: 'dashboard@adhashtech.com' };
+    const authedRemote = `https://${token}@github.com/AHY18099/AdHash_Project_Dashboard.git`;
+    try {
+        execFileSync('git', ['remote', 'set-url', 'origin', authedRemote], { cwd: __dirname, env: gitEnv });
+        execFileSync('git', ['add', 'data/qa-shared.json'], { cwd: __dirname, env: gitEnv });
+        try { execFileSync('git', ['commit', '-m', 'chore: persist qa-shared.json on shutdown'], { cwd: __dirname, env: gitEnv }); } catch (_) {}
+        execFileSync('git', ['push', 'origin', 'HEAD'], { cwd: __dirname, env: gitEnv, timeout: 8000 });
+        console.log('[shutdown] qa-shared.json pushed to GitHub successfully');
+    } catch (e) {
+        console.error('[shutdown] Failed to push qa-shared.json:', e.message);
+    }
+    process.exit(0);
 });
 
