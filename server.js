@@ -4099,10 +4099,10 @@ app.post('/api/wfdocs/:projectId', async (req, res) => {
         const meta = { name, size: size || buffer.length, fileId, uploadedAt, mimeType, ghAssetId, ghUrl, assetName };
         fs.writeFileSync(path.join(projectDir, fileId + '.meta.json'), JSON.stringify(meta));
 
-        // Read current wfdocs list from qa-shared.json and append
+        // Read current wfdocs list from qa-shared.json and append (dedup by serverId)
         const shared = readQaData();
         const projKey = 'qa3_' + req.params.projectId;
-        const current = (shared[projKey] && shared[projKey].wfdocs) || [];
+        const current = ((shared[projKey] && shared[projKey].wfdocs) || []).filter(f => f.serverId !== fileId);
         const newEntry = { name, size: size || buffer.length, uploadedAt, serverId: fileId, ghAssetId, ghUrl, assetName };
         _persistWfDocMeta(req.params.projectId, [...current, newEntry]);
 
@@ -4317,7 +4317,12 @@ async function migrateWfDocsToGitHub() {
                 }
             } catch (e) { console.error(`[migrate] Failed for ${entry.name}:`, e.message); }
         }
-        if (anyMigrated) shared[projKey].wfdocs = wfdocs;
+        if (anyMigrated) {
+            // Dedup by serverId before saving
+            const seen = new Map();
+            for (const f of wfdocs) { if (!seen.has(f.serverId) || (f.ghUrl && !seen.get(f.serverId).ghUrl)) seen.set(f.serverId, f); }
+            shared[projKey].wfdocs = Array.from(seen.values());
+        }
     }
     if (anyMigrated) { writeQaData(shared); console.log('[migrate] wfdoc migration complete, qa-shared.json updated'); }
 }
