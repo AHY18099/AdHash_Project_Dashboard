@@ -36,7 +36,8 @@ const AUTH_COOKIE_NAME = 'adhash_auth';
 const AUTH_COOKIE_VALUE = Buffer.from(`${SUPER_ADMIN_EMAIL}:${SUPER_ADMIN_PASSWORD}`).toString('base64url');
 
 // Parse JSON bodies
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 // Security headers on every response
 app.use((req, res, next) => {

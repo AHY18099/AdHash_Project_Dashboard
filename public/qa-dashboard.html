@@ -3153,7 +3153,7 @@ function renderWorkflowDocs(p){
 function handleWfDocUpload(p,input){
   const file=input.files[0];
   if(!file)return;
-  const maxMB=20;
+  const maxMB=100;
   if(file.size>maxMB*1024*1024){alert(`File too large. Max ${maxMB} MB allowed.`);input.value='';return;}
   const reader=new FileReader();
   reader.onload=e=>{
