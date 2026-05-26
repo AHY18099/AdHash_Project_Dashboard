@@ -1083,25 +1083,39 @@ body.dark .tt-task-card:hover{box-shadow:0 8px 28px rgba(0,0,0,0.5),0 0 0 1px rg
 .pt-field-val{font-size:12px;color:var(--txt)}
 .pt-cmt-box{background:var(--card2);border-radius:7px;padding:8px 10px;font-size:11px;color:var(--txt2);margin-bottom:8px}
 .pt-cmt-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-bottom:3px}
-.tp-card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--card-shadow);margin-bottom:10px}
-.tp-card-hdr{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
-.tp-card-name{font-weight:700;font-size:14px;color:var(--txt);flex:1}
-.tp-card-body{padding:12px 14px}
-.tp-field-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:10px}
-.tp-field{display:flex;flex-direction:column;gap:3px}
-.tp-field-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
-.tp-field-val{font-size:12px;color:var(--txt)}
-.tp-apis-section{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+/* ── THIRD PARTY CARDS ── */
+.tp-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:14px;transition:box-shadow .2s,border-color .2s}
+.tp-card:hover{box-shadow:0 4px 24px rgba(0,0,0,.10);border-color:var(--border2)}
+.tp-card-hdr{display:flex;align-items:center;gap:10px;padding:14px 18px 14px 18px;background:var(--card2);border-bottom:1.5px solid var(--border)}
+.tp-card-name{font-weight:800;font-size:15px;color:var(--txt);flex:1;letter-spacing:-.2px}
+.tp-card-body{padding:16px 18px}
+.tp-field-row{display:flex;flex-wrap:wrap;gap:0;margin-bottom:12px}
+.tp-field{display:flex;flex-direction:column;gap:4px;min-width:160px;flex:1;padding:10px 14px;border-right:1px solid var(--border);position:relative}
+.tp-field:last-child{border-right:none}
+.tp-field-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--mut)}
+.tp-field-val{font-size:13px;color:var(--txt);font-weight:500;word-break:break-all}
+.tp-field-url-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.tp-pwd-wrap{display:flex;align-items:center;gap:6px}
+.tp-pwd-toggle{background:none;border:none;padding:0;cursor:pointer;color:var(--mut);font-size:12px;line-height:1;transition:color .15s}
+.tp-pwd-toggle:hover{color:var(--txt)}
+.tp-env-badge{flex-shrink:0;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid}
+.tp-note-box{margin-top:2px;padding:10px 14px;background:var(--card2);border-radius:10px;border:1px solid var(--border);font-size:13px;color:var(--txt2);white-space:pre-wrap;word-break:break-word;line-height:1.55}
+.tp-note-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);display:block;margin-bottom:5px}
+.tp-apis-section{margin-top:14px;padding-top:12px;border-top:1.5px solid var(--border)}
+.tp-apis-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.tp-apis-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
 .tp-api-modal-row{background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:6px}
-.tp-api-run-btn{background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.3);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;color:var(--pass);cursor:pointer}
+.tp-api-run-btn{background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.3);border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--pass);cursor:pointer;transition:background .15s}
+.tp-api-run-btn:hover:not(:disabled){background:rgba(5,150,105,.18)}
 .tp-api-run-btn:disabled{opacity:.5;cursor:not-allowed}
-.tp-api-row{display:flex;align-items:stretch;gap:0;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px}
+.tp-api-row{display:flex;align-items:stretch;gap:0;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px}
 .tp-api-row:last-child{border-bottom:none}
 .tp-api-resp-panel{margin-top:2px}
 .tp-resp-toggle{background:none;border:none;font-size:11px;font-weight:600;color:var(--inp);cursor:pointer;padding:2px 0;text-decoration:underline;text-underline-offset:2px}
 .tp-resp-toggle:hover{color:var(--txt)}
 .tp-api-modal-resp{margin-top:6px}
-.tp-section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.tp-section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.tp-hdr-actions{display:flex;align-items:center;gap:6px}
 /* ── TASK CHECKLIST ── */
 .tcl-wrap{padding:16px}
 .tcl-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px}
@@ -4877,75 +4891,136 @@ function ptDelete(p,i){if(!confirm('Delete this task?'))return;STORE[p].pendingt
 // ══════════════════════════════════════════════════════
 const TP_API_METHODS=['GET','POST','PUT','PATCH','DELETE','OTHER'];
 const TP_API_STATUSES=['Active','Deprecated','Testing','Inactive'];
+function _tpEnvBadge(env){
+  if(!env)return'';
+  const cfg={Production:{bg:'rgba(99,102,241,.12)',color:'#6366f1',border:'rgba(99,102,241,.3)'},Staging:{bg:'rgba(249,115,22,.12)',color:'#f97316',border:'rgba(249,115,22,.3)'},Dev:{bg:'rgba(16,185,129,.12)',color:'#10b981',border:'rgba(16,185,129,.3)'}};
+  const c=cfg[env]||{bg:'rgba(100,116,139,.1)',color:'var(--mut)',border:'rgba(100,116,139,.2)'};
+  return`<span class="tp-env-badge" style="background:${c.bg};color:${c.color};border-color:${c.border}">${escH(env)}</span>`;
+}
+
 function renderThirdPartyTab(p){
   if(!STORE[p].thirdparty)STORE[p].thirdparty=[];
   const items=STORE[p].thirdparty;
+
   const cards=items.map((acct,i)=>{
-    const expiryHtml=(()=>{
+    // ── expiry status ──
+    const expiryChip=(()=>{
       if(!acct.expiryDate)return'';
       const d=new Date(acct.expiryDate);const now=new Date();
       const diff=Math.round((d-now)/(1000*60*60*24));
-      if(diff<0)return`<span style="color:var(--fail);font-weight:700;font-size:11px">⚠ Expired</span>`;
-      if(diff<=30)return`<span style="color:var(--blk);font-weight:700;font-size:11px">⚠ Expires in ${diff}d</span>`;
-      return`<span style="color:var(--pass);font-size:11px">✓ Valid until ${d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>`;
+      if(diff<0)return`<span style="background:rgba(239,68,68,.1);color:var(--fail);border:1px solid rgba(239,68,68,.3);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">⚠ Expired</span>`;
+      if(diff<=30)return`<span style="background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">⚠ Expires in ${diff}d</span>`;
+      return`<span style="background:rgba(5,150,105,.08);color:var(--pass);border:1px solid rgba(5,150,105,.25);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:600">✓ Valid</span>`;
     })();
+
+    // ── field rows ──
+    const fields=[];
+    if(acct.url){
+      const displayUrl=acct.url.replace(/^https?:\/\//,'');
+      fields.push(`<div class="tp-field" style="flex:2;min-width:200px">
+        <div class="tp-field-lbl">URL</div>
+        <div class="tp-field-url-row">
+          <a href="${escH(acct.url)}" target="_blank" class="tt-link-cell" style="font-size:13px;font-weight:500;word-break:break-all" title="${escH(acct.url)}">${escH(displayUrl)}</a>
+          ${_tpEnvBadge(acct.environment)}
+        </div>
+      </div>`);
+    } else if(acct.environment){
+      fields.push(`<div class="tp-field"><div class="tp-field-lbl">Environment</div><div class="tp-field-val">${_tpEnvBadge(acct.environment)}</div></div>`);
+    }
+    if(acct.username){
+      fields.push(`<div class="tp-field"><div class="tp-field-lbl">Username</div><div class="tp-field-val">${escH(acct.username)}</div></div>`);
+    }
+    if(acct.tpPassword){
+      fields.push(`<div class="tp-field"><div class="tp-field-lbl">Password</div>
+        <div class="tp-pwd-wrap">
+          <span id="tp-pwd-${p}-${i}" class="tp-field-val" style="letter-spacing:3px;font-size:16px">••••••••</span>
+          <button class="tp-pwd-toggle" title="Show/hide password" onclick="tpTogglePwd('${p}',${i},'${escH(acct.tpPassword).replace(/'/g,"\\'")}')">👁</button>
+        </div>
+      </div>`);
+    }
+    if(acct.credentials){
+      fields.push(`<div class="tp-field"><div class="tp-field-lbl">Credentials</div><div class="tp-field-val">${escH(acct.credentials)}</div></div>`);
+    }
+    if(acct.paymentBalance){
+      fields.push(`<div class="tp-field"><div class="tp-field-lbl">Payment Balance</div><div class="tp-field-val" style="font-weight:700;color:var(--pass)">${escH(acct.paymentBalance)}</div></div>`);
+    }
+    if(acct.renewalDate){
+      fields.push(`<div class="tp-field"><div class="tp-field-lbl">Renewal Date</div><div class="tp-field-val">${escH(acct.renewalDate)}</div></div>`);
+    }
+    if(acct.expiryDate){
+      fields.push(`<div class="tp-field"><div class="tp-field-lbl">Expiry Date</div><div class="tp-field-val">${escH(acct.expiryDate)}</div></div>`);
+    }
+
+    // ── APIs section ──
     const apisHtml=(acct.apis||[]).length>0?`
       <div class="tp-apis-section">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)">APIs (${acct.apis.length})</div>
+        <div class="tp-apis-hdr">
+          <div class="tp-apis-title">APIs <span style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:1px 8px;font-size:10px;margin-left:4px">${acct.apis.length}</span></div>
           <button id="tp-tab-runall-${i}" class="tp-api-run-btn" onclick="tpRunAllFromTab('${p}',${i},this)">▶ Run All</button>
         </div>
         ${acct.apis.map((api,ai)=>{
           const lastRun=api.lastRun;
           const badgeCss=lastRun?(lastRun.status==='reachable'?'color:var(--pass);background:rgba(5,150,105,.1);border-color:rgba(5,150,105,.3)':'color:var(--fail);background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.2)'):'';
-          const runBadge=lastRun?`<span id="tp-tab-badge-${i}-${ai}" style="font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;border:1px solid;${badgeCss}">${lastRun.status==='reachable'?'✓ Reachable':'✕ Unreachable'}</span>`:`<span id="tp-tab-badge-${i}-${ai}" style="display:none;font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;border:1px solid"></span>`;
+          const runBadge=lastRun?`<span id="tp-tab-badge-${i}-${ai}" style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;border:1px solid;${badgeCss}">${lastRun.status==='reachable'?'✓ Reachable':'✕ Unreachable'}</span>`:`<span id="tp-tab-badge-${i}-${ai}" style="display:none;font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;border:1px solid"></span>`;
           const respPanel=lastRun?.response?`<div id="tp-resp-${i}-${ai}" class="tp-api-resp-panel" style="display:none"><button type="button" onclick="tpToggleResp('${i}','${ai}')" class="tp-resp-toggle">▼ View Response</button><div id="tp-resp-body-${i}-${ai}" class="tp-api-resp-body">${_tpFmtResp(lastRun.response)}</div></div>`:`<div id="tp-resp-${i}-${ai}" class="tp-api-resp-panel" style="display:none"></div>`;
+          const methodColors={'GET':'#3b82f6','POST':'#10b981','PUT':'#f59e0b','PATCH':'#8b5cf6','DELETE':'#ef4444'};
+          const mc=methodColors[api.method]||'var(--mut)';
           return`<div class="tp-api-row" style="flex-direction:column;align-items:stretch;gap:4px">
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-              <span style="background:var(--card2);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;color:var(--inp)">${escH(api.method||'GET')}</span>
-              <span style="font-weight:600;color:var(--txt);flex:1">${escH(api.name||'—')}</span>
-              ${api.url?`<span style="color:var(--mut);font-size:10px;font-family:var(--font-mono)">${escH(api.url.replace(/^https?:\/\//,'').substring(0,32))}${api.url.length>35?'…':''}</span>`:''}
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="background:${mc}20;border:1px solid ${mc}40;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:800;color:${mc};min-width:42px;text-align:center">${escH(api.method||'GET')}</span>
+              <span style="font-weight:600;font-size:12px;color:var(--txt);flex:1">${escH(api.name||'—')}</span>
+              ${api.url?`<span style="color:var(--mut);font-size:11px;font-family:monospace;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escH(api.url)}">${escH(api.url.replace(/^https?:\/\//,'').substring(0,36))}${api.url.length>39?'…':''}</span>`:''}
               ${runBadge}
               <button id="tp-tab-run-${i}-${ai}" class="tp-api-run-btn" onclick="tpRunApiFromTab('${p}',${i},${ai},this)">▶ Run</button>
-              ${isAdmin()?`<button class="tt-action-btn" style="padding:1px 6px;font-size:10px" onclick="tpEditApi('${p}',${i},${ai})">✏ Edit</button><button class="tt-action-btn del" style="padding:1px 6px;font-size:10px" onclick="tpDeleteApi('${p}',${i},${ai})">✕</button>`:''}
+              ${isAdmin()?`<button class="tt-action-btn" style="padding:2px 8px;font-size:11px" onclick="tpEditApi('${p}',${i},${ai})">✏ Edit</button><button class="tt-action-btn del" style="padding:2px 8px;font-size:11px" onclick="tpDeleteApi('${p}',${i},${ai})">✕</button>`:''}
             </div>
             ${respPanel}
           </div>`;
         }).join('')}
       </div>`:'';
+
     return`<div class="tp-card">
       <div class="tp-card-hdr">
-        <div class="tp-card-name">${escH(acct.name||'(unnamed)')}</div>
-        ${expiryHtml}
-        ${isAdmin()?`<button class="tt-action-btn" onclick="tpOpenEdit('${p}',${i})">✏ Edit</button>
-        <button class="tt-action-btn" onclick="tpOpenAddApi('${p}',${i})">＋ API</button>
-        <button class="tt-action-btn del" onclick="tpDelete('${p}',${i})">✕</button>`:''}
+        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+          <div class="tp-card-name">${escH(acct.name||'(unnamed)')}</div>
+          ${expiryChip}
+        </div>
+        <div class="tp-hdr-actions">
+          ${isAdmin()?`
+            <button class="tt-action-btn" style="padding:4px 12px;font-size:12px;gap:4px" onclick="tpOpenEdit('${p}',${i})">✏ Edit</button>
+            <button class="tt-action-btn" style="padding:4px 12px;font-size:12px" onclick="tpOpenAddApi('${p}',${i})">＋ API</button>
+            <button class="tt-action-btn del" style="padding:4px 10px;font-size:12px" onclick="tpDelete('${p}',${i})" title="Delete account">✕</button>
+          `:''}
+        </div>
       </div>
       <div class="tp-card-body">
-        <div class="tp-field-grid">
-          ${acct.url?`<div class="tp-field"><div class="tp-field-lbl">URL</div><div style="display:flex;align-items:center;gap:6px"><a href="${escH(acct.url)}" target="_blank" class="tt-link-cell" style="font-size:11px">${escH(acct.url.replace(/^https?:\/\//,'').substring(0,40))}</a>${acct.environment?`<span style="flex-shrink:0;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:700;background:${acct.environment==='Production'?'rgba(99,102,241,.12)':acct.environment==='Staging'?'rgba(249,115,22,.12)':'rgba(16,185,129,.12)'};color:${acct.environment==='Production'?'#6366f1':acct.environment==='Staging'?'#f97316':'#10b981'};border:1px solid ${acct.environment==='Production'?'rgba(99,102,241,.3)':acct.environment==='Staging'?'rgba(249,115,22,.3)':'rgba(16,185,129,.3)'}">${escH(acct.environment)}</span>`:''}</div></div>`:''}
-          ${acct.username?`<div class="tp-field"><div class="tp-field-lbl">Username</div><div class="tp-field-val">${escH(acct.username)}</div></div>`:''}
-          ${acct.tpPassword?`<div class="tp-field"><div class="tp-field-lbl">Password</div><div class="tp-field-val" style="letter-spacing:2px">••••••••</div></div>`:''}
-          ${acct.credentials?`<div class="tp-field"><div class="tp-field-lbl">Credentials Used</div><div class="tp-field-val">${escH(acct.credentials)}</div></div>`:''}
-          ${acct.paymentBalance?`<div class="tp-field"><div class="tp-field-lbl">Payment Balance</div><div class="tp-field-val" style="font-weight:700;color:var(--pass)">${escH(acct.paymentBalance)}</div></div>`:''}
-          ${acct.renewalDate?`<div class="tp-field"><div class="tp-field-lbl">Renewal Date</div><div class="tp-field-val">${escH(acct.renewalDate)}</div></div>`:''}
-          ${acct.expiryDate?`<div class="tp-field"><div class="tp-field-lbl">Expiry Date</div><div class="tp-field-val">${escH(acct.expiryDate)}</div></div>`:''}
-        </div>
-        ${acct.note?`<div style="margin-top:10px;padding:8px 12px;background:var(--card2);border-radius:8px;border:1px solid var(--border);font-size:12px;color:var(--mut);white-space:pre-wrap;word-break:break-word"><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-right:8px;display:block;margin-bottom:4px">Note</span>${escH(acct.note)}</div>`:''}
+        ${fields.length?`<div class="tp-field-row">${fields.join('')}</div>`:''}
+        ${acct.note?`<div class="tp-note-box"><span class="tp-note-lbl">📝 Note</span>${escH(acct.note)}</div>`:''}
         ${apisHtml}
       </div>
     </div>`;
   }).join('');
-  return`<div style="padding:16px">
+
+  return`<div style="padding:16px 20px">
     <div class="tp-section-hdr">
       <div>
         <div style="font-size:18px;font-weight:800;color:var(--txt)">🔗 Third Party Accounts</div>
-        <div style="font-size:12px;color:var(--mut);margin-top:2px">${items.length} account${items.length!==1?'s':''}</div>
+        <div style="font-size:12px;color:var(--mut);margin-top:3px">${items.length} account${items.length!==1?'s':''}</div>
       </div>
       ${isAdmin()?`<button class="pov-add-btn" onclick="tpOpenAdd('${p}')">＋ Add Account</button>`:''}
     </div>
-    ${items.length===0?`<div class="pov-env-empty">No third party accounts added yet.${isAdmin()?` <button class="pov-add-btn" style="margin-left:10px" onclick="tpOpenAdd('${p}')">＋ Add Account</button>`:''}</div>`:cards}
+    ${items.length===0
+      ?`<div class="pov-env-empty">No third party accounts added yet.${isAdmin()?` <button class="pov-add-btn" style="margin-left:10px" onclick="tpOpenAdd('${p}')">＋ Add Account</button>`:''}</div>`
+      :cards}
   </div>`;
+}
+
+// Toggle password visibility in tp card
+function tpTogglePwd(p,i,pwd){
+  const el=document.getElementById('tp-pwd-'+p+'-'+i);
+  if(!el)return;
+  if(el.dataset.shown==='1'){el.textContent='••••••••';el.style.letterSpacing='3px';el.style.fontSize='16px';el.dataset.shown='0';}
+  else{el.textContent=pwd;el.style.letterSpacing='normal';el.style.fontSize='13px';el.dataset.shown='1';}
 }
 // ── Temp API rows for modal (add/edit) ──
 let _tpApiRows=[];
