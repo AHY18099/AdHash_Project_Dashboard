@@ -6485,17 +6485,54 @@ function restoreChecklistReport(p,i){
 // ══════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════
+// ── LOCALSTORAGE → SERVER MIGRATION ──
+// Reads all qa3_* keys from localStorage and pushes them to the server.
+// Called automatically when server has no data (first run after refactor).
+async function migrateLocalStorageToServer(){
+  const keys=[];
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(k&&(k.startsWith('qa3_')||k==='qa_users'||k==='qa3_daily_tasks'||k==='qa3_day_meta'||k==='qa3_team_tasks'||k==='qa3_releases'))keys.push(k);
+  }
+  if(!keys.length)return 0;
+  const migData={};
+  for(const k of keys){
+    try{const v=localStorage.getItem(k);if(v){migData[k]=JSON.parse(v);}}catch(e){}
+  }
+  // Push each key to server
+  await Promise.all(Object.entries(migData).map(([k,v])=>
+    fetch('/api/qa-data/'+encodeURIComponent(k),{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({value:v})
+    }).catch(()=>{})
+  ));
+  return Object.keys(migData).length;
+}
+
 window.addEventListener('DOMContentLoaded',async()=>{
   initTheme();
   // Show loading overlay while we fetch all data from server
   const loadEl=document.createElement('div');
   loadEl.id='srv-loading';
   loadEl.style.cssText='position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-family:inherit';
-  loadEl.innerHTML='<div style="width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--grad-a);border-radius:50%;animation:spin .7s linear infinite"></div><div style="color:var(--mut);font-size:13px;font-weight:500">Loading workspace…</div>';
+  loadEl.innerHTML='<div style="width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--grad-a);border-radius:50%;animation:spin .7s linear infinite"></div><div id="srv-loading-msg" style="color:var(--mut);font-size:13px;font-weight:500">Loading workspace…</div>';
   document.body.appendChild(loadEl);
 
   // Load all data from server (single source of truth — no localStorage)
   await loadFromServer();
+
+  // If server has no project data, migrate from localStorage (handles first run after refactor)
+  const serverHasData=Object.keys(_serverData).some(k=>k.startsWith('qa3_'));
+  if(!serverHasData){
+    const msgEl=document.getElementById('srv-loading-msg');
+    if(msgEl)msgEl.textContent='Migrating your data to server…';
+    const n=await migrateLocalStorageToServer();
+    if(n>0){
+      // reload from server now that migration is done
+      await loadFromServer();
+    }
+  }
+
   initUsers();
   loadAllState();
 
