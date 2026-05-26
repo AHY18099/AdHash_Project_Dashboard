@@ -3976,110 +3976,245 @@ app.post('/api/proxy', async (req, res) => {
     }
 });
 
-// ── WORKFLOW DOCS FILE STORAGE ──
+// ── WORKFLOW DOCS FILE STORAGE — GitHub Releases backend ──
+// Files are stored as GitHub Release assets (up to 2GB each, permanent, survives any redeploy).
+// Railway disk is used only as a local cache; GitHub Release is the source of truth.
+
 const WF_DOCS_DIR = path.join(__dirname, 'data', 'wfdocs');
 fs.mkdirSync(WF_DOCS_DIR, { recursive: true });
+const GH_WFDOC_RELEASE_TAG = 'wfdoc-storage';
 
-// Helper: persist wfdoc metadata list for a project into qa-shared.json so it survives redeploys
-function _persistWfDocMeta(projectId) {
+// Ensure the wfdoc storage release exists, return its id
+async function _ghEnsureWfDocRelease() {
+    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+    if (!token) return null;
     try {
-        const projectDir = path.join(WF_DOCS_DIR, projectId);
-        const metaList = fs.existsSync(projectDir)
-            ? fs.readdirSync(projectDir).filter(f => f.endsWith('.meta.json')).map(f => {
-                try { return JSON.parse(fs.readFileSync(path.join(projectDir, f), 'utf8')); } catch { return null; }
-              }).filter(Boolean)
-            : [];
-        // Merge into qa-shared.json under the project's wfdocs key
+        // Try to get existing release
+        const get = await _ghRequest('GET', `/repos/${GH_API_REPO}/releases/tags/${GH_WFDOC_RELEASE_TAG}`, null, token);
+        if (get.status === 200) return get.body.id;
+        // Create it
+        const create = await _ghRequest('POST', `/repos/${GH_API_REPO}/releases`, {
+            tag_name: GH_WFDOC_RELEASE_TAG, name: 'Workflow Document Storage',
+            body: 'Internal storage for workflow documents. Do not delete.',
+            draft: false, prerelease: false
+        }, token);
+        if (create.status === 201) { console.log('[wfdoc] Created GitHub Release for storage, id:', create.body.id); return create.body.id; }
+        console.error('[wfdoc] Could not create release:', create.status, create.body && create.body.message);
+        return null;
+    } catch (e) { console.error('[wfdoc] _ghEnsureWfDocRelease error:', e.message); return null; }
+}
+
+// Upload buffer to GitHub Release as an asset, return asset download_url
+async function _ghUploadWfDocAsset(releaseId, assetName, buffer, mimeType) {
+    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+    if (!token) return null;
+    return new Promise((resolve, reject) => {
+        const https = require('https');
+        const options = {
+            hostname: 'uploads.github.com',
+            path: `/repos/${GH_API_REPO}/releases/${releaseId}/assets?name=${encodeURIComponent(assetName)}`,
+            method: 'POST',
+            headers: {
+                'Authorization': `token ${token}`, 'User-Agent': 'AdHash-Dashboard',
+                'Content-Type': mimeType || 'application/octet-stream',
+                'Content-Length': buffer.length
+            }
+        };
+        const req = https.request(options, res => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const r = JSON.parse(data);
+                    if (res.statusCode === 201) resolve(r.browser_download_url || r.url);
+                    else { console.error('[wfdoc] upload asset failed:', res.statusCode, r.message); resolve(null); }
+                } catch (e) { resolve(null); }
+            });
+        });
+        req.on('error', reject);
+        req.setTimeout(120000, () => { req.destroy(); reject(new Error('upload timeout')); });
+        req.write(buffer);
+        req.end();
+    });
+}
+
+// Delete a GitHub Release asset by asset id
+async function _ghDeleteWfDocAsset(assetId) {
+    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+    if (!token) return;
+    try {
+        await _ghRequest('DELETE', `/repos/${GH_API_REPO}/releases/assets/${assetId}`, null, token);
+    } catch (e) { console.error('[wfdoc] delete asset error:', e.message); }
+}
+
+// Persist wfdoc metadata into qa-shared.json (survives redeploy)
+function _persistWfDocMeta(projectId, wfdocList) {
+    try {
         const shared = readQaData();
         const projKey = 'qa3_' + projectId;
         if (!shared[projKey]) shared[projKey] = {};
-        // Keep only metadata (no base64 data), mark with serverId
-        shared[projKey].wfdocs = metaList.map(m => ({
-            name: m.name, size: m.size || 0, uploadedAt: m.uploadedAt || '', serverId: m.fileId
-        }));
+        shared[projKey].wfdocs = wfdocList;
         writeQaData(shared);
     } catch (e) { console.error('_persistWfDocMeta error:', e.message); }
 }
 
-// POST /api/wfdocs/:projectId — upload a file (base64 JSON body)
-app.post('/api/wfdocs/:projectId', (req, res) => {
+// POST /api/wfdocs/:projectId — upload a file, store in GitHub Release
+app.post('/api/wfdocs/:projectId', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     const { name, data: b64data, size } = req.body || {};
     if (!name || !b64data) return res.status(400).json({ error: 'Missing name or data' });
-    const projectDir = path.join(WF_DOCS_DIR, req.params.projectId);
-    fs.mkdirSync(projectDir, { recursive: true });
-    const fileId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-    const metaPath = path.join(projectDir, fileId + '.meta.json');
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const uploadedAt = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const mimeType = b64data.split(';')[0].replace('data:', '') || 'application/octet-stream';
     const base64 = b64data.replace(/^data:[^;]+;base64,/, '');
-    const filePath = path.join(projectDir, fileId + '.bin');
+    const buffer = Buffer.from(base64, 'base64');
+    const fileId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    const assetName = fileId + '_' + name.replace(/[^a-zA-Z0-9._-]/g, '_');
+
     try {
-        fs.writeFileSync(filePath, Buffer.from(base64, 'base64'));
-        const now = new Date();
-        const pad = n => String(n).padStart(2, '0');
-        const uploadedAt = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-        const meta = { name, size, fileId, uploadedAt, mimeType: b64data.split(';')[0].replace('data:', '') || 'application/octet-stream' };
-        fs.writeFileSync(metaPath, JSON.stringify(meta));
-        // Persist metadata list to qa-shared.json so it survives redeploys
-        _persistWfDocMeta(req.params.projectId);
+        // Try GitHub Release upload first
+        const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+        let ghAssetId = null;
+        let ghUrl = null;
+        if (token) {
+            const releaseId = await _ghEnsureWfDocRelease();
+            if (releaseId) {
+                ghUrl = await _ghUploadWfDocAsset(releaseId, assetName, buffer, mimeType);
+                // Get asset id for future deletion
+                if (ghUrl) {
+                    const rel = await _ghRequest('GET', `/repos/${GH_API_REPO}/releases/tags/${GH_WFDOC_RELEASE_TAG}`, null, token);
+                    if (rel.status === 200) {
+                        const asset = (rel.body.assets || []).find(a => a.name === assetName);
+                        if (asset) ghAssetId = asset.id;
+                    }
+                }
+            }
+        }
+
+        // Also write to local disk as cache
+        const projectDir = path.join(WF_DOCS_DIR, req.params.projectId);
+        fs.mkdirSync(projectDir, { recursive: true });
+        fs.writeFileSync(path.join(projectDir, fileId + '.bin'), buffer);
+        const meta = { name, size: size || buffer.length, fileId, uploadedAt, mimeType, ghAssetId, ghUrl, assetName };
+        fs.writeFileSync(path.join(projectDir, fileId + '.meta.json'), JSON.stringify(meta));
+
+        // Read current wfdocs list from qa-shared.json and append
+        const shared = readQaData();
+        const projKey = 'qa3_' + req.params.projectId;
+        const current = (shared[projKey] && shared[projKey].wfdocs) || [];
+        const newEntry = { name, size: size || buffer.length, uploadedAt, serverId: fileId, ghAssetId, ghUrl, assetName };
+        _persistWfDocMeta(req.params.projectId, [...current, newEntry]);
+
+        if (ghUrl) console.log(`[wfdoc] Uploaded "${name}" to GitHub Release: ${ghUrl}`);
+        else console.log(`[wfdoc] Uploaded "${name}" to local disk only (no GitHub token or upload failed)`);
+
         res.json({ success: true, fileId });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
 });
 
-// GET /api/wfdocs/:projectId — list files for a project
-// Merges disk metadata with qa-shared.json metadata so list survives even if .bin files are gone
+// GET /api/wfdocs/:projectId — list files
 app.get('/api/wfdocs/:projectId', (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
-    const projectDir = path.join(WF_DOCS_DIR, req.params.projectId);
-    // Files that still have their .bin on disk
-    const diskFiles = fs.existsSync(projectDir)
-        ? fs.readdirSync(projectDir).filter(f => f.endsWith('.meta.json')).map(f => {
-            try { return JSON.parse(fs.readFileSync(path.join(projectDir, f), 'utf8')); } catch { return null; }
-          }).filter(Boolean)
-        : [];
-    // Also check qa-shared.json for metadata of files whose .bin may have been lost
     const shared = readQaData();
     const projKey = 'qa3_' + req.params.projectId;
-    const sharedMeta = (shared[projKey]?.wfdocs || []).filter(m => m.serverId);
-    // Merge: disk is authoritative, fill in any from shared that aren't on disk
-    const diskIds = new Set(diskFiles.map(f => f.fileId));
-    const merged = [...diskFiles];
-    for (const sm of sharedMeta) {
-        if (!diskIds.has(sm.serverId)) {
-            // File was lost from disk — include metadata but mark as unavailable
-            merged.push({ name: sm.name, size: sm.size, uploadedAt: sm.uploadedAt, fileId: sm.serverId, unavailable: true });
-        }
-    }
-    res.json(merged);
+    const wfdocs = (shared[projKey] && shared[projKey].wfdocs) || [];
+    // Mark each file as available (disk or ghUrl) or unavailable
+    const projectDir = path.join(WF_DOCS_DIR, req.params.projectId);
+    const result = wfdocs.map(f => {
+        const onDisk = fs.existsSync(path.join(projectDir, (f.serverId || '') + '.bin'));
+        return { ...f, fileId: f.serverId, available: onDisk || !!f.ghUrl };
+    });
+    res.json(result);
 });
 
 // GET /api/wfdocs/:projectId/:fileId — download a file
-app.get('/api/wfdocs/:projectId/:fileId', (req, res) => {
+app.get('/api/wfdocs/:projectId/:fileId', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     const { projectId, fileId } = req.params;
     const projectDir = path.join(WF_DOCS_DIR, projectId);
+    const diskPath = path.join(projectDir, fileId + '.bin');
     const metaPath = path.join(projectDir, fileId + '.meta.json');
-    const filePath = path.join(projectDir, fileId + '.bin');
-    if (!fs.existsSync(filePath) || !fs.existsSync(metaPath)) return res.status(404).json({ error: 'File not found. It may have been lost in a server redeploy — please re-upload.' });
-    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-    res.setHeader('Content-Type', meta.mimeType || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(meta.name)}"`);
-    res.send(fs.readFileSync(filePath));
+
+    // Try disk first (fast)
+    if (fs.existsSync(diskPath) && fs.existsSync(metaPath)) {
+        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+        res.setHeader('Content-Type', meta.mimeType || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(meta.name)}"`);
+        return res.send(fs.readFileSync(diskPath));
+    }
+
+    // Disk miss — check qa-shared.json for GitHub URL
+    const shared = readQaData();
+    const projKey = 'qa3_' + projectId;
+    const wfdocs = (shared[projKey] && shared[projKey].wfdocs) || [];
+    const entry = wfdocs.find(f => f.serverId === fileId);
+
+    if (entry && entry.ghUrl) {
+        // Stream from GitHub Release
+        try {
+            const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+            const https = require('https');
+            // GitHub release asset download requires auth redirect handling
+            const dlUrl = new URL(entry.ghUrl);
+            const options = {
+                hostname: dlUrl.hostname, path: dlUrl.pathname + dlUrl.search,
+                headers: { 'Authorization': `token ${token}`, 'User-Agent': 'AdHash-Dashboard', 'Accept': 'application/octet-stream' }
+            };
+            const ghReq = https.get(options, ghRes => {
+                if (ghRes.statusCode === 302 || ghRes.statusCode === 301) {
+                    // Follow redirect
+                    https.get(ghRes.headers.location, ghRes2 => {
+                        res.setHeader('Content-Type', entry.mimeType || 'application/octet-stream');
+                        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(entry.name)}"`);
+                        ghRes2.pipe(res);
+                        // Cache to disk for next time
+                        const chunks = [];
+                        ghRes2.on('data', c => chunks.push(c));
+                        ghRes2.on('end', () => {
+                            try {
+                                fs.mkdirSync(projectDir, { recursive: true });
+                                fs.writeFileSync(diskPath, Buffer.concat(chunks));
+                            } catch (_) {}
+                        });
+                    }).on('error', () => res.status(502).json({ error: 'Failed to fetch from GitHub' }));
+                    return;
+                }
+                res.setHeader('Content-Type', entry.mimeType || 'application/octet-stream');
+                res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(entry.name)}"`);
+                ghRes.pipe(res);
+            });
+            ghReq.on('error', () => res.status(502).json({ error: 'Failed to fetch from GitHub' }));
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    } else {
+        res.status(404).json({ error: 'File not found. Please re-upload.' });
+    }
 });
 
-// DELETE /api/wfdocs/:projectId/:fileId — delete a file
-app.delete('/api/wfdocs/:projectId/:fileId', (req, res) => {
+// DELETE /api/wfdocs/:projectId/:fileId — delete a file from disk + GitHub Release
+app.delete('/api/wfdocs/:projectId/:fileId', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     const { projectId, fileId } = req.params;
     const projectDir = path.join(WF_DOCS_DIR, projectId);
-    const metaPath = path.join(projectDir, fileId + '.meta.json');
-    const filePath = path.join(projectDir, fileId + '.bin');
     try {
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        const diskPath = path.join(projectDir, fileId + '.bin');
+        const metaPath = path.join(projectDir, fileId + '.meta.json');
+        if (fs.existsSync(diskPath)) fs.unlinkSync(diskPath);
         if (fs.existsSync(metaPath)) fs.unlinkSync(metaPath);
-        // Update qa-shared.json metadata after delete
-        _persistWfDocMeta(projectId);
+
+        // Remove from qa-shared.json and delete GitHub asset
+        const shared = readQaData();
+        const projKey = 'qa3_' + projectId;
+        const before = (shared[projKey] && shared[projKey].wfdocs) || [];
+        const entry = before.find(f => f.serverId === fileId);
+        const after = before.filter(f => f.serverId !== fileId);
+        _persistWfDocMeta(projectId, after);
+
+        // Delete from GitHub Release if we have the asset id
+        if (entry && entry.ghAssetId) await _ghDeleteWfDocAsset(entry.ghAssetId);
+
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -4145,6 +4280,48 @@ app.post('/api/qa-data/:key', (req, res) => {
     }
 });
 
+// On startup: migrate any local wfdoc .bin files that have no ghUrl yet to GitHub Releases
+async function migrateWfDocsToGitHub() {
+    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+    if (!token) return;
+    const shared = readQaData();
+    let anyMigrated = false;
+    for (const projKey of Object.keys(shared)) {
+        if (!projKey.startsWith('qa3_')) continue;
+        const projectId = projKey.replace('qa3_', '');
+        const wfdocs = (shared[projKey] && shared[projKey].wfdocs) || [];
+        const needMigration = wfdocs.filter(f => !f.ghUrl && f.serverId);
+        if (!needMigration.length) continue;
+        const projectDir = path.join(WF_DOCS_DIR, projectId);
+        for (const entry of needMigration) {
+            const binPath = path.join(projectDir, entry.serverId + '.bin');
+            const metaPath = path.join(projectDir, entry.serverId + '.meta.json');
+            if (!fs.existsSync(binPath)) { console.log(`[migrate] No bin for ${entry.name} — skipping`); continue; }
+            try {
+                const buffer = fs.readFileSync(binPath);
+                const meta = fs.existsSync(metaPath) ? JSON.parse(fs.readFileSync(metaPath, 'utf8')) : {};
+                const mimeType = meta.mimeType || entry.mimeType || 'application/octet-stream';
+                const assetName = (entry.serverId) + '_' + (entry.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+                const releaseId = await _ghEnsureWfDocRelease();
+                if (!releaseId) continue;
+                const ghUrl = await _ghUploadWfDocAsset(releaseId, assetName, buffer, mimeType);
+                if (ghUrl) {
+                    // Get asset id
+                    const rel = await _ghRequest('GET', `/repos/${GH_API_REPO}/releases/tags/${GH_WFDOC_RELEASE_TAG}`, null, token);
+                    const asset = rel.status === 200 ? (rel.body.assets || []).find(a => a.name === assetName) : null;
+                    entry.ghUrl = ghUrl;
+                    entry.ghAssetId = asset ? asset.id : null;
+                    entry.assetName = assetName;
+                    anyMigrated = true;
+                    console.log(`[migrate] Uploaded "${entry.name}" to GitHub Release`);
+                }
+            } catch (e) { console.error(`[migrate] Failed for ${entry.name}:`, e.message); }
+        }
+        if (anyMigrated) shared[projKey].wfdocs = wfdocs;
+    }
+    if (anyMigrated) { writeQaData(shared); console.log('[migrate] wfdoc migration complete, qa-shared.json updated'); }
+}
+
 // Start server — pull latest data from GitHub first so redeploys never lose data
 pullQaDataFromGitHub().catch(e => console.error('[startup] pullQaDataFromGitHub failed:', e.message)).finally(() => {
 app.listen(PORT, () => {
@@ -4167,8 +4344,13 @@ app.listen(PORT, () => {
     logToArray('info', `Server started successfully on port ${PORT}`);
     logToArray('info', 'Project dashboard available at http://localhost:' + PORT);
 
-    // On startup, recover persisted results and attempt Zoho summary dispatch.
+    // On startup, migrate wfdocs to GitHub Releases + recover persisted test results.
     (async () => {
+        try {
+            await migrateWfDocsToGitHub();
+        } catch (e) {
+            console.error('[startup] wfdoc migration failed:', e.message);
+        }
         try {
             const recovered = await recoverCompletedRunFromState();
             if (recovered) {
