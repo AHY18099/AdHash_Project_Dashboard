@@ -19,11 +19,12 @@ function writeQaData(data) {
     schedulePersistQaData();
 }
 
-// Debounced: commit+push qa-shared.json to GitHub at most once every 30s
+// Debounced: commit+push qa-shared.json to GitHub — 5s debounce so rapid saves batch up
 let _persistQaTimer = null;
-function schedulePersistQaData() {
+function schedulePersistQaData(urgent = false) {
     if (_persistQaTimer) clearTimeout(_persistQaTimer);
-    _persistQaTimer = setTimeout(() => { _persistQaTimer = null; persistQaDataToGitHub(); }, 30000);
+    const delay = urgent ? 2000 : 5000;
+    _persistQaTimer = setTimeout(() => { _persistQaTimer = null; persistQaDataToGitHub(); }, delay);
 }
 
 function persistQaDataToGitHub() {
@@ -4001,7 +4002,9 @@ app.post('/api/qa-data-bulk', (req, res) => {
         for (const [k, v] of Object.entries(records)) {
             if (k && v !== undefined) { data[k] = v; count++; }
         }
-        writeQaData(data);
+        fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
+        fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
+        schedulePersistQaData(true); // urgent — push to git immediately after bulk restore
         res.json({ status: 'saved', count });
     } catch (e) {
         res.status(500).json({ error: e.message });
