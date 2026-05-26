@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AdHash — Data Restore Tool</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 36px; max-width: 580px; width: 100%; }
+h1 { font-size: 22px; font-weight: 800; color: #f1f5f9; margin-bottom: 6px; }
+.sub { color: #64748b; font-size: 13px; margin-bottom: 28px; line-height: 1.5; }
+.info-box { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; font-size: 13px; color: #94a3b8; line-height: 1.6; }
+.info-box strong { color: #e2e8f0; }
+.key-list { margin-top: 16px; background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 14px 16px; max-height: 200px; overflow-y: auto; display: none; }
+.key-list-item { font-size: 12px; font-family: monospace; color: #94a3b8; padding: 2px 0; border-bottom: 1px solid #1e293b; }
+.key-list-item:last-child { border-bottom: none; }
+.status { margin-top: 20px; padding: 16px; border-radius: 10px; font-size: 13px; font-weight: 600; display: none; line-height: 1.5; }
+.status.info { background: rgba(59,130,246,.12); border: 1px solid rgba(59,130,246,.3); color: #93c5fd; display: block; }
+.status.ok   { background: rgba(5,150,105,.12); border: 1px solid rgba(5,150,105,.3); color: #6ee7b7; display: block; }
+.status.err  { background: rgba(239,68,68,.10); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; display: block; }
+.log { margin-top: 10px; font-size: 11px; font-family: monospace; color: #94a3b8; max-height: 180px; overflow-y: auto; line-height: 1.7; white-space: pre-wrap; background: rgba(0,0,0,.3); border-radius: 6px; padding: 8px; }
+button.primary { width: 100%; padding: 14px; border: none; border-radius: 50px; cursor: pointer; font-size: 15px; font-weight: 700; color: #fff; background: linear-gradient(135deg, #3b82f6, #8b5cf6); margin-top: 20px; font-family: inherit; transition: opacity .2s, transform .2s; box-shadow: 0 4px 20px rgba(59,130,246,.35); }
+button.primary:hover:not(:disabled) { opacity: .92; transform: translateY(-2px); }
+button.primary:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.found-count { text-align: center; font-size: 13px; margin-top: 16px; font-weight: 600; }
+.found-count.good { color: #6ee7b7; }
+.found-count.none { color: #fca5a5; }
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 8px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🔄 AdHash Data Restore</h1>
+  <div class="sub">Reads all your saved AdHash data from this browser and pushes it to the server — so all team members can see it.</div>
+
+  <div class="info-box">
+    <strong>Open this page in the browser where your data was saved.</strong><br>
+    This tool recovers: credentials, smoke tests, prod checklist, third party accounts, staging info, daily tasks, workflow doc metadata, and all other project data.
+  </div>
+
+  <div id="found-count" class="found-count"></div>
+  <div id="key-list" class="key-list"></div>
+  <div id="status" class="status"></div>
+
+  <button class="primary" id="btn" onclick="doRestore()" disabled>🔄 Restore All Data to Server</button>
+  <button class="primary" id="show-keys-btn" onclick="toggleKeys()" style="background:rgba(99,102,241,.15);color:#818cf8;box-shadow:none;border:1px solid rgba(99,102,241,.3);margin-top:10px;font-size:13px;padding:10px;display:none">Show what will be restored</button>
+</div>
+
+<script>
+let _migData = {};
+
+window.addEventListener('DOMContentLoaded', () => {
+  scanLocalStorage();
+});
+
+function scanLocalStorage() {
+  _migData = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k) continue;
+    if (k.startsWith('qa3_') || k === 'qa_users' || k === 'qa3_daily_tasks' || k === 'qa3_day_meta' || k === 'qa3_team_tasks' || k === 'qa3_releases') {
+      try {
+        let v = JSON.parse(localStorage.getItem(k));
+        // Strip base64 wfdoc blobs — too large, wfdoc files handled separately
+        if (v && typeof v === 'object' && v.wfdocs) {
+          v = { ...v, wfdocs: (v.wfdocs || []).map(d => { const c = { ...d }; delete c.data; return c; }) };
+        }
+        _migData[k] = v;
+      } catch (e) {}
+    }
+  }
+
+  const count = Object.keys(_migData).length;
+  const countEl = document.getElementById('found-count');
+  const btn = document.getElementById('btn');
+  const showBtn = document.getElementById('show-keys-btn');
+
+  if (count > 0) {
+    countEl.className = 'found-count good';
+    countEl.textContent = `✓ Found ${count} data records in this browser ready to restore`;
+    btn.disabled = false;
+    showBtn.style.display = 'block';
+  } else {
+    countEl.className = 'found-count none';
+    countEl.textContent = '⚠ No AdHash data found in this browser. Open this page from the browser/device where you originally had the data.';
+    btn.disabled = true;
+  }
+}
+
+function toggleKeys() {
+  const el = document.getElementById('key-list');
+  const btn = document.getElementById('show-keys-btn');
+  if (el.style.display === 'block') {
+    el.style.display = 'none';
+    btn.textContent = 'Show what will be restored';
+    return;
+  }
+  el.innerHTML = Object.entries(_migData).map(([k, v]) => {
+    let desc = '';
+    if (k.startsWith('qa3_') && v && typeof v === 'object') {
+      const parts = [];
+      if (v.smoke?.length) parts.push(`${v.smoke.length} smoke tests`);
+      if (v.prod?.length) parts.push(`${v.prod.length} checklist`);
+      if (v.credentials?.length) parts.push(`${v.credentials.length} credentials`);
+      if (v.thirdparty?.length) parts.push(`${v.thirdparty.length} 3rd party`);
+      if (v.wfdocs?.length) parts.push(`${v.wfdocs.length} docs`);
+      if (v.pendingtasks?.length) parts.push(`${v.pendingtasks.length} tasks`);
+      if (parts.length) desc = ' — ' + parts.join(', ');
+    }
+    return `<div class="key-list-item">${k}${desc}</div>`;
+  }).join('');
+  el.style.display = 'block';
+  btn.textContent = 'Hide list';
+}
+
+async function doRestore() {
+  const btn = document.getElementById('btn');
+  const statusEl = document.getElementById('status');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Restoring…';
+
+  const keys = Object.keys(_migData);
+  if (!keys.length) {
+    statusEl.className = 'status err';
+    statusEl.textContent = 'No data found in this browser.';
+    btn.disabled = false;
+    btn.textContent = '🔄 Restore All Data to Server';
+    return;
+  }
+
+  statusEl.className = 'status info';
+  statusEl.innerHTML = `<span class="spinner"></span>Sending ${keys.length} records to server…`;
+
+  try {
+    const r = await fetch('/api/qa-data-bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ records: _migData })
+    });
+    const result = await r.json();
+
+    if (r.ok && result.count > 0) {
+      statusEl.className = 'status ok';
+      statusEl.innerHTML = `✅ Successfully restored ${result.count} records to the server!<div class="log">${keys.map(k => '✓ ' + k).join('\n')}</div><div style="margin-top:12px;font-size:12px;color:#94a3b8">All data is now saved to the server. Reload the main dashboard — your data will be visible on all devices.</div>`;
+      btn.textContent = '← Go to Dashboard';
+      btn.disabled = false;
+      btn.onclick = () => { window.location.href = '/'; };
+    } else {
+      throw new Error(result.error || `Server returned status ${r.status}`);
+    }
+  } catch (e) {
+    // Bulk failed — try one by one
+    statusEl.className = 'status info';
+    statusEl.innerHTML = `Bulk upload failed, trying one by one…<div class="log" id="log"></div>`;
+    const log = document.getElementById('log');
+    let ok = 0, fail = 0;
+    for (const [k, v] of Object.entries(_migData)) {
+      try {
+        const r2 = await fetch('/api/qa-data/' + encodeURIComponent(k), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: v })
+        });
+        if (r2.ok) { ok++; log.textContent += `✓ ${k}\n`; }
+        else { fail++; log.textContent += `✕ ${k} (HTTP ${r2.status})\n`; }
+      } catch (e2) {
+        fail++; log.textContent += `✕ ${k}: ${e2.message}\n`;
+      }
+      log.scrollTop = log.scrollHeight;
+    }
+    if (fail === 0) {
+      statusEl.className = 'status ok';
+      statusEl.innerHTML = `✅ Restored ${ok} records!<div class="log">${log.textContent}</div>`;
+      btn.textContent = '← Go to Dashboard';
+      btn.disabled = false;
+      btn.onclick = () => { window.location.href = '/'; };
+    } else {
+      statusEl.className = 'status err';
+      statusEl.innerHTML = `⚠ ${ok} succeeded, ${fail} failed.<div class="log">${log.textContent}</div>`;
+      btn.textContent = '🔄 Try Again';
+      btn.disabled = false;
+    }
+  }
+}
+</script>
+</body>
+</html>

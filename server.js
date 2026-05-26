@@ -3983,6 +3983,23 @@ app.delete('/api/qa-data/:key', (req, res) => {
     catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/qa-data-bulk — restore many keys at once (used by restore tool)
+app.post('/api/qa-data-bulk', (req, res) => {
+    const { records } = req.body || {};
+    if (!records || typeof records !== 'object') return res.status(400).json({ error: 'Missing records' });
+    try {
+        const data = readQaData();
+        let count = 0;
+        for (const [k, v] of Object.entries(records)) {
+            if (k && v !== undefined) { data[k] = v; count++; }
+        }
+        writeQaData(data);
+        res.json({ status: 'saved', count });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // POST /api/qa-data/:key — save one key's value
 app.post('/api/qa-data/:key', (req, res) => {
     const key = req.params.key;
