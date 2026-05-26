@@ -6486,27 +6486,63 @@ function restoreChecklistReport(p,i){
 // INIT
 // ══════════════════════════════════════════════════════
 // ── LOCALSTORAGE → SERVER MIGRATION ──
-// Reads all qa3_* keys from localStorage and pushes them to the server.
-// Called automatically when server has no data (first run after refactor).
-async function migrateLocalStorageToServer(){
-  const keys=[];
+function _lsCollectMigData(){
+  const migData={};
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
-    if(k&&(k.startsWith('qa3_')||k==='qa_users'||k==='qa3_daily_tasks'||k==='qa3_day_meta'||k==='qa3_team_tasks'||k==='qa3_releases'))keys.push(k);
+    if(!k)continue;
+    if(k.startsWith('qa3_')||k==='qa_users'||k==='qa3_daily_tasks'||k==='qa3_day_meta'||k==='qa3_team_tasks'||k==='qa3_releases'){
+      try{
+        let v=JSON.parse(localStorage.getItem(k));
+        // Strip base64 wfdoc blobs — they are too large and handled separately
+        if(v&&typeof v==='object'&&v.wfdocs){
+          v={...v,wfdocs:(v.wfdocs||[]).map(d=>{const c={...d};delete c.data;return c;})};
+        }
+        migData[k]=v;
+      }catch(e){}
+    }
   }
-  if(!keys.length)return 0;
-  const migData={};
-  for(const k of keys){
-    try{const v=localStorage.getItem(k);if(v){migData[k]=JSON.parse(v);}}catch(e){}
+  return migData;
+}
+
+async function migrateLocalStorageToServer(){
+  const migData=_lsCollectMigData();
+  if(!Object.keys(migData).length)return 0;
+  // Push one at a time (not parallel) to avoid overwhelming server
+  for(const [k,v] of Object.entries(migData)){
+    try{
+      await fetch('/api/qa-data/'+encodeURIComponent(k),{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({value:v})
+      });
+    }catch(e){}
   }
-  // Push each key to server
-  await Promise.all(Object.entries(migData).map(([k,v])=>
-    fetch('/api/qa-data/'+encodeURIComponent(k),{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({value:v})
-    }).catch(()=>{})
-  ));
   return Object.keys(migData).length;
+}
+
+// Show a restore banner if localStorage has project data the server is missing
+function _checkShowRestoreBanner(){
+  const lsKeys=[];
+  for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('qa3_proj'))lsKeys.push(k);}
+  if(!lsKeys.length)return;
+  // Check if server already has this data
+  const serverHasAll=lsKeys.every(k=>_serverData[k]&&JSON.stringify(_serverData[k]).length>50);
+  if(serverHasAll)return;
+  // Show banner
+  const banner=document.createElement('div');
+  banner.id='restore-banner';
+  banner.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9990;background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;padding:12px 24px;border-radius:50px;font-size:13px;font-weight:700;box-shadow:0 8px 32px rgba(0,0,0,.25);display:flex;align-items:center;gap:12px;cursor:pointer;font-family:inherit';
+  banner.innerHTML='⚠ This browser has data not yet saved to server. <span style="background:rgba(255,255,255,.25);padding:4px 14px;border-radius:50px;margin-left:4px">Click to Restore Now</span>';
+  banner.onclick=async()=>{
+    banner.innerHTML='<div style="width:18px;height:18px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0"></div> Restoring data…';
+    const n=await migrateLocalStorageToServer();
+    await loadFromServer();
+    loadAllState();
+    renderTopBar();renderProjectGrid();
+    banner.remove();
+    toast(`✓ Restored data from this browser (${n} records)`);
+  };
+  document.body.appendChild(banner);
 }
 
 window.addEventListener('DOMContentLoaded',async()=>{
@@ -6521,14 +6557,13 @@ window.addEventListener('DOMContentLoaded',async()=>{
   // Load all data from server (single source of truth — no localStorage)
   await loadFromServer();
 
-  // If server has no project data, migrate from localStorage (handles first run after refactor)
+  // If server has no project data, auto-migrate from localStorage
   const serverHasData=Object.keys(_serverData).some(k=>k.startsWith('qa3_'));
   if(!serverHasData){
     const msgEl=document.getElementById('srv-loading-msg');
-    if(msgEl)msgEl.textContent='Migrating your data to server…';
+    if(msgEl)msgEl.textContent='Restoring your data…';
     const n=await migrateLocalStorageToServer();
     if(n>0){
-      // reload from server now that migration is done
       await loadFromServer();
     }
   }
@@ -6555,6 +6590,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
     document.getElementById('dashboard').style.display='block';
     PROJECTS.forEach(p=>{curTab[p.id]=curTab[p.id]||'projoverview';});
     renderTopBar();renderProjectGrid();
+    // Check if this browser has localStorage data not yet on the server
+    setTimeout(()=>_checkShowRestoreBanner(),800);
     // sync wfdocs from server after initial render
     syncWfDocsFromServer().then(()=>{
       PROJECTS.forEach(p=>{if(curTab[p.id]==='wfdocs')renderProject(p.id);});
