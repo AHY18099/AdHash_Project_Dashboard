@@ -3974,6 +3974,15 @@ app.get('/api/qa-data/:key', (req, res) => {
     res.json({ key, value: data[key] });
 });
 
+// DELETE /api/qa-data/:key — remove a key
+app.delete('/api/qa-data/:key', (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    const data = readQaData();
+    delete data[req.params.key];
+    try { writeQaData(data); res.json({ status: 'deleted', key: req.params.key }); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /api/qa-data/:key — save one key's value
 app.post('/api/qa-data/:key', (req, res) => {
     const key = req.params.key;

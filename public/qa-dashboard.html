@@ -209,6 +209,7 @@ body.dark .uchip:hover{border-color:rgba(126,179,255,0.3);box-shadow:0 0 16px rg
 body.dark .udd{background:rgba(10,15,28,0.98);border-color:rgba(126,179,255,0.15);box-shadow:0 20px 60px rgba(0,0,0,0.8),0 0 0 1px rgba(126,179,255,0.08)}
 
 /* ── ANIMATIONS ── */
+@keyframes spin{to{transform:rotate(360deg)}}
 @keyframes fadeInDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:none}}
 @keyframes fadeInUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -1721,8 +1722,8 @@ function platformSwitcher(p,currentTab){
 
 // ══ AUTH ══
 const QA_SA_EMAIL='thenilavan@adhashtech.com';
-function getUsers(){try{const d=localStorage.getItem('qa_users');if(d)return JSON.parse(d);}catch(e){}return[];}
-function saveUsers(u){try{localStorage.setItem('qa_users',JSON.stringify(u));}catch(e){}syncToServer('qa_users',u);}
+function getUsers(){return _serverData['qa_users']||[];}
+function saveUsers(u){_serverData['qa_users']=u;serverPost('qa_users',u);}
 const DEFAULT_MEMBER_PASSWORD='Adhashq@786';
 const DEFAULT_TEAM_MEMBERS=[
   {id:'u_deepa',      name:'Deepa',      email:'deepa@adhashtech.com',      role:'member'},
@@ -1761,7 +1762,6 @@ function doLogin(){
   const u=users.find(x=>x.email.toLowerCase()===email&&x.password===pwd);
   if(!u){errEl.textContent='Invalid email or password.';errEl.classList.add('show');return;}
   _session={id:u.id,name:u.name,email:u.email,role:u.role};
-  try{sessionStorage.setItem('qa_session',JSON.stringify(_session));}catch(e){}
   document.getElementById('login-page').style.display='none';
   document.getElementById('dashboard').style.display='block';
   PROJECTS.forEach(p=>{curTab[p.id]=curTab[p.id]||'projoverview';});
@@ -1769,7 +1769,6 @@ function doLogin(){
 }
 function doLogout(){
   _session=null;
-  try{sessionStorage.removeItem('qa_session');}catch(e){}
   window.location.href='/landing';
 }
 
@@ -3582,8 +3581,8 @@ function dtCellSelect(taskIdx,colKey,val){
 // ── Day-level assigned-by: stored separately keyed by date ──
 // Format: DT_DAY_META[dateStr] = { assignedBy: '' }
 let DT_DAY_META={};
-function saveDayMeta(){try{localStorage.setItem('qa3_day_meta',JSON.stringify(DT_DAY_META));}catch(e){}syncToServer('qa3_day_meta',DT_DAY_META);}
-function loadDayMeta(){try{const d=localStorage.getItem('qa3_day_meta');if(d)DT_DAY_META=JSON.parse(d);}catch(e){}}
+function saveDayMeta(){_serverData['qa3_day_meta']=DT_DAY_META;serverPost('qa3_day_meta',DT_DAY_META);}
+function loadDayMeta(){DT_DAY_META=_serverData['qa3_day_meta']||DT_DAY_META;}
 
 // Ensure all projects have a row for the given date (auto-create if missing)
 function dtEnsureProjectRows(dateStr){
@@ -3903,8 +3902,8 @@ let _ttWeekOpen={};
 let _ttProjFilter='all';
 let _ttTodayStr=(()=>{const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`})();
 
-function saveTeamTasks(){try{localStorage.setItem('qa3_team_tasks',JSON.stringify(TEAM_TASKS));}catch(e){}syncToServer('qa3_team_tasks',TEAM_TASKS);}
-function loadTeamTasks(){try{const d=localStorage.getItem('qa3_team_tasks');if(d)TEAM_TASKS=JSON.parse(d);}catch(e){}}
+function saveTeamTasks(){_serverData['qa3_team_tasks']=TEAM_TASKS;serverPost('qa3_team_tasks',TEAM_TASKS);}
+function loadTeamTasks(){TEAM_TASKS=_serverData['qa3_team_tasks']||TEAM_TASKS;}
 
 function showTeamTasks(){
   curView='teamtasks';
@@ -4369,8 +4368,8 @@ const RL_TEST_STATUS=[
   'Bugs Reported','Waiting for Dev Build','Waiting for Prod Build'
 ];
 
-function saveReleases(){try{localStorage.setItem('qa3_releases',JSON.stringify(RELEASES));}catch(e){}syncToServer('qa3_releases',RELEASES);}
-function loadReleases(){try{const d=localStorage.getItem('qa3_releases');if(d)RELEASES=JSON.parse(d);}catch(e){}}
+function saveReleases(){_serverData['qa3_releases']=RELEASES;serverPost('qa3_releases',RELEASES);}
+function loadReleases(){RELEASES=_serverData['qa3_releases']||RELEASES;}
 
 function rlTodayStr(){
   const n=new Date();
@@ -4779,7 +4778,7 @@ function openEditUser(i){
     if(pwd)users[i].password=pwd;
     saveUsers(users);
     // update session if editing self
-    if(_session&&_session.id===users[i].id){_session.name=name;_session.email=email;_session.role=role;sessionStorage.setItem('qa_session',JSON.stringify(_session));renderTopBar();}
+    if(_session&&_session.id===users[i].id){_session.name=name;_session.email=email;_session.role=role;renderTopBar();}
     closeModal();renderUsersPage();toast('User updated');
   });
 }
@@ -5671,7 +5670,8 @@ function deleteProject(pid){
     }
     PROJECTS=PROJECTS.filter(x=>x.id!==pid);
     delete STORE[pid];
-    try{localStorage.removeItem('qa3_'+pid);}catch(e){}
+    delete _serverData['qa3_'+pid];
+    serverDelete('qa3_'+pid);
     saveAllState();closeModal();goHome();toast('Project removed');
   },{saveLabel:'Remove',dangerSave:true});
   setTimeout(()=>document.getElementById('del-pw-inp')?.focus(),120);
@@ -5956,42 +5956,56 @@ function saveState(p){
   saveToLS(p);/* proj-nav removed */renderProject(p);
   toast(`✓ Snapshot #${STORE[p].reports.length} saved`);
 }
-function saveToLS(p){try{localStorage.setItem('qa3_'+p,JSON.stringify(STORE[p]));}catch(e){}syncToServer('qa3_'+p,STORE[p]);}
-function saveAllState(){PROJECTS.forEach(p=>saveToLS(p.id));try{localStorage.setItem('qa3_projects',JSON.stringify(PROJECTS));}catch(e){}syncToServer('qa3_projects',PROJECTS);}
+// ── SERVER-FIRST STORAGE ──
+// _serverData is the in-memory mirror of qa-shared.json on the server.
+// All reads come from here; all writes go straight to the server.
+let _serverData={};
 
-// ── DAILY TASKS GLOBAL STATE ──
-let DAILY_TASKS=[];
-function saveDailyTasks(){try{localStorage.setItem('qa3_daily_tasks',JSON.stringify(DAILY_TASKS));}catch(e){}syncToServer('qa3_daily_tasks',DAILY_TASKS);}
-function loadDailyTasks(){try{const d=localStorage.getItem('qa3_daily_tasks');if(d)DAILY_TASKS=JSON.parse(d);}catch(e){}}
-
-// ── SERVER SYNC ──
-// Fire-and-forget push to shared JSON file on the server
-function syncToServer(key,value){
-  try{
-    fetch('/api/qa-data/'+encodeURIComponent(key),{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({value})
-    }).catch(()=>{});
-  }catch(e){}
+// Fire-and-forget POST of a single key to the server
+function serverPost(key,value){
+  fetch('/api/qa-data/'+encodeURIComponent(key),{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({value})
+  }).catch(()=>{});
+  // keep in-memory mirror updated so subsequent reads within same page session are instant
+  _serverData[key]=value;
 }
 
-// Pull all shared data from server, merge into localStorage and in-memory vars
-async function syncFromServer(){
+// Fire-and-forget DELETE of a key from the server
+function serverDelete(key){
+  fetch('/api/qa-data/'+encodeURIComponent(key),{method:'DELETE'}).catch(()=>{});
+}
+
+// Load all data from server into _serverData (called once on init, awaited)
+async function loadFromServer(){
   try{
     const r=await fetch('/api/qa-data',{cache:'no-store'});
     if(!r.ok)return;
-    const data=await r.json();
-    // Merge each key into localStorage so loadAllState picks it up
-    // Strip any base64 wfdoc data to avoid bloating localStorage
-    for(const [k,v] of Object.entries(data)){
-      if(k.startsWith('qa3_')&&v&&v.wfdocs){
-        v.wfdocs=(v.wfdocs||[]).map(d=>{const c={...d};delete c.data;return c;});
+    _serverData=await r.json();
+    // Strip any legacy base64 wfdoc blobs to keep memory clean
+    for(const k of Object.keys(_serverData)){
+      if(k.startsWith('qa3_')&&_serverData[k]&&_serverData[k].wfdocs){
+        _serverData[k].wfdocs=(_serverData[k].wfdocs||[]).map(d=>{const c={...d};delete c.data;return c;});
       }
-      try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}
     }
   }catch(e){}
 }
+
+function saveToLS(p){
+  _serverData['qa3_'+p]=STORE[p];
+  serverPost('qa3_'+p,STORE[p]);
+}
+function saveAllState(){
+  PROJECTS.forEach(p=>saveToLS(p.id));
+  _serverData['qa3_projects']=PROJECTS;
+  serverPost('qa3_projects',PROJECTS);
+}
+
+// ── DAILY TASKS GLOBAL STATE ──
+let DAILY_TASKS=[];
+function saveDailyTasks(){_serverData['qa3_daily_tasks']=DAILY_TASKS;serverPost('qa3_daily_tasks',DAILY_TASKS);}
+function loadDailyTasks(){DAILY_TASKS=_serverData['qa3_daily_tasks']||[];}
 
 // Pull wfdocs file metadata from server for all projects and merge into STORE
 async function syncWfDocsFromServer(){
@@ -6001,28 +6015,30 @@ async function syncWfDocsFromServer(){
         const r=await fetch('/api/wfdocs/'+encodeURIComponent(proj.id),{cache:'no-store'});
         if(!r.ok)return;
         const serverFiles=await r.json();
-        if(!Array.isArray(serverFiles)||!serverFiles.length)return;
+        if(!Array.isArray(serverFiles))return;
         if(!STORE[proj.id].wfdocs)STORE[proj.id].wfdocs=[];
-        // Merge server files — add any not already tracked by serverId
-        const existingIds=new Set((STORE[proj.id].wfdocs||[]).map(d=>d.serverId).filter(Boolean));
-        for(const sf of serverFiles){
-          if(!existingIds.has(sf.fileId)){
-            STORE[proj.id].wfdocs.push({name:sf.name,size:sf.size||0,uploadedAt:sf.uploadedAt||'',serverId:sf.fileId});
-          }
-        }
-        // Remove entries whose serverId no longer exists on server
+        // Server is authoritative for wfdocs — replace with server list
         const serverIds=new Set(serverFiles.map(sf=>sf.fileId));
-        STORE[proj.id].wfdocs=STORE[proj.id].wfdocs.filter(d=>!d.serverId||serverIds.has(d.serverId));
+        // Keep any legacy base64 entries that have no serverId
+        const legacyEntries=STORE[proj.id].wfdocs.filter(d=>!d.serverId);
+        const serverEntries=serverFiles.map(sf=>({name:sf.name,size:sf.size||0,uploadedAt:sf.uploadedAt||'',serverId:sf.fileId}));
+        STORE[proj.id].wfdocs=[...serverEntries,...legacyEntries];
+        // persist updated wfdocs list back to server store
+        _serverData['qa3_'+proj.id]=STORE[proj.id];
+        serverPost('qa3_'+proj.id,STORE[proj.id]);
       }catch(e){}
     }));
   }catch(e){}
 }
 
 function loadAllState(){
-  try{const cp=localStorage.getItem('qa3_projects');if(cp){const loaded=JSON.parse(cp);if(loaded&&loaded.length>0)PROJECTS=loaded;}}catch(e){}
+  // Load from server mirror (_serverData populated by loadFromServer())
+  const cp=_serverData['qa3_projects'];
+  if(cp&&Array.isArray(cp)&&cp.length>0)PROJECTS=cp;
   initStore();
   PROJECTS.forEach(p=>{
-    try{const d=localStorage.getItem('qa3_'+p.id);if(d)Object.assign(STORE[p.id],JSON.parse(d));}catch(e){}
+    const d=_serverData['qa3_'+p.id];
+    if(d)Object.assign(STORE[p.id],d);
   });
   loadDailyTasks();
   loadDayMeta();
@@ -6396,33 +6412,39 @@ function restoreChecklistReport(p,i){
 // ══════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded',async()=>{
   initTheme();
-  await syncFromServer();  // pull shared data before loading state
+  // Show loading overlay while we fetch all data from server
+  const loadEl=document.createElement('div');
+  loadEl.id='srv-loading';
+  loadEl.style.cssText='position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-family:inherit';
+  loadEl.innerHTML='<div style="width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--grad-a);border-radius:50%;animation:spin .7s linear infinite"></div><div style="color:var(--mut);font-size:13px;font-weight:500">Loading workspace…</div>';
+  document.body.appendChild(loadEl);
+
+  // Load all data from server (single source of truth — no localStorage)
+  await loadFromServer();
   initUsers();
   loadAllState();
-  // restore QA session from sessionStorage first
-  try{const s=sessionStorage.getItem('qa_session');if(s){_session=JSON.parse(s);}}catch(e){}
-  // if no QA session, try auto-login from server auth session
-  if(!_session){
-    try{
-      const r=await fetch('/api/auth/session',{cache:'no-store'});
-      const d=await r.json();
-      if(d.authenticated){
-        const users=getUsers();
-        let u=users.find(x=>x.email.toLowerCase()===d.email.toLowerCase());
-        if(!u){u={id:'u_sa',name:'Super Admin',email:d.email,role:'super_admin'};}
-        _session={id:u.id,name:u.name,email:u.email,role:u.role};
-        try{sessionStorage.setItem('qa_session',JSON.stringify(_session));}catch(e){}
-      }
-    }catch(e){}
-  }
+
+  // Determine session: check server auth cookie first (most reliable cross-device)
+  try{
+    const r=await fetch('/api/auth/session',{cache:'no-store'});
+    const d=await r.json();
+    if(d.authenticated){
+      const users=getUsers();
+      let u=users.find(x=>x.email.toLowerCase()===d.email.toLowerCase());
+      if(!u){u={id:'u_sa',name:'Super Admin',email:d.email,role:'super_admin'};}
+      _session={id:u.id,name:u.name,email:u.email,role:u.role};
+    }
+  }catch(e){}
+
+  loadEl.remove();
+
   if(_session){
     document.getElementById('login-page').style.display='none';
     document.getElementById('dashboard').style.display='block';
     PROJECTS.forEach(p=>{curTab[p.id]=curTab[p.id]||'projoverview';});
     renderTopBar();renderProjectGrid();
-    // sync wfdocs from server (after render so UI appears fast)
+    // sync wfdocs from server after initial render
     syncWfDocsFromServer().then(()=>{
-      // re-render any open wfdocs tab
       PROJECTS.forEach(p=>{if(curTab[p.id]==='wfdocs')renderProject(p.id);});
       renderProjectGrid();
     });
