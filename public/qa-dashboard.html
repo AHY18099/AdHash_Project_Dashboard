@@ -4896,7 +4896,7 @@ function renderThirdPartyTab(p){
       </div>
       <div class="tp-card-body">
         <div class="tp-field-grid">
-          ${acct.url?`<div class="tp-field"><div class="tp-field-lbl">URL</div><a href="${escH(acct.url)}" target="_blank" class="tt-link-cell" style="font-size:11px">${escH(acct.url.replace(/^https?:\/\//,'').substring(0,40))}</a></div>`:''}
+          ${acct.url?`<div class="tp-field"><div class="tp-field-lbl">URL</div><div style="display:flex;align-items:center;gap:6px"><a href="${escH(acct.url)}" target="_blank" class="tt-link-cell" style="font-size:11px">${escH(acct.url.replace(/^https?:\/\//,'').substring(0,40))}</a>${acct.environment?`<span style="flex-shrink:0;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:700;background:${acct.environment==='Production'?'rgba(99,102,241,.12)':acct.environment==='Staging'?'rgba(249,115,22,.12)':'rgba(16,185,129,.12)'};color:${acct.environment==='Production'?'#6366f1':acct.environment==='Staging'?'#f97316':'#10b981'};border:1px solid ${acct.environment==='Production'?'rgba(99,102,241,.3)':acct.environment==='Staging'?'rgba(249,115,22,.3)':'rgba(16,185,129,.3)'}">${escH(acct.environment)}</span>`:''}</div></div>`:''}
           ${acct.username?`<div class="tp-field"><div class="tp-field-lbl">Username</div><div class="tp-field-val">${escH(acct.username)}</div></div>`:''}
           ${acct.tpPassword?`<div class="tp-field"><div class="tp-field-lbl">Password</div><div class="tp-field-val" style="letter-spacing:2px">••••••••</div></div>`:''}
           ${acct.credentials?`<div class="tp-field"><div class="tp-field-lbl">Credentials Used</div><div class="tp-field-val">${escH(acct.credentials)}</div></div>`:''}
@@ -5407,7 +5407,12 @@ function tclDownloadReport(p,platformFilter){
 function _tpFormFields(acct){acct=acct||{};return`
     <div class="fg-row">
       <div class="fg"><label>Account Name *</label><input class="finp" id="tp-name" placeholder="e.g. Stripe, Twilio" value="${escH(acct.name||'')}" autocomplete="off"></div>
-      <div class="fg"><label>URL</label><input class="finp" id="tp-url" placeholder="https://" value="${escH(acct.url||'')}" autocomplete="off"></div>
+      <div class="fg" style="flex:2;display:flex;gap:8px;align-items:flex-end">
+        <div style="flex:1"><label>URL</label><input class="finp" id="tp-url" placeholder="https://" value="${escH(acct.url||'')}" autocomplete="off"></div>
+        <div style="min-width:120px"><label>Environment</label><select class="finp" id="tp-env">
+          ${['Production','Staging','Dev'].map(v=>`<option value="${v}"${(acct.environment||'Production')===v?' selected':''}>${v}</option>`).join('')}
+        </select></div>
+      </div>
     </div>
     <div class="fg-row">
       <div class="fg"><label>Username</label><input class="finp" id="tp-username" placeholder="login username" value="${escH(acct.username||'')}" autocomplete="off"></div>
@@ -5428,7 +5433,7 @@ function _tpFormFields(acct){acct=acct||{};return`
         <span id="tp-note-cnt" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--mut);pointer-events:none">${100-(acct.note||'').length} left</span>
       </div>
     </div>`;}
-function _tpReadFields(base){return{...(base||{}),name:document.getElementById('tp-name')?.value.trim()||'',url:document.getElementById('tp-url')?.value.trim()||'',username:document.getElementById('tp-username')?.value.trim()||'',tpPassword:document.getElementById('tp-password')?.value||'',credentials:document.getElementById('tp-creds')?.value.trim()||'',paymentBalance:document.getElementById('tp-balance')?.value.trim()||'',renewalDate:document.getElementById('tp-renewal')?.value||'',expiryDate:document.getElementById('tp-expiry')?.value||'',note:document.getElementById('tp-note')?.value.trim()||''};}
+function _tpReadFields(base){return{...(base||{}),name:document.getElementById('tp-name')?.value.trim()||'',url:document.getElementById('tp-url')?.value.trim()||'',environment:document.getElementById('tp-env')?.value||'Production',username:document.getElementById('tp-username')?.value.trim()||'',tpPassword:document.getElementById('tp-password')?.value||'',credentials:document.getElementById('tp-creds')?.value.trim()||'',paymentBalance:document.getElementById('tp-balance')?.value.trim()||'',renewalDate:document.getElementById('tp-renewal')?.value||'',expiryDate:document.getElementById('tp-expiry')?.value||'',note:document.getElementById('tp-note')?.value.trim()||''};}
 function tpOpenAdd(p){
   const body=_tpFormFields()+_tpApiSection([]);
   openModal('Add Third Party Account',body,()=>{
