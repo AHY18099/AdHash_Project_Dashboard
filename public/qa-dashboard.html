@@ -5435,6 +5435,7 @@ function _tpFormFields(acct){acct=acct||{};return`
     </div>`;}
 function _tpReadFields(base){return{...(base||{}),name:document.getElementById('tp-name')?.value.trim()||'',url:document.getElementById('tp-url')?.value.trim()||'',environment:document.getElementById('tp-env')?.value||'Production',username:document.getElementById('tp-username')?.value.trim()||'',tpPassword:document.getElementById('tp-password')?.value||'',credentials:document.getElementById('tp-creds')?.value.trim()||'',paymentBalance:document.getElementById('tp-balance')?.value.trim()||'',renewalDate:document.getElementById('tp-renewal')?.value||'',expiryDate:document.getElementById('tp-expiry')?.value||'',note:document.getElementById('tp-note')?.value.trim()||''};}
 function tpOpenAdd(p){
+  if(!isAdmin()){toast('Only admin can add third party accounts','err');return;}
   const body=_tpFormFields()+_tpApiSection([]);
   openModal('Add Third Party Account',body,()=>{
     const name=document.getElementById('tp-name')?.value.trim();
@@ -5446,6 +5447,7 @@ function tpOpenAdd(p){
   setTimeout(()=>_tpApiRender(),80);
 }
 function tpOpenEdit(p,i){
+  if(!isAdmin()){toast('Only admin can edit third party accounts','err');return;}
   const acct=STORE[p].thirdparty[i];
   const body=_tpFormFields(acct)+_tpApiSection(acct.apis||[]);
   openModal('Edit Third Party Account',body,()=>{
@@ -5456,8 +5458,9 @@ function tpOpenEdit(p,i){
   },{saveLabel:'Update'});
   setTimeout(()=>_tpApiRender(),80);
 }
-function tpDelete(p,i){if(!confirm('Delete this account?'))return;STORE[p].thirdparty.splice(i,1);saveToLS(p);renderProject(p);toast('Account deleted');}
+function tpDelete(p,i){if(!isAdmin()){toast('Only admin can delete third party accounts','err');return;}if(!confirm('Delete this account?'))return;STORE[p].thirdparty.splice(i,1);saveToLS(p);renderProject(p);toast('Account deleted');}
 function tpOpenAddApi(p,acctIdx){
+  if(!isAdmin()){toast('Only admin can add APIs','err');return;}
   // quick-add from the tab view (outside modal)
   const body=`
     <div class="fg-row">
@@ -5477,8 +5480,9 @@ function tpOpenAddApi(p,acctIdx){
     STORE[p].thirdparty[acctIdx].apis.push(api);saveToLS(p);closeModal();renderProject(p);toast('API added');
   },{saveLabel:'Add API'});
 }
-function tpDeleteApi(p,acctIdx,apiIdx){if(!confirm('Delete this API?'))return;STORE[p].thirdparty[acctIdx].apis.splice(apiIdx,1);saveToLS(p);renderProject(p);toast('API deleted');}
+function tpDeleteApi(p,acctIdx,apiIdx){if(!isAdmin()){toast('Only admin can delete APIs','err');return;}if(!confirm('Delete this API?'))return;STORE[p].thirdparty[acctIdx].apis.splice(apiIdx,1);saveToLS(p);renderProject(p);toast('API deleted');}
 function tpEditApi(p,acctIdx,apiIdx){
+  if(!isAdmin()){toast('Only admin can edit APIs','err');return;}
   const api=STORE[p].thirdparty[acctIdx]?.apis?.[apiIdx];
   if(!api)return;
   const body=`
