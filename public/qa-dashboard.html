@@ -1158,6 +1158,13 @@ body.dark .tcl-table tbody tr:hover{background:rgba(126,179,255,.04)}
 .tcl-inline-fail{color:#dc2626;border-color:rgba(220,38,38,.35);background:rgba(220,38,38,.07)}
 .tcl-inline-na{color:#64748b;border-color:rgba(100,116,139,.35);background:rgba(100,116,139,.08)}
 .tcl-inline-pending{color:#d97706;border-color:rgba(217,119,6,.35);background:rgba(217,119,6,.08)}
+.tcl-inline-done{color:#059669;border-color:rgba(5,150,105,.4);background:rgba(5,150,105,.1)}
+.tcl-inline-bugs-raised{color:#f97316;border-color:rgba(249,115,22,.4);background:rgba(249,115,22,.09)}
+.tcl-inline-bugs-closed{color:#6366f1;border-color:rgba(99,102,241,.4);background:rgba(99,102,241,.09)}
+.tcl-inline-bugs-reopened{color:#ef4444;border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.09)}
+.tcl-inline-hold{color:#94a3b8;border-color:rgba(148,163,184,.4);background:rgba(148,163,184,.08)}
+.tcl-inline-ready-prod{color:#8b5cf6;border-color:rgba(139,92,246,.4);background:rgba(139,92,246,.09)}
+.tcl-inline-ready-demo{color:#3b82f6;border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.09)}
 .tcl-btn-save{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;box-shadow:0 3px 10px rgba(124,58,237,.25)}
 .tcl-btn-save:hover:not([disabled]){transform:translateY(-1px);box-shadow:0 6px 18px rgba(124,58,237,.38)}
 .tcl-btn-save[disabled]{cursor:not-allowed;opacity:.45}
@@ -5118,20 +5125,26 @@ function _tpApiSection(existingApis){
 // ══════════════════════════════════════════════════════
 // TASK CHECKLIST
 // ══════════════════════════════════════════════════════
-const TCL_STATUSES=['Pass','Fail','NA','Pending'];
+const TCL_STATUSES=['Pending','Pass','Fail','NA','Bugs Raised','Bugs Closed','Bugs Re-Opened','Done','Hold','Ready for Prod','Ready for Demo'];
 const TCL_PLATFORMS=['Web','iOS','Android'];
 const TCL_ENVS=['Staging','Production'];
 
 function tclStats(items){
   const total=items.length;
-  const pass=items.filter(r=>r.status==='Pass').length;
+  const pass=items.filter(r=>r.status==='Pass'||r.status==='Done').length;
   const fail=items.filter(r=>r.status==='Fail').length;
   const na=items.filter(r=>r.status==='NA').length;
-  const pending=items.filter(r=>r.status==='Pending').length;
+  const pending=items.filter(r=>!r.status||r.status==='Pending').length;
+  const bugsRaised=items.filter(r=>r.status==='Bugs Raised').length;
+  const bugsClosed=items.filter(r=>r.status==='Bugs Closed').length;
+  const bugsReopened=items.filter(r=>r.status==='Bugs Re-Opened').length;
+  const hold=items.filter(r=>r.status==='Hold').length;
+  const readyProd=items.filter(r=>r.status==='Ready for Prod').length;
+  const readyDemo=items.filter(r=>r.status==='Ready for Demo').length;
   const high=items.reduce((a,r)=>a+(r.priorityHigh||0),0);
   const medium=items.reduce((a,r)=>a+(r.priorityMedium||0),0);
   const low=items.reduce((a,r)=>a+(r.priorityLow||0),0);
-  return{total,pass,fail,na,pending,high,medium,low};
+  return{total,pass,fail,na,pending,bugsRaised,bugsClosed,bugsReopened,hold,readyProd,readyDemo,high,medium,low};
 }
 
 // track inline edit dirty state per project
@@ -5186,15 +5199,22 @@ function renderTaskChecklist(p){
   const s=tclStats(items);
   const passRate=s.total?Math.round((s.pass/s.total)*100):0;
   const hasItems=items.length>0;
-  const allResolved=hasItems&&items.every(r=>r.status==='Pass'||r.status==='Fail'||r.status==='NA');
+  const TCL_RESOLVED=['Pass','Fail','NA','Done','Bugs Closed','Ready for Prod','Ready for Demo'];
+  const allResolved=hasItems&&items.every(r=>TCL_RESOLVED.includes(r.status));
   const members=getTeamMembers();
 
   const statsBar=`<div class="tcl-stats-bar">
     <div class="tcl-stat"><div class="tcl-stat-val" style="color:var(--txt)">${s.total}</div><div class="tcl-stat-lbl">Total</div></div>
-    <div class="tcl-stat"><div class="tcl-stat-val" style="color:#059669">${s.pass}</div><div class="tcl-stat-lbl">Pass</div></div>
+    <div class="tcl-stat"><div class="tcl-stat-val" style="color:#059669">${s.pass}</div><div class="tcl-stat-lbl">Pass/Done</div></div>
     <div class="tcl-stat"><div class="tcl-stat-val" style="color:#dc2626">${s.fail}</div><div class="tcl-stat-lbl">Fail</div></div>
     <div class="tcl-stat"><div class="tcl-stat-val" style="color:#d97706">${s.pending}</div><div class="tcl-stat-lbl">Pending</div></div>
     <div class="tcl-stat"><div class="tcl-stat-val" style="color:#64748b">${s.na}</div><div class="tcl-stat-lbl">N/A</div></div>
+    ${s.bugsRaised?`<div class="tcl-stat"><div class="tcl-stat-val" style="color:#f97316">${s.bugsRaised}</div><div class="tcl-stat-lbl">Bugs Raised</div></div>`:''}
+    ${s.bugsReopened?`<div class="tcl-stat"><div class="tcl-stat-val" style="color:#ef4444">${s.bugsReopened}</div><div class="tcl-stat-lbl">Re-Opened</div></div>`:''}
+    ${s.bugsClosed?`<div class="tcl-stat"><div class="tcl-stat-val" style="color:#6366f1">${s.bugsClosed}</div><div class="tcl-stat-lbl">Bugs Closed</div></div>`:''}
+    ${s.hold?`<div class="tcl-stat"><div class="tcl-stat-val" style="color:#94a3b8">${s.hold}</div><div class="tcl-stat-lbl">Hold</div></div>`:''}
+    ${s.readyProd?`<div class="tcl-stat"><div class="tcl-stat-val" style="color:#8b5cf6">${s.readyProd}</div><div class="tcl-stat-lbl">Ready/Prod</div></div>`:''}
+    ${s.readyDemo?`<div class="tcl-stat"><div class="tcl-stat-val" style="color:#3b82f6">${s.readyDemo}</div><div class="tcl-stat-lbl">Ready/Demo</div></div>`:''}
     <div class="tcl-stat"><div class="tcl-stat-val" style="color:#ef4444">${s.high}</div><div class="tcl-stat-lbl">🔴 High</div></div>
     <div class="tcl-stat"><div class="tcl-stat-val" style="color:#f97316">${s.medium}</div><div class="tcl-stat-lbl">🟠 Medium</div></div>
     <div class="tcl-stat"><div class="tcl-stat-val" style="color:#22c55e">${s.low}</div><div class="tcl-stat-lbl">🟢 Low</div></div>
@@ -5216,9 +5236,10 @@ function renderTaskChecklist(p){
   };
 
   // inline status dropdown
+  const TCL_CLS={'Pass':'pass','Fail':'fail','NA':'na','Pending':'pending','Done':'done','Bugs Raised':'bugs-raised','Bugs Closed':'bugs-closed','Bugs Re-Opened':'bugs-reopened','Hold':'hold','Ready for Prod':'ready-prod','Ready for Demo':'ready-demo'};
   const statusSel=(r,i)=>{
-    const cls={Pass:'pass',Fail:'fail',NA:'na',Pending:'pending'}[r.status]||'pending';
-    return`<select class="tcl-inline-sel tcl-inline-${cls}" onchange="tclInlineSave('${p}',${i},'status',this.value);this.className='tcl-inline-sel tcl-inline-'+({'Pass':'pass','Fail':'fail','NA':'na','Pending':'pending'}[this.value]||'pending')">
+    const cls=TCL_CLS[r.status]||'pending';
+    return`<select class="tcl-inline-sel tcl-inline-${cls}" onchange="tclInlineSave('${p}',${i},'status',this.value);this.className='tcl-inline-sel tcl-inline-'+(({'Pass':'pass','Fail':'fail','NA':'na','Pending':'pending','Done':'done','Bugs Raised':'bugs-raised','Bugs Closed':'bugs-closed','Bugs Re-Opened':'bugs-reopened','Hold':'hold','Ready for Prod':'ready-prod','Ready for Demo':'ready-demo'})[this.value]||'pending')">
       ${TCL_STATUSES.map(v=>`<option${r.status===v?' selected':''}>${v}</option>`).join('')}
     </select>`;
   };
@@ -5409,7 +5430,7 @@ function tclDownloadReport(p,platformFilter){
   const platColor={Web:'#3b82f6',iOS:'#8b5cf6',Android:'#10b981'};
   const platAccent=(platformFilter&&platformFilter!=='ALL')?(platColor[platformFilter]||'#6366f1'):'#6366f1';
 
-  const statusColor={Pass:'#059669',Fail:'#dc2626',NA:'#64748b',Pending:'#d97706'};
+  const statusColor={Pass:'#059669',Fail:'#dc2626',NA:'#64748b',Pending:'#d97706',Done:'#059669','Bugs Raised':'#f97316','Bugs Closed':'#6366f1','Bugs Re-Opened':'#ef4444',Hold:'#94a3b8','Ready for Prod':'#8b5cf6','Ready for Demo':'#3b82f6'};
   const envColor={Staging:'#f97316',Production:'#6366f1'};
 
   // full donut for the report
@@ -6402,7 +6423,7 @@ function _buildChecklistReportHtml(p,snap,platformFilter){
   const platLabel=(platformFilter&&platformFilter!=='ALL')?` — ${platformFilter}`:'';
   const platColor={Web:'#3b82f6',iOS:'#8b5cf6',Android:'#10b981'};
   const platAccent=(platformFilter&&platformFilter!=='ALL')?(platColor[platformFilter]||'#6366f1'):'#7c3aed';
-  const statusColor={Pass:'#059669',Fail:'#dc2626',NA:'#64748b',Pending:'#d97706'};
+  const statusColor={Pass:'#059669',Fail:'#dc2626',NA:'#64748b',Pending:'#d97706',Done:'#059669','Bugs Raised':'#f97316','Bugs Closed':'#6366f1','Bugs Re-Opened':'#ef4444',Hold:'#94a3b8','Ready for Prod':'#8b5cf6','Ready for Demo':'#3b82f6'};
   const envColor={Staging:'#f97316',Production:'#6366f1'};
 
   const donutSvg=(()=>{
