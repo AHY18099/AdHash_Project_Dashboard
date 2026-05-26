@@ -2756,7 +2756,7 @@ function rowHtml(p,sec,r,i,isSm){
     <td><span class="badge ${(r.priority||'').toLowerCase()}">${r.priority||''}</span></td>
     <td><select class="ssel ${sc}" ${isPend&&!isAdmin()?'disabled':''} onchange="updateStatus('${p}','${sec}',${i},this)">${opts}</select></td>
     ${isAdmin()?`
-    <td><input class="inp-sm" style="width:110px" value="${r.comment||''}" placeholder="Note…" onchange="STORE['${p}']['${sec}'][${i}].comment=this.value"></td>
+    <td><input class="inp-sm" style="width:110px" value="${r.comment||''}" placeholder="Note…" onchange="STORE['${p}']['${sec}'][${i}].comment=this.value;saveToLS('${p}')"></td>
     <td class="acell">
       ${isPend?`<button class="btn-icon apr" onclick="approveRow('${p}','${sec}',${i})">✓</button><button class="btn-icon rej" onclick="rejectRow('${p}','${sec}',${i})">✗</button>`:
         `<button class="btn-icon" onclick="openEditRow('${p}','${sec}',${i})">✏</button><button class="btn-icon del" onclick="deleteRow('${p}','${sec}',${i})">✕</button>`}
@@ -3420,6 +3420,7 @@ function updateStatus(p,sec,i,sel){
   sel.className='ssel '+sel.value.replace(' ','-');
   sel.closest('tr').dataset.status=sel.value;
   updateStats(p);
+  saveToLS(p);
   // refresh filter counts
   const data=STORE[p][sec];
   const fbar=document.querySelector('.fbar');
@@ -3650,7 +3651,8 @@ function dtAssignedChange(taskIdx,sel){
   }
   const date=DAILY_TASKS[taskIdx].date;
   const saveBtn=document.getElementById('dt-save-'+date);
-  if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 Save';}
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='✓ Saved';}
+  saveDailyTasks();
 }
 
 function renderDayTable(dateStr){
@@ -3701,7 +3703,8 @@ function dtInlineChange(taskIdx,colKey,sel){
   sel.className=`dt-cell-select ${sel.value==='PASS'?'val-pass':sel.value==='FAIL'?'val-fail':sel.value==='NA'?'val-na':'val-blank'}`;
   const date=DAILY_TASKS[taskIdx].date;
   const saveBtn=document.getElementById('dt-save-'+date);
-  if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 Save';}
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='✓ Saved';}
+  saveDailyTasks();
 }
 
 function dtDeleteRow(taskIdx){
@@ -5147,6 +5150,7 @@ function tclInlineSave(p,i,field,val){
   _tclDirty[p]=true;
   const btn=document.getElementById('tcl-save-btn-'+p);
   if(btn){btn.disabled=false;btn.style.opacity='1';}
+  saveToLS(p);
 }
 
 function tclSaveReport(p){
@@ -5780,6 +5784,7 @@ function updateStatus(p,sec,i,sel){
   sel.className='ssel '+sel.value.replace(' ','-');
   sel.closest('tr').dataset.status=sel.value;
   updateStats(p);
+  saveToLS(p);
   // refresh filter counts
   const body=document.getElementById(`${p}-${sec}-body`);
   if(body){
