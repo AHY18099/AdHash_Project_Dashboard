@@ -4627,6 +4627,59 @@ function showTodayReleases(){curView='todayreleases';renderReleasesPage('today')
 function showNextReleases(){curView='nextreleases';renderReleasesPage('next');}
 function showPastReleases(){curView='pastreleases';renderReleasesPage('past');}
 
+// ── Auto-transition notifications ──────────────────────────────────────────
+// Called on startup and every minute. Detects when a release moves category
+// (next→today, today→past, next→past) and fires email+Slack exactly once.
+// Uses r._notifiedAs to track last notified category — stored in RELEASES data.
+function rlCheckAutoTransitions(){
+  let anyChanged=false;
+  RELEASES.forEach(r=>{
+    const current=rlClassify(r);
+    const prev=r._notifiedAs||'next'; // default assumption: started as 'next'
+    if(current===prev)return; // no change
+
+    // Transition detected
+    r._notifiedAs=current;
+    anyChanged=true;
+
+    const proj=PROJECTS.find(x=>x.id===r.projectId);
+    const projName=proj?.name||r.projectId||'Unknown';
+    const rdFormatted=r.releaseDate?new Date(r.releaseDate).toLocaleString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+
+    if(current==='today' && prev==='next'){
+      // Next release → Today (date matched today)
+      notifyAssignment('release_today',[
+        {label:'Action',value:'🚀 Auto-Moved to Today Releases'},
+        {label:'Project',value:projName},
+        {label:'Release Date',value:rdFormatted},
+        {label:'Summary',value:r.releaseSummary||'—'},
+        {label:'Environment',value:r.envType||'—'},
+        {label:'Platform',value:r.platform||'—'},
+        {label:'Assigned By',value:r.assignedBy||'—'},
+        {label:'Current Status',value:r.currentStatus||'To Do'},
+      ],{projectId:r.projectId,assignedBy:r.assignedBy||'Dashboard',projectName:projName});
+
+    } else if(current==='past' && (prev==='today'||prev==='next')){
+      // Any → Past (date passed or Ready for Client)
+      const reason=r.testingStatus==='Ready for Client'?'Testing Status: Ready for Client':'Release date has passed';
+      notifyAssignment('release_today',[
+        {label:'Action',value:'📁 Auto-Moved to Past Releases'},
+        {label:'Reason',value:reason},
+        {label:'Project',value:projName},
+        {label:'Release Date',value:rdFormatted},
+        {label:'Summary',value:r.releaseSummary||'—'},
+        {label:'Environment',value:r.envType||'—'},
+        {label:'Testing Status',value:r.testingStatus||'—'},
+        {label:'Assigned By',value:r.assignedBy||'—'},
+      ],{projectId:r.projectId,assignedBy:r.assignedBy||'Dashboard',projectName:projName});
+    }
+  });
+
+  if(anyChanged){
+    saveReleases(); // persist _notifiedAs flags so we don't re-notify on refresh
+  }
+}
+
 // Count today's releases for the badge (excludes past/ready-for-client)
 function rlTodayCount(){
   const todayStr=rlTodayStr();
@@ -6494,6 +6547,8 @@ function loadAllState(){
   loadDayMeta();
   loadTeamTasks();
   loadReleases();
+  // Check for auto-transitions after any full data reload (deferred so UI is ready)
+  setTimeout(()=>rlCheckAutoTransitions(), 1500);
 }
 function resetProject(p){
   if(!confirm(`Reset all ${PROJECTS.find(x=>x.id===p)?.name||p} statuses to Not Started?`))return;
@@ -6976,6 +7031,10 @@ window.addEventListener('DOMContentLoaded',async()=>{
     // If any failed saves are still pending (network was down), retry them.
     // Also re-saves daily tasks + team tasks as a final safety net.
     setInterval(()=>_autoSaveHeartbeat(), 60000);
+    // ── Auto-transition check: runs at startup + every 60s ──
+    // Detects releases that moved to today/past since last check and sends email+Slack
+    setTimeout(()=>rlCheckAutoTransitions(), 3000); // 3s delay so notifyAssignment is ready
+    setInterval(()=>rlCheckAutoTransitions(), 60000);
   }
 });
 
