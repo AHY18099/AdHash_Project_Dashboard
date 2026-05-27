@@ -6696,7 +6696,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   const loadEl=document.createElement('div');
   loadEl.id='srv-loading';
   loadEl.style.cssText='position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-family:inherit';
-  loadEl.innerHTML='<div style="width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--grad-a);border-radius:50%;animation:spin .7s linear infinite"></div><div id="srv-loading-msg" style="color:var(--mut);font-size:13px;font-weight:500">Loading workspace…</div>';
+  loadEl.innerHTML='<div style="width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--grad-a);border-radius:50%;animation:spin .7s linear infinite"></div><div id="srv-loading-msg" style="color:var(--mut);font-size:13px;font-weight:500">Restoring your data from GitHub…</div>';
   document.body.appendChild(loadEl);
 
   // Load all data from server (single source of truth — no localStorage)
@@ -6742,8 +6742,28 @@ window.addEventListener('DOMContentLoaded',async()=>{
       PROJECTS.forEach(p=>{if(curTab[p.id]==='wfdocs')renderProject(p.id);});
       renderProjectGrid();
     });
+    // ── Auto-save heartbeat every 60s ──
+    // If any failed saves are still pending (network was down), retry them.
+    // Also re-saves daily tasks + team tasks as a final safety net.
+    setInterval(()=>_autoSaveHeartbeat(), 60000);
   }
 });
+
+// Heartbeat: retry any failed saves + re-save key volatile data as safety net
+let _lastHbDtHash='', _lastHbTtHash='';
+function _autoSaveHeartbeat(){
+  // Retry any pending failed saves first
+  if(Object.keys(_pendingRetries).length > 0){
+    _retryAllFailed();
+    return;
+  }
+  // Re-save daily tasks only if they changed since last heartbeat
+  const dtHash = JSON.stringify(DAILY_TASKS);
+  if(dtHash !== _lastHbDtHash){ _lastHbDtHash=dtHash; saveDailyTasks(); }
+  // Re-save team tasks only if they changed
+  const ttHash = JSON.stringify(TEAM_TASKS);
+  if(ttHash !== _lastHbTtHash){ _lastHbTtHash=ttHash; saveTeamTasks(); }
+}
 
 </script>
 </body>
