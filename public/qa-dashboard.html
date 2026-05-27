@@ -2682,10 +2682,25 @@ function fmtDate(iso){
 function changeFbStatus(p,id,status){
   const f=(STORE[p].feedback||[]).find(x=>x.id===id);
   if(!f)return;
+  const oldStatus=f.status;
   f.status=status;
   if(status==='resolved'||status==='closed')f.resolvedAt=f.resolvedAt||new Date().toISOString();
   else if(status!=='resolved'&&status!=='closed')f.resolvedAt=null;
   saveToLS(p);renderProject(p);toast('Status updated');
+  // Send notification on inline status change
+  const projName=PROJECTS.find(x=>x.id===p)?.name||p;
+  const fbType=f.type==='bug'?'feedback_bug':'feedback_req';
+  const statusLabels={open:'Open',inprogress:'In Progress',clarification:'Clarification Required',resolved:'Resolved',closed:'Closed',wontfix:"Won't Fix",deferred:'Deferred'};
+  notifyAssignment(fbType,[
+    {label:'Action',value:'🔄 Status Updated'},
+    {label:'Project',value:projName},
+    {label:'Type',value:f.type==='bug'?'🐛 Bug':'📋 Requirement'},
+    {label:'Title',value:f.title},
+    {label:'Previous Status',value:statusLabels[oldStatus]||oldStatus},
+    {label:'New Status',value:statusLabels[status]||status},
+    {label:'Client / Source',value:f.clientName||'—'},
+    {label:'Reported By',value:f.reportedBy||'—'},
+  ],{projectId:p,assignedBy:f.reportedBy||'Dashboard',projectName:projName});
 }
 
 function deleteFeedback(p,id){
@@ -4210,6 +4225,19 @@ function ttInlineChange(idx,field,el){
   if(field==='currentStatus')el.className=`tt-sel ${ttCurrStatusClass(el.value)}`;
   if(field==='testingStatus')el.className=`tt-sel ${ttTestStatusClass(el.value)}`;
   saveTeamTasks();
+  // Send notification when status is changed inline
+  if(field==='currentStatus'||field==='testingStatus'){
+    const t=TEAM_TASKS[idx];
+    const proj=PROJECTS.find(x=>x.id===t.projectId);
+    notifyAssignment('teamtask',[
+      {label:'Action',value:'🔄 Status Updated'},
+      {label:'Project',value:proj?.name||t.projectId},
+      {label:'Task Summary',value:t.taskSummary},
+      {label:'Date',value:t.date},
+      {label:'Assigned By',value:t.assignedBy||'—'},
+      {label:field==='currentStatus'?'New Current Status':'New Testing Status',value:el.value},
+    ],{projectId:t.projectId,assignedBy:t.assignedBy||'Dashboard',projectName:proj?.name||t.projectId});
+  }
 }
 
 function ttInlineText(idx,field,el){
@@ -4752,6 +4780,20 @@ function rlInline(idx,field,el){
   saveReleases();
   const mode=curView==='todayreleases'?'today':'next';
   renderReleasesPage(mode);
+  // Send notification when status is changed inline
+  if(field==='currentStatus'||field==='testingStatus'){
+    const r=RELEASES[idx];
+    const proj=PROJECTS.find(x=>x.id===r.projectId);
+    const rlType=mode==='today'?'release_today':'release_next';
+    notifyAssignment(rlType,[
+      {label:'Action',value:'🔄 Status Updated'},
+      {label:'Project',value:proj?.name||r.projectId},
+      {label:'Release Date',value:r.releaseDate},
+      {label:'Summary',value:r.releaseSummary},
+      {label:'Assigned By',value:r.assignedBy||'—'},
+      {label:field==='currentStatus'?'New Current Status':'New Testing Status',value:el.value},
+    ],{projectId:r.projectId,assignedBy:r.assignedBy||'Dashboard',projectName:proj?.name||r.projectId});
+  }
 }
 function rlInlineVal(idx,field,val){
   if(idx<0||idx>=RELEASES.length)return;
