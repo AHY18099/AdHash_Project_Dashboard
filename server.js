@@ -187,12 +187,15 @@ const SUPER_ADMIN_PASSWORD = process.env.QA_ADMIN_PASSWORD || 'Qateam@123';
 
 // Apply defaults so all features work on Railway without manual env var setup
 // GITHUB_TOKEN must be set as a Railway environment variable — no hardcoded fallback
-if (!process.env.ZOHO_MAIL_ENABLED)  process.env.ZOHO_MAIL_ENABLED  = 'true';
-if (!process.env.ZOHO_MAIL_FROM)     process.env.ZOHO_MAIL_FROM     = 'thenilavan@adhashtech.com';
-if (!process.env.ZOHO_MAIL_USER)     process.env.ZOHO_MAIL_USER     = 'thenilavan@adhashtech.com';
-if (!process.env.ZOHO_MAIL_PASS)     process.env.ZOHO_MAIL_PASS     = 'G8sYN8MRCWpM';
-if (!process.env.ZOHO_MAIL_TO)       process.env.ZOHO_MAIL_TO       = 'qateam@adhashtech.com';
-if (!process.env.ZOHO_MAIL_CC)       process.env.ZOHO_MAIL_CC       = 'qateam@adhashtech.com';
+if (!process.env.ZOHO_MAIL_ENABLED)    process.env.ZOHO_MAIL_ENABLED    = 'true';
+if (!process.env.ZOHO_MAIL_FROM)       process.env.ZOHO_MAIL_FROM       = 'thenilavan@adhashtech.com';
+if (!process.env.ZOHO_MAIL_TO)         process.env.ZOHO_MAIL_TO         = 'qateam@adhashtech.com';
+if (!process.env.ZOHO_MAIL_CC)         process.env.ZOHO_MAIL_CC         = 'qateam@adhashtech.com';
+// Zoho REST API OAuth2 credentials (replaces SMTP — Railway blocks all SMTP ports)
+if (!process.env.ZOHO_CLIENT_ID)       process.env.ZOHO_CLIENT_ID       = '1000.DVQEG5BEQDFQ0ULRWVPY77ZMFWC77S';
+if (!process.env.ZOHO_CLIENT_SECRET)   process.env.ZOHO_CLIENT_SECRET   = 'b297abaa2202667173c98f59fd3ac8185fcdd71969';
+if (!process.env.ZOHO_REFRESH_TOKEN)   process.env.ZOHO_REFRESH_TOKEN   = '1000.df711cadb21bd11351c2127e4e6ded37.6367f4b9c445fb1f42e5625479cb5a29';
+if (!process.env.ZOHO_ACCOUNT_ID)      process.env.ZOHO_ACCOUNT_ID      = '8370649000000008002';
 if (!process.env.SLACK_BOT_TOKEN)    process.env.SLACK_BOT_TOKEN    = 'xoxb-419650362022-11217403721126-XiJEnpEJPpklhzcauEXfsmSi';
 if (!process.env.SLACK_CHANNEL)      process.env.SLACK_CHANNEL      = '#testing-team';
 if (!process.env.SLACK_ENABLED)      process.env.SLACK_ENABLED      = 'true';
@@ -1730,7 +1733,7 @@ app.post('/api/run-project/:projectId', (req, res) => {
 });
 
 // Protected keys that must never be exposed or overwritten via the secrets UI
-const PROTECTED_ENV_KEYS = new Set(['GITHUB_TOKEN','ZOHO_MAIL_PASS','ZOHO_MAIL_USER','ZOHO_MAIL_FROM','ZOHO_MAIL_TO','ZOHO_MAIL_ENABLED','ZOHO_MAIL_CC','SLACK_BOT_TOKEN','SLACK_CHANNEL','SLACK_ENABLED']);
+const PROTECTED_ENV_KEYS = new Set(['GITHUB_TOKEN','ZOHO_MAIL_PASS','ZOHO_MAIL_USER','ZOHO_MAIL_FROM','ZOHO_MAIL_TO','ZOHO_MAIL_ENABLED','ZOHO_MAIL_CC','ZOHO_CLIENT_ID','ZOHO_CLIENT_SECRET','ZOHO_REFRESH_TOKEN','ZOHO_ACCOUNT_ID','SLACK_BOT_TOKEN','SLACK_CHANNEL','SLACK_ENABLED']);
 
 function readEnvFile() {
     const envPath = path.join(__dirname, '.env');

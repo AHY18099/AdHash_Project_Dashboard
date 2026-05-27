@@ -1,77 +1,92 @@
-const nodemailer = require('nodemailer');
+/**
+ * Zoho Mail utility — uses Zoho Mail REST API over HTTPS (port 443).
+ * SMTP is blocked on Railway; this HTTP approach always works.
+ *
+ * OAuth2 flow: refresh_token → access_token (1h TTL) → send mail.
+ * Credentials stored as env vars (set as Railway variables).
+ */
+const axios = require('axios');
 
-function getTransportConfigs() {
-    const envHost = process.env.ZOHO_MAIL_HOST;
-    const port = Number(process.env.ZOHO_MAIL_PORT || 0); // 0 = use defaults below
-    const secureEnv = process.env.ZOHO_MAIL_SECURE;
+// Zoho OAuth2 + Mail API endpoints (India DC — zoho.com works for .in accounts too)
+const TOKEN_URL    = 'https://accounts.zoho.com/oauth/v2/token';
+const MAIL_API     = 'https://mail.zoho.com/api/accounts';
 
-    if (envHost && port) {
-        const secure = secureEnv ? secureEnv === 'true' : port === 465;
-        return [{ host: envHost, port, secure }];
+// In-memory access token cache (refreshed when expired)
+let _cachedToken      = null;
+let _tokenExpiresAt   = 0;
+
+async function getAccessToken() {
+    const now = Date.now();
+    // Reuse cached token if still valid (with 60s safety margin)
+    if (_cachedToken && now < _tokenExpiresAt - 60000) {
+        return _cachedToken;
     }
 
-    // Railway (and many cloud hosts) block outbound port 465 (SMTPS).
-    // Try port 587 (STARTTLS) first — works on most clouds.
-    // Then fall back to 465 in case 587 is blocked.
-    return [
-        // Port 587 STARTTLS — most cloud-friendly
-        { host: 'smtp.zoho.in',  port: 587, secure: false },
-        { host: 'smtp.zoho.com', port: 587, secure: false },
-        // Port 465 SSL — direct SSL, blocked by some clouds
-        { host: 'smtp.zoho.in',  port: 465, secure: true  },
-        { host: 'smtp.zoho.com', port: 465, secure: true  },
-    ];
-}
+    const clientId     = process.env.ZOHO_CLIENT_ID;
+    const clientSecret = process.env.ZOHO_CLIENT_SECRET;
+    const refreshToken = process.env.ZOHO_REFRESH_TOKEN;
 
-function getZohoTransport(config) {
-    const transportOptions = {
-        host: config.host,
-        port: config.port,
-        secure: config.secure,       // false = STARTTLS upgrade, true = direct SSL
-        connectionTimeout: 15000,    // 15s to connect
-        greetingTimeout:   10000,    // 10s for SMTP greeting
-        socketTimeout:     20000,    // 20s for each socket operation
-        auth: {
-            user: process.env.ZOHO_MAIL_USER,
-            pass: process.env.ZOHO_MAIL_PASS
-        }
-    };
-    // For port 587 STARTTLS, require TLS upgrade
-    if (!config.secure) {
-        transportOptions.requireTLS = true;
-        transportOptions.tls = { rejectUnauthorized: false };
+    if (!clientId || !clientSecret || !refreshToken) {
+        throw new Error('Zoho OAuth env vars missing: ZOHO_CLIENT_ID / ZOHO_CLIENT_SECRET / ZOHO_REFRESH_TOKEN');
     }
-    return nodemailer.createTransport(transportOptions);
+
+    console.log('[zoho-mail] refreshing access token...');
+    const resp = await axios.post(TOKEN_URL, new URLSearchParams({
+        grant_type:    'refresh_token',
+        client_id:     clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+    }), { timeout: 15000 });
+
+    if (!resp.data.access_token) {
+        throw new Error(`Zoho token refresh failed: ${JSON.stringify(resp.data)}`);
+    }
+
+    _cachedToken    = resp.data.access_token;
+    _tokenExpiresAt = now + (resp.data.expires_in || 3600) * 1000;
+    console.log('[zoho-mail] ✅ access token refreshed');
+    return _cachedToken;
 }
 
 async function sendZohoMail({ subject, html, to, from, cc }) {
-    const configs = getTransportConfigs();
-    let lastError;
+    const accountId = process.env.ZOHO_ACCOUNT_ID;
+    if (!accountId) throw new Error('ZOHO_ACCOUNT_ID env var not set');
 
-    for (const config of configs) {
-        const transporter = getZohoTransport(config);
-        try {
-            console.log(`[zoho-mail] trying ${config.host}:${config.port} secure=${config.secure}`);
-            const mailOptions = {
-                from: from || process.env.ZOHO_MAIL_FROM,
-                to: to || process.env.ZOHO_MAIL_TO,
-                subject,
-                html
-            };
-            // CC: use provided cc, or fall back to ZOHO_MAIL_CC env var
-            const ccAddr = cc || process.env.ZOHO_MAIL_CC;
-            if (ccAddr) mailOptions.cc = ccAddr;
+    const accessToken = await getAccessToken();
 
-            const info = await transporter.sendMail(mailOptions);
-            console.log(`[zoho-mail] ✅ sent via ${config.host}:${config.port} → messageId:${info.messageId}`);
-            return info;
-        } catch (error) {
-            console.warn(`[zoho-mail] ❌ ${config.host}:${config.port} failed: ${error.message}`);
-            lastError = error;
+    const fromAddr = from || process.env.ZOHO_MAIL_FROM || 'thenilavan@adhashtech.com';
+    const toAddr   = to   || process.env.ZOHO_MAIL_TO   || 'qateam@adhashtech.com';
+    const ccAddr   = cc   || process.env.ZOHO_MAIL_CC   || '';
+
+    const payload = {
+        fromAddress: fromAddr,
+        toAddress:   toAddr,
+        subject,
+        content:     html,
+        mailFormat:  'html',
+    };
+    if (ccAddr) payload.ccAddress = ccAddr;
+
+    console.log(`[zoho-mail] sending via REST API → to:${toAddr} cc:${ccAddr}`);
+
+    const resp = await axios.post(
+        `${MAIL_API}/${accountId}/messages`,
+        payload,
+        {
+            headers: {
+                Authorization:  `Zoho-oauthtoken ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            timeout: 20000,
         }
+    );
+
+    if (resp.data?.status?.code !== 200) {
+        throw new Error(`Zoho Mail API error: ${JSON.stringify(resp.data?.status || resp.data)}`);
     }
 
-    throw lastError || new Error('Zoho mail send failed on all SMTP endpoints');
+    console.log(`[zoho-mail] ✅ email sent → messageId:${resp.data?.data?.messageId}`);
+    return resp.data;
 }
 
 module.exports = { sendZohoMail };
