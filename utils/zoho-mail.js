@@ -23,6 +23,9 @@ function getZohoTransport(config) {
         host: config.host,
         port: config.port,
         secure: config.secure,
+        connectionTimeout: 10000,   // 10s to connect
+        greetingTimeout:   8000,    // 8s for SMTP greeting
+        socketTimeout:     15000,   // 15s for each socket operation
         auth: {
             user: process.env.ZOHO_MAIL_USER,
             pass: process.env.ZOHO_MAIL_PASS

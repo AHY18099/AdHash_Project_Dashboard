@@ -4379,14 +4379,23 @@ app.post('/api/qa-data/:key', async (req, res) => {
     }
 });
 
-// ── ASSIGNMENT NOTIFICATION EMAIL ──
-// POST /api/notify-assignment — send a beautiful Zoho email when a task/release/feedback is assigned
-app.post('/api/notify-assignment', async (req, res) => {
+// ── ASSIGNMENT NOTIFICATION EMAIL + SLACK ──
+// POST /api/notify-assignment — respond IMMEDIATELY (202), send email+Slack in background
+app.post('/api/notify-assignment', (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
-    if (process.env.ZOHO_MAIL_ENABLED !== 'true') return res.json({ sent: false, reason: 'mail_disabled' });
 
     const { type, assignedBy, assignedTo, projectName, subject: subjectOverride, details, dashboardUrl } = req.body || {};
     if (!type || !assignedBy) return res.status(400).json({ error: 'Missing required fields' });
+
+    // Respond immediately so the browser never hangs
+    res.json({ queued: true, type, projectName });
+
+    // Fire all notifications asynchronously in the background
+    _sendNotificationsAsync({ type, assignedBy, assignedTo, projectName, subject: subjectOverride, details, dashboardUrl });
+});
+
+async function _sendNotificationsAsync({ type, assignedBy, assignedTo, projectName, subject: subjectOverride, details, dashboardUrl }) {
+    if (process.env.ZOHO_MAIL_ENABLED !== 'true' && process.env.SLACK_ENABLED !== 'true') return;
 
     // Resolve assignedBy → email using qa_users from shared data
     const sharedData = readQaData();
@@ -4488,33 +4497,28 @@ app.post('/api/notify-assignment', async (req, res) => {
 </td></tr></table>
 </body></html>`;
 
-    const results = { email: null, slack: null };
-
-    // ── Send Email (with CC to qateam) ──
-    try {
-        await sendZohoMail({
+    // ── Send Email + Slack in parallel (both non-blocking, errors logged only) ──
+    const emailPromise = (process.env.ZOHO_MAIL_ENABLED === 'true')
+        ? sendZohoMail({
             subject: subjectLine,
             html,
             to: toAddresses,
             cc: process.env.ZOHO_MAIL_CC || 'qateam@adhashtech.com'
-        });
-        results.email = { sent: true, to: toAddresses, cc: process.env.ZOHO_MAIL_CC };
-        console.log(`[notify] Email sent → to:${toAddresses} cc:${process.env.ZOHO_MAIL_CC} | ${type} | ${projectName}`);
-    } catch (e) {
-        results.email = { sent: false, error: e.message };
-        console.error('[notify] Email failed:', e.message);
-    }
+          })
+            .then(() => console.log(`[notify] ✅ Email → to:${toAddresses} cc:${process.env.ZOHO_MAIL_CC} | ${type} | ${projectName}`))
+            .catch(e => console.error(`[notify] ❌ Email failed (${type}):`, e.message))
+        : Promise.resolve();
 
-    // ── Send Slack (fire in parallel, don't block response) ──
-    if (process.env.SLACK_ENABLED === 'true') {
-        sendSlackNotification({ type, projectName, assignedBy, details, dashboardUrl: dashUrl })
-            .then(() => console.log(`[notify] Slack sent → ${process.env.SLACK_CHANNEL} | ${type} | ${projectName}`))
-            .catch(e => console.error('[notify] Slack failed:', e.message));
-        results.slack = { queued: true, channel: process.env.SLACK_CHANNEL };
-    }
+    const slackPromise = (process.env.SLACK_ENABLED === 'true')
+        ? sendSlackNotification({ type, projectName, assignedBy, details, dashboardUrl: dashUrl })
+            .then(() => console.log(`[notify] ✅ Slack → ${process.env.SLACK_CHANNEL} | ${type} | ${projectName}`))
+            .catch(e => console.error(`[notify] ❌ Slack failed (${type}):`, e.message))
+        : Promise.resolve();
 
-    res.json({ sent: results.email?.sent || false, results });
-});
+    // Wait for both (for logging), but this runs after response already sent
+    Promise.all([emailPromise, slackPromise])
+        .catch(e => console.error('[notify] unexpected error:', e.message));
+}
 
 // On startup: migrate any local wfdoc .bin files that have no ghUrl yet to GitHub Releases.
 // Also performs a full dedup pass on ALL project wfdoc lists to fix any previously accumulated duplicates.
