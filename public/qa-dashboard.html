@@ -4921,8 +4921,8 @@ function rlSaveEntry(editIdx,mode){
   closeModal();
   renderReleasesPage(mode);
   toast(isNewRl?'Release added ✓':'Release updated ✓');
-  // Send notification on both Save (new) and Update (edit)
-  if(entry.assignedBy){
+  // Send notification on both Save (new) and Update (edit) — always, regardless of assignedBy
+  {
     const rlType=mode==='today'?'release_today':'release_next';
     const rlProj=PROJECTS.find(x=>x.id===entry.projectId);
     notifyAssignment(rlType,[
@@ -4933,9 +4933,10 @@ function rlSaveEntry(editIdx,mode){
       {label:'Environment',value:entry.envType},
       {label:'Platform',value:entry.platform},
       {label:'Project URL',value:entry.projectUrl?`<a href="${entry.projectUrl}" style="color:#6366f1">${entry.projectUrl}</a>`:'—'},
-      {label:'Assigned By',value:entry.assignedBy},
-      {label:'Status',value:entry.currentStatus},
-    ],{projectId:entry.projectId,assignedBy:entry.assignedBy,projectName:rlProj?.name||entry.projectId});
+      {label:'Assigned By',value:entry.assignedBy||'—'},
+      {label:'Current Status',value:entry.currentStatus||'—'},
+      {label:'Testing Status',value:entry.testingStatus||'—'},
+    ],{projectId:entry.projectId,assignedBy:entry.assignedBy||'Dashboard',projectName:rlProj?.name||entry.projectId});
   }
 }
 
