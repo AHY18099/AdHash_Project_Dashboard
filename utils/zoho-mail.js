@@ -2,35 +2,46 @@ const nodemailer = require('nodemailer');
 
 function getTransportConfigs() {
     const envHost = process.env.ZOHO_MAIL_HOST;
-    const port = Number(process.env.ZOHO_MAIL_PORT || 465);
-    const secure = process.env.ZOHO_MAIL_SECURE
-        ? process.env.ZOHO_MAIL_SECURE === 'true'
-        : port === 465;
+    const port = Number(process.env.ZOHO_MAIL_PORT || 0); // 0 = use defaults below
+    const secureEnv = process.env.ZOHO_MAIL_SECURE;
 
-    if (envHost) {
+    if (envHost && port) {
+        const secure = secureEnv ? secureEnv === 'true' : port === 465;
         return [{ host: envHost, port, secure }];
     }
 
-    // Fallback across common Zoho SMTP endpoints for region/account differences.
+    // Railway (and many cloud hosts) block outbound port 465 (SMTPS).
+    // Try port 587 (STARTTLS) first — works on most clouds.
+    // Then fall back to 465 in case 587 is blocked.
     return [
-        { host: 'smtp.zoho.in', port: 465, secure: true },
-        { host: 'smtp.zoho.com', port: 465, secure: true }
+        // Port 587 STARTTLS — most cloud-friendly
+        { host: 'smtp.zoho.in',  port: 587, secure: false },
+        { host: 'smtp.zoho.com', port: 587, secure: false },
+        // Port 465 SSL — direct SSL, blocked by some clouds
+        { host: 'smtp.zoho.in',  port: 465, secure: true  },
+        { host: 'smtp.zoho.com', port: 465, secure: true  },
     ];
 }
 
 function getZohoTransport(config) {
-    return nodemailer.createTransport({
+    const transportOptions = {
         host: config.host,
         port: config.port,
-        secure: config.secure,
-        connectionTimeout: 10000,   // 10s to connect
-        greetingTimeout:   8000,    // 8s for SMTP greeting
-        socketTimeout:     15000,   // 15s for each socket operation
+        secure: config.secure,       // false = STARTTLS upgrade, true = direct SSL
+        connectionTimeout: 15000,    // 15s to connect
+        greetingTimeout:   10000,    // 10s for SMTP greeting
+        socketTimeout:     20000,    // 20s for each socket operation
         auth: {
             user: process.env.ZOHO_MAIL_USER,
             pass: process.env.ZOHO_MAIL_PASS
         }
-    });
+    };
+    // For port 587 STARTTLS, require TLS upgrade
+    if (!config.secure) {
+        transportOptions.requireTLS = true;
+        transportOptions.tls = { rejectUnauthorized: false };
+    }
+    return nodemailer.createTransport(transportOptions);
 }
 
 async function sendZohoMail({ subject, html, to, from, cc }) {
@@ -40,6 +51,7 @@ async function sendZohoMail({ subject, html, to, from, cc }) {
     for (const config of configs) {
         const transporter = getZohoTransport(config);
         try {
+            console.log(`[zoho-mail] trying ${config.host}:${config.port} secure=${config.secure}`);
             const mailOptions = {
                 from: from || process.env.ZOHO_MAIL_FROM,
                 to: to || process.env.ZOHO_MAIL_TO,
@@ -51,8 +63,10 @@ async function sendZohoMail({ subject, html, to, from, cc }) {
             if (ccAddr) mailOptions.cc = ccAddr;
 
             const info = await transporter.sendMail(mailOptions);
+            console.log(`[zoho-mail] ✅ sent via ${config.host}:${config.port} → messageId:${info.messageId}`);
             return info;
         } catch (error) {
+            console.warn(`[zoho-mail] ❌ ${config.host}:${config.port} failed: ${error.message}`);
             lastError = error;
         }
     }

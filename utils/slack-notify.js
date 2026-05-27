@@ -43,9 +43,13 @@ const TYPE_LABELS = {
  */
 async function sendSlackNotification({ type, projectName, assignedBy, details, dashboardUrl }) {
     const token   = process.env.SLACK_BOT_TOKEN;
-    const channel = process.env.SLACK_CHANNEL || '#testing-team';
+    // Slack API requires channel name WITHOUT the '#' prefix, or a channel ID.
+    // Strip leading '#' if present.
+    const rawChannel = process.env.SLACK_CHANNEL || 'testing-team';
+    const channel = rawChannel.startsWith('#') ? rawChannel.slice(1) : rawChannel;
 
     if (!token) throw new Error('SLACK_BOT_TOKEN not configured');
+    console.log(`[slack] posting to channel: "${channel}" token starts with: ${token.slice(0,12)}...`);
 
     const color     = TYPE_COLORS[type]  || '#6366f1';
     const emoji     = TYPE_EMOJIS[type]  || ':bell:';
@@ -125,8 +129,10 @@ async function sendSlackNotification({ type, projectName, assignedBy, details, d
     });
 
     if (!response.data.ok) {
+        console.error(`[slack] API response (not ok):`, JSON.stringify(response.data));
         throw new Error(`Slack API error: ${response.data.error}`);
     }
+    console.log(`[slack] ✅ message posted to #${channel}`);
 
     return response.data;
 }
