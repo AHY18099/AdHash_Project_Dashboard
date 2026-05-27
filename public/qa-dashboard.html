@@ -2802,18 +2802,19 @@ function openFeedbackModal(p,type,editId){
     else STORE[p].feedback.push(entry);
     saveToLS(p);closeModal();_fbSubtab[p]=type==='req'?'req':'bug';renderProject(p);
     toast(isEdit?'Feedback updated':'Feedback added');
-    // Send notification email for new feedback/bugs
-    if(!isEdit){
+    // Send notification on both Save (new) and Update (edit)
+    {
       const fbProjName=PROJECTS.find(x=>x.id===p)?.name||p;
       const fbType=type==='bug'?'feedback_bug':'feedback_req';
       notifyAssignment(fbType,[
+        {label:'Action',value:isEdit?'✏️ Feedback Updated':'🆕 Feedback Added'},
         {label:'Project',value:fbProjName},
         {label:'Type',value:type==='bug'?'🐛 Bug':'📋 Requirement'},
         {label:'Title',value:entry.title},
         {label:'Priority',value:entry.priority||'—'},
         {label:'Status',value:entry.status||'—'},
         {label:'Client / Source',value:entry.clientName||'—'},
-        {label:'Description',value:(entry.description||'').slice(0,200)||(entry.description?.length>200?'…':'')},
+        {label:'Description',value:(entry.description||'').slice(0,200)+(entry.description?.length>200?'…':'')},
         {label:'Reported By',value:entry.reportedBy||'—'},
       ],{projectId:p,assignedBy:entry.reportedBy||'',projectName:fbProjName});
     }
@@ -4515,10 +4516,11 @@ function ttSaveEntry(editIdx){
   _ttMonth=date.slice(0,7);
   renderTeamTasksPage();
   toast(isNew?'Task added ✓':'Task updated ✓');
-  // Send assignment notification email for new tasks
-  if(isNew&&entry.assignedBy){
+  // Send notification on both Save (new) and Update (edit)
+  if(entry.assignedBy){
     const proj=PROJECTS.find(x=>x.id===projectId);
     notifyAssignment('teamtask',[
+      {label:'Action',value:isNew?'🆕 New Task Added':'✏️ Task Updated'},
       {label:'Project',value:proj?.name||projectId},
       {label:'Task Summary',value:entry.taskSummary},
       {label:'Date',value:entry.date},
@@ -4877,11 +4879,12 @@ function rlSaveEntry(editIdx,mode){
   closeModal();
   renderReleasesPage(mode);
   toast(isNewRl?'Release added ✓':'Release updated ✓');
-  // Send release notification email for new entries
-  if(isNewRl&&entry.assignedBy){
+  // Send notification on both Save (new) and Update (edit)
+  if(entry.assignedBy){
     const rlType=mode==='today'?'release_today':'release_next';
     const rlProj=PROJECTS.find(x=>x.id===entry.projectId);
     notifyAssignment(rlType,[
+      {label:'Action',value:isNewRl?'🆕 New Release Added':'✏️ Release Updated'},
       {label:'Project',value:rlProj?.name||entry.projectId},
       {label:'Release Date',value:entry.releaseDate},
       {label:'Summary',value:entry.releaseSummary},
