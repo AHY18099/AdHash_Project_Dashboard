@@ -1108,8 +1108,10 @@ body.dark .tt-task-card:hover{box-shadow:0 8px 28px rgba(0,0,0,0.5),0 0 0 1px rg
 .tp-pwd-toggle{background:none;border:none;padding:0;cursor:pointer;color:var(--mut);font-size:12px;line-height:1;transition:color .15s}
 .tp-pwd-toggle:hover{color:var(--txt)}
 .tp-env-badge{flex-shrink:0;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid}
-.tp-note-box{margin-top:2px;padding:10px 14px;background:var(--card2);border-radius:10px;border:1px solid var(--border);font-size:13px;color:var(--txt2);white-space:pre-wrap;word-break:break-word;line-height:1.55}
+.tp-note-box{margin-top:2px;padding:10px 14px;background:var(--card2);border-radius:10px;border:1px solid var(--border);font-size:13px;color:var(--txt2);word-break:break-word;line-height:1.55}
 .tp-note-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);display:block;margin-bottom:5px}
+.tp-note-list{margin:0;padding-left:18px;list-style:disc}
+.tp-note-list li{padding:2px 0;line-height:1.5}
 .tp-apis-section{margin-top:14px;padding-top:12px;border-top:1.5px solid var(--border)}
 .tp-apis-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .tp-apis-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
@@ -5042,7 +5044,7 @@ function renderThirdPartyTab(p){
       </div>
       <div class="tp-card-body">
         ${fields.length?`<div class="tp-field-row">${fields.join('')}</div>`:''}
-        ${acct.note?`<div class="tp-note-box"><span class="tp-note-lbl">📝 Note</span>${escH(acct.note)}</div>`:''}
+        ${acct.note?`<div class="tp-note-box"><span class="tp-note-lbl">📝 Note</span><ul class="tp-note-list">${acct.note.split(' | ').map(s=>s.trim()).filter(Boolean).map(s=>`<li>${escH(s)}</li>`).join('')}</ul></div>`:''}
         ${apisHtml}
       </div>
     </div>`;

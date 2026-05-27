@@ -4120,7 +4120,25 @@ app.get('/api/wfdocs/:projectId', (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     const shared = readQaData();
     const projKey = 'qa3_' + req.params.projectId;
-    const wfdocs = (shared[projKey] && shared[projKey].wfdocs) || [];
+    let wfdocs = (shared[projKey] && shared[projKey].wfdocs) || [];
+    // Defensive dedup by name (keep entry with serverId/ghUrl preferred)
+    const seenNames = new Map();
+    for (const f of wfdocs) {
+        const key = f.name;
+        if (!seenNames.has(key)) { seenNames.set(key, f); }
+        else {
+            const ex = seenNames.get(key);
+            if (!ex.serverId && f.serverId) seenNames.set(key, f);
+            else if (ex.serverId && !ex.ghUrl && f.ghUrl) seenNames.set(key, f);
+        }
+    }
+    wfdocs = Array.from(seenNames.values());
+    // If we deduped in-memory, persist the fix so it doesn't accumulate again
+    const storedCount = (shared[projKey] && shared[projKey].wfdocs) ? shared[projKey].wfdocs.length : 0;
+    if (storedCount !== wfdocs.length) {
+        console.log(`[wfdoc-dedup] ${req.params.projectId}: ${storedCount} → ${wfdocs.length} (fixed in GET)`);
+        _persistWfDocMeta(req.params.projectId, wfdocs);
+    }
     // Mark each file as available (disk or ghUrl) or unavailable
     const projectDir = path.join(WF_DOCS_DIR, req.params.projectId);
     const result = wfdocs.map(f => {
@@ -4280,17 +4298,40 @@ app.post('/api/qa-data/:key', (req, res) => {
     }
 });
 
-// On startup: migrate any local wfdoc .bin files that have no ghUrl yet to GitHub Releases
+// On startup: migrate any local wfdoc .bin files that have no ghUrl yet to GitHub Releases.
+// Also performs a full dedup pass on ALL project wfdoc lists to fix any previously accumulated duplicates.
 async function migrateWfDocsToGitHub() {
     const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
     if (!token) return;
     const shared = readQaData();
-    let anyMigrated = false;
+    let anyChanged = false;
+
     for (const projKey of Object.keys(shared)) {
         if (!projKey.startsWith('qa3_')) continue;
         const projectId = projKey.replace('qa3_', '');
         const wfdocs = (shared[projKey] && shared[projKey].wfdocs) || [];
-        const needMigration = wfdocs.filter(f => !f.ghUrl && f.serverId);
+        if (!wfdocs.length) continue;
+
+        // ── Always dedup by name first (defensive: fixes accumulated duplicates) ──
+        const seenNames = new Map();
+        for (const f of wfdocs) {
+            const key = f.name;
+            if (!seenNames.has(key)) { seenNames.set(key, f); }
+            else {
+                const ex = seenNames.get(key);
+                if (!ex.serverId && f.serverId) seenNames.set(key, f);
+                else if (ex.serverId && !ex.ghUrl && f.ghUrl) seenNames.set(key, f);
+            }
+        }
+        const deduped = Array.from(seenNames.values());
+        if (deduped.length !== wfdocs.length) {
+            console.log(`[migrate] dedup ${projKey}: ${wfdocs.length} → ${deduped.length}`);
+            shared[projKey].wfdocs = deduped;
+            anyChanged = true;
+        }
+
+        // ── Migrate files that have a local .bin but no ghUrl yet ──
+        const needMigration = deduped.filter(f => !f.ghUrl && f.serverId);
         if (!needMigration.length) continue;
         const projectDir = path.join(WF_DOCS_DIR, projectId);
         for (const entry of needMigration) {
@@ -4312,19 +4353,13 @@ async function migrateWfDocsToGitHub() {
                     entry.ghUrl = ghUrl;
                     entry.ghAssetId = asset ? asset.id : null;
                     entry.assetName = assetName;
-                    anyMigrated = true;
+                    anyChanged = true;
                     console.log(`[migrate] Uploaded "${entry.name}" to GitHub Release`);
                 }
             } catch (e) { console.error(`[migrate] Failed for ${entry.name}:`, e.message); }
         }
-        if (anyMigrated) {
-            // Dedup by serverId before saving
-            const seen = new Map();
-            for (const f of wfdocs) { if (!seen.has(f.serverId) || (f.ghUrl && !seen.get(f.serverId).ghUrl)) seen.set(f.serverId, f); }
-            shared[projKey].wfdocs = Array.from(seen.values());
-        }
     }
-    if (anyMigrated) { writeQaData(shared); console.log('[migrate] wfdoc migration complete, qa-shared.json updated'); }
+    if (anyChanged) { writeQaData(shared); console.log('[migrate] wfdoc dedup/migration complete, qa-shared.json updated'); }
 }
 
 // Start server — pull latest data from GitHub first so redeploys never lose data
