@@ -71,7 +71,18 @@ async function pullQaDataFromGitHub() {
             const remoteData = JSON.parse(decoded);
             fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
             fs.writeFileSync(QA_DATA_PATH, JSON.stringify(remoteData, null, 2));
-            console.log(`[startup] Restored qa-shared.json from GitHub (${Object.keys(remoteData).length} keys, sha=${_ghFileSha.slice(0,7)})`);
+            // Log a detailed inventory so Railway logs show exactly what was restored
+            console.log(`[startup] ✅ Restored qa-shared.json from GitHub (sha=${_ghFileSha.slice(0,7)})`);
+            let totalItems = 0;
+            for (const [k, v] of Object.entries(remoteData)) {
+                if (Array.isArray(v) && v.length > 0) { console.log(`  ${k}: ${v.length} items`); totalItems += v.length; }
+                else if (v && typeof v === 'object') {
+                    for (const [sk, sv] of Object.entries(v)) {
+                        if (Array.isArray(sv) && sv.length > 0) { console.log(`  ${k}.${sk}: ${sv.length} items`); totalItems += sv.length; }
+                    }
+                }
+            }
+            console.log(`[startup] Total data items restored: ${totalItems}`);
         } else {
             console.log('[startup] GitHub pull failed:', result.status, (result.body && result.body.message) || '');
         }
@@ -4246,6 +4257,20 @@ app.get('/api/qa-data', (req, res) => {
     res.json(readQaData());
 });
 
+// GET /api/backup — download full qa-shared.json as a file (for manual backup)
+app.get('/api/backup', (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const data = readQaData();
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="adhash-qa-backup-${ts}.json"`);
+        res.send(JSON.stringify(data, null, 2));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // GET /api/qa-data/:key — return one key
 app.get('/api/qa-data/:key', (req, res) => {
     const data = readQaData();
@@ -4263,8 +4288,8 @@ app.delete('/api/qa-data/:key', (req, res) => {
     catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/qa-data-bulk — restore many keys at once (used by restore tool)
-app.post('/api/qa-data-bulk', (req, res) => {
+// POST /api/qa-data-bulk — restore many keys at once (used by restore tool), await GitHub push
+app.post('/api/qa-data-bulk', async (req, res) => {
     const { records } = req.body || {};
     if (!records || typeof records !== 'object') return res.status(400).json({ error: 'Missing records' });
     try {
@@ -4275,15 +4300,17 @@ app.post('/api/qa-data-bulk', (req, res) => {
         }
         fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
         fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
-        schedulePersistQaData(true); // urgent — push to git immediately after bulk restore
-        res.json({ status: 'saved', count });
+        if (_persistQaTimer) { clearTimeout(_persistQaTimer); _persistQaTimer = null; }
+        let ghSaved = false;
+        try { await persistQaDataToGitHub(); ghSaved = true; } catch (_) {}
+        res.json({ status: 'saved', count, ghSaved });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
 });
 
-// POST /api/qa-data/:key — save one key's value
-app.post('/api/qa-data/:key', (req, res) => {
+// POST /api/qa-data/:key — save one key's value, await GitHub push for durability
+app.post('/api/qa-data/:key', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     const key = req.params.key;
     const { value } = req.body;
@@ -4291,8 +4318,20 @@ app.post('/api/qa-data/:key', (req, res) => {
     const data = readQaData();
     data[key] = value;
     try {
-        writeQaData(data);
-        res.json({ status: 'saved', key });
+        // Write to disk immediately
+        fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
+        fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
+        // Cancel any pending debounced save — we're doing it synchronously now
+        if (_persistQaTimer) { clearTimeout(_persistQaTimer); _persistQaTimer = null; }
+        // Push to GitHub synchronously — client waits for this ACK
+        let ghSaved = false;
+        try {
+            await persistQaDataToGitHub();
+            ghSaved = true;
+        } catch (ghErr) {
+            console.error('[save] GitHub push failed for key', key, ':', ghErr.message);
+        }
+        res.json({ status: 'saved', key, ghSaved });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }

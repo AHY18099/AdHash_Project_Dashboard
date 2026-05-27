@@ -250,6 +250,13 @@ body.dark .topbar{background:rgba(5,8,16,0.88);border-bottom-color:rgba(126,179,
 .topbar-right{display:flex;align-items:center;gap:8px;margin-left:auto}
 .btn-home{padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--txt2);cursor:pointer;font-size:13px;font-weight:600;transition:all .15s}
 .btn-home:hover{border-color:var(--grad-a);color:var(--grad-a)}
+.btn-backup{padding:6px 13px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--txt2);cursor:pointer;font-size:12px;font-weight:600;transition:all .15s;white-space:nowrap}
+.btn-backup:hover{border-color:#10b981;color:#10b981}
+.save-status-badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;border:1px solid;white-space:nowrap;transition:all .3s;cursor:default}
+.save-status-idle{background:rgba(16,185,129,.1);color:#10b981;border-color:rgba(16,185,129,.3)}
+.save-status-saving{background:rgba(251,191,36,.1);color:#d97706;border-color:rgba(251,191,36,.3);animation:savePulse 1s infinite}
+.save-status-error{background:rgba(239,68,68,.1);color:#ef4444;border-color:rgba(239,68,68,.3);cursor:pointer}
+@keyframes savePulse{0%,100%{opacity:1}50%{opacity:.5}}
 .notif-btn{position:relative;padding:7px 10px;border-radius:12px;border:1.5px solid var(--border);background:transparent;color:var(--mut);cursor:pointer;font-size:14px;transition:all .2s}
 .notif-btn:hover{border-color:var(--grad-a);color:var(--grad-a)}
 .nbadge{position:absolute;top:-5px;right:-5px;background:var(--fail);color:#fff;border-radius:9px;font-size:9px;font-weight:800;padding:1px 5px;min-width:16px;text-align:center}
@@ -1814,7 +1821,9 @@ function renderTopBar(){
   document.getElementById('topbar').innerHTML=`
     <div class="tl"><span class="brand">AdHash</span><span class="qa-badge">QA</span></div>
     <div class="topbar-right">
+      <span id="save-status-badge" class="save-status-badge save-status-idle" title="Data save status">✓ Saved</span>
       <button id="theme-toggle-btn" class="theme-toggle-btn" onclick="toggleTheme()">${isDark?'☀ Light':'🌙 Dark'}</button>
+      ${isAdmin()?`<button class="btn-backup" onclick="downloadBackup()" title="Download full data backup">📥 Backup</button>`:''}
       ${isAdmin()&&totalPend>0?`<button class="notif-btn" onclick="showPendingOverview()" title="Pending approvals">🔔<span class="nbadge">${totalPend}</span></button>`:''}
       <button class="btn-home" onclick="window.location.href='/landing'">← Home</button>
       <div class="uchip" onclick="toggleUDD()">
@@ -6101,15 +6110,38 @@ function saveState(p){
 // All reads come from here; all writes go straight to the server.
 let _serverData={};
 
-// Track consecutive save failures to warn user
-let _saveFailCount=0;
+// ── SAVE STATUS INDICATOR ──
+// Shows "✓ Saved", "⏳ Saving…", or "❌ Failed – Tap to retry" in top bar badge
+let _activeSaves=0; // count of in-flight save calls
+let _pendingRetries={}; // key → {key,value,retries}
 
-// POST to server — updates in-memory mirror immediately, retries once on failure
+function _setSaveStatus(state,msg){
+  const el=document.getElementById('save-status-badge');
+  if(!el)return;
+  el.className='save-status-badge save-status-'+state;
+  el.textContent=msg;
+  el.onclick=state==='error'?()=>_retryAllFailed():null;
+}
+function _retryAllFailed(){
+  const pending=Object.values(_pendingRetries);
+  if(!pending.length)return;
+  _pendingRetries={};
+  pending.forEach(p=>_doServerPost(p.key,p.value,3));
+}
+function _updateSaveStatusBadge(){
+  if(_activeSaves>0) _setSaveStatus('saving','⏳ Saving…');
+  else if(Object.keys(_pendingRetries).length>0) _setSaveStatus('error','❌ Failed – Tap to retry');
+  else _setSaveStatus('idle','✓ Saved');
+}
+
+// POST to server — updates in-memory mirror immediately, retries up to 3× with backoff
 function serverPost(key,value){
   _serverData[key]=value; // update mirror immediately for instant UI reads
-  _doServerPost(key,value,true);
+  _doServerPost(key,value,3);
 }
-async function _doServerPost(key,value,retry){
+async function _doServerPost(key,value,retriesLeft){
+  _activeSaves++;
+  _updateSaveStatusBadge();
   try{
     const r=await fetch('/api/qa-data/'+encodeURIComponent(key),{
       method:'POST',
@@ -6117,33 +6149,50 @@ async function _doServerPost(key,value,retry){
       body:JSON.stringify({value})
     });
     if(r.ok){
-      _saveFailCount=0;
-      // Remove any save-error banner
-      document.getElementById('_save-err-banner')?.remove();
+      const j=await r.json().catch(()=>({}));
+      // ghSaved:true means the server confirmed push to GitHub
+      if(j.ghSaved===false){
+        // Server saved to disk but GitHub push failed — warn but don't block
+        console.warn('[save] Server saved key',key,'but GitHub push failed — will retry on next save');
+      }
+      delete _pendingRetries[key];
+      _activeSaves=Math.max(0,_activeSaves-1);
+      _updateSaveStatusBadge();
     } else if(r.status===401){
-      // Session expired — redirect to login
+      _activeSaves=Math.max(0,_activeSaves-1);
       window.location.href='/';
     } else {
       throw new Error('HTTP '+r.status);
     }
   }catch(e){
-    if(retry){
-      // Wait 2s and retry once
-      setTimeout(()=>_doServerPost(key,value,false),2000);
+    _activeSaves=Math.max(0,_activeSaves-1);
+    if(retriesLeft>0){
+      const delay=retriesLeft===3?1500:retriesLeft===2?3000:6000;
+      _pendingRetries[key]={key,value,retries:retriesLeft-1};
+      _updateSaveStatusBadge();
+      setTimeout(()=>_doServerPost(key,value,retriesLeft-1),delay);
     } else {
-      _saveFailCount++;
-      if(_saveFailCount>=2) _showSaveErrorBanner();
+      _pendingRetries[key]={key,value,retries:0};
+      _updateSaveStatusBadge();
+      console.error('[save] Failed to save key',key,'after all retries:',e.message);
     }
   }
 }
 
-function _showSaveErrorBanner(){
-  if(document.getElementById('_save-err-banner'))return;
-  const b=document.createElement('div');
-  b.id='_save-err-banner';
-  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#ef4444;color:#fff;text-align:center;padding:10px 16px;font-size:13px;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:12px';
-  b.innerHTML='⚠ Data save failed — check your connection. <button onclick="location.reload()" style="background:rgba(255,255,255,.25);border:none;color:#fff;font-weight:700;padding:4px 14px;border-radius:50px;cursor:pointer;font-family:inherit">Reload</button><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#fff;cursor:pointer;font-size:16px;padding:0 4px">✕</button>';
-  document.body.prepend(b);
+// Download full data backup as JSON file
+async function downloadBackup(){
+  try{
+    const r=await fetch('/api/backup',{cache:'no-store'});
+    if(!r.ok){toast('Backup failed: '+r.status,'err');return;}
+    const blob=await r.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`adhash-qa-backup-${new Date().toISOString().slice(0,19).replace(/[:.]/g,'-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Backup downloaded ✓');
+  }catch(e){toast('Backup error: '+e.message,'err');}
 }
 
 // Fire-and-forget DELETE of a key from the server
