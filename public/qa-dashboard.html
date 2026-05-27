@@ -6230,7 +6230,7 @@ let DAILY_TASKS=[];
 function saveDailyTasks(){_serverData['qa3_daily_tasks']=DAILY_TASKS;serverPost('qa3_daily_tasks',DAILY_TASKS);}
 function loadDailyTasks(){DAILY_TASKS=_serverData['qa3_daily_tasks']||[];}
 
-// Pull wfdocs file metadata from server for all projects and merge into STORE
+// Pull wfdocs file metadata from server for all projects and merge into STORE (read-only sync)
 async function syncWfDocsFromServer(){
   try{
     await Promise.all(PROJECTS.map(async proj=>{
@@ -6240,15 +6240,12 @@ async function syncWfDocsFromServer(){
         const serverFiles=await r.json();
         if(!Array.isArray(serverFiles))return;
         if(!STORE[proj.id].wfdocs)STORE[proj.id].wfdocs=[];
-        // Server is authoritative for wfdocs — replace with server list
-        const serverIds=new Set(serverFiles.map(sf=>sf.fileId));
-        // Keep any legacy base64 entries that have no serverId
+        // Server is authoritative for wfdocs — update in-memory only, no re-save
+        // (data is already in GitHub; re-saving would cause unnecessary API calls + SHA conflicts)
         const legacyEntries=STORE[proj.id].wfdocs.filter(d=>!d.serverId);
         const serverEntries=serverFiles.map(sf=>({name:sf.name,size:sf.size||0,uploadedAt:sf.uploadedAt||'',serverId:sf.fileId}));
         STORE[proj.id].wfdocs=[...serverEntries,...legacyEntries];
-        // persist updated wfdocs list back to server store
-        _serverData['qa3_'+proj.id]=STORE[proj.id];
-        serverPost('qa3_'+proj.id,STORE[proj.id]);
+        _serverData['qa3_'+proj.id]=STORE[proj.id]; // update mirror only
       }catch(e){}
     }));
   }catch(e){}

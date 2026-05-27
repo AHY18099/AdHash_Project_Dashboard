@@ -92,9 +92,12 @@ async function pullQaDataFromGitHub() {
 }
 
 // Push qa-shared.json to GitHub via Contents API — single HTTPS call, ~500ms, no git process.
-// Debounced so rapid saves batch into one call.
+// Uses a serial queue so concurrent saves are serialised (no SHA conflicts from parallel pushes).
 let _persistQaTimer = null;
 let _persistPending = false;
+let _persistInFlight = false;   // true while a GitHub push is in progress
+let _persistQueue = [];         // waiters: resolve functions to notify when current push completes
+
 function schedulePersistQaData(urgent = false) {
     _persistPending = true;
     if (_persistQaTimer) clearTimeout(_persistQaTimer);
@@ -103,8 +106,15 @@ function schedulePersistQaData(urgent = false) {
 }
 
 async function persistQaDataToGitHub() {
+    // If a push is already in flight, queue this call and return when that push completes
+    if (_persistInFlight) {
+        return new Promise(resolve => {
+            _persistQueue.push(resolve);
+        });
+    }
+    _persistInFlight = true;
     const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
-    if (!token) return;
+    if (!token) { _persistInFlight = false; _drainPersistQueue(); return; }
     _persistPending = false;
     try {
         const content = fs.existsSync(QA_DATA_PATH) ? fs.readFileSync(QA_DATA_PATH, 'utf8') : '{}';
@@ -130,15 +140,29 @@ async function persistQaDataToGitHub() {
             // SHA conflict — fetch latest SHA and retry once
             console.log('[persist] SHA conflict — fetching latest SHA and retrying');
             _ghFileSha = null;
+            _persistInFlight = false;
+            _drainPersistQueue();
             schedulePersistQaData(true);
+            return;
         } else {
             console.error('[persist] GitHub API error:', result.status, result.body && result.body.message);
         }
     } catch (e) {
         console.error('[persist] Failed to save qa-shared.json to GitHub:', e.message);
         // Retry after 3s on network error
+        _persistInFlight = false;
+        _drainPersistQueue();
         setTimeout(() => persistQaDataToGitHub(), 3000);
+        return;
     }
+    _persistInFlight = false;
+    _drainPersistQueue();
+}
+
+// Notify all queued waiters that the current push has finished
+function _drainPersistQueue() {
+    const waiters = _persistQueue.splice(0);
+    waiters.forEach(resolve => resolve());
 }
 
 const app = express();
