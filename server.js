@@ -120,38 +120,51 @@ async function persistQaDataToGitHub() {
         const content = fs.existsSync(QA_DATA_PATH) ? fs.readFileSync(QA_DATA_PATH, 'utf8') : '{}';
         const encoded = Buffer.from(content).toString('base64');
 
-        // If we don't have the SHA yet, fetch it first
-        if (!_ghFileSha) {
-            const meta = await _ghRequest('GET', `/repos/${GH_API_REPO}/contents/${GH_API_FILE}`, null, token);
-            if (meta.status === 200) _ghFileSha = meta.body.sha;
+        // Always fetch the latest SHA from GitHub before pushing — prevents stale SHA errors
+        // when an external script pushes directly to GitHub (force-sync, fix scripts, etc.)
+        const meta = await _ghRequest('GET', `/repos/${GH_API_REPO}/contents/${GH_API_FILE}`, null, token);
+        if (meta.status === 200) {
+            const remoteSha = meta.body.sha;
+            // Check if remote content already matches what we want to push
+            const remoteContent = Buffer.from(meta.body.content.replace(/\n/g, ''), 'base64').toString('utf8');
+            if (remoteContent === content) {
+                // Already in sync — update our SHA cache and done
+                _ghFileSha = remoteSha;
+                console.log('[persist] GitHub already up to date — no push needed');
+                _persistInFlight = false; _drainPersistQueue(); return;
+            }
+            _ghFileSha = remoteSha;
+        } else {
+            // Can't get SHA — use cached or skip
+            if (!_ghFileSha) {
+                console.error('[persist] Cannot get GitHub SHA:', meta.status);
+                _persistInFlight = false; _drainPersistQueue(); return;
+            }
         }
 
         const body = {
             message: 'chore: persist qa-shared.json',
             content: encoded,
-            ..._ghFileSha ? { sha: _ghFileSha } : {}
+            sha: _ghFileSha
         };
 
         const result = await _ghRequest('PUT', `/repos/${GH_API_REPO}/contents/${GH_API_FILE}`, body, token);
         if (result.status === 200 || result.status === 201) {
             _ghFileSha = result.body.content && result.body.content.sha;
-            console.log(`[persist] qa-shared.json saved to GitHub OK`);
-        } else if (result.status === 409) {
-            // SHA conflict — fetch latest SHA and retry once
-            console.log('[persist] SHA conflict — fetching latest SHA and retrying');
+            console.log(`[persist] qa-shared.json saved to GitHub OK (sha=${_ghFileSha && _ghFileSha.slice(0,7)})`);
+        } else if (result.status === 409 || result.status === 422) {
+            // Conflict — reset SHA and retry
+            console.log(`[persist] GitHub conflict (${result.status}) — will retry`);
             _ghFileSha = null;
-            _persistInFlight = false;
-            _drainPersistQueue();
-            schedulePersistQaData(true);
+            _persistInFlight = false; _drainPersistQueue();
+            setTimeout(() => persistQaDataToGitHub(), 500);
             return;
         } else {
             console.error('[persist] GitHub API error:', result.status, result.body && result.body.message);
         }
     } catch (e) {
         console.error('[persist] Failed to save qa-shared.json to GitHub:', e.message);
-        // Retry after 3s on network error
-        _persistInFlight = false;
-        _drainPersistQueue();
+        _persistInFlight = false; _drainPersistQueue();
         setTimeout(() => persistQaDataToGitHub(), 3000);
         return;
     }
