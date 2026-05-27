@@ -4385,17 +4385,22 @@ app.post('/api/notify-assignment', (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
 
     const { type, assignedBy, assignedTo, projectName, subject: subjectOverride, details, dashboardUrl } = req.body || {};
-    if (!type || !assignedBy) return res.status(400).json({ error: 'Missing required fields' });
+    if (!type) return res.status(400).json({ error: 'Missing required field: type' });
 
     // Respond immediately so the browser never hangs
     res.json({ queued: true, type, projectName });
+    console.log(`[notify] queued → type:${type} project:${projectName} assignedBy:${assignedBy||'(none)'}`);
 
     // Fire all notifications asynchronously in the background
-    _sendNotificationsAsync({ type, assignedBy, assignedTo, projectName, subject: subjectOverride, details, dashboardUrl });
+    _sendNotificationsAsync({ type, assignedBy: assignedBy || 'Dashboard', assignedTo, projectName, subject: subjectOverride, details, dashboardUrl });
 });
 
 async function _sendNotificationsAsync({ type, assignedBy, assignedTo, projectName, subject: subjectOverride, details, dashboardUrl }) {
-    if (process.env.ZOHO_MAIL_ENABLED !== 'true' && process.env.SLACK_ENABLED !== 'true') return;
+    console.log(`[notify] _sendNotificationsAsync start → ZOHO_MAIL_ENABLED=${process.env.ZOHO_MAIL_ENABLED} SLACK_ENABLED=${process.env.SLACK_ENABLED} ZOHO_MAIL_USER=${process.env.ZOHO_MAIL_USER} type=${type}`);
+    if (process.env.ZOHO_MAIL_ENABLED !== 'true' && process.env.SLACK_ENABLED !== 'true') {
+        console.log('[notify] both mail and slack disabled — skipping');
+        return;
+    }
 
     // Resolve assignedBy → email using qa_users from shared data
     const sharedData = readQaData();

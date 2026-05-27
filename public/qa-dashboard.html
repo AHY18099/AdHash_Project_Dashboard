@@ -4064,8 +4064,8 @@ async function notifyAssignment(type, details, extra){
     };
     const r=await fetch('/api/notify-assignment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const j=await r.json();
-    if(j.sent) console.log('[notify] email sent to:',j.to);
-    else console.log('[notify] email skipped:',j.reason||j.error);
+    if(j.queued||j.sent) console.log('[notify] notification queued →',j.type,j.projectName||'');
+    else console.log('[notify] notification NOT sent:',j.error||j.reason||JSON.stringify(j));
   }catch(e){console.warn('[notify] email failed:',e.message);}
 }
 
