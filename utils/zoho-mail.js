@@ -30,19 +30,24 @@ function getZohoTransport(config) {
     });
 }
 
-async function sendZohoMail({ subject, html, to, from }) {
+async function sendZohoMail({ subject, html, to, from, cc }) {
     const configs = getTransportConfigs();
     let lastError;
 
     for (const config of configs) {
         const transporter = getZohoTransport(config);
         try {
-            const info = await transporter.sendMail({
+            const mailOptions = {
                 from: from || process.env.ZOHO_MAIL_FROM,
                 to: to || process.env.ZOHO_MAIL_TO,
                 subject,
                 html
-            });
+            };
+            // CC: use provided cc, or fall back to ZOHO_MAIL_CC env var
+            const ccAddr = cc || process.env.ZOHO_MAIL_CC;
+            if (ccAddr) mailOptions.cc = ccAddr;
+
+            const info = await transporter.sendMail(mailOptions);
             return info;
         } catch (error) {
             lastError = error;

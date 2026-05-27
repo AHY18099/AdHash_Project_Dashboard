@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { readLatestApiResultsPayload } = require('./utils/latest-api-results.js');
 const { sendZohoMail } = require('./utils/zoho-mail');
+const { sendSlackNotification } = require('./utils/slack-notify');
 
 // ── SHARED DATA (must be defined before login handler uses it) ──
 const QA_DATA_PATH = path.join(__dirname, 'data', 'qa-shared.json');
@@ -191,6 +192,10 @@ if (!process.env.ZOHO_MAIL_FROM)     process.env.ZOHO_MAIL_FROM     = 'thenilava
 if (!process.env.ZOHO_MAIL_USER)     process.env.ZOHO_MAIL_USER     = 'thenilavan@adhashtech.com';
 if (!process.env.ZOHO_MAIL_PASS)     process.env.ZOHO_MAIL_PASS     = 'G8sYN8MRCWpM';
 if (!process.env.ZOHO_MAIL_TO)       process.env.ZOHO_MAIL_TO       = 'qateam@adhashtech.com';
+if (!process.env.ZOHO_MAIL_CC)       process.env.ZOHO_MAIL_CC       = 'qateam@adhashtech.com';
+if (!process.env.SLACK_BOT_TOKEN)    process.env.SLACK_BOT_TOKEN    = 'xoxb-419650362022-11217403721126-XiJEnpEJPpklhzcauEXfsmSi';
+if (!process.env.SLACK_CHANNEL)      process.env.SLACK_CHANNEL      = '#testing-team';
+if (!process.env.SLACK_ENABLED)      process.env.SLACK_ENABLED      = 'true';
 const SUPER_ADMIN_ROLE = 'super-admin';
 const AUTH_COOKIE_NAME = 'adhash_auth';
 const AUTH_COOKIE_VALUE = Buffer.from(`${SUPER_ADMIN_EMAIL}:${SUPER_ADMIN_PASSWORD}`).toString('base64url');
@@ -1725,7 +1730,7 @@ app.post('/api/run-project/:projectId', (req, res) => {
 });
 
 // Protected keys that must never be exposed or overwritten via the secrets UI
-const PROTECTED_ENV_KEYS = new Set(['GITHUB_TOKEN','ZOHO_MAIL_PASS','ZOHO_MAIL_USER','ZOHO_MAIL_FROM','ZOHO_MAIL_TO','ZOHO_MAIL_ENABLED']);
+const PROTECTED_ENV_KEYS = new Set(['GITHUB_TOKEN','ZOHO_MAIL_PASS','ZOHO_MAIL_USER','ZOHO_MAIL_FROM','ZOHO_MAIL_TO','ZOHO_MAIL_ENABLED','ZOHO_MAIL_CC','SLACK_BOT_TOKEN','SLACK_CHANNEL','SLACK_ENABLED']);
 
 function readEnvFile() {
     const envPath = path.join(__dirname, '.env');
@@ -4483,14 +4488,32 @@ app.post('/api/notify-assignment', async (req, res) => {
 </td></tr></table>
 </body></html>`;
 
+    const results = { email: null, slack: null };
+
+    // ── Send Email (with CC to qateam) ──
     try {
-        await sendZohoMail({ subject: subjectLine, html, to: toAddresses });
-        console.log(`[notify] Assignment email sent to: ${toAddresses} | type=${type} | project=${projectName}`);
-        res.json({ sent: true, to: toAddresses });
+        await sendZohoMail({
+            subject: subjectLine,
+            html,
+            to: toAddresses,
+            cc: process.env.ZOHO_MAIL_CC || 'qateam@adhashtech.com'
+        });
+        results.email = { sent: true, to: toAddresses, cc: process.env.ZOHO_MAIL_CC };
+        console.log(`[notify] Email sent → to:${toAddresses} cc:${process.env.ZOHO_MAIL_CC} | ${type} | ${projectName}`);
     } catch (e) {
-        console.error('[notify] Failed to send assignment email:', e.message);
-        res.json({ sent: false, error: e.message });
+        results.email = { sent: false, error: e.message };
+        console.error('[notify] Email failed:', e.message);
     }
+
+    // ── Send Slack (fire in parallel, don't block response) ──
+    if (process.env.SLACK_ENABLED === 'true') {
+        sendSlackNotification({ type, projectName, assignedBy, details, dashboardUrl: dashUrl })
+            .then(() => console.log(`[notify] Slack sent → ${process.env.SLACK_CHANNEL} | ${type} | ${projectName}`))
+            .catch(e => console.error('[notify] Slack failed:', e.message));
+        results.slack = { queued: true, channel: process.env.SLACK_CHANNEL };
+    }
+
+    res.json({ sent: results.email?.sent || false, results });
 });
 
 // On startup: migrate any local wfdoc .bin files that have no ghUrl yet to GitHub Releases.
