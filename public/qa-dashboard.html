@@ -1277,10 +1277,13 @@ body.dark .tcl-stat{background:rgba(12,17,32,.8);border-color:rgba(255,255,255,.
 .rl-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px}
 .rl-title-today{font-size:20px;font-weight:800;background:linear-gradient(135deg,#10b981 0%,#059669 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .rl-title-next{font-size:20px;font-weight:800;background:linear-gradient(135deg,#8b5cf6 0%,#6d28d9 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.rl-title-past{font-size:20px;font-weight:800;background:linear-gradient(135deg,#64748b 0%,#475569 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .rl-subtitle{font-size:12px;color:var(--mut);margin-top:3px}
 .rl-add-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;color:#fff}
 .rl-add-btn.today{background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 4px 14px rgba(16,185,129,.3)}
 .rl-add-btn.next{background:linear-gradient(135deg,#8b5cf6,#6d28d9);box-shadow:0 4px 14px rgba(139,92,246,.3)}
+.rl-past-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;background:linear-gradient(135deg,rgba(100,116,139,.15),rgba(71,85,105,.1));color:#64748b;border:1px solid rgba(100,116,139,.3);margin-left:8px}
+body.dark .rl-past-badge{background:rgba(100,116,139,.2);color:#94a3b8}
 .rl-add-btn:hover{transform:translateY(-1px)}
 .rl-summary-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
 .rl-sum-chip{font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px}
@@ -2013,8 +2016,9 @@ function renderProjectGrid(){
       <div class="pj-grid-footer">
         <button class="pj-add-btn" onclick="showDailyTasks()">📅 Daily Task Updates</button>
         <button class="pj-add-btn" style="background:linear-gradient(135deg,#f97316 0%,#ef4444 100%);box-shadow:0 4px 16px rgba(249,115,22,.3)" onclick="showTeamTasks()">📋 Team Task Assigned</button>
-        <button class="pj-add-btn" style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);box-shadow:0 4px 16px rgba(16,185,129,.3)" onclick="showTodayReleases()">🚀 Today Releases</button>
+        <button class="pj-add-btn" style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);box-shadow:0 4px 16px rgba(16,185,129,.3);position:relative" onclick="showTodayReleases()">🚀 Today Releases${(()=>{const c=rlTodayCount();return c>0?`<span style="position:absolute;top:-7px;right:-7px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid #fff;line-height:1">${c}</span>`:''})()}</button>
         <button class="pj-add-btn" style="background:linear-gradient(135deg,#8b5cf6 0%,#6d28d9 100%);box-shadow:0 4px 16px rgba(139,92,246,.3)" onclick="showNextReleases()">📆 Next Releases</button>
+        <button class="pj-add-btn" style="background:linear-gradient(135deg,#64748b 0%,#475569 100%);box-shadow:0 4px 16px rgba(100,116,139,.3)" onclick="showPastReleases()">📁 Past Releases</button>
         ${isAdmin()?`<button class="pj-add-btn" onclick="openAddProject()">＋ New Project</button>`:''}
         ${isAdmin()?`<button class="pj-users-btn" onclick="showUsers()">👥 Manage Users</button>`:''}
       </div>
@@ -2037,6 +2041,7 @@ function renderProject(p){
   if(curView==='teamtasks'){renderTeamTasksPage();return;}
   if(curView==='todayreleases'){renderReleasesPage('today');return;}
   if(curView==='nextreleases'){renderReleasesPage('next');return;}
+  if(curView==='pastreleases'){renderReleasesPage('past');return;}
   const proj=PROJECTS.find(x=>x.id===p);
   const pend=(STORE[p].pending||[]).filter(x=>x.status==='pending').length;
   const s=calcStats(p);
@@ -4620,30 +4625,58 @@ function rlBugDisplay(bugs,withReopen){
 
 function showTodayReleases(){curView='todayreleases';renderReleasesPage('today');}
 function showNextReleases(){curView='nextreleases';renderReleasesPage('next');}
+function showPastReleases(){curView='pastreleases';renderReleasesPage('past');}
+
+// Count today's releases for the badge (excludes past/ready-for-client)
+function rlTodayCount(){
+  const todayStr=rlTodayStr();
+  return RELEASES.filter(r=>{
+    if(!r.releaseDate)return false;
+    const rd=r.releaseDate.slice(0,10);
+    const isPast=(rd<todayStr)||(r.testingStatus==='Ready for Client');
+    return !isPast && rd===todayStr;
+  }).length;
+}
+
+// Classify a release: 'past' | 'today' | 'next'
+function rlClassify(r){
+  const todayStr=rlTodayStr();
+  if(!r.releaseDate)return'next';
+  const rd=r.releaseDate.slice(0,10);
+  if(r.testingStatus==='Ready for Client')return'past';
+  if(rd<todayStr)return'past';
+  if(rd===todayStr)return'today';
+  return'next';
+}
 
 function renderReleasesPage(mode){
   const isToday=(mode==='today');
-  const todayStr=rlTodayStr();
-  const list=RELEASES.filter(r=>{
-    if(!r.releaseDate)return false;
-    const rd=r.releaseDate.slice(0,10);
-    return isToday?(rd===todayStr):(rd>todayStr);
-  }).sort((a,b)=>a.releaseDate<b.releaseDate?-1:1);
+  const isPast=(mode==='past');
+  const list=RELEASES.filter(r=>rlClassify(r)===mode)
+    .sort((a,b)=>{
+      // Past: newest first; Today/Next: soonest first
+      if(isPast)return a.releaseDate>b.releaseDate?-1:1;
+      return a.releaseDate<b.releaseDate?-1:1;
+    });
 
-  let totDone=0,totProg=0,totTodo=0,totHold=0;
+  let totDone=0,totProg=0,totTodo=0,totHold=0,totReadyClient=0,totDatePassed=0;
   list.forEach(r=>{
     const s=r.currentStatus||'To Do';
     if(s==='Done')totDone++;
     else if(s==='In Progress'||s==='Partially Done')totProg++;
     else if(s==='Hold'||s==='Skipped')totHold++;
     else totTodo++;
+    if(isPast){
+      if(r.testingStatus==='Ready for Client')totReadyClient++;
+      else totDatePassed++;
+    }
   });
 
   const cardsHtml=list.length===0?`
     <div class="rl-empty">
-      <div class="rl-empty-icon">${isToday?'🚀':'📆'}</div>
-      <div style="font-weight:700;font-size:14px;margin-bottom:6px">${isToday?'No releases scheduled for today':'No upcoming releases'}</div>
-      <div>Click "＋ Add Release" to create one</div>
+      <div class="rl-empty-icon">${isToday?'🚀':isPast?'📁':'📆'}</div>
+      <div style="font-weight:700;font-size:14px;margin-bottom:6px">${isToday?'No releases scheduled for today':isPast?'No past releases yet':'No upcoming releases'}</div>
+      <div>${isPast?'Releases move here automatically when the date passes or status is set to Ready for Client':'Click "＋ Add Release" to create one'}</div>
     </div>`:list.map(r=>{
       const idx=RELEASES.indexOf(r);
       const isOpen=_rlCardOpen[r.id]!==false;
@@ -4658,13 +4691,15 @@ function renderReleasesPage(mode){
       const ptOpts=RL_PROJ_TYPES.map(v=>`<option value="${v}" ${r.projectType===v?'selected':''}>${v}</option>`).join('');
       const platOpts=RL_PLATFORMS.map(v=>`<option value="${v}" ${r.platform===v?'selected':''}>${v}</option>`).join('');
       const envOpts=RL_ENV_TYPES.map(v=>`<option value="${v}" ${r.envType===v?'selected':''}>${v}</option>`).join('');
-      return`<div class="rl-card" id="rl-card-${r.id}">
+      const pastReason=isPast?(r.testingStatus==='Ready for Client'?'✅ Ready for Client':'📅 Date Passed'):'';
+      return`<div class="rl-card" id="rl-card-${r.id}" style="${isPast?'opacity:0.88':''}">
         <div class="rl-card-hdr" onclick="rlToggleCard('${r.id}')">
           <span class="rl-card-proj" style="background:${pColor}18;color:${pColor};border:1px solid ${pColor}44">
             <span class="tt-proj-dot" style="background:${pColor}"></span>${escH(pName)}
           </span>
           <span class="rl-card-env ${envCls}">${escH(r.envType||'Staging')}</span>
           <span class="rl-card-summary">${escH(r.releaseSummary||'(no summary)')}</span>
+          ${isPast?`<span class="rl-past-badge">${pastReason}</span>`:''}
           <span class="rl-status-badge ${rlStatusClass(r.currentStatus)}">${escH(r.currentStatus||'To Do')}</span>
           <span class="rl-card-date">${escH(rdFormatted)}</span>
           <span class="rl-card-chevron${isOpen?' open':''}">▾</span>
@@ -4747,19 +4782,26 @@ function renderReleasesPage(mode){
     <div class="rl-wrap">
       <div class="rl-header">
         <div>
-          <div class="${isToday?'rl-title-today':'rl-title-next'}">${isToday?'🚀 Today Releases':'📆 Next Releases'}</div>
-          <div class="rl-subtitle">${isToday?`Releases scheduled for today — ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}`:'All upcoming scheduled releases'}</div>
+          <div class="${isToday?'rl-title-today':isPast?'rl-title-past':'rl-title-next'}">${isToday?'🚀 Today Releases':isPast?'📁 Past Releases':'📆 Next Releases'}</div>
+          <div class="rl-subtitle">${isToday?`Releases scheduled for today — ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}`:isPast?'Completed releases & releases marked Ready for Client — auto-archived':'All upcoming scheduled releases'}</div>
         </div>
         <div class="dt-header-right">
-          <button class="rl-add-btn ${isToday?'today':'next'}" onclick="rlOpenAdd('${mode}')">＋ Add Release</button>
+          ${!isPast?`<button class="rl-add-btn ${isToday?'today':'next'}" onclick="rlOpenAdd('${mode}')">＋ Add Release</button>`:''}
           <button class="btn btn-secondary" onclick="goHome()">← Projects</button>
         </div>
       </div>
       <div class="rl-summary-bar">
-        <span class="rl-sum-chip done">✓ ${totDone} Done</span>
-        <span class="rl-sum-chip prog">↻ ${totProg} In Progress</span>
-        <span class="rl-sum-chip todo">— ${totTodo} To Do</span>
-        <span class="rl-sum-chip hold">⏸ ${totHold} Hold / Skipped</span>
+        ${isPast?`
+          <span class="rl-sum-chip done">✅ ${totReadyClient} Ready for Client</span>
+          <span class="rl-sum-chip hold">📅 ${totDatePassed} Date Passed</span>
+          <span class="rl-sum-chip done">✓ ${totDone} Done</span>
+          <span class="rl-sum-chip prog">↻ ${totProg} In Progress</span>
+        `:`
+          <span class="rl-sum-chip done">✓ ${totDone} Done</span>
+          <span class="rl-sum-chip prog">↻ ${totProg} In Progress</span>
+          <span class="rl-sum-chip todo">— ${totTodo} To Do</span>
+          <span class="rl-sum-chip hold">⏸ ${totHold} Hold / Skipped</span>
+        `}
         <span style="margin-left:auto;font-size:12px;color:var(--mut);font-weight:600">${list.length} release${list.length!==1?'s':''}</span>
       </div>
       <div id="rl-list">${cardsHtml}</div>
@@ -4778,13 +4820,21 @@ function rlInline(idx,field,el){
   if(idx<0||idx>=RELEASES.length)return;
   RELEASES[idx][field]=el.value;
   saveReleases();
-  const mode=curView==='todayreleases'?'today':'next';
-  renderReleasesPage(mode);
+  // After status change, re-classify — may have moved to Past
+  const r=RELEASES[idx];
+  const newMode=rlClassify(r); // 'today' | 'next' | 'past'
+  const viewMode=curView==='pastreleases'?'past':curView==='todayreleases'?'today':'next';
+  if(newMode==='past' && viewMode!=='past'){
+    toast('✅ Moved to Past Releases');
+    curView='pastreleases';
+    renderReleasesPage('past');
+  } else {
+    renderReleasesPage(viewMode);
+  }
   // Send notification when status is changed inline
   if(field==='currentStatus'||field==='testingStatus'){
-    const r=RELEASES[idx];
     const proj=PROJECTS.find(x=>x.id===r.projectId);
-    const rlType=mode==='today'?'release_today':'release_next';
+    const rlType=viewMode==='today'?'release_today':'release_next';
     notifyAssignment(rlType,[
       {label:'Action',value:'🔄 Status Updated'},
       {label:'Project',value:proj?.name||r.projectId},
