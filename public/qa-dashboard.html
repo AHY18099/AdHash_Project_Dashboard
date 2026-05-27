@@ -804,9 +804,18 @@ body.dark .fb-type-badge.bug{background:rgba(255,68,68,.1);border-color:rgba(255
 .fb-status-badge.closed{background:rgba(148,163,184,.12);color:var(--mut);border:1px solid rgba(148,163,184,.3)}
 .fb-status-badge.wontfix{background:rgba(239,68,68,.08);color:var(--fail);border:1px solid rgba(239,68,68,.25)}
 .fb-status-badge.deferred{background:rgba(139,92,246,.1);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)}
+.fb-status-badge.clarification{background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.3)}
+body.dark .fb-status-badge.clarification{background:rgba(249,115,22,.13);color:#fb923c;border-color:rgba(249,115,22,.4)}
 body.dark .fb-status-badge.deferred{background:rgba(139,92,246,.12);color:#a78bfa;border-color:rgba(139,92,246,.4)}
 body.dark .fb-status-badge.inprogress{background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.3)}
 body.dark .fb-status-badge.resolved{background:rgba(0,255,136,.1);border-color:rgba(0,255,136,.3)}
+.fb-desc-list{list-style:none;padding:0;margin:0 0 8px 0}
+.fb-desc-list li{font-size:13px;color:var(--mut);line-height:1.65;padding:2px 0 2px 18px;position:relative}
+.fb-desc-list li::before{content:'•';position:absolute;left:4px;color:var(--grad-a);font-weight:700}
+.fb-comment-box{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px}
+.fb-comment-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-bottom:4px}
+.fb-comment-txt{font-size:13px;color:var(--txt);line-height:1.6;white-space:pre-wrap}
+.fb-comment-count{font-size:10px;color:var(--mut);text-align:right;margin-top:2px}
 
 .fb-priority-badge{padding:2px 8px;border-radius:12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-left:4px}
 .fb-priority-badge.low{background:rgba(16,185,129,.1);color:var(--pass)}
@@ -2541,10 +2550,18 @@ function feedbackCardHtml(p,f){
   const idx=(STORE[p].feedback||[]).indexOf(f)<0?
     (STORE[p].feedback||[]).findIndex(x=>x.id===f.id):
     (STORE[p].feedback||[]).findIndex(x=>x.id===f.id);
-  const statuses=['open','inprogress','resolved','closed','wontfix','deferred'];
-  const statusLabels={open:'Open',inprogress:'In Progress',resolved:'Resolved',closed:'Closed',wontfix:"Won't Fix",deferred:'Deferred'};
+  const statuses=['open','inprogress','clarification','resolved','closed','wontfix','deferred'];
+  const statusLabels={open:'Open',inprogress:'In Progress',clarification:'Clarification Required',resolved:'Resolved',closed:'Closed',wontfix:"Won't Fix",deferred:'Deferred'};
   const priorityLabel={low:'Low',medium:'Medium',high:'High',critical:'🔴 Critical'};
   const statusOpts=statuses.map(s=>`<option value="${s}" ${f.status===s?'selected':''}>${statusLabels[s]}</option>`).join('');
+
+  // Render description as bullet points — split by newlines or numbered lines
+  const descHtml=(()=>{
+    if(!f.description)return'';
+    const lines=f.description.split('\n').map(l=>l.trim()).filter(Boolean);
+    if(lines.length<=1)return`<div class="fb-desc">${escH(f.description)}</div>`;
+    return`<ul class="fb-desc-list">${lines.map(l=>`<li>${escH(l.replace(/^[\d]+[.)]\s*/,''))}</li>`).join('')}</ul>`;
+  })();
 
   return`<div class="fb-card">
     <div class="fb-card-head">
@@ -2567,13 +2584,15 @@ function feedbackCardHtml(p,f){
         onchange="changeFbStatus('${p}','${f.id}',this.value)">${statusOpts}</select>`
         :`<span class="fb-status-badge ${f.status}">${statusLabels[f.status]||f.status}</span>`}
     </div>
-    ${f.description?`<div class="fb-desc">${escH(f.description)}</div>`:''}
+    ${descHtml}
     ${f.stepsToRepro&&f.type==='bug'?`<div class="fb-desc" style="font-size:12px;background:var(--card2);border-radius:8px;padding:8px 12px;border:1px solid var(--border)"><b>Steps to reproduce:</b><br>${escH(f.stepsToRepro).replace(/\n/g,'<br>')}</div>`:''}
+    ${f.comments?`<div class="fb-comment-box"><div class="fb-comment-lbl">💬 Comments</div><div class="fb-comment-txt">${escH(f.comments)}</div></div>`:''}
     <div class="fb-footer">
       <span>🆔 ${f.id.slice(-6).toUpperCase()}</span>
       <span class="fb-footer-sep">·</span>
       <span>Added ${escH(fmtDate(f.createdAt))}</span>
       ${f.resolvedAt?`<span class="fb-footer-sep">·</span><span style="color:var(--pass)">✓ Resolved ${escH(fmtDate(f.resolvedAt))}</span>`:''}
+      ${f.comments?`<span class="fb-footer-sep">·</span><span style="color:var(--mut)">💬 Has comments</span>`:''}
     </div>
   </div>`;
 }
@@ -2588,7 +2607,7 @@ function changeFbStatus(p,id,status){
   if(!f)return;
   f.status=status;
   if(status==='resolved'||status==='closed')f.resolvedAt=f.resolvedAt||new Date().toISOString();
-  else f.resolvedAt=null;
+  else if(status!=='resolved'&&status!=='closed')f.resolvedAt=null;
   saveToLS(p);renderProject(p);toast('Status updated');
 }
 
@@ -2601,9 +2620,18 @@ function deleteFeedback(p,id){
 function openFeedbackModal(p,type,editId){
   const isEdit=!!editId;
   const existing=isEdit?(STORE[p].feedback||[]).find(f=>f.id===editId):null;
-  const e=existing||{type,title:'',clientName:'',reportedBy:'',assignedTo:'',priority:'medium',status:'open',description:'',stepsToRepro:'',reportedAt:new Date().toISOString().slice(0,10),dueDate:'',affectedVersion:''};
+  const e=existing||{type,title:'',clientName:'',reportedBy:'',assignedTo:'',priority:'medium',status:'open',description:'',stepsToRepro:'',comments:'',reportedAt:new Date().toISOString().slice(0,10),dueDate:'',affectedVersion:''};
   const isBug=type==='bug';
   const title=(isEdit?'Edit ':(isBug?'Report Bug':'New Requirement'));
+  const fbStatuses=[
+    {v:'open',l:'Open'},
+    {v:'inprogress',l:'In Progress'},
+    {v:'clarification',l:'Clarification Required'},
+    {v:'resolved',l:'Resolved'},
+    {v:'closed',l:'Closed'},
+    {v:'wontfix',l:"Won't Fix"},
+    {v:'deferred',l:'Deferred'}
+  ];
   const body=`
   <div class="fg-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
     <div>
@@ -2635,7 +2663,7 @@ function openFeedbackModal(p,type,editId){
     <div>
       <label class="flbl">Status</label>
       <select class="finp" id="fb-status">
-        ${['open','inprogress','resolved','closed','wontfix','deferred'].map(v=>`<option value="${v}" ${e.status===v?'selected':''}>${{open:'Open',inprogress:'In Progress',resolved:'Resolved',closed:'Closed',wontfix:"Won't Fix",deferred:'Deferred'}[v]}</option>`).join('')}
+        ${fbStatuses.map(({v,l})=>`<option value="${v}" ${e.status===v?'selected':''}>${l}</option>`).join('')}
       </select>
     </div>
     ${isBug?`<div>
@@ -2654,19 +2682,25 @@ function openFeedbackModal(p,type,editId){
     <div></div>
   </div>
   <div style="margin-bottom:12px">
-    <label class="flbl">Description</label>
-    <textarea class="finp" id="fb-desc" rows="3" placeholder="Detailed description...">${escH(e.description||'')}</textarea>
+    <label class="flbl">Description <span style="color:var(--mut);font-weight:400;font-size:11px">(each line shown as a separate point)</span></label>
+    <textarea class="finp" id="fb-desc" rows="4" placeholder="Enter each requirement point on a new line&#10;Line 1&#10;Line 2&#10;Line 3...">${escH(e.description||'')}</textarea>
   </div>
-  ${isBug?`<div>
+  ${isBug?`<div style="margin-bottom:12px">
     <label class="flbl">Steps to Reproduce</label>
     <textarea class="finp" id="fb-steps" rows="3" placeholder="1. Go to...\n2. Click...\n3. See error">${escH(e.stepsToRepro||'')}</textarea>
-  </div>`:''}`;
+  </div>`:''}
+  <div style="margin-bottom:4px">
+    <label class="flbl">Comments <span style="color:var(--mut);font-weight:400;font-size:11px">(internal notes, max 1000 chars)</span></label>
+    <textarea class="finp" id="fb-comments" rows="3" maxlength="1000" placeholder="Add internal comments, clarification notes, follow-up actions..." oninput="document.getElementById('fb-comments-count').textContent=this.value.length+'/1000'">${escH(e.comments||'')}</textarea>
+    <div id="fb-comments-count" style="font-size:11px;color:var(--mut);text-align:right;margin-top:2px">${(e.comments||'').length}/1000</div>
+  </div>`;
 
   openModal(title,body,()=>{
     const titleVal=document.getElementById('fb-title')?.value.trim();
     if(!titleVal){toast('Title is required','err');return;}
     const now=new Date().toISOString();
     const statusVal=document.getElementById('fb-status').value;
+    const commentsVal=(document.getElementById('fb-comments')?.value||'').slice(0,1000);
     const entry={
       id: isEdit?e.id:('fb_'+Date.now()+'_'+Math.random().toString(36).slice(2,6)),
       type,
@@ -2679,6 +2713,7 @@ function openFeedbackModal(p,type,editId){
       description:document.getElementById('fb-desc')?.value.trim()||'',
       stepsToRepro:isBug?(document.getElementById('fb-steps')?.value.trim()||''):'',
       affectedVersion:isBug?(document.getElementById('fb-version')?.value.trim()||''):'',
+      comments:commentsVal,
       reportedAt:document.getElementById('fb-date')?.value||now.slice(0,10),
       dueDate:(!isBug&&document.getElementById('fb-due'))?document.getElementById('fb-due').value:'',
       createdAt:isEdit?e.createdAt:now,
