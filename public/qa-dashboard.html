@@ -335,6 +335,28 @@ body.dark .pj-today-tasks-empty{background:rgba(255,255,255,.03);border-color:rg
 .pj-today-tasks-label.has-tasks{color:var(--txt);font-weight:800}
 .pj-today-tasks-label.has-tasks::before{animation:none;opacity:1;transform:scale(1.1)}
 .pj-today-none{font-size:11.5px;color:var(--mut);font-style:italic}
+
+/* ── Client Feedback card on project grid ── */
+.pj-feedback-card{margin-top:8px;border-radius:10px;border:1px solid var(--border);padding:8px 10px;background:rgba(100,116,139,.05);transition:all .2s}
+.pj-feedback-active{border-color:rgba(20,184,166,.25);background:rgba(20,184,166,.04)}
+body.dark .pj-feedback-active{background:rgba(20,184,166,.06);border-color:rgba(20,184,166,.2)}
+.pj-feedback-hdr{display:flex;align-items:center;gap:5px;margin-bottom:6px}
+.pj-feedback-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mut)}
+.pj-feedback-label.has-fb{color:#0d9488}
+.pj-feedback-total-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:50px;font-size:9.5px;font-weight:800;background:rgba(20,184,166,.15);color:#0d9488;border:1px solid rgba(20,184,166,.3)}
+.pj-fb-empty{display:flex;align-items:center;justify-content:center;padding:4px 0}
+.pj-fb-empty-txt{font-size:11px;color:var(--mut);font-style:italic}
+.pj-fb-rows{display:flex;flex-direction:column;gap:5px}
+.pj-fb-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.pj-fb-icon{font-size:12px;flex-shrink:0}
+.pj-fb-type{font-size:11px;font-weight:700;color:var(--txt);min-width:80px}
+.pj-fb-total{font-size:12px;font-weight:800;color:var(--txt);min-width:18px;text-align:center;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:0 5px;line-height:18px}
+.pj-fb-chips{display:flex;gap:3px;flex-wrap:wrap;margin-left:auto}
+.pj-fb-chip{display:inline-flex;align-items:center;padding:1px 7px;border-radius:50px;font-size:9.5px;font-weight:700;white-space:nowrap}
+.pj-fb-chip.open{background:rgba(245,158,11,.12);color:#d97706;border:1px solid rgba(245,158,11,.3)}
+.pj-fb-chip.done{background:rgba(16,185,129,.12);color:#059669;border:1px solid rgba(16,185,129,.3)}
+.pj-fb-chip.crit{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
+
 /* Section card stat rows — label left, value right */
 .pj-statlist{display:flex;flex-direction:column;gap:5px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
 .pj-statrow{display:flex;align-items:center;justify-content:space-between;min-height:20px}
@@ -1879,7 +1901,9 @@ function renderProjectGrid(){
     const pillTxt=s.total===0?'— No Tests':ready?'✓ Release Ready':s.fail>0?`✗ ${s.fail} Failed`:hasStarted?`◌ ${pct}% In Progress`:'— Not Started';
     const pend=isAdmin()?(STORE[p.id]?.pending?.filter(x=>x.status==='pending')||[]).length:0;
     const iconBg=`${p.color}22`;
-    const websiteUrl=STORE[p.id]?.env?.website||p.website||'';
+    // Prefer production URL from envDetails, fallback to env.website or project default
+    const _prodEnvUrl=(STORE[p.id]?.envDetails?.production||[]).find(e=>e.url)?.url||'';
+    const websiteUrl=_prodEnvUrl||STORE[p.id]?.env?.website||p.website||'';
     const faviconHtml=(()=>{
       if(!websiteUrl)return`<span style="font-size:22px">${PROJ_ICONS[p.id]||'📁'}</span>`;
       try{
@@ -1910,6 +1934,39 @@ function renderProjectGrid(){
           ${ttHold>0?`<span class="pj-today-chip hold">⊘ ${ttHold} Hold</span>`:''}
           ${ttSkip>0?`<span class="pj-today-chip skip">↷ ${ttSkip} Skipped</span>`:''}
         </div>`;
+    // Client feedback counts for this project
+    const _allFb=(STORE[p.id]?.feedback||[]);
+    const _fbReqs=_allFb.filter(f=>f.type==='req');
+    const _fbBugs=_allFb.filter(f=>f.type==='bug');
+    const _fbReqOpen=_fbReqs.filter(f=>f.status==='open'||f.status==='inprogress').length;
+    const _fbReqDone=_fbReqs.filter(f=>f.status==='resolved'||f.status==='closed').length;
+    const _fbBugOpen=_fbBugs.filter(f=>f.status==='open'||f.status==='inprogress').length;
+    const _fbBugDone=_fbBugs.filter(f=>f.status==='resolved'||f.status==='closed').length;
+    const _fbBugCrit=_fbBugs.filter(f=>f.priority==='critical').length;
+    const hasFeedback=_allFb.length>0;
+    const fbCardHtml=!hasFeedback
+      ?`<div class="pj-fb-row pj-fb-empty"><span class="pj-fb-empty-txt">No feedback yet</span></div>`
+      :`<div class="pj-fb-rows">
+          <div class="pj-fb-row">
+            <span class="pj-fb-icon req">📋</span>
+            <span class="pj-fb-type">Requirements</span>
+            <span class="pj-fb-total">${_fbReqs.length}</span>
+            <span class="pj-fb-chips">
+              ${_fbReqOpen>0?`<span class="pj-fb-chip open">${_fbReqOpen} Open</span>`:''}
+              ${_fbReqDone>0?`<span class="pj-fb-chip done">${_fbReqDone} Done</span>`:''}
+            </span>
+          </div>
+          <div class="pj-fb-row">
+            <span class="pj-fb-icon bug">🐛</span>
+            <span class="pj-fb-type">Bugs</span>
+            <span class="pj-fb-total">${_fbBugs.length}</span>
+            <span class="pj-fb-chips">
+              ${_fbBugOpen>0?`<span class="pj-fb-chip open">${_fbBugOpen} Open</span>`:''}
+              ${_fbBugDone>0?`<span class="pj-fb-chip done">${_fbBugDone} Done</span>`:''}
+              ${_fbBugCrit>0?`<span class="pj-fb-chip crit">🔴 ${_fbBugCrit} Critical</span>`:''}
+            </span>
+          </div>
+        </div>`;
     // Card highlight styles when tasks exist today
     const cardHighlight=hasTodayTasks
       ?`border-color:${taskHighlightColor}55;box-shadow:0 0 0 1.5px ${taskHighlightColor}33,0 4px 20px ${taskHighlightColor}18`
@@ -1929,6 +1986,13 @@ function renderProjectGrid(){
             <div class="pj-today-tasks-label${hasTodayTasks?' has-tasks':''}">Today's Tasks</div>
           </div>
           ${todayTasksHtml}
+        </div>
+        <div class="pj-feedback-card${hasFeedback?' pj-feedback-active':''}">
+          <div class="pj-feedback-hdr">
+            <span class="pj-feedback-label${hasFeedback?' has-fb':''}">💬 Client Feedback</span>
+            ${hasFeedback?`<span class="pj-feedback-total-badge">${_allFb.length}</span>`:''}
+          </div>
+          ${fbCardHtml}
         </div>
         <div class="pj-footer">
           <span class="pj-status-pill ${pillCls}">${pillTxt}</span>
@@ -2015,7 +2079,9 @@ function renderProject(p){
 
   const needsBar=tab==='smoke'||tab==='prod';
   const PROJ_ICONS={humee:'🤖',synctag:'🏷️',wavedin:'🌊',ddp:'📊',aisignpro:'✍️'};
-  const _hdrWebsite=STORE[p]?.env?.website||proj?.website||'';
+  // Prefer production URL from envDetails for favicon (same logic as project cards)
+  const _hdrProdUrl=(STORE[p]?.envDetails?.production||[]).find(e=>e.url)?.url||'';
+  const _hdrWebsite=_hdrProdUrl||STORE[p]?.env?.website||proj?.website||'';
   const _hdrFavicon=(()=>{
     if(!_hdrWebsite)return`<span style="font-size:18px">${PROJ_ICONS[p]||'📁'}</span>`;
     try{
@@ -2736,6 +2802,21 @@ function openFeedbackModal(p,type,editId){
     else STORE[p].feedback.push(entry);
     saveToLS(p);closeModal();_fbSubtab[p]=type==='req'?'req':'bug';renderProject(p);
     toast(isEdit?'Feedback updated':'Feedback added');
+    // Send notification email for new feedback/bugs
+    if(!isEdit){
+      const fbProjName=PROJECTS.find(x=>x.id===p)?.name||p;
+      const fbType=type==='bug'?'feedback_bug':'feedback_req';
+      notifyAssignment(fbType,[
+        {label:'Project',value:fbProjName},
+        {label:'Type',value:type==='bug'?'🐛 Bug':'📋 Requirement'},
+        {label:'Title',value:entry.title},
+        {label:'Priority',value:entry.priority||'—'},
+        {label:'Status',value:entry.status||'—'},
+        {label:'Client / Source',value:entry.clientName||'—'},
+        {label:'Description',value:(entry.description||'').slice(0,200)||(entry.description?.length>200?'…':'')},
+        {label:'Reported By',value:entry.reportedBy||'—'},
+      ],{projectId:p,assignedBy:entry.reportedBy||'',projectName:fbProjName});
+    }
   },{saveLabel:isEdit?'Update':'Save'});
 }
 
@@ -2787,7 +2868,7 @@ function renderTestTable(p,sec){
       ${isAdmin()?`<th style="width:32px;padding:4px 8px"><input type="checkbox" title="Select all" onchange="toggleSelectAll('${p}','${sec}',this)" style="cursor:pointer"></th>`:''}
       <th>ID</th><th>MODULE</th><th>${isSm?'TEST STEP':'CHECKLIST ITEM'}</th>
       <th>${isSm?'ACTION':'EXPECTED OUTCOME'}</th><th>${isSm?'EXPECTED':'COMPLIANCE CHECK'}</th>
-      <th>${isSm?'EDGE CASE':'—'}</th><th>PRIORITY</th><th>STATUS</th>
+      ${isSm?`<th>EDGE CASE</th>`:''}<th>PRIORITY</th><th>STATUS</th>
       ${isAdmin()?'<th>NOTES</th><th>ACTIONS</th>':''}
     </tr></thead>
     <tbody id="${p}-${sec}-body">${rows}</tbody>
@@ -2805,7 +2886,7 @@ function rowHtml(p,sec,r,i,isSm){
     <td class="step">${isSm?r.step:r.item}</td>
     <td class="act">${isSm?(r.action||''):r.expected||''}</td>
     <td class="exp">${isSm?(r.expected||''):r.compliance||''}</td>
-    <td class="edg">${isSm?(r.edge||''):'—'}</td>
+    ${isSm?`<td class="edg">${r.edge||''}</td>`:''}
     <td><span class="badge ${(r.priority||'').toLowerCase()}">${r.priority||''}</span></td>
     <td><select class="ssel ${sc}" ${isPend&&!isAdmin()?'disabled':''} onchange="updateStatus('${p}','${sec}',${i},this)">${opts}</select></td>
     ${isAdmin()?`
@@ -3966,6 +4047,28 @@ function dtDelete(idx){
 }
 
 // ══════════════════════════════════════════════════════════════════
+// ASSIGNMENT NOTIFICATION EMAIL HELPER
+// ══════════════════════════════════════════════════════════════════
+async function notifyAssignment(type, details, extra){
+  try{
+    const proj=extra?.projectId?PROJECTS.find(x=>x.id===extra.projectId):null;
+    const projectName=proj?.name||extra?.projectName||'';
+    const body={
+      type,
+      assignedBy:extra?.assignedBy||'',
+      assignedTo:extra?.assignedTo||'',
+      projectName,
+      details,
+      dashboardUrl:'https://adhashprojectdashboard-production.up.railway.app/'
+    };
+    const r=await fetch('/api/notify-assignment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const j=await r.json();
+    if(j.sent) console.log('[notify] email sent to:',j.to);
+    else console.log('[notify] email skipped:',j.reason||j.error);
+  }catch(e){console.warn('[notify] email failed:',e.message);}
+}
+
+// ══════════════════════════════════════════════════════════════════
 // TEAM TASK ASSIGNED — full feature
 // ══════════════════════════════════════════════════════════════════
 let TEAM_TASKS=[];
@@ -4340,7 +4443,7 @@ function ttBuildModalBody(entry,prefillDate){
       <div class="tt-form-section-title">Open Bugs Count</div>
       <div class="tt-bug-modal-grid">
         <div class="tt-bug-modal-section">
-          <div class="tt-bug-modal-title">Count by Severity</div>
+          <div class="tt-bug-modal-title">Count by Priority</div>
           <div class="tt-bug-count-row"><span class="tt-bug-count-label">Total</span><input class="tt-bug-count-inp" type="number" min="0" id="ob-total" value="${ob.total||0}"></div>
           <div class="tt-bug-count-row"><span class="tt-bug-count-label"><span class="tt-bug-tag high">High</span></span><input class="tt-bug-count-inp" type="number" min="0" id="ob-high" value="${ob.high||0}"></div>
           <div class="tt-bug-count-row"><span class="tt-bug-count-label"><span class="tt-bug-tag med">Medium</span></span><input class="tt-bug-count-inp" type="number" min="0" id="ob-medium" value="${ob.medium||0}"></div>
@@ -4357,7 +4460,7 @@ function ttBuildModalBody(entry,prefillDate){
       <div class="tt-form-section-title">Reopened Bugs Count</div>
       <div class="tt-bug-modal-grid">
         <div class="tt-bug-modal-section">
-          <div class="tt-bug-modal-title">Count by Severity</div>
+          <div class="tt-bug-modal-title">Count by Priority</div>
           <div class="tt-bug-count-row"><span class="tt-bug-count-label">Total</span><input class="tt-bug-count-inp" type="number" min="0" id="rb-total" value="${rb.total||0}"></div>
           <div class="tt-bug-count-row"><span class="tt-bug-count-label"><span class="tt-bug-tag high">High</span></span><input class="tt-bug-count-inp" type="number" min="0" id="rb-high" value="${rb.high||0}"></div>
           <div class="tt-bug-count-row"><span class="tt-bug-count-label"><span class="tt-bug-tag med">Medium</span></span><input class="tt-bug-count-inp" type="number" min="0" id="rb-medium" value="${rb.medium||0}"></div>
@@ -4404,13 +4507,28 @@ function ttSaveEntry(editIdx){
     assigneeComments:g('tt-assignee-cmts'),
     assignerComments:g('tt-assigner-cmts'),
   };
-  if(editIdx!=null&&editIdx>=0){TEAM_TASKS[editIdx]=entry;}
+  const isNew=editIdx==null||editIdx<0;
+  if(!isNew){TEAM_TASKS[editIdx]=entry;}
   else{TEAM_TASKS.push(entry);}
   saveTeamTasks();
   closeModal();
   _ttMonth=date.slice(0,7);
   renderTeamTasksPage();
-  toast(editIdx!=null?'Task updated ✓':'Task added ✓');
+  toast(isNew?'Task added ✓':'Task updated ✓');
+  // Send assignment notification email for new tasks
+  if(isNew&&entry.assignedBy){
+    const proj=PROJECTS.find(x=>x.id===projectId);
+    notifyAssignment('teamtask',[
+      {label:'Project',value:proj?.name||projectId},
+      {label:'Task Summary',value:entry.taskSummary},
+      {label:'Date',value:entry.date},
+      {label:'Assigned By',value:entry.assignedBy},
+      {label:'Environment',value:entry.envType},
+      {label:'Estimation',value:entry.estimationHrs},
+      {label:'Status',value:entry.currentStatus},
+      {label:'Jira',value:entry.jiraUrl?`<a href="${entry.jiraUrl}" style="color:#6366f1">${entry.jiraUrl}</a>`:'—'},
+    ],{projectId,assignedBy:entry.assignedBy});
+  }
 }
 
 function ttOpenAdd(prefillDate){
@@ -4691,7 +4809,7 @@ function rlBuildModalBody(entry,defaultMode){
       <div class="tt-form-section-title">Open Bugs Count</div>
       <div class="tt-bug-modal-grid">
         <div class="tt-bug-modal-section">
-          <div class="tt-bug-modal-title">By Severity</div>
+          <div class="tt-bug-modal-title">By Priority</div>
           <div class="tt-bug-count-row"><span class="tt-bug-count-label">Total</span><input class="tt-bug-count-inp" type="number" min="0" id="ob-total" value="${ob.total||0}"></div>
           <div class="tt-bug-count-row"><span class="tt-bug-count-label"><span class="tt-bug-tag high">High</span></span><input class="tt-bug-count-inp" type="number" min="0" id="ob-high" value="${ob.high||0}"></div>
           <div class="tt-bug-count-row"><span class="tt-bug-count-label"><span class="tt-bug-tag med">Medium</span></span><input class="tt-bug-count-inp" type="number" min="0" id="ob-medium" value="${ob.medium||0}"></div>
@@ -4708,7 +4826,7 @@ function rlBuildModalBody(entry,defaultMode){
       <div class="tt-form-section-title">Reopened Bugs Count</div>
       <div class="tt-bug-modal-grid">
         <div class="tt-bug-modal-section">
-          <div class="tt-bug-modal-title">By Severity</div>
+          <div class="tt-bug-modal-title">By Priority</div>
           <div class="tt-bug-count-row"><span class="tt-bug-count-label">Total</span><input class="tt-bug-count-inp" type="number" min="0" id="rb-total" value="${rb.total||0}"></div>
           <div class="tt-bug-count-row"><span class="tt-bug-count-label"><span class="tt-bug-tag high">High</span></span><input class="tt-bug-count-inp" type="number" min="0" id="rb-high" value="${rb.high||0}"></div>
           <div class="tt-bug-count-row"><span class="tt-bug-count-label"><span class="tt-bug-tag med">Medium</span></span><input class="tt-bug-count-inp" type="number" min="0" id="rb-medium" value="${rb.medium||0}"></div>
@@ -4752,12 +4870,28 @@ function rlSaveEntry(editIdx,mode){
     assigneeComments:g('rl-assignee-cmts'),
     assignerComments:g('rl-assigner-cmts'),
   };
-  if(editIdx!=null&&editIdx>=0){RELEASES[editIdx]=entry;}
+  const isNewRl=editIdx==null||editIdx<0;
+  if(!isNewRl){RELEASES[editIdx]=entry;}
   else{RELEASES.push(entry);_rlCardOpen[entry.id]=true;}
   saveReleases();
   closeModal();
   renderReleasesPage(mode);
-  toast(editIdx!=null?'Release updated ✓':'Release added ✓');
+  toast(isNewRl?'Release added ✓':'Release updated ✓');
+  // Send release notification email for new entries
+  if(isNewRl&&entry.assignedBy){
+    const rlType=mode==='today'?'release_today':'release_next';
+    const rlProj=PROJECTS.find(x=>x.id===entry.projectId);
+    notifyAssignment(rlType,[
+      {label:'Project',value:rlProj?.name||entry.projectId},
+      {label:'Release Date',value:entry.releaseDate},
+      {label:'Summary',value:entry.releaseSummary},
+      {label:'Environment',value:entry.envType},
+      {label:'Platform',value:entry.platform},
+      {label:'Project URL',value:entry.projectUrl?`<a href="${entry.projectUrl}" style="color:#6366f1">${entry.projectUrl}</a>`:'—'},
+      {label:'Assigned By',value:entry.assignedBy},
+      {label:'Status',value:entry.currentStatus},
+    ],{projectId:entry.projectId,assignedBy:entry.assignedBy,projectName:rlProj?.name||entry.projectId});
+  }
 }
 
 function rlOpenAdd(mode){

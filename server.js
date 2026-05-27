@@ -4374,6 +4374,125 @@ app.post('/api/qa-data/:key', async (req, res) => {
     }
 });
 
+// ── ASSIGNMENT NOTIFICATION EMAIL ──
+// POST /api/notify-assignment — send a beautiful Zoho email when a task/release/feedback is assigned
+app.post('/api/notify-assignment', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    if (process.env.ZOHO_MAIL_ENABLED !== 'true') return res.json({ sent: false, reason: 'mail_disabled' });
+
+    const { type, assignedBy, assignedTo, projectName, subject: subjectOverride, details, dashboardUrl } = req.body || {};
+    if (!type || !assignedBy) return res.status(400).json({ error: 'Missing required fields' });
+
+    // Resolve assignedBy → email using qa_users from shared data
+    const sharedData = readQaData();
+    const users = sharedData['qa_users'] || [];
+    const DEFAULT_EMAILS = {
+        'Deepa': 'deepa@adhashtech.com',
+        'Prakash Raj': 'prakashraj@adhashtech.com',
+        'Raghuram': 'raghuram@adhashtech.com',
+        'Thenilavan': 'thenilavan@adhashtech.com',
+        'Yogesh': 'yogesh@adhashtech.com',
+    };
+    const findEmail = (name) => {
+        if (!name) return null;
+        const u = users.find(u => u.name && u.name.toLowerCase() === name.toLowerCase());
+        if (u && u.email) return u.email;
+        for (const [k, v] of Object.entries(DEFAULT_EMAILS)) {
+            if (k.toLowerCase() === name.toLowerCase()) return v;
+        }
+        return null;
+    };
+
+    const assignedByEmail = findEmail(assignedBy);
+    const assignedToEmail = assignedTo ? findEmail(assignedTo) : null;
+
+    // Build recipients: always notify thenilavan, and include assignedTo if resolved
+    const toList = new Set(['thenilavan@adhashtech.com']);
+    if (assignedByEmail && assignedByEmail !== 'thenilavan@adhashtech.com') toList.add(assignedByEmail);
+    if (assignedToEmail) toList.add(assignedToEmail);
+    const toAddresses = [...toList].join(', ');
+
+    // Type labels
+    const typeLabels = {
+        'teamtask': '📋 Team Task Assigned',
+        'release_today': '🚀 Today\'s Release',
+        'release_next': '📆 Next Release',
+        'feedback_req': '📋 New Client Requirement',
+        'feedback_bug': '🐛 New Bug Reported',
+    };
+    const typeLabel = typeLabels[type] || '📌 Dashboard Notification';
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const dashUrl = dashboardUrl || 'https://adhashprojectdashboard-production.up.railway.app/';
+
+    // Build detail rows HTML
+    const detailRowsHtml = (details || []).map(d =>
+        `<tr><td style="padding:10px 16px;font-size:13px;color:#64748b;font-weight:600;white-space:nowrap;vertical-align:top;border-bottom:1px solid #f1f5f9;width:36%">${d.label}</td><td style="padding:10px 16px;font-size:13px;color:#1e293b;vertical-align:top;border-bottom:1px solid #f1f5f9">${d.value||'—'}</td></tr>`
+    ).join('');
+
+    const subjectLine = subjectOverride || `${typeLabel} — ${projectName || 'AdHash Dashboard'} | ${dateStr}`;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f0f4f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4f8;padding:32px 0">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
+  <!-- Header gradient -->
+  <tr><td style="background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#ec4899 100%);padding:32px 36px">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td>
+          <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.7);margin-bottom:6px">AdHash QA Dashboard</div>
+          <div style="font-size:22px;font-weight:800;color:#ffffff;line-height:1.2">${typeLabel}</div>
+          ${projectName?`<div style="margin-top:8px;display:inline-block;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);border-radius:50px;padding:4px 14px;font-size:12px;font-weight:700;color:#fff">📁 ${projectName}</div>`:''}
+        </td>
+        <td align="right" style="vertical-align:top">
+          <div style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:10px;padding:10px 14px;text-align:right">
+            <div style="font-size:11px;color:rgba(255,255,255,0.75);font-weight:600">Assigned by</div>
+            <div style="font-size:15px;font-weight:800;color:#fff;margin-top:2px">${assignedBy||'—'}</div>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+  <!-- Date/time bar -->
+  <tr><td style="background:#f8fafc;padding:10px 36px;border-bottom:1px solid #e2e8f0">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="font-size:12px;color:#64748b;font-weight:600">📅 ${dateStr}</td>
+      <td align="right" style="font-size:12px;color:#64748b;font-weight:600">🕐 ${timeStr}</td>
+    </tr></table>
+  </td></tr>
+  <!-- Details table -->
+  <tr><td style="padding:24px 36px">
+    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:14px">Assignment Details</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+      ${detailRowsHtml}
+    </table>
+  </td></tr>
+  <!-- CTA -->
+  <tr><td align="center" style="padding:8px 36px 28px">
+    <a href="${dashUrl}" style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-decoration:none;padding:14px 32px;border-radius:50px;font-size:14px;font-weight:800;letter-spacing:.3px;box-shadow:0 4px 16px rgba(99,102,241,.35)">🚀 Open Dashboard →</a>
+  </td></tr>
+  <!-- Footer -->
+  <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 36px;text-align:center">
+    <div style="font-size:11px;color:#94a3b8">This is an automated notification from AdHash QA Dashboard. Do not reply to this email.</div>
+    <div style="font-size:11px;color:#94a3b8;margin-top:4px">© ${now.getFullYear()} AdHash Technologies · <a href="${dashUrl}" style="color:#6366f1;text-decoration:none">adhashprojectdashboard-production.up.railway.app</a></div>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+
+    try {
+        await sendZohoMail({ subject: subjectLine, html, to: toAddresses });
+        console.log(`[notify] Assignment email sent to: ${toAddresses} | type=${type} | project=${projectName}`);
+        res.json({ sent: true, to: toAddresses });
+    } catch (e) {
+        console.error('[notify] Failed to send assignment email:', e.message);
+        res.json({ sent: false, error: e.message });
+    }
+});
+
 // On startup: migrate any local wfdoc .bin files that have no ghUrl yet to GitHub Releases.
 // Also performs a full dedup pass on ALL project wfdoc lists to fix any previously accumulated duplicates.
 async function migrateWfDocsToGitHub() {
