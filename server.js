@@ -4345,6 +4345,7 @@ app.post('/api/qa-data-bulk', async (req, res) => {
             if (k === 'qa3_daily_tasks') data[k] = mergeDailyTasks(data[k], v);
             else if (k === 'qa3_team_tasks') data[k] = mergeTeamTasks(data[k], v);
             else if (k === 'qa3_releases') data[k] = mergeReleases(data[k], v);
+            else if (k.startsWith('qa3_') && v && typeof v === 'object' && !Array.isArray(v)) data[k] = mergeProjectData(data[k], v);
             else data[k] = v;
             count++;
         }
@@ -4395,6 +4396,65 @@ function mergeReleases(existing, incoming) {
     return Array.from(map.values());
 }
 
+// Generic array merge by id field — for any sub-array that uses an 'id' key
+function mergeById(existing, incoming) {
+    if (!Array.isArray(incoming)) return existing || [];
+    if (!Array.isArray(existing) || existing.length === 0) return incoming;
+    const map = new Map();
+    existing.forEach(r => { if (r && r.id) map.set(r.id, r); });
+    incoming.forEach(r => { if (r && r.id) map.set(r.id, r); });
+    // Preserve items without id (older records) from both sides, dedup by position
+    const withoutId = [
+        ...existing.filter(r => !r || !r.id),
+        ...incoming.filter(r => !r || !r.id),
+    ];
+    return [...Array.from(map.values()), ...withoutId];
+}
+
+// Merge smoke/prod rows: stable 'id' like SMK-01, PRD-01 — merge by that id
+// Status, owner, comment are the mutable fields; structure fields are trusted from incoming
+function mergeTestRows(existing, incoming) {
+    if (!Array.isArray(incoming)) return existing || [];
+    if (!Array.isArray(existing) || existing.length === 0) return incoming;
+    const map = new Map();
+    existing.forEach(r => { if (r && r.id) map.set(r.id, r); });
+    // Incoming wins for any known row — preserves status/owner/comment updates
+    incoming.forEach(r => { if (r && r.id) map.set(r.id, r); });
+    return Array.from(map.values());
+}
+
+// Deep merge a qa3_<projectId> project object.
+// Sub-arrays that multiple users can edit concurrently are merged by row id.
+// Scalar fields (env, gates) are replaced by incoming (only admin edits those).
+const PROJECT_ARRAY_KEYS = ['smoke', 'prod', 'feedback', 'thirdparty', 'taskchecklist',
+                            'pendingtasks', 'credentials', 'apitests', 'testdata',
+                            'releaseNotes', 'reports', 'pending'];
+
+function mergeProjectData(existing, incoming) {
+    if (!existing || typeof existing !== 'object') return incoming;
+    if (!incoming || typeof incoming !== 'object') return existing;
+    const merged = { ...existing };
+    for (const key of Object.keys(incoming)) {
+        if (PROJECT_ARRAY_KEYS.includes(key)) {
+            if (key === 'smoke' || key === 'prod') {
+                merged[key] = mergeTestRows(existing[key], incoming[key]);
+            } else {
+                merged[key] = mergeById(existing[key], incoming[key]);
+            }
+        } else if (key === 'envDetails' && incoming[key] && typeof incoming[key] === 'object') {
+            // envDetails has production[] and staging[] sub-arrays
+            merged[key] = {
+                production: mergeById((existing[key]||{}).production, incoming[key].production),
+                staging:    mergeById((existing[key]||{}).staging,    incoming[key].staging),
+            };
+        } else {
+            // Scalar/object fields (env, gates, etc.) — incoming wins
+            merged[key] = incoming[key];
+        }
+    }
+    return merged;
+}
+
 // POST /api/qa-data/:key — save one key's value, await GitHub push for durability
 app.post('/api/qa-data/:key', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
@@ -4410,6 +4470,9 @@ app.post('/api/qa-data/:key', async (req, res) => {
         data[key] = mergeTeamTasks(data[key], value);
     } else if (key === 'qa3_releases') {
         data[key] = mergeReleases(data[key], value);
+    } else if (key.startsWith('qa3_') && value && typeof value === 'object' && !Array.isArray(value)) {
+        // Per-project data (qa3_humee, qa3_wavedin, etc.) — deep merge sub-arrays
+        data[key] = mergeProjectData(data[key], value);
     } else {
         data[key] = value;
     }
