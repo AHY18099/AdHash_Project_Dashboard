@@ -5032,18 +5032,19 @@ function rlSaveEntry(editIdx,mode){
     assignerComments:g('rl-assigner-cmts'),
   };
   const isNewRl=editIdx==null||editIdx<0;
+  const oldTestingStatus=!isNewRl&&RELEASES[editIdx]?RELEASES[editIdx].testingStatus:null;
   if(!isNewRl){RELEASES[editIdx]=entry;}
   else{RELEASES.push(entry);_rlCardOpen[entry.id]=true;}
   saveReleases();
   closeModal();
   renderReleasesPage(mode);
   toast(isNewRl?'Release added ✓':'Release updated ✓');
-  // Send notification on both Save (new) and Update (edit) — always, regardless of assignedBy
-  {
+  // Notify only for new releases OR when testingStatus actually changed
+  if(isNewRl||entry.testingStatus!==oldTestingStatus){
     const rlType=mode==='today'?'release_today':'release_next';
     const rlProj=PROJECTS.find(x=>x.id===entry.projectId);
     notifyAssignment(rlType,[
-      {label:'Action',value:isNewRl?'🆕 New Release Added':'✏️ Release Updated'},
+      {label:'Action',value:isNewRl?'🆕 New Release Added':'🔄 Testing Status Changed'},
       {label:'Project',value:rlProj?.name||entry.projectId},
       {label:'Release Date',value:entry.releaseDate},
       {label:'Summary',value:entry.releaseSummary},
@@ -5052,7 +5053,7 @@ function rlSaveEntry(editIdx,mode){
       {label:'Project URL',value:entry.projectUrl?`<a href="${entry.projectUrl}" style="color:#6366f1">${entry.projectUrl}</a>`:'—'},
       {label:'Assigned To',value:entry.assignedBy||'—'},
       {label:'Current Status',value:entry.currentStatus||'—'},
-      {label:'Testing Status',value:entry.testingStatus||'—'},
+      {label:'Testing Status',value:isNewRl?entry.testingStatus||'—':`${oldTestingStatus||'—'} → ${entry.testingStatus||'—'}`},
     ],{projectId:entry.projectId,assignedBy:_session?.name||'Dashboard',assignedTo:entry.assignedBy||'',projectName:rlProj?.name||entry.projectId});
   }
 }
@@ -5063,7 +5064,7 @@ function rlOpenAdd(mode){
 function rlOpenEdit(idx){
   const entry=RELEASES[idx];
   if(!entry)return;
-  const mode=curView==='todayreleases'?'today':'next';
+  const mode=curView==='pastreleases'?'past':curView==='todayreleases'?'today':'next';
   openModal('Edit Release',rlBuildModalBody(entry,mode),()=>rlSaveEntry(idx,mode));
 }
 
