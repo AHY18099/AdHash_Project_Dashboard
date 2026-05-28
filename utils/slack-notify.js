@@ -41,7 +41,7 @@ const TYPE_LABELS = {
  * @param {Array}  opts.details      - [{label, value}, ...]
  * @param {string} opts.dashboardUrl - link to dashboard
  */
-async function sendSlackNotification({ type, projectName, assignedBy, details, dashboardUrl }) {
+async function sendSlackNotification({ type, projectName, assignedBy, assignedTo, details, dashboardUrl }) {
     const token   = process.env.SLACK_BOT_TOKEN;
     // Slack API requires channel name WITHOUT the '#' prefix, or a channel ID.
     // Strip leading '#' if present.
@@ -85,7 +85,7 @@ async function sendSlackNotification({ type, projectName, assignedBy, details, d
             type: 'context',
             elements: [
                 { type: 'mrkdwn', text: projectName ? `📁 *${projectName}*` : '*AdHash QA Dashboard*' },
-                { type: 'mrkdwn', text: `👤 Assigned by *${assignedBy || '—'}*` },
+                { type: 'mrkdwn', text: '👤 By *' + (assignedBy || '—') + '*' + (assignedTo ? '  →  🎯 *' + assignedTo + '*' : '') },
                 { type: 'mrkdwn', text: `🕐 ${dateTimeStr}` }
             ]
         },

@@ -4518,7 +4518,7 @@ async function _sendNotificationsAsync({ type, assignedBy, assignedTo, projectNa
         : Promise.resolve();
 
     const slackPromise = (process.env.SLACK_ENABLED === 'true')
-        ? sendSlackNotification({ type, projectName, assignedBy, details, dashboardUrl: dashUrl })
+        ? sendSlackNotification({ type, projectName, assignedBy, assignedTo, details, dashboardUrl: dashUrl })
             .then(() => console.log(`[notify] ✅ Slack → ${process.env.SLACK_CHANNEL} | ${type} | ${projectName}`))
             .catch(e => console.error(`[notify] ❌ Slack failed (${type}):`, e.message))
         : Promise.resolve();
