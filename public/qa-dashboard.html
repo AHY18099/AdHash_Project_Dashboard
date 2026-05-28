@@ -4246,9 +4246,9 @@ function ttInlineChange(idx,field,el){
       {label:'Project',value:proj?.name||t.projectId},
       {label:'Task Summary',value:t.taskSummary},
       {label:'Date',value:t.date},
-      {label:'Assigned By',value:t.assignedBy||'—'},
+      {label:'Assigned To',value:t.assignedBy||'—'},
       {label:'New Testing Status',value:el.value},
-    ],{projectId:t.projectId,assignedBy:t.assignedBy||'Dashboard',projectName:proj?.name||t.projectId});
+    ],{projectId:t.projectId,assignedBy:_session?.name||'Dashboard',assignedTo:t.assignedBy||'',projectName:proj?.name||t.projectId});
   }
 }
 
@@ -4564,12 +4564,12 @@ function ttSaveEntry(editIdx){
       {label:'Project',value:proj?.name||projectId},
       {label:'Task Summary',value:entry.taskSummary},
       {label:'Date',value:entry.date},
-      {label:'Assigned By',value:entry.assignedBy},
+      {label:'Assigned To',value:entry.assignedBy},
       {label:'Environment',value:entry.envType},
       {label:'Estimation',value:entry.estimationHrs},
       {label:'Status',value:entry.currentStatus},
       {label:'Jira',value:entry.jiraUrl?`<a href="${entry.jiraUrl}" style="color:#6366f1">${entry.jiraUrl}</a>`:'—'},
-    ],{projectId,assignedBy:entry.assignedBy});
+    ],{projectId,assignedBy:_session?.name||entry.assignedBy,assignedTo:entry.assignedBy});
   }
 }
 
@@ -4662,9 +4662,9 @@ function rlCheckAutoTransitions(){
         {label:'Summary',value:r.releaseSummary||'—'},
         {label:'Environment',value:r.envType||'—'},
         {label:'Platform',value:r.platform||'—'},
-        {label:'Assigned By',value:r.assignedBy||'—'},
+        {label:'Assigned To',value:r.assignedBy||'—'},
         {label:'Current Status',value:r.currentStatus||'To Do'},
-      ],{projectId:r.projectId,assignedBy:r.assignedBy||'Dashboard',projectName:projName});
+      ],{projectId:r.projectId,assignedBy:_session?.name||'Dashboard',assignedTo:r.assignedBy||'',projectName:projName});
 
     } else if(current==='past' && (prev==='today'||prev==='next')){
       // Any → Past (date passed or Ready for Client)
@@ -4677,8 +4677,8 @@ function rlCheckAutoTransitions(){
         {label:'Summary',value:r.releaseSummary||'—'},
         {label:'Environment',value:r.envType||'—'},
         {label:'Testing Status',value:r.testingStatus||'—'},
-        {label:'Assigned By',value:r.assignedBy||'—'},
-      ],{projectId:r.projectId,assignedBy:r.assignedBy||'Dashboard',projectName:projName});
+        {label:'Assigned To',value:r.assignedBy||'—'},
+      ],{projectId:r.projectId,assignedBy:_session?.name||'Dashboard',assignedTo:r.assignedBy||'',projectName:projName});
     }
   });
 
@@ -4900,9 +4900,9 @@ function rlInline(idx,field,el){
       {label:'Project',value:proj?.name||r.projectId},
       {label:'Release Date',value:r.releaseDate},
       {label:'Summary',value:r.releaseSummary},
-      {label:'Assigned By',value:r.assignedBy||'—'},
+      {label:'Assigned To',value:r.assignedBy||'—'},
       {label:field==='currentStatus'?'New Current Status':'New Testing Status',value:el.value},
-    ],{projectId:r.projectId,assignedBy:r.assignedBy||'Dashboard',projectName:proj?.name||r.projectId});
+    ],{projectId:r.projectId,assignedBy:_session?.name||'Dashboard',assignedTo:r.assignedBy||'',projectName:proj?.name||r.projectId});
   }
 }
 function rlInlineVal(idx,field,val){
@@ -5043,10 +5043,10 @@ function rlSaveEntry(editIdx,mode){
       {label:'Environment',value:entry.envType},
       {label:'Platform',value:entry.platform},
       {label:'Project URL',value:entry.projectUrl?`<a href="${entry.projectUrl}" style="color:#6366f1">${entry.projectUrl}</a>`:'—'},
-      {label:'Assigned By',value:entry.assignedBy||'—'},
+      {label:'Assigned To',value:entry.assignedBy||'—'},
       {label:'Current Status',value:entry.currentStatus||'—'},
       {label:'Testing Status',value:entry.testingStatus||'—'},
-    ],{projectId:entry.projectId,assignedBy:entry.assignedBy||'Dashboard',projectName:rlProj?.name||entry.projectId});
+    ],{projectId:entry.projectId,assignedBy:_session?.name||'Dashboard',assignedTo:entry.assignedBy||'',projectName:rlProj?.name||entry.projectId});
   }
 }
 
