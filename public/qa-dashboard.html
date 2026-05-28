@@ -2128,9 +2128,9 @@ function renderActionBar(p,sec){
   return`<div class="abar">
     <button class="btn btn-pass" onclick="markAllPass('${p}','${sec}')">✓ All Pass</button>
     <button class="btn btn-reset" onclick="resetSection('${p}','${sec}')">↺ Reset All</button>
-    <button class="btn btn-save" onclick="saveAndReport('${p}')">💾 Save Snapshot</button>
+    <button class="btn btn-save" onclick="saveAndReport('${p}')">💾 Save Report</button>
     <button class="btn btn-download" onclick="downloadReport('${p}')">⬇ Download Report</button>
-    ${isAdmin()?`<button class="btn btn-secondary" onclick="openAddRow('${p}','${sec}')">＋ Add Test Case</button>`:''}
+    <button class="btn btn-secondary" onclick="openAddRow('${p}','${sec}')">＋ Add Test Case</button>
     <span class="abar-count" id="${p}-${sec}-shown">${shown} of ${shown} shown</span>
   </div>`;
 }
@@ -2903,7 +2903,7 @@ function renderTestTable(p,sec){
       <th>ID</th><th>MODULE</th><th>${isSm?'TEST STEP':'CHECKLIST ITEM'}</th>
       <th>${isSm?'ACTION':'EXPECTED OUTCOME'}</th><th>${isSm?'EXPECTED':'COMPLIANCE CHECK'}</th>
       ${isSm?`<th>EDGE CASE</th>`:''}<th>PRIORITY</th><th>STATUS</th>
-      ${isAdmin()?'<th>NOTES</th><th>ACTIONS</th>':''}
+      <th>NOTES</th><th>ACTIONS</th>
     </tr></thead>
     <tbody id="${p}-${sec}-body">${rows}</tbody>
   </table></div>`;
@@ -2922,13 +2922,13 @@ function rowHtml(p,sec,r,i,isSm){
     <td class="exp">${isSm?(r.expected||''):r.compliance||''}</td>
     ${isSm?`<td class="edg">${r.edge||''}</td>`:''}
     <td><span class="badge ${(r.priority||'').toLowerCase()}">${r.priority||''}</span></td>
-    <td><select class="ssel ${sc}" ${isPend&&!isAdmin()?'disabled':''} onchange="updateStatus('${p}','${sec}',${i},this)">${opts}</select></td>
-    ${isAdmin()?`
+    <td><select class="ssel ${sc}" onchange="updateStatus('${p}','${sec}',${i},this)">${opts}</select></td>
     <td><input class="inp-sm" style="width:110px" value="${r.comment||''}" placeholder="Note…" onchange="STORE['${p}']['${sec}'][${i}].comment=this.value;saveToLS('${p}')"></td>
     <td class="acell">
-      ${isPend?`<button class="btn-icon apr" onclick="approveRow('${p}','${sec}',${i})">✓</button><button class="btn-icon rej" onclick="rejectRow('${p}','${sec}',${i})">✗</button>`:
-        `<button class="btn-icon" onclick="openEditRow('${p}','${sec}',${i})">✏</button><button class="btn-icon del" onclick="deleteRow('${p}','${sec}',${i})">✕</button>`}
-    </td>`:''}
+      ${isPend&&isAdmin()?`<button class="btn-icon apr" onclick="approveRow('${p}','${sec}',${i})">✓</button><button class="btn-icon rej" onclick="rejectRow('${p}','${sec}',${i})">✗</button>`:
+        isPend?`<span style="font-size:10px;color:var(--mut)">Pending</span>`:
+        `<button class="btn-icon" onclick="openEditRow('${p}','${sec}',${i})">✏</button>${isAdmin()?`<button class="btn-icon del" onclick="deleteRow('${p}','${sec}',${i})">✕</button>`:''}`}
+    </td>
   </tr>`;
 }
 
@@ -5516,7 +5516,7 @@ function tclSaveReport(p){
   const s=tclStats(items);
   const passRate=s.total?Math.round((s.pass/s.total)*100):0;
   const now=new Date();
-  const dateStr=now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  // Deep-copy items into snapshot BEFORE resetting
   const snap={
     type:'checklist',
     datetime:now.toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})+' '+now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),
@@ -5527,12 +5527,21 @@ function tclSaveReport(p){
   };
   if(!STORE[p].reports)STORE[p].reports=[];
   STORE[p].reports.push(snap);
-  STORE[p].taskchecklist=[];
+  // Reset status + bug counts only — keep all checklist items intact, never delete them
+  STORE[p].taskchecklist=STORE[p].taskchecklist.map(r=>({
+    ...r,
+    status:'Pending',
+    bugsCount:0,
+    priorityHigh:0,
+    priorityMedium:0,
+    priorityLow:0,
+    comments:''
+  }));
   _tclDirty[p]=false;
   saveToLS(p);
-  curTab[p]='reports';
+  curTab[p]='taskchecklist';
   renderProject(p);
-  toast(`✓ Checklist saved — view in Saved Reports tab`);
+  toast(`✓ Report #${STORE[p].reports.length} saved — statuses reset, checklist items preserved`);
 }
 
 function renderTaskChecklist(p){
@@ -5542,8 +5551,6 @@ function renderTaskChecklist(p){
   const s=tclStats(items);
   const passRate=s.total?Math.round((s.pass/s.total)*100):0;
   const hasItems=items.length>0;
-  const TCL_RESOLVED=['Pass','Fail','NA','Done','Bugs Closed','Ready for Prod','Ready for Demo'];
-  const allResolved=hasItems&&items.every(r=>TCL_RESOLVED.includes(r.status));
   const members=getTeamMembers();
 
   const statsBar=`<div class="tcl-stats-bar">
@@ -5622,7 +5629,6 @@ function renderTaskChecklist(p){
     <tbody>${rows}</tbody>
   </table></div>`:`<div class="tcl-empty"><div class="ico">✔</div><div>No checklist items yet. Click "+ Add" to start tracking.</div></div>`;
 
-  const saveDisabled=!_tclDirty[p]&&!allResolved;
   return`<div class="tcl-wrap">
     <div class="tcl-hdr">
       <div class="tcl-hdr-left">
@@ -5630,7 +5636,7 @@ function renderTaskChecklist(p){
         <p>${items.length} item${items.length!==1?'s':''} · ${passRate}% pass rate</p>
       </div>
       <div class="tcl-actions">
-        ${hasItems?`<button id="tcl-save-btn-${p}" class="tcl-btn tcl-btn-save" onclick="tclSaveReport('${p}')" ${saveDisabled?'disabled style="opacity:.45"':''}>💾 Save Report</button>`:''}
+        ${hasItems?`<button id="tcl-save-btn-${p}" class="tcl-btn tcl-btn-save" onclick="tclSaveReport('${p}')">💾 Save Report</button>`:''}
         ${hasItems?`<button class="tcl-btn tcl-btn-dl" onclick="tclShowDownloadPicker('${p}')">⬇ Download Report</button>`:''}
         <button class="tcl-btn tcl-btn-outline" onclick="switchTab('${p}','releasenotes')">📝 Release Notes</button>
         <button class="tcl-btn tcl-btn-primary" onclick="tclOpenAdd('${p}')">＋ Add</button>
@@ -6241,47 +6247,23 @@ function getRowData(isSm,existing){
 }
 function openAddRow(p,sec){
   const isSm=sec==='smoke';
-  const title=isAdmin()?`Add ${isSm?'Smoke Test':'Production Item'}`:`Submit New ${isSm?'Smoke Test':'Production Item'} (Pending Approval)`;
-  openModal(title,rowFormHtml(null,isSm),()=>{
+  openModal(`Add ${isSm?'Smoke Test':'Production Item'}`,rowFormHtml(null,isSm),()=>{
     const d=getRowData(isSm,null);
     if(!d.module||!(d.step||d.item)){toast('Module and step/item are required','err');return;}
     if(!d.id)d.id=(isSm?'SMK':'PRD')+'-'+(STORE[p][sec].length+1).toString().padStart(2,'0');
-    if(isAdmin()){
-      d._id='r_'+Date.now().toString(36);
-      STORE[p][sec].push(d);
-    }else{
-      // member: submit for approval
-      const pend={id:'pend_'+Date.now(),projId:p,section:sec,type:'add',originalIdx:-1,originalData:null,newData:{...d,_id:'r_'+Date.now().toString(36),_pending:true},submittedBy:_session.id,submittedByName:_session.name,submittedAt:new Date().toLocaleString('en-US',{dateStyle:'medium',timeStyle:'short'}),status:'pending'};
-      if(!STORE[p].pending)STORE[p].pending=[];
-      STORE[p].pending.push(pend);
-      // also add a pending-flagged row to the table for visibility
-      const visRow={...d,_id:'pend_'+Date.now().toString(36),_pending:true,_pendIdx:STORE[p].pending.length-1};
-      STORE[p][sec].push(visRow);
-      toast('Submitted for super admin approval 🔔');
-      closeModal();saveToLS(p);/* proj-nav removed */renderProject(p);return;
-    }
+    d._id='r_'+Date.now().toString(36);
+    STORE[p][sec].push(d);
     closeModal();saveToLS(p);renderProject(p);toast('Test case added');
-  },isAdmin()?{}:{saveLabel:'Submit for Approval'});
+  },{saveLabel:'Add'});
 }
 function openEditRow(p,sec,i){
   const isSm=sec==='smoke';const r=STORE[p][sec][i];
-  const title=isAdmin()?`Edit ${isSm?'Smoke Test':'Production Item'}`:`Request Edit (Pending Approval)`;
-  openModal(title,rowFormHtml(r,isSm),()=>{
+  openModal(`Edit ${isSm?'Smoke Test':'Production Item'}`,rowFormHtml(r,isSm),()=>{
     const d=getRowData(isSm,r);
     if(!d.module||!(d.step||d.item)){toast('Module and step/item are required','err');return;}
-    if(isAdmin()){
-      STORE[p][sec][i]={...r,...d};
-    }else{
-      const pend={id:'pend_'+Date.now(),projId:p,section:sec,type:'edit',originalIdx:i,originalData:{...r},newData:{...r,...d},submittedBy:_session.id,submittedByName:_session.name,submittedAt:new Date().toLocaleString('en-US',{dateStyle:'medium',timeStyle:'short'}),status:'pending'};
-      if(!STORE[p].pending)STORE[p].pending=[];
-      STORE[p].pending.push(pend);
-      STORE[p][sec][i]._pending=true;
-      STORE[p][sec][i]._pendIdx=STORE[p].pending.length-1;
-      toast('Edit request submitted for approval 🔔');
-      closeModal();saveToLS(p);/* proj-nav removed */renderProject(p);return;
-    }
+    STORE[p][sec][i]={...r,...d};
     closeModal();saveToLS(p);updateStats(p);renderProject(p);toast('Test case updated');
-  },isAdmin()?{}:{saveLabel:'Submit for Approval'});
+  },{saveLabel:'Update'});
 }
 function deleteRow(p,sec,i){
   if(!isAdmin()){toast('Only super admin can delete test cases','err');return;}
@@ -6397,10 +6379,25 @@ function deleteRN(p,i){if(!confirm('Delete this release note?'))return;STORE[p].
 function saveState(p){
   const s=calcStats(p);
   const now=new Date();
-  const snap={datetime:now.toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})+' '+now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),label:STORE[p].env.releaseVersion||'',summary:s,env:JSON.parse(JSON.stringify(STORE[p].env)),gates:[...STORE[p].gates],smoke:JSON.parse(JSON.stringify(STORE[p].smoke)),prod:JSON.parse(JSON.stringify(STORE[p].prod)),testdata:JSON.parse(JSON.stringify(STORE[p].testdata||[])),releaseNotes:JSON.parse(JSON.stringify(STORE[p].releaseNotes||[]))};
+  // Deep-copy current data into snapshot BEFORE resetting
+  const snap={
+    datetime:now.toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})+' '+now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),
+    label:STORE[p].env.releaseVersion||'',
+    summary:s,
+    env:JSON.parse(JSON.stringify(STORE[p].env)),
+    gates:[...STORE[p].gates],
+    smoke:JSON.parse(JSON.stringify(STORE[p].smoke)),
+    prod:JSON.parse(JSON.stringify(STORE[p].prod)),
+    testdata:JSON.parse(JSON.stringify(STORE[p].testdata||[])),
+    releaseNotes:JSON.parse(JSON.stringify(STORE[p].releaseNotes||[])),
+    taskchecklist:JSON.parse(JSON.stringify(STORE[p].taskchecklist||[]))
+  };
   STORE[p].reports.push(snap);
-  saveToLS(p);/* proj-nav removed */renderProject(p);
-  toast(`✓ Snapshot #${STORE[p].reports.length} saved`);
+  // Reset status + comment on every non-pending row — keep rows intact, never delete them
+  STORE[p].smoke.forEach(r=>{if(!r._pending){r.status='Not Started';r.comment='';}});
+  STORE[p].prod.forEach(r=>{if(!r._pending){r.status='Not Started';r.comment='';}});
+  saveToLS(p);renderProject(p);
+  toast(`✓ Report #${STORE[p].reports.length} saved — statuses reset, test cases preserved`);
 }
 // ── SERVER-FIRST STORAGE ──
 // _serverData is the in-memory mirror of qa-shared.json on the server.
