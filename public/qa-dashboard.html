@@ -2706,7 +2706,7 @@ function changeFbStatus(p,id,status){
     {label:'Assigned To',value:f.assignedTo||'—'},
     {label:'Client / Source',value:f.clientName||'—'},
     {label:'Reported By',value:f.reportedBy||'—'},
-  ],{projectId:p,assignedBy:f.reportedBy||'Dashboard',projectName:projName});
+  ],{projectId:p,assignedBy:_session?.name||f.reportedBy||'Dashboard',projectName:projName});
 }
 
 function deleteFeedback(p,id){
@@ -2843,7 +2843,7 @@ function openFeedbackModal(p,type,editId){
         {label:'Client / Source',value:entry.clientName||'—'},
         {label:'Description',value:(entry.description||'').slice(0,200)+(entry.description?.length>200?'…':'')},
         {label:'Reported By',value:entry.reportedBy||'—'},
-      ],{projectId:p,assignedBy:entry.reportedBy||'',projectName:fbProjName});
+      ],{projectId:p,assignedBy:_session?.name||entry.reportedBy||'Dashboard',projectName:fbProjName});
     }
   },{saveLabel:isEdit?'Update':'Save'});
 }
