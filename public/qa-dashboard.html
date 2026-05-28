@@ -7057,34 +7057,48 @@ window.addEventListener('DOMContentLoaded',async()=>{
       PROJECTS.forEach(p=>{if(curTab[p.id]==='wfdocs')renderProject(p.id);});
       renderProjectGrid();
     });
-    // ── Auto-save heartbeat every 60s ──
-    // If any failed saves are still pending (network was down), retry them.
-    // Also re-saves daily tasks + team tasks as a final safety net.
-    setInterval(()=>_autoSaveHeartbeat(), 60000);
+    // ── Auto-save heartbeat every 15s (was 60s — shorter window = less data lost on redeploy) ──
+    setInterval(()=>_autoSaveHeartbeat(), 15000);
     // ── Auto-transition check: runs at startup + every 60s ──
-    // Detects releases that moved to today/past since last check and sends email+Slack
-    setTimeout(()=>rlCheckAutoTransitions(), 3000); // 3s delay so notifyAssignment is ready
+    setTimeout(()=>rlCheckAutoTransitions(), 3000);
     setInterval(()=>rlCheckAutoTransitions(), 60000);
+    // ── Flush all unsaved data when user closes or navigates away ──
+    window.addEventListener('beforeunload', ()=>_flushAllUnsaved());
   }
 });
 
+// Force-save everything that has changed — called on beforeunload and can be called manually
+function _flushAllUnsaved(){
+  if(DAILY_TASKS.length>0){saveDailyTasks();}
+  if(TEAM_TASKS.length>0){saveTeamTasks();}
+  if(RELEASES.length>0){saveReleases();}
+  // Save all project stores that have been loaded
+  PROJECTS.forEach(p=>{if(STORE[p.id])saveToLS(p.id);});
+}
+
 // Heartbeat: retry any failed saves + re-save key volatile data as safety net
 let _lastHbDtHash='', _lastHbTtHash='', _lastHbRlHash='';
+let _lastHbStoreHash={};
 function _autoSaveHeartbeat(){
   // Retry any pending failed saves first
   if(Object.keys(_pendingRetries).length > 0){
     _retryAllFailed();
     return;
   }
-  // Re-save daily tasks only if they changed since last heartbeat
-  const dtHash = JSON.stringify(DAILY_TASKS);
-  if(dtHash !== _lastHbDtHash){ _lastHbDtHash=dtHash; saveDailyTasks(); }
-  // Re-save team tasks only if they changed
-  const ttHash = JSON.stringify(TEAM_TASKS);
-  if(ttHash !== _lastHbTtHash){ _lastHbTtHash=ttHash; saveTeamTasks(); }
-  // Re-save releases only if they changed (prevents data loss on Railway redeploy)
-  const rlHash = JSON.stringify(RELEASES);
-  if(rlHash !== _lastHbRlHash){ _lastHbRlHash=rlHash; saveReleases(); }
+  // Re-save daily tasks only if changed
+  const dtHash=JSON.stringify(DAILY_TASKS);
+  if(dtHash!==_lastHbDtHash){_lastHbDtHash=dtHash;saveDailyTasks();}
+  // Re-save team tasks only if changed
+  const ttHash=JSON.stringify(TEAM_TASKS);
+  if(ttHash!==_lastHbTtHash){_lastHbTtHash=ttHash;saveTeamTasks();}
+  // Re-save releases only if changed
+  const rlHash=JSON.stringify(RELEASES);
+  if(rlHash!==_lastHbRlHash){_lastHbRlHash=rlHash;saveReleases();}
+  // Re-save project stores (smoke, feedback, thirdparty, etc.) only if changed
+  PROJECTS.forEach(p=>{
+    const h=JSON.stringify(STORE[p.id]);
+    if(h&&h!==_lastHbStoreHash[p.id]){_lastHbStoreHash[p.id]=h;saveToLS(p.id);}
+  });
 }
 
 </script>

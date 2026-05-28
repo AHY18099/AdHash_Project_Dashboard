@@ -4729,13 +4729,12 @@ app.listen(PORT, () => {
     logToArray('info', `Server started successfully on port ${PORT}`);
     logToArray('info', 'Project dashboard available at http://localhost:' + PORT);
 
-    // ── Server-side heartbeat: force-persist all data to GitHub every 2 minutes ──
-    // Ensures data survives Railway redeploys even if browser tab was closed
-    // or the client-side heartbeat didn't fire before the deploy.
+    // ── Server-side heartbeat: force-persist all data to GitHub every 30s ──
+    // Shorter interval = smaller window of data loss between saves and redeploys.
     setInterval(() => {
         schedulePersistQaData();
         console.log('[heartbeat] scheduled GitHub persist');
-    }, 120000); // every 2 minutes
+    }, 30000); // every 30 seconds
 
     // On startup, migrate wfdocs to GitHub Releases + recover persisted test results.
     (async () => {
