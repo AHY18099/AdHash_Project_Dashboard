@@ -4676,7 +4676,7 @@ function rlCheckAutoTransitions(){
     } else if(current==='past' && (prev==='today'||prev==='next')){
       // Any → Past (date passed or Ready for Client)
       const reason=r.testingStatus==='Ready for Client'?'Testing Status: Ready for Client':'Release date has passed';
-      notifyAssignment('release_today',[
+      notifyAssignment('release_past',[
         {label:'Action',value:'📁 Auto-Moved to Past Releases'},
         {label:'Reason',value:reason},
         {label:'Project',value:projName},
@@ -4891,25 +4891,39 @@ function rlInline(idx,field,el){
   const r=RELEASES[idx];
   const newMode=rlClassify(r); // 'today' | 'next' | 'past'
   const viewMode=curView==='pastreleases'?'past':curView==='todayreleases'?'today':'next';
-  if(newMode==='past' && viewMode!=='past'){
+  const autoMovedToPast=newMode==='past' && viewMode!=='past';
+  if(autoMovedToPast){
     toast('✅ Moved to Past Releases');
     curView='pastreleases';
     renderReleasesPage('past');
   } else {
     renderReleasesPage(viewMode);
   }
-  // Notify only when testingStatus changes inline
+  // Notify when testingStatus changes, or when release auto-moved to past tab
   if(field==='testingStatus'){
     const proj=PROJECTS.find(x=>x.id===r.projectId);
-    const rlType=viewMode==='past'?'release_past':viewMode==='today'?'release_today':'release_next';
-    notifyAssignment(rlType,[
-      {label:'Action',value:'🔄 Testing Status Changed'},
-      {label:'Project',value:proj?.name||r.projectId},
-      {label:'Release Date',value:r.releaseDate},
-      {label:'Summary',value:r.releaseSummary},
-      {label:'Assigned To',value:r.assignedBy||'—'},
-      {label:'New Testing Status',value:el.value},
-    ],{projectId:r.projectId,assignedBy:_session?.name||'Dashboard',assignedTo:r.assignedBy||'',projectName:proj?.name||r.projectId});
+    if(autoMovedToPast){
+      // Status change triggered auto-move — send a single "moved to past" notification
+      notifyAssignment('release_past',[
+        {label:'Action',value:'📁 Moved to Past Releases'},
+        {label:'Reason',value:'Testing Status: '+el.value},
+        {label:'Project',value:proj?.name||r.projectId},
+        {label:'Release Date',value:r.releaseDate||'—'},
+        {label:'Summary',value:r.releaseSummary||'—'},
+        {label:'Assigned To',value:r.assignedBy||'—'},
+        {label:'Testing Status',value:el.value},
+      ],{projectId:r.projectId,assignedBy:_session?.name||'Dashboard',assignedTo:r.assignedBy||'',projectName:proj?.name||r.projectId});
+    } else {
+      const rlType=viewMode==='past'?'release_past':viewMode==='today'?'release_today':'release_next';
+      notifyAssignment(rlType,[
+        {label:'Action',value:'🔄 Testing Status Changed'},
+        {label:'Project',value:proj?.name||r.projectId},
+        {label:'Release Date',value:r.releaseDate||'—'},
+        {label:'Summary',value:r.releaseSummary||'—'},
+        {label:'Assigned To',value:r.assignedBy||'—'},
+        {label:'New Testing Status',value:el.value},
+      ],{projectId:r.projectId,assignedBy:_session?.name||'Dashboard',assignedTo:r.assignedBy||'',projectName:proj?.name||r.projectId});
+    }
   }
 }
 function rlInlineVal(idx,field,val){
