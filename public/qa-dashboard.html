@@ -2703,6 +2703,7 @@ function changeFbStatus(p,id,status){
     {label:'Title',value:f.title},
     {label:'Previous Status',value:statusLabels[oldStatus]||oldStatus},
     {label:'New Status',value:statusLabels[status]||status},
+    {label:'Assigned To',value:f.assignedTo||'—'},
     {label:'Client / Source',value:f.clientName||'—'},
     {label:'Reported By',value:f.reportedBy||'—'},
   ],{projectId:p,assignedBy:f.reportedBy||'Dashboard',projectName:projName});
@@ -2747,7 +2748,10 @@ function openFeedbackModal(p,type,editId){
     </div>
     <div>
       <label class="flbl">Assigned To</label>
-      <input class="finp" id="fb-assignee" value="${escH(e.assignedTo||'')}" placeholder="Team member" />
+      <select class="finp" id="fb-assignee">
+        <option value="">— Unassigned —</option>
+        ${getUsers().filter(u=>u.id!=='u_sa').map(u=>`<option value="${escH(u.name)}" ${(e.assignedTo||'')===(u.name)?'selected':''}>${escH(u.name)}</option>`).join('')}
+      </select>
     </div>
   </div>
   <div class="fg-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
@@ -2826,13 +2830,16 @@ function openFeedbackModal(p,type,editId){
     {
       const fbProjName=PROJECTS.find(x=>x.id===p)?.name||p;
       const fbType=type==='bug'?'feedback_bug':'feedback_req';
+      const assignedChanged=isEdit&&(e.assignedTo||'')!==(entry.assignedTo||'');
+      const actionLabel=isEdit?(assignedChanged&&entry.assignedTo?'👤 Assigned to '+entry.assignedTo:'✏️ Feedback Updated'):'🆕 Feedback Added';
       notifyAssignment(fbType,[
-        {label:'Action',value:isEdit?'✏️ Feedback Updated':'🆕 Feedback Added'},
+        {label:'Action',value:actionLabel},
         {label:'Project',value:fbProjName},
         {label:'Type',value:type==='bug'?'🐛 Bug':'📋 Requirement'},
         {label:'Title',value:entry.title},
         {label:'Priority',value:entry.priority||'—'},
         {label:'Status',value:entry.status||'—'},
+        {label:'Assigned To',value:entry.assignedTo||'—'},
         {label:'Client / Source',value:entry.clientName||'—'},
         {label:'Description',value:(entry.description||'').slice(0,200)+(entry.description?.length>200?'…':'')},
         {label:'Reported By',value:entry.reportedBy||'—'},
