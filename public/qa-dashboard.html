@@ -2419,6 +2419,7 @@ function openEnvDetailModal(p,type,editIdx){
     const name=document.getElementById('ped-name')?.value.trim();
     if(!name){toast('Name is required','err');return;}
     const entry={
+      id:isEdit?(existing.id||('env_'+Date.now()+'_'+Math.random().toString(36).slice(2,6))):('env_'+Date.now()+'_'+Math.random().toString(36).slice(2,6)),
       name,
       url:document.getElementById('ped-url')?.value.trim()||'',
       domain:document.getElementById('ped-domain')?.value.trim()||'',
@@ -3208,7 +3209,7 @@ function apiSaveEntry(p,editIdx){
   const url=document.getElementById('api-url')?.value.trim();
   if(!name){toast('API name is required','err');return;}
   if(!url){toast('URL is required','err');return;}
-  const entry={name,url,method:document.getElementById('api-method')?.value||'GET',headers:apiCollectHeaders(),body:document.getElementById('api-body')?.value||'',lastStatus:null,lastCode:null,lastResponse:null,lastTime:null};
+  const entry={id:editIdx!=null&&(STORE[p].apitests||[])[editIdx]?.id?STORE[p].apitests[editIdx].id:('api_'+Date.now()+'_'+Math.random().toString(36).slice(2,6)),name,url,method:document.getElementById('api-method')?.value||'GET',headers:apiCollectHeaders(),body:document.getElementById('api-body')?.value||'',lastStatus:null,lastCode:null,lastResponse:null,lastTime:null};
   if(editIdx!=null){
     // preserve last run results on edit
     const prev=(STORE[p].apitests||[])[editIdx];
@@ -3498,6 +3499,7 @@ function openCredentialModal(p,editIdx){
     const name=document.getElementById('cr-name')?.value.trim();
     if(!name){toast('Name is required','err');return;}
     const entry={
+      id:isEdit?(existing.id||('cr_'+Date.now()+'_'+Math.random().toString(36).slice(2,6))):('cr_'+Date.now()+'_'+Math.random().toString(36).slice(2,6)),
       name,
       environment:document.getElementById('cr-env')?.value||'Production',
       url:document.getElementById('cr-url')?.value.trim()||'',
@@ -5207,7 +5209,7 @@ function ptOpenAdd(p){
   openModal('Add Pending Task',body,()=>{
     const name=document.getElementById('pt-name')?.value.trim();
     if(!name){toast('Task name is required','err');return;}
-    const entry={name,description:document.getElementById('pt-desc')?.value.trim()||'',requirementDate:document.getElementById('pt-reqdate')?.value||'',status:document.getElementById('pt-status')?.value||'To Do',assigneeComments:document.getElementById('pt-aee-cmt')?.value.trim()||'',assignerComments:document.getElementById('pt-aer-cmt')?.value.trim()||'',nextDevDate:document.getElementById('pt-nextdev')?.value||''};
+    const entry={id:'pt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name,description:document.getElementById('pt-desc')?.value.trim()||'',requirementDate:document.getElementById('pt-reqdate')?.value||'',status:document.getElementById('pt-status')?.value||'To Do',assigneeComments:document.getElementById('pt-aee-cmt')?.value.trim()||'',assignerComments:document.getElementById('pt-aer-cmt')?.value.trim()||'',nextDevDate:document.getElementById('pt-nextdev')?.value||''};
     STORE[p].pendingtasks.push(entry);saveToLS(p);closeModal();renderProject(p);toast('Task added');
   },{saveLabel:'Add Task'});
 }
@@ -5228,7 +5230,7 @@ function ptOpenEdit(p,i){
   openModal('Edit Pending Task',body,()=>{
     const name=document.getElementById('pt-name')?.value.trim();
     if(!name){toast('Task name is required','err');return;}
-    STORE[p].pendingtasks[i]={name,description:document.getElementById('pt-desc')?.value.trim()||'',requirementDate:document.getElementById('pt-reqdate')?.value||'',status:document.getElementById('pt-status')?.value||'To Do',assigneeComments:document.getElementById('pt-aee-cmt')?.value.trim()||'',assignerComments:document.getElementById('pt-aer-cmt')?.value.trim()||'',nextDevDate:document.getElementById('pt-nextdev')?.value||''};
+    STORE[p].pendingtasks[i]={id:t.id||('pt_'+Date.now()),name,description:document.getElementById('pt-desc')?.value.trim()||'',requirementDate:document.getElementById('pt-reqdate')?.value||'',status:document.getElementById('pt-status')?.value||'To Do',assigneeComments:document.getElementById('pt-aee-cmt')?.value.trim()||'',assignerComments:document.getElementById('pt-aer-cmt')?.value.trim()||'',nextDevDate:document.getElementById('pt-nextdev')?.value||''};
     saveToLS(p);closeModal();renderProject(p);toast('Task updated');
   },{saveLabel:'Update'});
 }
@@ -5679,7 +5681,7 @@ function tclOpenAdd(p){
     const mod=document.getElementById('tcl-module')?.value.trim();
     if(!mod){toast('Module is required','err');return;}
     if(!STORE[p].taskchecklist)STORE[p].taskchecklist=[];
-    STORE[p].taskchecklist.push(tclRead());
+    STORE[p].taskchecklist.push({id:'tcl_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),...tclRead()});
     _tclDirty[p]=true;
     saveToLS(p);closeModal();renderProject(p);toast('Item added');
   },{saveLabel:'Add Item'});
@@ -5905,7 +5907,7 @@ function tpOpenAdd(p){
   openModal('Add Third Party Account',body,()=>{
     const name=document.getElementById('tp-name')?.value.trim();
     if(!name){toast('Account name is required','err');return;}
-    const entry={..._tpReadFields(),apis:[..._tpApiRows]};
+    const entry={id:'tp_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),..._tpReadFields(),apis:[..._tpApiRows]};
     if(!STORE[p].thirdparty)STORE[p].thirdparty=[];
     STORE[p].thirdparty.push(entry);saveToLS(p);closeModal();renderProject(p);toast('Account added');
   },{saveLabel:'Add Account'});
@@ -6367,8 +6369,8 @@ function tdFormHtml(r){r=r||{};return`
   <div class="fg-row"><div class="fg"><label>Test Date</label><input type="date" id="td-d" value="${r.testDate||''}"></div><div class="fg"><label>Tested By</label><input id="td-t" value="${r.testedBy||''}" placeholder="Your name" autocomplete="off"></div></div>
   <div class="fg"><label>Notes</label><textarea id="td-o" placeholder="Any notes about this test account…">${r.notes||''}</textarea></div>`;}
 function getTDData(){return{accountName:document.getElementById('td-n').value.trim(),loginMethod:document.getElementById('td-m').value,credential:document.getElementById('td-c').value.trim(),role:document.getElementById('td-r').value.trim(),environment:document.getElementById('td-e').value.trim(),testDate:document.getElementById('td-d').value,testedBy:document.getElementById('td-t').value.trim(),notes:document.getElementById('td-o').value.trim()};}
-function openAddTD(p){openModal('Add Test Data Entry',tdFormHtml(null),()=>{const d=getTDData();if(!d.accountName){toast('Account name is required','err');return;}STORE[p].testdata.push(d);closeModal();renderProject(p);toast('Entry added');});}
-function openEditTD(p,i){openModal('Edit Test Data Entry',tdFormHtml(STORE[p].testdata[i]),()=>{const d=getTDData();if(!d.accountName){toast('Account name is required','err');return;}STORE[p].testdata[i]=d;closeModal();renderProject(p);toast('Entry updated');});}
+function openAddTD(p){openModal('Add Test Data Entry',tdFormHtml(null),()=>{const d=getTDData();if(!d.accountName){toast('Account name is required','err');return;}STORE[p].testdata.push({id:'td_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),...d});closeModal();renderProject(p);toast('Entry added');});}
+function openEditTD(p,i){openModal('Edit Test Data Entry',tdFormHtml(STORE[p].testdata[i]),()=>{const d=getTDData();if(!d.accountName){toast('Account name is required','err');return;}STORE[p].testdata[i]={id:STORE[p].testdata[i]?.id||('td_'+Date.now()),...d};closeModal();renderProject(p);toast('Entry updated');});}
 function deleteTD(p,i){if(!confirm('Delete this entry?'))return;STORE[p].testdata.splice(i,1);renderProject(p);toast('Entry deleted');}
 // ══════════════════════════════════════════════════════
 // RELEASE NOTES MODALS
@@ -6381,8 +6383,8 @@ function rnFormHtml(r){r=r||{};const changes=(r.changes||[]).join('\n');return`
   <div class="fg"><label>Breaking Changes</label><input id="rn-bc" value="${r.breakingChanges||''}" placeholder="Optional — any breaking changes"></div>
   <div class="fg"><label>Known Issues</label><input id="rn-ki" value="${r.knownIssues||''}" placeholder="Optional — known issues in this release"></div>`;}
 function getRNData(){return{version:document.getElementById('rn-v').value.trim(),status:document.getElementById('rn-s').value,releaseDate:document.getElementById('rn-d').value,author:document.getElementById('rn-a').value.trim(),summary:document.getElementById('rn-sum').value.trim(),changes:document.getElementById('rn-ch').value.split('\n').map(l=>l.trim()).filter(Boolean),breakingChanges:document.getElementById('rn-bc').value.trim(),knownIssues:document.getElementById('rn-ki').value.trim()};}
-function openAddRN(p){openModal('Add Release Note',rnFormHtml(null),()=>{const d=getRNData();if(!d.version){toast('Version is required','err');return;}if(!STORE[p].releaseNotes)STORE[p].releaseNotes=[];STORE[p].releaseNotes.push(d);closeModal();renderProject(p);toast('Release note added');});}
-function openEditRN(p,i){openModal('Edit Release Note',rnFormHtml(STORE[p].releaseNotes[i]),()=>{const d=getRNData();if(!d.version){toast('Version is required','err');return;}STORE[p].releaseNotes[i]=d;closeModal();renderProject(p);toast('Release note updated');});}
+function openAddRN(p){openModal('Add Release Note',rnFormHtml(null),()=>{const d=getRNData();if(!d.version){toast('Version is required','err');return;}if(!STORE[p].releaseNotes)STORE[p].releaseNotes=[];STORE[p].releaseNotes.push({id:'rn_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),...d});closeModal();renderProject(p);toast('Release note added');});}
+function openEditRN(p,i){openModal('Edit Release Note',rnFormHtml(STORE[p].releaseNotes[i]),()=>{const d=getRNData();if(!d.version){toast('Version is required','err');return;}STORE[p].releaseNotes[i]={id:STORE[p].releaseNotes[i]?.id||('rn_'+Date.now()),...d};closeModal();renderProject(p);toast('Release note updated');});}
 function deleteRN(p,i){if(!confirm('Delete this release note?'))return;STORE[p].releaseNotes.splice(i,1);renderProject(p);toast('Deleted');}
 // ══════════════════════════════════════════════════════
 // SAVE / LOAD

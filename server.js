@@ -8,6 +8,17 @@ const { sendSlackNotification } = require('./utils/slack-notify');
 
 // ── SHARED DATA (must be defined before login handler uses it) ──
 const QA_DATA_PATH = path.join(__dirname, 'data', 'qa-shared.json');
+
+// In-memory write lock: prevents concurrent POST handlers from reading the
+// same on-disk snapshot and clobbering each other's writes (race condition).
+let _writeQueue = Promise.resolve();
+function _withWriteLock(fn) {
+    _writeQueue = _writeQueue.then(fn).catch(e => {
+        console.error('[writeLock] error:', e.message);
+    });
+    return _writeQueue;
+}
+
 function readQaData() {
     try {
         if (fs.existsSync(QA_DATA_PATH)) return JSON.parse(fs.readFileSync(QA_DATA_PATH, 'utf8'));
@@ -4337,21 +4348,23 @@ app.delete('/api/qa-data/:key', (req, res) => {
 app.post('/api/qa-data-bulk', async (req, res) => {
     const { records } = req.body || {};
     if (!records || typeof records !== 'object') return res.status(400).json({ error: 'Missing records' });
+    let count = 0;
     try {
-        const data = readQaData();
-        let count = 0;
-        for (const [k, v] of Object.entries(records)) {
-            if (!k || v === undefined) continue;
-            if (k === 'qa3_daily_tasks') data[k] = mergeDailyTasks(data[k], v);
-            else if (k === 'qa3_team_tasks') data[k] = mergeTeamTasks(data[k], v);
-            else if (k === 'qa3_releases') data[k] = mergeReleases(data[k], v);
-            else if (k.startsWith('qa3_') && v && typeof v === 'object' && !Array.isArray(v)) data[k] = mergeProjectData(data[k], v);
-            else data[k] = v;
-            count++;
-        }
-        fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
-        fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
-        if (_persistQaTimer) { clearTimeout(_persistQaTimer); _persistQaTimer = null; }
+        await _withWriteLock(async () => {
+            const data = readQaData();
+            for (const [k, v] of Object.entries(records)) {
+                if (!k || v === undefined || v === null) continue;
+                if (k === 'qa3_daily_tasks') data[k] = mergeDailyTasks(data[k], v);
+                else if (k === 'qa3_team_tasks') data[k] = mergeTeamTasks(data[k], v);
+                else if (k === 'qa3_releases') data[k] = mergeReleases(data[k], v);
+                else if (k.startsWith('qa3_') && v && typeof v === 'object' && !Array.isArray(v)) data[k] = mergeProjectData(data[k], v);
+                else data[k] = v;
+                count++;
+            }
+            fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
+            fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
+            if (_persistQaTimer) { clearTimeout(_persistQaTimer); _persistQaTimer = null; }
+        });
         let ghSaved = false;
         try { await persistQaDataToGitHub(); ghSaved = true; } catch (_) {}
         res.json({ status: 'saved', count, ghSaved });
@@ -4396,19 +4409,22 @@ function mergeReleases(existing, incoming) {
     return Array.from(map.values());
 }
 
-// Generic array merge by id field — for any sub-array that uses an 'id' key
+// Generic array merge by id field — for any sub-array that uses an 'id' key.
+// For legacy items without an id, use a natural key (name+url or name alone) to deduplicate
+// so repeated heartbeat saves never produce duplicates even for old records.
 function mergeById(existing, incoming) {
     if (!Array.isArray(incoming)) return existing || [];
     if (!Array.isArray(existing) || existing.length === 0) return incoming;
-    const map = new Map();
-    existing.forEach(r => { if (r && r.id) map.set(r.id, r); });
-    incoming.forEach(r => { if (r && r.id) map.set(r.id, r); });
-    // Preserve items without id (older records) from both sides, dedup by position
-    const withoutId = [
-        ...existing.filter(r => !r || !r.id),
-        ...incoming.filter(r => !r || !r.id),
-    ];
-    return [...Array.from(map.values()), ...withoutId];
+    const byId = new Map();
+    existing.forEach(r => { if (r && r.id) byId.set(r.id, r); });
+    incoming.forEach(r => { if (r && r.id) byId.set(r.id, r); });
+    // For items without id, deduplicate by natural key: name+url (or just name if no url)
+    const noIdMap = new Map();
+    const natKey = r => ((r && r.name) || '') + '|' + ((r && r.url) || '') + '|' + ((r && r.environment) || '');
+    existing.filter(r => r && !r.id).forEach(r => noIdMap.set(natKey(r), r));
+    // Incoming wins for matching natural key
+    incoming.filter(r => r && !r.id).forEach(r => noIdMap.set(natKey(r), r));
+    return [...Array.from(byId.values()), ...Array.from(noIdMap.values())];
 }
 
 // Merge smoke/prod rows: stable 'id' like SMK-01, PRD-01 — merge by that id
@@ -4433,58 +4449,59 @@ const PROJECT_ARRAY_KEYS = ['smoke', 'prod', 'feedback', 'thirdparty', 'taskchec
 function mergeProjectData(existing, incoming) {
     if (!existing || typeof existing !== 'object') return incoming;
     if (!incoming || typeof incoming !== 'object') return existing;
+    // Start from existing so keys NOT present in incoming are preserved (not wiped)
     const merged = { ...existing };
     for (const key of Object.keys(incoming)) {
+        const inVal = incoming[key];
+        // Never clobber existing data with null/undefined
+        if (inVal === null || inVal === undefined) continue;
         if (PROJECT_ARRAY_KEYS.includes(key)) {
             if (key === 'smoke' || key === 'prod') {
-                merged[key] = mergeTestRows(existing[key], incoming[key]);
+                merged[key] = mergeTestRows(existing[key], inVal);
             } else {
-                merged[key] = mergeById(existing[key], incoming[key]);
+                merged[key] = mergeById(existing[key], inVal);
             }
-        } else if (key === 'envDetails' && incoming[key] && typeof incoming[key] === 'object') {
-            // envDetails has production[] and staging[] sub-arrays
+        } else if (key === 'envDetails' && inVal && typeof inVal === 'object') {
             merged[key] = {
-                production: mergeById((existing[key]||{}).production, incoming[key].production),
-                staging:    mergeById((existing[key]||{}).staging,    incoming[key].staging),
+                production: mergeById((existing[key]||{}).production, inVal.production),
+                staging:    mergeById((existing[key]||{}).staging,    inVal.staging),
             };
         } else {
-            // Scalar/object fields (env, gates, etc.) — incoming wins
-            merged[key] = incoming[key];
+            // Scalar/object fields — incoming wins only if it has a real value
+            merged[key] = inVal;
         }
     }
     return merged;
 }
 
-// POST /api/qa-data/:key — save one key's value, await GitHub push for durability
+// POST /api/qa-data/:key — save one key's value, serialised through write lock to prevent race.
+// The write lock ensures concurrent requests read-modify-write sequentially, not in parallel.
 app.post('/api/qa-data/:key', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     const key = req.params.key;
     const { value } = req.body;
     if (value === undefined) return res.status(400).json({ error: 'Missing value' });
-    const data = readQaData();
 
-    // Smart merge for multi-user shared arrays to prevent overwrite between users
-    if (key === 'qa3_daily_tasks') {
-        data[key] = mergeDailyTasks(data[key], value);
-    } else if (key === 'qa3_team_tasks') {
-        data[key] = mergeTeamTasks(data[key], value);
-    } else if (key === 'qa3_releases') {
-        data[key] = mergeReleases(data[key], value);
-    } else if (key.startsWith('qa3_') && value && typeof value === 'object' && !Array.isArray(value)) {
-        // Per-project data (qa3_humee, qa3_wavedin, etc.) — deep merge sub-arrays
-        data[key] = mergeProjectData(data[key], value);
-    } else {
-        data[key] = value;
-    }
-
+    let ghSaved = false;
     try {
-        // Write to disk immediately
-        fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
-        fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
-        // Cancel any pending debounced save — we're doing it synchronously now
-        if (_persistQaTimer) { clearTimeout(_persistQaTimer); _persistQaTimer = null; }
-        // Push to GitHub synchronously — client waits for this ACK
-        let ghSaved = false;
+        await _withWriteLock(async () => {
+            const data = readQaData(); // always reads fresh from disk inside lock
+            // Smart merge — prevents one user overwriting another's concurrent changes
+            if (key === 'qa3_daily_tasks') {
+                data[key] = mergeDailyTasks(data[key], value);
+            } else if (key === 'qa3_team_tasks') {
+                data[key] = mergeTeamTasks(data[key], value);
+            } else if (key === 'qa3_releases') {
+                data[key] = mergeReleases(data[key], value);
+            } else if (key.startsWith('qa3_') && value && typeof value === 'object' && !Array.isArray(value)) {
+                data[key] = mergeProjectData(data[key], value);
+            } else {
+                data[key] = value;
+            }
+            fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
+            fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
+            if (_persistQaTimer) { clearTimeout(_persistQaTimer); _persistQaTimer = null; }
+        });
         try {
             await persistQaDataToGitHub();
             ghSaved = true;
@@ -4643,6 +4660,60 @@ async function _sendNotificationsAsync({ type, assignedBy, assignedTo, projectNa
         .catch(e => console.error('[notify] unexpected error:', e.message));
 }
 
+// Deduplicate a single array: keyed by id if present, otherwise by natural key (name+url+environment).
+function deduplicateArray(arr) {
+    if (!Array.isArray(arr) || arr.length === 0) return arr;
+    const byId = new Map();
+    const byNatKey = new Map();
+    const natKey = r => ((r && r.name) || '') + '|' + ((r && r.url) || '') + '|' + ((r && r.environment) || '');
+    arr.forEach(r => {
+        if (r && r.id) byId.set(r.id, r);
+        else byNatKey.set(natKey(r), r);
+    });
+    return [...Array.from(byId.values()), ...Array.from(byNatKey.values())];
+}
+
+// Deduplicate all project sub-arrays on startup.
+// Uses deduplicateArray so even legacy records without an 'id' are cleaned.
+async function deduplicateAllProjectData() {
+    const data = readQaData();
+    let changed = false;
+    for (const key of Object.keys(data)) {
+        if (!key.startsWith('qa3_')) continue;
+        const proj = data[key];
+        if (!proj || typeof proj !== 'object' || Array.isArray(proj)) continue;
+        for (const arrKey of PROJECT_ARRAY_KEYS) {
+            if (!Array.isArray(proj[arrKey]) || proj[arrKey].length === 0) continue;
+            const before = proj[arrKey].length;
+            proj[arrKey] = deduplicateArray(proj[arrKey]);
+            if (proj[arrKey].length !== before) {
+                console.log(`[dedup] ${key}.${arrKey}: ${before} → ${proj[arrKey].length}`);
+                changed = true;
+            }
+        }
+        // Also dedup envDetails
+        if (proj.envDetails && typeof proj.envDetails === 'object') {
+            for (const side of ['production', 'staging']) {
+                if (!Array.isArray(proj.envDetails[side]) || proj.envDetails[side].length === 0) continue;
+                const before = proj.envDetails[side].length;
+                proj.envDetails[side] = deduplicateArray(proj.envDetails[side]);
+                if (proj.envDetails[side].length !== before) {
+                    console.log(`[dedup] ${key}.envDetails.${side}: ${before} → ${proj.envDetails[side].length}`);
+                    changed = true;
+                }
+            }
+        }
+    }
+    if (changed) {
+        fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
+        fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
+        console.log('[dedup] cleaned duplicates — saving to GitHub');
+        try { await persistQaDataToGitHub(); } catch (e) { console.error('[dedup] GitHub push failed:', e.message); }
+    } else {
+        console.log('[dedup] no duplicates found');
+    }
+}
+
 // On startup: migrate any local wfdoc .bin files that have no ghUrl yet to GitHub Releases.
 // Also performs a full dedup pass on ALL project wfdoc lists to fix any previously accumulated duplicates.
 async function migrateWfDocsToGitHub() {
@@ -4736,6 +4807,16 @@ app.listen(PORT, () => {
         console.log('[heartbeat] scheduled GitHub persist');
     }, 30000); // every 30 seconds
 
+    // On startup, deduplicate all project sub-arrays to clean up any previously accumulated duplicates.
+    // This is safe to run every startup — it only removes exact duplicate rows.
+    (async () => {
+        try {
+            await deduplicateAllProjectData();
+        } catch (e) {
+            console.error('[startup] dedup failed:', e.message);
+        }
+    })();
+
     // On startup, migrate wfdocs to GitHub Releases + recover persisted test results.
     (async () => {
         try {
@@ -4758,21 +4839,28 @@ app.listen(PORT, () => {
 });
 }); // end pullQaDataFromGitHub().finally
 
-// On Railway redeploy, SIGTERM is sent before the process is killed.
-// Use GitHub Contents API (single HTTPS call ~500ms) to save data before exit.
-process.on('SIGTERM', () => {
-    console.log('[shutdown] SIGTERM received — saving qa-shared.json to GitHub via API');
-    if (_persistQaTimer) { clearTimeout(_persistQaTimer); _persistQaTimer = null; }
-    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
-    if (!token) { process.exit(0); return; }
-    persistQaDataToGitHub().then(() => {
-        console.log('[shutdown] qa-shared.json saved to GitHub successfully');
+// On Railway redeploy, SIGTERM is sent before the process is killed (~30s window).
+// Drain the write queue first, then push to GitHub, then exit.
+process.on('SIGTERM', async () => {
+    console.log('[shutdown] SIGTERM received — flushing write queue and saving to GitHub');
+    // Hard-exit failsafe: Railway gives 30s; use 25s to be safe
+    const killTimer = setTimeout(() => {
+        console.log('[shutdown] Hard exit — GitHub save took too long');
         process.exit(0);
-    }).catch(e => {
-        console.error('[shutdown] Failed to save qa-shared.json:', e.message);
-        process.exit(0);
-    });
-    // Hard exit after 10s in case API hangs
-    setTimeout(() => { console.log('[shutdown] Hard exit after timeout'); process.exit(0); }, 10000);
+    }, 25000);
+    killTimer.unref(); // don't let this keep the process alive if we exit cleanly first
+    try {
+        if (_persistQaTimer) { clearTimeout(_persistQaTimer); _persistQaTimer = null; }
+        // Wait for any in-progress write-locked operations to complete
+        await _writeQueue;
+        const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+        if (token) {
+            await persistQaDataToGitHub();
+            console.log('[shutdown] qa-shared.json saved to GitHub successfully');
+        }
+    } catch (e) {
+        console.error('[shutdown] Save failed:', e.message);
+    }
+    process.exit(0);
 });
 
