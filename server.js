@@ -4691,7 +4691,7 @@ async function deduplicateAllProjectData() {
                 changed = true;
             }
         }
-        // Also dedup envDetails
+        // Dedup envDetails
         if (proj.envDetails && typeof proj.envDetails === 'object') {
             for (const side of ['production', 'staging']) {
                 if (!Array.isArray(proj.envDetails[side]) || proj.envDetails[side].length === 0) continue;
@@ -4701,6 +4701,25 @@ async function deduplicateAllProjectData() {
                     console.log(`[dedup] ${key}.envDetails.${side}: ${before} → ${proj.envDetails[side].length}`);
                     changed = true;
                 }
+            }
+        }
+        // Dedup wfdocs by name — keep entry with serverId preferred over legacy entry
+        if (Array.isArray(proj.wfdocs) && proj.wfdocs.length > 0) {
+            const before = proj.wfdocs.length;
+            const seenNames = new Map();
+            proj.wfdocs.forEach(f => {
+                const k = (f.name || '').trim();
+                if (!seenNames.has(k)) { seenNames.set(k, f); }
+                else {
+                    const ex = seenNames.get(k);
+                    if (!ex.serverId && f.serverId) seenNames.set(k, f);
+                    else if (!ex.ghUrl && f.ghUrl) seenNames.set(k, f);
+                }
+            });
+            proj.wfdocs = Array.from(seenNames.values());
+            if (proj.wfdocs.length !== before) {
+                console.log(`[dedup] ${key}.wfdocs: ${before} → ${proj.wfdocs.length}`);
+                changed = true;
             }
         }
     }

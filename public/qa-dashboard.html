@@ -354,6 +354,7 @@ body.dark .pj-feedback-active{background:rgba(20,184,166,.06);border-color:rgba(
 .pj-fb-chips{display:flex;gap:3px;flex-wrap:wrap;margin-left:auto}
 .pj-fb-chip{display:inline-flex;align-items:center;padding:1px 7px;border-radius:50px;font-size:9.5px;font-weight:700;white-space:nowrap}
 .pj-fb-chip.open{background:rgba(245,158,11,.12);color:#d97706;border:1px solid rgba(245,158,11,.3)}
+.pj-fb-chip.inp{background:rgba(59,130,246,.12);color:#3b82f6;border:1px solid rgba(59,130,246,.3)}
 .pj-fb-chip.done{background:rgba(16,185,129,.12);color:#059669;border:1px solid rgba(16,185,129,.3)}
 .pj-fb-chip.crit{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
 
@@ -1941,9 +1942,11 @@ function renderProjectGrid(){
     const _allFb=(STORE[p.id]?.feedback||[]);
     const _fbReqs=_allFb.filter(f=>f.type==='req');
     const _fbBugs=_allFb.filter(f=>f.type==='bug');
-    const _fbReqOpen=_fbReqs.filter(f=>f.status==='open'||f.status==='inprogress').length;
+    const _fbReqOpen=_fbReqs.filter(f=>f.status==='open').length;
+    const _fbReqInp=_fbReqs.filter(f=>f.status==='inprogress').length;
     const _fbReqDone=_fbReqs.filter(f=>f.status==='resolved'||f.status==='closed').length;
-    const _fbBugOpen=_fbBugs.filter(f=>f.status==='open'||f.status==='inprogress').length;
+    const _fbBugOpen=_fbBugs.filter(f=>f.status==='open').length;
+    const _fbBugInp=_fbBugs.filter(f=>f.status==='inprogress').length;
     const _fbBugDone=_fbBugs.filter(f=>f.status==='resolved'||f.status==='closed').length;
     const _fbBugCrit=_fbBugs.filter(f=>f.priority==='critical').length;
     const hasFeedback=_allFb.length>0;
@@ -1956,6 +1959,7 @@ function renderProjectGrid(){
             <span class="pj-fb-total">${_fbReqs.length}</span>
             <span class="pj-fb-chips">
               ${_fbReqOpen>0?`<span class="pj-fb-chip open">${_fbReqOpen} Open</span>`:''}
+              ${_fbReqInp>0?`<span class="pj-fb-chip inp">${_fbReqInp} In Progress</span>`:''}
               ${_fbReqDone>0?`<span class="pj-fb-chip done">${_fbReqDone} Done</span>`:''}
             </span>
           </div>
@@ -1965,6 +1969,7 @@ function renderProjectGrid(){
             <span class="pj-fb-total">${_fbBugs.length}</span>
             <span class="pj-fb-chips">
               ${_fbBugOpen>0?`<span class="pj-fb-chip open">${_fbBugOpen} Open</span>`:''}
+              ${_fbBugInp>0?`<span class="pj-fb-chip inp">${_fbBugInp} In Progress</span>`:''}
               ${_fbBugDone>0?`<span class="pj-fb-chip done">${_fbBugDone} Done</span>`:''}
               ${_fbBugCrit>0?`<span class="pj-fb-chip crit">🔴 ${_fbBugCrit} Critical</span>`:''}
             </span>
@@ -6545,7 +6550,9 @@ let DAILY_TASKS=[];
 function saveDailyTasks(){_serverData['qa3_daily_tasks']=DAILY_TASKS;serverPost('qa3_daily_tasks',DAILY_TASKS);}
 function loadDailyTasks(){DAILY_TASKS=_serverData['qa3_daily_tasks']||[];}
 
-// Pull wfdocs file metadata from server for all projects and merge into STORE (read-only sync)
+// Pull wfdocs file metadata from server for all projects — server is the single source of truth.
+// The server already deduplicates by name (keeping the entry with serverId/ghUrl preferred).
+// We replace STORE entirely so legacy entries stored in qa-shared are not double-counted.
 async function syncWfDocsFromServer(){
   try{
     await Promise.all(PROJECTS.map(async proj=>{
@@ -6554,13 +6561,9 @@ async function syncWfDocsFromServer(){
         if(!r.ok)return;
         const serverFiles=await r.json();
         if(!Array.isArray(serverFiles))return;
-        if(!STORE[proj.id].wfdocs)STORE[proj.id].wfdocs=[];
-        // Server is authoritative for wfdocs — update in-memory only, no re-save
-        // (data is already in GitHub; re-saving would cause unnecessary API calls + SHA conflicts)
-        const legacyEntries=STORE[proj.id].wfdocs.filter(d=>!d.serverId);
-        const serverEntries=serverFiles.map(sf=>({name:sf.name,size:sf.size||0,uploadedAt:sf.uploadedAt||'',serverId:sf.fileId}));
-        STORE[proj.id].wfdocs=[...serverEntries,...legacyEntries];
-        _serverData['qa3_'+proj.id]=STORE[proj.id]; // update mirror only
+        // Server is authoritative — replace STORE entirely (no merging with local copy)
+        STORE[proj.id].wfdocs=serverFiles.map(sf=>({name:sf.name,size:sf.size||0,uploadedAt:sf.uploadedAt||'',serverId:sf.fileId||sf.serverId||null}));
+        _serverData['qa3_'+proj.id]=STORE[proj.id]; // update mirror only, no re-save
       }catch(e){}
     }));
   }catch(e){}
