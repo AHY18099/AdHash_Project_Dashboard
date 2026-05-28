@@ -7039,7 +7039,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
 });
 
 // Heartbeat: retry any failed saves + re-save key volatile data as safety net
-let _lastHbDtHash='', _lastHbTtHash='';
+let _lastHbDtHash='', _lastHbTtHash='', _lastHbRlHash='';
 function _autoSaveHeartbeat(){
   // Retry any pending failed saves first
   if(Object.keys(_pendingRetries).length > 0){
@@ -7052,6 +7052,9 @@ function _autoSaveHeartbeat(){
   // Re-save team tasks only if they changed
   const ttHash = JSON.stringify(TEAM_TASKS);
   if(ttHash !== _lastHbTtHash){ _lastHbTtHash=ttHash; saveTeamTasks(); }
+  // Re-save releases only if they changed (prevents data loss on Railway redeploy)
+  const rlHash = JSON.stringify(RELEASES);
+  if(rlHash !== _lastHbRlHash){ _lastHbRlHash=rlHash; saveReleases(); }
 }
 
 </script>
