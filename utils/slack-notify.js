@@ -12,6 +12,7 @@ const TYPE_COLORS = {
     teamtask:     '#6366f1',
     release_today:'#10b981',
     release_next: '#3b82f6',
+    release_past: '#8b5cf6',
     feedback_req: '#f59e0b',
     feedback_bug: '#ef4444',
 };
@@ -20,6 +21,7 @@ const TYPE_EMOJIS = {
     teamtask:     ':clipboard:',
     release_today:':rocket:',
     release_next: ':calendar:',
+    release_past: ':white_check_mark:',
     feedback_req: ':memo:',
     feedback_bug: ':bug:',
 };
@@ -28,6 +30,7 @@ const TYPE_LABELS = {
     teamtask:     'Team Task Assigned',
     release_today:"Today's Release",
     release_next: 'Next Release',
+    release_past: 'Past Release',
     feedback_req: 'New Client Requirement',
     feedback_bug: 'New Bug Reported',
 };

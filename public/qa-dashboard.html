@@ -4898,17 +4898,17 @@ function rlInline(idx,field,el){
   } else {
     renderReleasesPage(viewMode);
   }
-  // Send notification when status is changed inline
-  if(field==='currentStatus'||field==='testingStatus'){
+  // Notify only when testingStatus changes inline
+  if(field==='testingStatus'){
     const proj=PROJECTS.find(x=>x.id===r.projectId);
-    const rlType=viewMode==='today'?'release_today':'release_next';
+    const rlType=viewMode==='past'?'release_past':viewMode==='today'?'release_today':'release_next';
     notifyAssignment(rlType,[
-      {label:'Action',value:'🔄 Status Updated'},
+      {label:'Action',value:'🔄 Testing Status Changed'},
       {label:'Project',value:proj?.name||r.projectId},
       {label:'Release Date',value:r.releaseDate},
       {label:'Summary',value:r.releaseSummary},
       {label:'Assigned To',value:r.assignedBy||'—'},
-      {label:field==='currentStatus'?'New Current Status':'New Testing Status',value:el.value},
+      {label:'New Testing Status',value:el.value},
     ],{projectId:r.projectId,assignedBy:_session?.name||'Dashboard',assignedTo:r.assignedBy||'',projectName:proj?.name||r.projectId});
   }
 }
@@ -5041,7 +5041,7 @@ function rlSaveEntry(editIdx,mode){
   toast(isNewRl?'Release added ✓':'Release updated ✓');
   // Notify only for new releases OR when testingStatus actually changed
   if(isNewRl||entry.testingStatus!==oldTestingStatus){
-    const rlType=mode==='today'?'release_today':'release_next';
+    const rlType=mode==='past'?'release_past':mode==='today'?'release_today':'release_next';
     const rlProj=PROJECTS.find(x=>x.id===entry.projectId);
     notifyAssignment(rlType,[
       {label:'Action',value:isNewRl?'🆕 New Release Added':'🔄 Testing Status Changed'},
