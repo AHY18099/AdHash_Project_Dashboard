@@ -4341,7 +4341,12 @@ app.post('/api/qa-data-bulk', async (req, res) => {
         const data = readQaData();
         let count = 0;
         for (const [k, v] of Object.entries(records)) {
-            if (k && v !== undefined) { data[k] = v; count++; }
+            if (!k || v === undefined) continue;
+            if (k === 'qa3_daily_tasks') data[k] = mergeDailyTasks(data[k], v);
+            else if (k === 'qa3_team_tasks') data[k] = mergeTeamTasks(data[k], v);
+            else if (k === 'qa3_releases') data[k] = mergeReleases(data[k], v);
+            else data[k] = v;
+            count++;
         }
         fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
         fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
@@ -4354,6 +4359,42 @@ app.post('/api/qa-data-bulk', async (req, res) => {
     }
 });
 
+// Smart merge helpers — prevent multi-user overwrite on shared arrays
+// Each user's browser only has their slice of data; a full replace would clobber other users' rows.
+
+// Merge daily tasks: keyed by (date, projectId) — each row is unique per project per day
+function mergeDailyTasks(existing, incoming) {
+    if (!Array.isArray(incoming)) return existing;
+    const map = new Map();
+    (existing || []).forEach(r => { if (r.date && r.projectId) map.set(r.date + '|' + r.projectId, r); });
+    incoming.forEach(r => { if (r.date && r.projectId) map.set(r.date + '|' + r.projectId, r); });
+    return Array.from(map.values());
+}
+
+// Merge team tasks: keyed by id when present, otherwise by (date, projectId, taskSummary)
+function mergeTeamTasks(existing, incoming) {
+    if (!Array.isArray(incoming)) return existing;
+    const byId = new Map();
+    const byNk = new Map(); // natural key fallback
+    const nk = r => (r.date||'') + '|' + (r.projectId||'') + '|' + (r.taskSummary||'');
+    (existing || []).forEach(r => {
+        if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r);
+    });
+    incoming.forEach(r => {
+        if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r);
+    });
+    return [...Array.from(byId.values()), ...Array.from(byNk.values())];
+}
+
+// Merge releases: keyed by id
+function mergeReleases(existing, incoming) {
+    if (!Array.isArray(incoming)) return existing;
+    const map = new Map();
+    (existing || []).forEach(r => { if (r.id) map.set(r.id, r); });
+    incoming.forEach(r => { if (r.id) map.set(r.id, r); });
+    return Array.from(map.values());
+}
+
 // POST /api/qa-data/:key — save one key's value, await GitHub push for durability
 app.post('/api/qa-data/:key', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
@@ -4361,7 +4402,18 @@ app.post('/api/qa-data/:key', async (req, res) => {
     const { value } = req.body;
     if (value === undefined) return res.status(400).json({ error: 'Missing value' });
     const data = readQaData();
-    data[key] = value;
+
+    // Smart merge for multi-user shared arrays to prevent overwrite between users
+    if (key === 'qa3_daily_tasks') {
+        data[key] = mergeDailyTasks(data[key], value);
+    } else if (key === 'qa3_team_tasks') {
+        data[key] = mergeTeamTasks(data[key], value);
+    } else if (key === 'qa3_releases') {
+        data[key] = mergeReleases(data[key], value);
+    } else {
+        data[key] = value;
+    }
+
     try {
         // Write to disk immediately
         fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });

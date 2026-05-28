@@ -6445,6 +6445,22 @@ async function _doServerPost(key,value,retriesLeft){
         // Server saved to disk but GitHub push failed — warn but don't block
         console.warn('[save] Server saved key',key,'but GitHub push failed — will retry on next save');
       }
+      // For shared multi-user arrays, re-fetch the server's merged result so our local
+      // copy stays consistent with other users' updates.
+      if(key==='qa3_daily_tasks'||key==='qa3_team_tasks'||key==='qa3_releases'){
+        try{
+          const sr=await fetch('/api/qa-data/'+encodeURIComponent(key),{cache:'no-store'});
+          if(sr.ok){
+            const sd=await sr.json();
+            if(Array.isArray(sd.value)){
+              _serverData[key]=sd.value;
+              if(key==='qa3_daily_tasks'){_serverData[key]=sd.value;loadDailyTasks();}
+              else if(key==='qa3_team_tasks'){_serverData[key]=sd.value;loadTeamTasks();}
+              else if(key==='qa3_releases'){_serverData[key]=sd.value;loadReleases();}
+            }
+          }
+        }catch(_){}
+      }
       delete _pendingRetries[key];
       _activeSaves=Math.max(0,_activeSaves-1);
       _updateSaveStatusBadge();
