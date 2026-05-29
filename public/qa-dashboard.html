@@ -3777,7 +3777,7 @@ function dtEnsureProjectRows(dateStr){
     const exists=DAILY_TASKS.find(t=>t.date===dateStr&&t.projectId===p.id);
     const defAssignee=p.defaultAssignee||'';
     if(!exists){
-      const entry={date:dateStr,projectId:p.id,assignedBy:defAssignee};
+      const entry={id:'dt_'+Math.random().toString(36).slice(2,10),date:dateStr,projectId:p.id,assignedBy:defAssignee};
       DT_COLS.forEach(c=>{entry[c.key]='';});
       DAILY_TASKS.push(entry);
       changed=true;

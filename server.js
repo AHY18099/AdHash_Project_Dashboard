@@ -4384,7 +4384,13 @@ function mergeDailyTasks(existing, incoming) {
     const nk = r => (r.date||'') + '|' + (r.projectId||'');
     (existing || []).forEach(r => { if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r); });
     incoming.forEach(r => { if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r); });
-    return [...Array.from(byId.values()), ...Array.from(byNk.values())];
+    // Build set of date|projectId keys already covered by id-keyed entries
+    // so no-id legacy entries don't create duplicates alongside them
+    const coveredById = new Set(Array.from(byId.values()).map(nk));
+    const nkOnly = Array.from(byNk.entries())
+        .filter(([k]) => !coveredById.has(k))
+        .map(([, v]) => v);
+    return [...Array.from(byId.values()), ...nkOnly];
 }
 
 // Merge team tasks: keyed by id when present, otherwise by (date, projectId) for legacy items
@@ -4399,7 +4405,12 @@ function mergeTeamTasks(existing, incoming) {
     incoming.forEach(r => {
         if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r);
     });
-    return [...Array.from(byId.values()), ...Array.from(byNk.values())];
+    // Drop no-id entries whose date|projectId is already covered by an id-keyed entry
+    const coveredById = new Set(Array.from(byId.values()).map(nk));
+    const nkOnly = Array.from(byNk.entries())
+        .filter(([k]) => !coveredById.has(k))
+        .map(([, v]) => v);
+    return [...Array.from(byId.values()), ...nkOnly];
 }
 
 // Merge releases: keyed by id
