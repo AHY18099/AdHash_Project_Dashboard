@@ -731,12 +731,19 @@ function parseApiSuiteReport(reportPath: string, fallbackTotal: number): DomainS
   const html = fs.readFileSync(fullReportPath, 'utf8');
   const rowPattern = /<tr class="test-row (passed|failed|skipped)">[\s\S]*?<td class="test-name">([^<]+)<\/td>[\s\S]*?<span class="status-badge [^"]+">([^<]+)<\/span>[\s\S]*?<td class="test-duration">([^<]+)<\/td>[\s\S]*?<td class="test-details"([^>]*)>([\s\S]*?)<\/td>[\s\S]*?<\/tr>/gi;
   const configs = loadApiSuiteConfigs();
-  const configByMethodAndName = new Map(
-    configs.map((entry) => [
-      `${normalizeApiMethod(entry.method)}::${normalizeApiName(entry.name)}`,
-      entry
-    ])
-  );
+  // Build lookup by both short name ("WavedIn App Login") and project-prefixed name
+  // ("WavedIn — WavedIn App Login") since regenerate-specs.mjs uses the latter format.
+  const configByMethodAndName = new Map<string, ApiSuiteConfig>();
+  configs.forEach((entry) => {
+    configByMethodAndName.set(`${normalizeApiMethod(entry.method)}::${normalizeApiName(entry.name)}`, entry);
+  });
+
+  // Also build a lookup by URL for fallback matching
+  const configByUrl = new Map<string, ApiSuiteConfig>();
+  configs.forEach((entry) => {
+    if (entry.url) configByUrl.set(entry.url.trim().replace(/\/+$/, '').toLowerCase(), entry);
+  });
+
   const detailsByKey = new Map<string, ApiDetail>();
   let parsedCount = 0;
 
@@ -744,14 +751,29 @@ function parseApiSuiteReport(reportPath: string, fallbackTotal: number): DomainS
     const rowStatus = String(match[1] || '').trim().toLowerCase();
     const attributes = match[5] || '';
     const title = decodeHtmlEntities(match[2]).trim();
-    const titleMatch = title.match(/^(GET|POST|PUT|DELETE|PATCH)\s+(.+)$/i);
 
-    if (!titleMatch) {
+    // Format 1: "POST WavedIn App Login" (local spec — method + name)
+    // Format 2: "API: WavedIn — WavedIn App Login" (regenerated spec — API: project — name)
+    let method: string;
+    let name: string;
+
+    const methodPrefixMatch = title.match(/^(GET|POST|PUT|DELETE|PATCH)\s+(.+)$/i);
+    const apiPrefixMatch = title.match(/^API:\s+(.+)$/i);
+
+    if (methodPrefixMatch) {
+      method = normalizeApiMethod(methodPrefixMatch[1]);
+      name = methodPrefixMatch[2].trim();
+    } else if (apiPrefixMatch) {
+      // "API: WavedIn — WavedIn App Login" → extract just the api name after the last "— "
+      const fullName = apiPrefixMatch[1].trim();
+      const dashIdx = fullName.indexOf(' — ');
+      name = dashIdx !== -1 ? fullName.slice(dashIdx + 3).trim() : fullName;
+      // Look up method from config by name
+      const foundConfig = configs.find((c) => normalizeApiName(c.name) === normalizeApiName(name));
+      method = normalizeApiMethod(foundConfig?.method || 'GET');
+    } else {
       continue;
     }
-
-    const method = normalizeApiMethod(titleMatch[1]);
-    const name = titleMatch[2].trim();
     const requestBody = decodeBase64Value(attributes.match(/data-request-body="([^"]*)"/i)?.[1]) || getApiRequestFallback(method);
     const responseBody = decodeBase64Value(attributes.match(/data-response-body="([^"]*)"/i)?.[1]) || getApiResponseFallback();
     const responseCodeValue = decodeHtmlEntities(attributes.match(/data-response-code="([^"]*)"/i)?.[1] || '').trim();
