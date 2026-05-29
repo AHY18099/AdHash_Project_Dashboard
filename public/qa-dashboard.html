@@ -5567,7 +5567,15 @@ function tclSaveReport(p){
     comments:''
   }));
   _tclDirty[p]=false;
+  // Snapshot the reset version before async server re-fetch can overwrite it
+  const _tclResetSnap=JSON.parse(JSON.stringify(STORE[p].taskchecklist));
   saveToLS(p);
+  // Re-apply reset after save completes in case async server re-fetch overwrites with stale data
+  setTimeout(()=>{
+    STORE[p].taskchecklist=_tclResetSnap;
+    curTab[p]='taskchecklist';
+    renderProject(p);
+  },1200);
   curTab[p]='taskchecklist';
   renderProject(p);
   toast(`✓ Report #${STORE[p].reports.length} saved — statuses reset, checklist items preserved`);

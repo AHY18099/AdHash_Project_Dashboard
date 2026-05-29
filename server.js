@@ -4726,6 +4726,18 @@ async function deduplicateAllProjectData() {
                 changed = true;
             }
         }
+        // Dedup thirdparty.apis nested arrays
+        if (Array.isArray(proj.thirdparty)) {
+            proj.thirdparty.forEach(acct => {
+                if (!Array.isArray(acct.apis) || acct.apis.length === 0) return;
+                const before = acct.apis.length;
+                acct.apis = deduplicateArray(acct.apis);
+                if (acct.apis.length !== before) {
+                    console.log(`[dedup] ${key}.thirdparty[${acct.name}].apis: ${before} → ${acct.apis.length}`);
+                    changed = true;
+                }
+            });
+        }
         // Dedup envDetails
         if (proj.envDetails && typeof proj.envDetails === 'object') {
             for (const side of ['production', 'staging']) {
