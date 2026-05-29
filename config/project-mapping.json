@@ -876,8 +876,8 @@
             "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}"
           },
           "body": {
-            "email": "{{SUPER_ADMIN_EMAIL}}",
-            "password": "{{SUPER_ADMIN_PASSWORD}}",
+            "email": "superadmin@ddp.events",
+            "password": "Event!@#123",
             "gotrue_meta_security": {}
           },
           "capture": {
@@ -921,8 +921,8 @@
             "apikey": "{{DDP_SUPABASE_API_KEY|DDP_SUPABASE_PUBLISHABLE_KEY}}"
           },
           "body": {
-            "email": "{{DDP_ADMIN_EMAIL}}",
-            "password": "{{DDP_ADMIN_PASSWORD}}",
+            "email": "ddpadmin@ddp.events",
+            "password": "Event!@#123",
             "gotrue_meta_security": {}
           },
           "capture": {

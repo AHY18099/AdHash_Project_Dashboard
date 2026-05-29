@@ -17,10 +17,6 @@ jobs:
     env:
       CI: 'true'
       SUPABASE_API_KEY: ${{ secrets.SUPABASE_API_KEY }}
-      SUPER_ADMIN_EMAIL: ${{ secrets.SUPER_ADMIN_EMAIL }}
-      SUPER_ADMIN_PASSWORD: ${{ secrets.SUPER_ADMIN_PASSWORD }}
-      DDP_ADMIN_EMAIL: ${{ secrets.DDP_ADMIN_EMAIL }}
-      DDP_ADMIN_PASSWORD: ${{ secrets.DDP_ADMIN_PASSWORD }}
       ZOHO_MAIL_ENABLED: ${{ secrets.ZOHO_MAIL_ENABLED }}
       ZOHO_MAIL_FROM: ${{ secrets.ZOHO_MAIL_FROM }}
       ZOHO_MAIL_USER: ${{ secrets.ZOHO_MAIL_USER }}

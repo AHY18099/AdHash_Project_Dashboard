@@ -114,25 +114,12 @@ function isDdpSupabaseAuthFlowRequest(endpoint: ApiEndpoint): boolean {
   return /\/auth\/v1\/token\?grant_type=password|\/auth\/v1\/user|\/functions\/v1\/send-otp/i.test(endpoint.url);
 }
 
-// DDP auth-flow tests require DDP user credentials (email+password) that are not
-// stored as CI secrets. Always skip these in CI to prevent 401 failures.
 function isCiDdpSecretMissing(): boolean {
-  return String(process.env.CI || '').trim().toLowerCase() === 'true';
+  return String(process.env.CI || '').trim().toLowerCase() === 'true' && !hasSupabaseApiKey();
 }
 
 function isCiSupabaseSecretMissing(): boolean {
   return String(process.env.CI || '').trim().toLowerCase() === 'true' && !hasSupabaseApiKey();
-}
-
-function hasSupabaseLoginCredentials(): boolean {
-  return Boolean(
-    process.env.SUPER_ADMIN_EMAIL?.trim() &&
-    process.env.SUPER_ADMIN_PASSWORD?.trim()
-  );
-}
-
-function isCiSupabaseLoginCredentialMissing(): boolean {
-  return String(process.env.CI || '').trim().toLowerCase() === 'true' && !hasSupabaseLoginCredentials();
 }
 
 function extractBearerToken(authorizationHeader?: string): string | null {
@@ -439,10 +426,6 @@ test.describe('API Tests', () => {
   for (const endpoint of apiEndpoints) {
     test(`${endpoint.method} ${endpoint.name}`, async () => {
       test.skip(isDdpSupabaseAuthFlowRequest(endpoint) && isCiDdpSecretMissing(), SKIPPED_SUPABASE_MESSAGE);
-      test.skip(
-        isSupabaseLoginRequest(endpoint.url) && isCiSupabaseLoginCredentialMissing(),
-        'Skipped in CI: SUPER_ADMIN_EMAIL/SUPER_ADMIN_PASSWORD secret is not configured'
-      );
 
       const startTime = Date.now();
       
