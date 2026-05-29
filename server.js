@@ -4309,10 +4309,12 @@ app.delete('/api/wfdocs/:projectId/:fileId', async (req, res) => {
 // ── SHARED DATA API endpoints ──
 
 // GET /api/qa-data — return all shared keys (deduped before sending)
+// _DEPLOY_VERSION is checked by client to detect stale deploys
+const _DEPLOY_VERSION = 'v20260529-dedup-final';
 app.get('/api/qa-data', (req, res) => {
     const raw = readQaData();
     // Apply dedup to all per-project objects before sending to client
-    const out = {};
+    const out = { _deployVersion: _DEPLOY_VERSION };
     for (const [k, v] of Object.entries(raw)) {
         if (k.startsWith('qa3_') && v && typeof v === 'object' && !Array.isArray(v)) {
             out[k] = deduplicateProjectData(v);
