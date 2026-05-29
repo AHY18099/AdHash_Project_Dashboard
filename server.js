@@ -4885,9 +4885,12 @@ async function migrateWfDocsToGitHub() {
     if (anyChanged) { writeQaData(shared); console.log('[migrate] wfdoc dedup/migration complete, qa-shared.json updated'); }
 }
 
-// Start server — pull latest data from GitHub first so redeploys never lose data
-pullQaDataFromGitHub().catch(e => console.error('[startup] pullQaDataFromGitHub failed:', e.message)).finally(() => {
-app.listen(PORT, () => {
+// Start server — pull latest data from GitHub, dedup synchronously, THEN start listening
+(async () => {
+    try { await pullQaDataFromGitHub(); } catch (e) { console.error('[startup] pullQaDataFromGitHub failed:', e.message); }
+    // Dedup BEFORE accepting requests so no client ever receives duplicate data
+    try { await deduplicateAllProjectData(); console.log('[startup] dedup complete — server ready'); } catch (e) { console.error('[startup] dedup failed:', e.message); }
+    app.listen(PORT, () => {
     testRunning = false;
     testResults = null;
     testLogs = [];
@@ -4914,16 +4917,6 @@ app.listen(PORT, () => {
         console.log('[heartbeat] scheduled GitHub persist');
     }, 30000); // every 30 seconds
 
-    // On startup, deduplicate all project sub-arrays to clean up any previously accumulated duplicates.
-    // This is safe to run every startup — it only removes exact duplicate rows.
-    (async () => {
-        try {
-            await deduplicateAllProjectData();
-        } catch (e) {
-            console.error('[startup] dedup failed:', e.message);
-        }
-    })();
-
     // On startup, migrate wfdocs to GitHub Releases + recover persisted test results.
     (async () => {
         try {
@@ -4944,7 +4937,7 @@ app.listen(PORT, () => {
         }
     })();
 });
-}); // end pullQaDataFromGitHub().finally
+})(); // end startup async IIFE
 
 // On Railway redeploy, SIGTERM is sent before the process is killed (~30s window).
 // Drain the write queue first, then push to GitHub, then exit.

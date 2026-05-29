@@ -3045,7 +3045,7 @@ function renderReports(p){
     const idx=reps.length-1-ri;
 
     // ── Checklist-type report ──
-    if(rep.type==='checklist'){
+    if(rep.type==='checklist'||rep.type==='task_checklist'||(Array.isArray(rep.items)&&rep.items.length>0)){
       const s=rep.stats||{};
       const pct=rep.passRate||0;
       const platforms=[...new Set((rep.items||[]).map(r=>r.platform).filter(Boolean))];
