@@ -4121,13 +4121,7 @@ let _ttProjFilter='all';
 let _ttTodayStr=(()=>{const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`})();
 
 function saveTeamTasks(){_serverData['qa3_team_tasks']=TEAM_TASKS;serverPost('qa3_team_tasks',TEAM_TASKS);}
-function loadTeamTasks(){
-  TEAM_TASKS=_serverData['qa3_team_tasks']||TEAM_TASKS;
-  // Backfill stable ids on any legacy tasks that lack one
-  let _ttNeedsSave=false;
-  TEAM_TASKS.forEach(r=>{if(!r.id){r.id='tt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);_ttNeedsSave=true;}});
-  if(_ttNeedsSave)saveTeamTasks();
-}
+function loadTeamTasks(){TEAM_TASKS=_serverData['qa3_team_tasks']||TEAM_TASKS;}
 
 function showTeamTasks(){
   curView='teamtasks';
@@ -6580,13 +6574,7 @@ function saveAllState(){
 // ── DAILY TASKS GLOBAL STATE ──
 let DAILY_TASKS=[];
 function saveDailyTasks(){_serverData['qa3_daily_tasks']=DAILY_TASKS;serverPost('qa3_daily_tasks',DAILY_TASKS);}
-function loadDailyTasks(){
-  DAILY_TASKS=_serverData['qa3_daily_tasks']||[];
-  // Backfill stable ids on any legacy tasks that lack one
-  let _dtNeedsSave=false;
-  DAILY_TASKS.forEach(r=>{if(!r.id){r.id='dt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);_dtNeedsSave=true;}});
-  if(_dtNeedsSave)saveDailyTasks();
-}
+function loadDailyTasks(){DAILY_TASKS=_serverData['qa3_daily_tasks']||[];}
 
 // Pull wfdocs file metadata from server for all projects — server is the single source of truth.
 // The server already deduplicates by name (keeping the entry with serverId/ghUrl preferred).

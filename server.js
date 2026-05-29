@@ -4680,6 +4680,25 @@ function deduplicateArray(arr) {
 async function deduplicateAllProjectData() {
     const data = readQaData();
     let changed = false;
+
+    // Dedup top-level team tasks and daily tasks arrays
+    if (Array.isArray(data['qa3_team_tasks']) && data['qa3_team_tasks'].length > 0) {
+        const before = data['qa3_team_tasks'].length;
+        data['qa3_team_tasks'] = mergeTeamTasks([], data['qa3_team_tasks']);
+        if (data['qa3_team_tasks'].length !== before) {
+            console.log(`[dedup] qa3_team_tasks: ${before} → ${data['qa3_team_tasks'].length}`);
+            changed = true;
+        }
+    }
+    if (Array.isArray(data['qa3_daily_tasks']) && data['qa3_daily_tasks'].length > 0) {
+        const before = data['qa3_daily_tasks'].length;
+        data['qa3_daily_tasks'] = mergeDailyTasks([], data['qa3_daily_tasks']);
+        if (data['qa3_daily_tasks'].length !== before) {
+            console.log(`[dedup] qa3_daily_tasks: ${before} → ${data['qa3_daily_tasks'].length}`);
+            changed = true;
+        }
+    }
+
     for (const key of Object.keys(data)) {
         if (!key.startsWith('qa3_')) continue;
         const proj = data[key];
