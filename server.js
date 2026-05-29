@@ -4379,18 +4379,20 @@ app.post('/api/qa-data-bulk', async (req, res) => {
 // Merge daily tasks: keyed by (date, projectId) — each row is unique per project per day
 function mergeDailyTasks(existing, incoming) {
     if (!Array.isArray(incoming)) return existing;
-    const map = new Map();
-    (existing || []).forEach(r => { if (r.date && r.projectId) map.set(r.date + '|' + r.projectId, r); });
-    incoming.forEach(r => { if (r.date && r.projectId) map.set(r.date + '|' + r.projectId, r); });
-    return Array.from(map.values());
+    const byId = new Map();
+    const byNk = new Map();
+    const nk = r => (r.date||'') + '|' + (r.projectId||'');
+    (existing || []).forEach(r => { if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r); });
+    incoming.forEach(r => { if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r); });
+    return [...Array.from(byId.values()), ...Array.from(byNk.values())];
 }
 
-// Merge team tasks: keyed by id when present, otherwise by (date, projectId, taskSummary)
+// Merge team tasks: keyed by id when present, otherwise by (date, projectId) for legacy items
 function mergeTeamTasks(existing, incoming) {
     if (!Array.isArray(incoming)) return existing;
     const byId = new Map();
-    const byNk = new Map(); // natural key fallback
-    const nk = r => (r.date||'') + '|' + (r.projectId||'') + '|' + (r.taskSummary||'');
+    const byNk = new Map(); // natural key fallback for legacy items without id
+    const nk = r => (r.date||'') + '|' + (r.projectId||'');
     (existing || []).forEach(r => {
         if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r);
     });

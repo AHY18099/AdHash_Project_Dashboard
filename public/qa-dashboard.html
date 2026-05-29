@@ -4049,12 +4049,20 @@ function dtSaveEntry(editIdx){
   const assignedBy=document.getElementById('dt-assigned')?.value||'';
   const entry={date,projectId,assignedBy};
   DT_COLS.forEach(c=>{entry[c.key]=document.getElementById('dt-col-'+c.key)?.value||'';});
-  if(editIdx!=null&&editIdx>=0){DAILY_TASKS[editIdx]=entry;}
-  else{
+  if(editIdx!=null&&editIdx>=0){
+    // Preserve existing id so server mergeDailyTasks can match this record
+    entry.id=DAILY_TASKS[editIdx]?.id||('dt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6));
+    DAILY_TASKS[editIdx]=entry;
+  } else {
     // avoid duplicate project+date combo
     const dupIdx=DAILY_TASKS.findIndex(t=>t.date===date&&t.projectId===projectId);
-    if(dupIdx>=0){DAILY_TASKS[dupIdx]=entry;}
-    else{DAILY_TASKS.push(entry);}
+    if(dupIdx>=0){
+      entry.id=DAILY_TASKS[dupIdx]?.id||('dt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6));
+      DAILY_TASKS[dupIdx]=entry;
+    } else {
+      entry.id='dt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+      DAILY_TASKS.push(entry);
+    }
   }
   saveDailyTasks();
   closeModal();
@@ -4113,7 +4121,13 @@ let _ttProjFilter='all';
 let _ttTodayStr=(()=>{const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`})();
 
 function saveTeamTasks(){_serverData['qa3_team_tasks']=TEAM_TASKS;serverPost('qa3_team_tasks',TEAM_TASKS);}
-function loadTeamTasks(){TEAM_TASKS=_serverData['qa3_team_tasks']||TEAM_TASKS;}
+function loadTeamTasks(){
+  TEAM_TASKS=_serverData['qa3_team_tasks']||TEAM_TASKS;
+  // Backfill stable ids on any legacy tasks that lack one
+  let _ttNeedsSave=false;
+  TEAM_TASKS.forEach(r=>{if(!r.id){r.id='tt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);_ttNeedsSave=true;}});
+  if(_ttNeedsSave)saveTeamTasks();
+}
 
 function showTeamTasks(){
   curView='teamtasks';
@@ -4556,8 +4570,14 @@ function ttSaveEntry(editIdx){
     assignerComments:g('tt-assigner-cmts'),
   };
   const isNew=editIdx==null||editIdx<0;
-  if(!isNew){TEAM_TASKS[editIdx]=entry;}
-  else{TEAM_TASKS.push(entry);}
+  if(!isNew){
+    // Preserve the existing id so server mergeTeamTasks matches by id (not natural key)
+    entry.id=TEAM_TASKS[editIdx]?.id||(entry.id||('tt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6)));
+    TEAM_TASKS[editIdx]=entry;
+  } else {
+    entry.id='tt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+    TEAM_TASKS.push(entry);
+  }
   saveTeamTasks();
   closeModal();
   _ttMonth=date.slice(0,7);
@@ -6226,14 +6246,14 @@ function openEnvModal(p){
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px"><span style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Custom Fields</span><button class="btn-icon" onclick="addCF()">＋ Add Field</button></div>
     <div id="cf-container">${cfHtml}</div>`,()=>{
     STORE[p].env={environment:document.getElementById('ee').value,qaLead:document.getElementById('eq').value,website:document.getElementById('ew').value,dashboard:document.getElementById('ed').value,releaseDate:document.getElementById('er').value,appVersion:document.getElementById('ea').value,releaseVersion:document.getElementById('ev').value,custom:getCFs()};
-    closeModal();renderProject(p);toast('Environment updated');
+    saveToLS(p);closeModal();renderProject(p);toast('Environment updated');
   });
 }
 function addCF(){const c=document.getElementById('cf-container');const i=c.querySelectorAll('.cf-row').length;c.insertAdjacentHTML('beforeend',`<div class="cf-row" id="cf-${i}"><input id="cfk-${i}" placeholder="Field name"><input id="cfv-${i}" placeholder="Value"><button class="btn-icon del" onclick="this.closest('.cf-row').remove()">✕</button></div>`);}
 function getCFs(){return Array.from(document.querySelectorAll('#cf-container .cf-row')).map(row=>{const is=row.querySelectorAll('input');return{key:is[0]?.value||'',value:is[1]?.value||''};}).filter(c=>c.key);}
-function openAddGate(p){openModal('Add Gate Criterion',`<div class="fg"><label>Criterion</label><textarea id="gt" placeholder="Enter release gate criterion…" rows="2"></textarea></div>`,()=>{const t=document.getElementById('gt').value.trim();if(!t){toast('Enter criterion text','err');return;}STORE[p].gates.push(t);closeModal();renderProject(p);toast('Criterion added');});}
-function openEditGate(p,i){openModal('Edit Gate Criterion',`<div class="fg"><label>Criterion</label><textarea id="gt" rows="2">${STORE[p].gates[i]}</textarea></div>`,()=>{const t=document.getElementById('gt').value.trim();if(!t){toast('Enter criterion text','err');return;}STORE[p].gates[i]=t;closeModal();renderProject(p);toast('Criterion updated');});}
-function deleteGate(p,i){if(!confirm('Remove this criterion?'))return;STORE[p].gates.splice(i,1);renderProject(p);toast('Criterion removed');}
+function openAddGate(p){openModal('Add Gate Criterion',`<div class="fg"><label>Criterion</label><textarea id="gt" placeholder="Enter release gate criterion…" rows="2"></textarea></div>`,()=>{const t=document.getElementById('gt').value.trim();if(!t){toast('Enter criterion text','err');return;}STORE[p].gates.push(t);saveToLS(p);closeModal();renderProject(p);toast('Criterion added');});}
+function openEditGate(p,i){openModal('Edit Gate Criterion',`<div class="fg"><label>Criterion</label><textarea id="gt" rows="2">${STORE[p].gates[i]}</textarea></div>`,()=>{const t=document.getElementById('gt').value.trim();if(!t){toast('Enter criterion text','err');return;}STORE[p].gates[i]=t;saveToLS(p);closeModal();renderProject(p);toast('Criterion updated');});}
+function deleteGate(p,i){if(!confirm('Remove this criterion?'))return;STORE[p].gates.splice(i,1);saveToLS(p);renderProject(p);toast('Criterion removed');}
 // ══════════════════════════════════════════════════════
 // ROW ADD / EDIT (with approval workflow for members)
 // ══════════════════════════════════════════════════════
@@ -6372,7 +6392,7 @@ function tdFormHtml(r){r=r||{};return`
   <div class="fg"><label>Notes</label><textarea id="td-o" placeholder="Any notes about this test account…">${r.notes||''}</textarea></div>`;}
 function getTDData(){return{accountName:document.getElementById('td-n').value.trim(),loginMethod:document.getElementById('td-m').value,credential:document.getElementById('td-c').value.trim(),role:document.getElementById('td-r').value.trim(),environment:document.getElementById('td-e').value.trim(),testDate:document.getElementById('td-d').value,testedBy:document.getElementById('td-t').value.trim(),notes:document.getElementById('td-o').value.trim()};}
 function openAddTD(p){openModal('Add Test Data Entry',tdFormHtml(null),()=>{const d=getTDData();if(!d.accountName){toast('Account name is required','err');return;}STORE[p].testdata.push({id:'td_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),...d});closeModal();renderProject(p);toast('Entry added');});}
-function openEditTD(p,i){openModal('Edit Test Data Entry',tdFormHtml(STORE[p].testdata[i]),()=>{const d=getTDData();if(!d.accountName){toast('Account name is required','err');return;}STORE[p].testdata[i]={id:STORE[p].testdata[i]?.id||('td_'+Date.now()),...d};closeModal();renderProject(p);toast('Entry updated');});}
+function openEditTD(p,i){openModal('Edit Test Data Entry',tdFormHtml(STORE[p].testdata[i]),()=>{const d=getTDData();if(!d.accountName){toast('Account name is required','err');return;}STORE[p].testdata[i]={id:STORE[p].testdata[i]?.id||('td_'+Date.now()),...d};saveToLS(p);closeModal();renderProject(p);toast('Entry updated');});}
 function deleteTD(p,i){if(!confirm('Delete this entry?'))return;STORE[p].testdata.splice(i,1);renderProject(p);toast('Entry deleted');}
 // ══════════════════════════════════════════════════════
 // RELEASE NOTES MODALS
@@ -6386,7 +6406,7 @@ function rnFormHtml(r){r=r||{};const changes=(r.changes||[]).join('\n');return`
   <div class="fg"><label>Known Issues</label><input id="rn-ki" value="${r.knownIssues||''}" placeholder="Optional — known issues in this release"></div>`;}
 function getRNData(){return{version:document.getElementById('rn-v').value.trim(),status:document.getElementById('rn-s').value,releaseDate:document.getElementById('rn-d').value,author:document.getElementById('rn-a').value.trim(),summary:document.getElementById('rn-sum').value.trim(),changes:document.getElementById('rn-ch').value.split('\n').map(l=>l.trim()).filter(Boolean),breakingChanges:document.getElementById('rn-bc').value.trim(),knownIssues:document.getElementById('rn-ki').value.trim()};}
 function openAddRN(p){openModal('Add Release Note',rnFormHtml(null),()=>{const d=getRNData();if(!d.version){toast('Version is required','err');return;}if(!STORE[p].releaseNotes)STORE[p].releaseNotes=[];STORE[p].releaseNotes.push({id:'rn_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),...d});closeModal();renderProject(p);toast('Release note added');});}
-function openEditRN(p,i){openModal('Edit Release Note',rnFormHtml(STORE[p].releaseNotes[i]),()=>{const d=getRNData();if(!d.version){toast('Version is required','err');return;}STORE[p].releaseNotes[i]={id:STORE[p].releaseNotes[i]?.id||('rn_'+Date.now()),...d};closeModal();renderProject(p);toast('Release note updated');});}
+function openEditRN(p,i){openModal('Edit Release Note',rnFormHtml(STORE[p].releaseNotes[i]),()=>{const d=getRNData();if(!d.version){toast('Version is required','err');return;}STORE[p].releaseNotes[i]={id:STORE[p].releaseNotes[i]?.id||('rn_'+Date.now()),...d};saveToLS(p);closeModal();renderProject(p);toast('Release note updated');});}
 function deleteRN(p,i){if(!confirm('Delete this release note?'))return;STORE[p].releaseNotes.splice(i,1);renderProject(p);toast('Deleted');}
 // ══════════════════════════════════════════════════════
 // SAVE / LOAD
@@ -6560,7 +6580,13 @@ function saveAllState(){
 // ── DAILY TASKS GLOBAL STATE ──
 let DAILY_TASKS=[];
 function saveDailyTasks(){_serverData['qa3_daily_tasks']=DAILY_TASKS;serverPost('qa3_daily_tasks',DAILY_TASKS);}
-function loadDailyTasks(){DAILY_TASKS=_serverData['qa3_daily_tasks']||[];}
+function loadDailyTasks(){
+  DAILY_TASKS=_serverData['qa3_daily_tasks']||[];
+  // Backfill stable ids on any legacy tasks that lack one
+  let _dtNeedsSave=false;
+  DAILY_TASKS.forEach(r=>{if(!r.id){r.id='dt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);_dtNeedsSave=true;}});
+  if(_dtNeedsSave)saveDailyTasks();
+}
 
 // Pull wfdocs file metadata from server for all projects — server is the single source of truth.
 // The server already deduplicates by name (keeping the entry with serverId/ghUrl preferred).
