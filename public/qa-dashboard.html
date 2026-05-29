@@ -1736,6 +1736,40 @@ const PROJ_ENV_EXTRA={
 function mkEnv(p){const extra=PROJ_ENV_EXTRA[p.id]||{};const extraCustFields=Object.entries(extra).map(([k,v])=>({key:k.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase()),value:v}));return{environment:'Production',website:p.website||'',dashboard:p.dashboard||'',releaseDate:p.releaseDate||'',qaLead:'',appVersion:'',releaseVersion:'',custom:extraCustFields};}
 function mkSmoke(pid){const base=pid==='synctag'?SYNCTAG_SMOKE_BASE:pid==='ddp'?DDP_SMOKE_BASE:pid==='aisignpro'?AISIGNPRO_SMOKE_BASE:pid==='wavedin'?WAVEDIN_SMOKE_BASE:SMOKE_BASE;const defStatus=pid==='humee';const useEmbed=pid==='aisignpro';return base.map(r=>({...r,status:useEmbed?(r.status||'Not Started'):defStatus&&r.id!=='SMK-25'?'Pass':defStatus&&r.id==='SMK-25'?'Not Started':'Not Started',owner:useEmbed?(r.owner||''):defStatus?r.id==='SMK-25'?'Release Manager':'QA Lead':'',comment:r.comment||'',_id:'r_'+Math.random().toString(36).slice(2)}));}
 function mkProd(pid){const base=pid==='synctag'?SYNCTAG_PROD_BASE:pid==='ddp'?DDP_PROD_BASE:pid==='aisignpro'?AISIGNPRO_PROD_BASE:pid==='wavedin'?WAVEDIN_PROD_BASE:PROD_BASE;const useEmbed=pid==='aisignpro';return base.map(r=>({...r,status:useEmbed?(r.status||'Not Started'):'Not Started',owner:'',comment:r.comment||'',_id:'r_'+Math.random().toString(36).slice(2)}));}
+// ── Deduplication utility ────────────────────────────────────────────────────
+// Applied every time data enters STORE from the server to prevent any
+// accumulated duplicates from surfacing in the UI.
+const _PROJ_ARRAY_KEYS=['smoke','prod','feedback','thirdparty','taskchecklist',
+  'pendingtasks','credentials','apitests','testdata','releaseNotes','reports','pending','wfdocs'];
+
+function deduplicateById(arr,idField='id'){
+  if(!Array.isArray(arr)||arr.length===0)return arr;
+  const seen=new Map();
+  const nk=r=>((r&&r.name)||'')+'|'+((r&&r.url)||'')+'|'+((r&&r.environment)||'');
+  arr.forEach(r=>{
+    if(r&&r[idField])seen.set(r[idField],r);
+    else if(r){const k=nk(r);if(!seen.has('nk:'+k))seen.set('nk:'+k,r);}
+  });
+  return Array.from(seen.values());
+}
+
+function _deduplicateStoreProject(obj){
+  if(!obj||typeof obj!=='object')return obj;
+  _PROJ_ARRAY_KEYS.forEach(k=>{
+    if(Array.isArray(obj[k]))obj[k]=deduplicateById(obj[k]);
+  });
+  if(obj.envDetails){
+    if(Array.isArray(obj.envDetails.production))obj.envDetails.production=deduplicateById(obj.envDetails.production);
+    if(Array.isArray(obj.envDetails.staging))obj.envDetails.staging=deduplicateById(obj.envDetails.staging);
+  }
+  // Dedup thirdparty.apis nested
+  if(Array.isArray(obj.thirdparty)){
+    obj.thirdparty.forEach(acct=>{if(Array.isArray(acct.apis))acct.apis=deduplicateById(acct.apis);});
+  }
+  return obj;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function initStore(){
   PROJECTS.forEach(p=>{
     if(!STORE[p.id])STORE[p.id]={
@@ -5581,6 +5615,26 @@ function tclSaveReport(p){
   toast(`✓ Report #${STORE[p].reports.length} saved — statuses reset, checklist items preserved`);
 }
 
+function tclResetAll(p){
+  if(!confirm('Reset all rows? This will clear the testing status, bugs, and comments for all rows. The row items will NOT be deleted.'))return;
+  STORE[p].taskchecklist=(STORE[p].taskchecklist||[]).map(r=>({
+    ...r,
+    status:'Pending',
+    testedBy:'',
+    bugsCount:0,
+    priorityHigh:0,
+    priorityMedium:0,
+    priorityLow:0,
+    jiraLinks:'',
+    comments:''
+  }));
+  _tclDirty[p]=false;
+  saveToLS(p);
+  curTab[p]='taskchecklist';
+  renderProject(p);
+  toast('All rows have been reset');
+}
+
 function renderTaskChecklist(p){
   if(!STORE[p].taskchecklist)STORE[p].taskchecklist=[];
   const items=STORE[p].taskchecklist;
@@ -5675,6 +5729,7 @@ function renderTaskChecklist(p){
       <div class="tcl-actions">
         ${hasItems?`<button id="tcl-save-btn-${p}" class="tcl-btn tcl-btn-save" onclick="tclSaveReport('${p}')">💾 Save Report</button>`:''}
         ${hasItems?`<button class="tcl-btn tcl-btn-dl" onclick="tclShowDownloadPicker('${p}')">⬇ Download Report</button>`:''}
+        ${hasItems?`<button class="tcl-btn tcl-btn-outline" style="color:#ef4444;border-color:#ef444440" onclick="tclResetAll('${p}')">↺ Reset All</button>`:''}
         <button class="tcl-btn tcl-btn-outline" onclick="switchTab('${p}','releasenotes')">📝 Release Notes</button>
         <button class="tcl-btn tcl-btn-primary" onclick="tclOpenAdd('${p}')">＋ Add</button>
       </div>
@@ -6502,7 +6557,7 @@ async function _doServerPost(key,value,retriesLeft){
               else if(key.startsWith('qa3_')){
                 // Per-project key — update STORE with merged result (don't re-render to avoid flicker)
                 const pid=key.replace('qa3_','');
-                if(STORE[pid]&&sd.value&&typeof sd.value==='object')Object.assign(STORE[pid],sd.value);
+                if(STORE[pid]&&sd.value&&typeof sd.value==='object'){Object.assign(STORE[pid],sd.value);_deduplicateStoreProject(STORE[pid]);}
               }
             }
           }
@@ -6609,7 +6664,7 @@ function loadAllState(){
   initStore();
   PROJECTS.forEach(p=>{
     const d=_serverData['qa3_'+p.id];
-    if(d)Object.assign(STORE[p.id],d);
+    if(d){Object.assign(STORE[p.id],d);_deduplicateStoreProject(STORE[p.id]);}
   });
   loadDailyTasks();
   loadDayMeta();
