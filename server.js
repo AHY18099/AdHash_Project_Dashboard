@@ -4434,11 +4434,14 @@ function mergeById(existing, incoming) {
 function mergeTestRows(existing, incoming) {
     if (!Array.isArray(incoming)) return existing || [];
     if (!Array.isArray(existing) || existing.length === 0) return incoming;
-    const map = new Map();
-    existing.forEach(r => { if (r && r.id) map.set(r.id, r); });
-    // Incoming wins for any known row — preserves status/owner/comment updates
-    incoming.forEach(r => { if (r && r.id) map.set(r.id, r); });
-    return Array.from(map.values());
+    const byId = new Map();
+    const byNk = new Map();
+    // Natural key for legacy rows without id: module+step (or module+item for prod)
+    const nk = r => ((r && r.module) || '') + '|' + ((r && r.step) || '') + '|' + ((r && r.item) || '');
+    existing.forEach(r => { if (r && r.id) byId.set(r.id, r); else if (r) byNk.set(nk(r), r); });
+    // Incoming wins — preserves status/comment updates
+    incoming.forEach(r => { if (r && r.id) byId.set(r.id, r); else if (r) byNk.set(nk(r), r); });
+    return [...Array.from(byId.values()), ...Array.from(byNk.values())];
 }
 
 // Deep merge a qa3_<projectId> project object.

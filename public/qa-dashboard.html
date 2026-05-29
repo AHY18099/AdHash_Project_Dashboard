@@ -5982,7 +5982,7 @@ function tpOpenAddApi(p,acctIdx){
   openModal('Add API',body,()=>{
     const name=document.getElementById('tpa-name')?.value.trim();
     if(!name){toast('API name is required','err');return;}
-    const api={name,method:document.getElementById('tpa-method')?.value||'GET',url:document.getElementById('tpa-url')?.value.trim()||'',status:document.getElementById('tpa-status')?.value||'Active',description:document.getElementById('tpa-desc')?.value.trim()||''};
+    const api={id:'tpa_'+Math.random().toString(36).slice(2,10),name,method:document.getElementById('tpa-method')?.value||'GET',url:document.getElementById('tpa-url')?.value.trim()||'',status:document.getElementById('tpa-status')?.value||'Active',description:document.getElementById('tpa-desc')?.value.trim()||''};
     if(!STORE[p].thirdparty[acctIdx].apis)STORE[p].thirdparty[acctIdx].apis=[];
     STORE[p].thirdparty[acctIdx].apis.push(api);saveToLS(p);closeModal();renderProject(p);toast('API added');
   },{saveLabel:'Add API'});
@@ -6279,8 +6279,7 @@ function openAddRow(p,sec){
   openModal(`Add ${isSm?'Smoke Test':'Production Item'}`,rowFormHtml(null,isSm),()=>{
     const d=getRowData(isSm,null);
     if(!d.module||!(d.step||d.item)){toast('Module and step/item are required','err');return;}
-    if(!d.id)d.id=(isSm?'SMK':'PRD')+'-'+(STORE[p][sec].length+1).toString().padStart(2,'0');
-    d._id='r_'+Date.now().toString(36);
+    if(!d.id)d.id=(isSm?'smk_':'prd_')+Math.random().toString(36).slice(2,10);
     STORE[p][sec].push(d);
     closeModal();saveToLS(p);renderProject(p);toast('Test case added');
   },{saveLabel:'Add'});
