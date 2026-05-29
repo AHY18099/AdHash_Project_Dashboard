@@ -4308,9 +4308,19 @@ app.delete('/api/wfdocs/:projectId/:fileId', async (req, res) => {
 
 // ── SHARED DATA API endpoints ──
 
-// GET /api/qa-data — return all shared keys
+// GET /api/qa-data — return all shared keys (deduped before sending)
 app.get('/api/qa-data', (req, res) => {
-    res.json(readQaData());
+    const raw = readQaData();
+    // Apply dedup to all per-project objects before sending to client
+    const out = {};
+    for (const [k, v] of Object.entries(raw)) {
+        if (k.startsWith('qa3_') && v && typeof v === 'object' && !Array.isArray(v)) {
+            out[k] = deduplicateProjectData(v);
+        } else {
+            out[k] = v;
+        }
+    }
+    res.json(out);
 });
 
 // GET /api/backup — download full qa-shared.json as a file (for manual backup)
@@ -4327,12 +4337,21 @@ app.get('/api/backup', (req, res) => {
     }
 });
 
-// GET /api/qa-data/:key — return one key
+// GET /api/qa-data/:key — return one key (deduped before sending)
 app.get('/api/qa-data/:key', (req, res) => {
     const data = readQaData();
     const key = req.params.key;
     if (!(key in data)) return res.status(404).json({ error: 'Key not found' });
-    res.json({ key, value: data[key] });
+    let value = data[key];
+    // Apply dedup on per-project objects before returning to client
+    if (key.startsWith('qa3_') && value && typeof value === 'object' && !Array.isArray(value)) {
+        value = deduplicateProjectData(value);
+    } else if (key === 'qa3_team_tasks' && Array.isArray(value)) {
+        value = mergeTeamTasks([], value);
+    } else if (key === 'qa3_daily_tasks' && Array.isArray(value)) {
+        value = mergeDailyTasks([], value);
+    }
+    res.json({ key, value });
 });
 
 // DELETE /api/qa-data/:key — remove a key
@@ -4687,6 +4706,28 @@ function deduplicateArray(arr) {
         else byNatKey.set(natKey(r), r);
     });
     return [...Array.from(byId.values()), ...Array.from(byNatKey.values())];
+}
+
+// Dedup a single project object in memory — used by GET /api/qa-data/:key before sending to client
+const PROJECT_ARRAY_KEYS_ALL = ['smoke', 'prod', 'feedback', 'thirdparty', 'taskchecklist',
+    'pendingtasks', 'credentials', 'apitests', 'testdata', 'releaseNotes', 'reports', 'pending', 'wfdocs'];
+function deduplicateProjectData(proj) {
+    if (!proj || typeof proj !== 'object') return proj;
+    const out = { ...proj };
+    PROJECT_ARRAY_KEYS_ALL.forEach(k => {
+        if (Array.isArray(out[k]) && out[k].length > 0) out[k] = deduplicateArray(out[k]);
+    });
+    if (out.envDetails) {
+        if (Array.isArray(out.envDetails.production)) out.envDetails = { ...out.envDetails, production: deduplicateArray(out.envDetails.production) };
+        if (Array.isArray(out.envDetails.staging))    out.envDetails = { ...out.envDetails, staging:    deduplicateArray(out.envDetails.staging)    };
+    }
+    if (Array.isArray(out.thirdparty)) {
+        out.thirdparty = out.thirdparty.map(acct => ({
+            ...acct,
+            apis: Array.isArray(acct.apis) ? deduplicateArray(acct.apis) : acct.apis
+        }));
+    }
+    return out;
 }
 
 // Deduplicate all project sub-arrays on startup.
