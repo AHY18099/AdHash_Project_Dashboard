@@ -4229,7 +4229,8 @@ app.get('/api/health', async (req, res) => {
             uptime:       Math.floor(process.uptime())
         });
     } catch (e) {
-        res.status(500).json({ status: 'error', database: 'disconnected', error: e.message });
+        // Return 200 so Railway health checks don't kill the container — database is just disconnected
+        res.json({ status: 'degraded', database: 'disconnected', error: e.message, uptime: Math.floor(process.uptime()) });
     }
 });
 
