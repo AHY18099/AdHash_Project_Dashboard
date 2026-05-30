@@ -177,18 +177,61 @@ async function deleteKey(key) {
     }
 }
 
-/** Load ALL data from MongoDB — used to populate the in-memory cache on startup. */
+/** Load ALL data from MongoDB in parallel — used to populate the in-memory cache on startup.
+ *  Fetches every collection once (not once-per-project) then groups by projectId in memory.
+ *  Reduces ~180 sequential queries down to ~19 parallel queries. */
 async function readAllData() {
-    const db    = getDB();
+    const db = getDB();
+
+    // Fetch all global arrays + project configs + every section collection — all in parallel
+    const allCols = [...Object.values(SECTION_MAP), 'env_details'];
+    const [users, daily, team, releases, projects, ...sectionResults] = await Promise.all([
+        _findAll('users'),
+        _findAll('daily_tasks'),
+        _findAll('team_tasks'),
+        _findAll('releases'),
+        db.collection('projects').find({}).toArray(),
+        ...allCols.map(col => db.collection(col).find({}).toArray()),
+    ]);
+
     const cache = {};
-    cache['qa_users']          = await _findAll('users');
-    cache['qa3_daily_tasks']   = await _findAll('daily_tasks');
-    cache['qa3_team_tasks']    = await _findAll('team_tasks');
-    cache['qa3_releases']      = await _findAll('releases');
-    const projects = await db.collection('projects').find({}).toArray();
+    cache['qa_users']        = users;
+    cache['qa3_daily_tasks'] = daily;
+    cache['qa3_team_tasks']  = team;
+    cache['qa3_releases']    = releases;
+
+    if (!projects.length) return cache;
+
+    // Map col index back to its name
+    const colDocs = {};
+    allCols.forEach((col, i) => { colDocs[col] = sectionResults[i]; });
+
+    // Build per-project skeleton
+    const byProject = {};
     for (const p of projects) {
-        cache['qa3_' + p.id] = await assembleProject(p.id);
+        byProject[p.id] = { env: p.env || {}, gates: p.gates || [], envDetails: { production: [], staging: [] } };
+        for (const field of Object.keys(SECTION_MAP)) byProject[p.id][field] = [];
     }
+
+    // Distribute section docs into their project buckets
+    for (const [field, col] of Object.entries(SECTION_MAP)) {
+        for (const doc of colDocs[col] || []) {
+            if (byProject[doc.projectId]) byProject[doc.projectId][field].push(doc);
+        }
+    }
+
+    // Distribute env_details
+    for (const doc of colDocs['env_details'] || []) {
+        if (!byProject[doc.projectId]) continue;
+        const { envType, ...rest } = doc;
+        if (envType === 'production') byProject[doc.projectId].envDetails.production.push(rest);
+        else if (envType === 'staging') byProject[doc.projectId].envDetails.staging.push(rest);
+    }
+
+    for (const [pid, data] of Object.entries(byProject)) {
+        cache['qa3_' + pid] = data;
+    }
+
     return cache;
 }
 
