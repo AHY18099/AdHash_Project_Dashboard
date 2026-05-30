@@ -4819,9 +4819,10 @@ async function migrateWfDocsToGitHub() {
         const keyCount = Object.keys(_qaCache).length;
         console.log(`[startup] ✅ Loaded ${keyCount} keys from MongoDB into cache`);
     } catch (e) {
-        console.error('[startup] ❌ MongoDB connection failed:', e.message);
-        console.error('[startup] Check MONGODB_URI environment variable on Railway');
-        process.exit(1); // Railway will auto-restart
+        console.error('[startup] ⚠️  MongoDB connection failed:', e.message);
+        console.error('[startup] Starting with empty cache — data will be unavailable until MongoDB connects');
+        // Do NOT exit — let the server start so Railway health checks pass.
+        // Reconnection will be attempted on first data request.
     }
     app.listen(PORT, () => {
     testRunning = false;
