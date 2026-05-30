@@ -6503,12 +6503,14 @@ function saveState(p){
 // All reads come from here; all writes go straight to the server.
 let _serverData={};
 let _sseSource=null;
-let _recentSaves={}; // key → timestamp of last local save (used to suppress own-update echo)
+// Unique ID for this browser tab — server echoes it back so we can skip our own SSE events
+const MY_CLIENT_ID='client_'+Date.now()+'_'+Math.random().toString(36).slice(2);
 
 // ── SAVE STATUS INDICATOR ──
 // Shows "✓ Saved", "⏳ Saving…", or "❌ Failed – Tap to retry" in top bar badge
 let _activeSaves=0; // count of in-flight save calls
 let _pendingRetries={}; // key → {key,value,retries}
+let _savingClearTimer=null; // FIX D: force-clear "Saving..." after 5s if stuck
 
 function _setSaveStatus(state,msg){
   const el=document.getElementById('save-status-badge');
@@ -6524,15 +6526,21 @@ function _retryAllFailed(){
   pending.forEach(p=>_doServerPost(p.key,p.value,3));
 }
 function _updateSaveStatusBadge(){
-  if(_activeSaves>0) _setSaveStatus('saving','⏳ Saving…');
-  else if(Object.keys(_pendingRetries).length>0) _setSaveStatus('error','❌ Failed – Tap to retry');
-  else _setSaveStatus('idle','✓ Saved');
+  clearTimeout(_savingClearTimer);
+  if(_activeSaves>0){
+    _setSaveStatus('saving','⏳ Saving…');
+    // FIX D: force-clear after 5s so UI never stays stuck on "Saving..."
+    _savingClearTimer=setTimeout(()=>{_activeSaves=0;_setSaveStatus('idle','✓ Saved');},5000);
+  } else if(Object.keys(_pendingRetries).length>0){
+    _setSaveStatus('error','❌ Failed – Tap to retry');
+  } else {
+    _setSaveStatus('idle','✓ Saved');
+  }
 }
 
 // POST to server — updates in-memory mirror immediately, retries up to 3× with backoff
 function serverPost(key,value){
   _serverData[key]=value; // update mirror immediately for instant UI reads
-  _recentSaves[key]=Date.now(); // suppress own SSE echo for 3s
   _doServerPost(key,value,3);
 }
 async function _doServerPost(key,value,retriesLeft){
@@ -6542,42 +6550,33 @@ async function _doServerPost(key,value,retriesLeft){
     const r=await fetch('/api/qa-data/'+encodeURIComponent(key),{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({value})
+      // FIX A: include clientId so server echoes it back in SSE — we skip our own events
+      body:JSON.stringify({value,_clientId:MY_CLIENT_ID})
     });
     if(r.ok){
       const j=await r.json().catch(()=>({}));
-      // ghSaved:true means the server confirmed push to GitHub
-      if(j.ghSaved===false){
-        // Server saved to disk but GitHub push failed — warn but don't block
-        console.warn('[save] Server saved key',key,'but GitHub push failed — will retry on next save');
-      }
-      // For shared multi-user arrays, re-fetch the server's merged result so our local
-      // copy stays consistent with other users' updates.
-      // Re-fetch merged result for all shared multi-user keys
-      const _isSharedKey=key==='qa3_daily_tasks'||key==='qa3_team_tasks'||key==='qa3_releases'||(key.startsWith('qa3_')&&key!=='qa3_day_meta'&&key!=='qa3_projects');
-      if(_isSharedKey){
-        try{
-          const sr=await fetch('/api/qa-data/'+encodeURIComponent(key),{cache:'no-store'});
-          if(sr.ok){
-            const sd=await sr.json();
-            if(sd.value!==undefined){
-              _serverData[key]=sd.value;
-              if(key==='qa3_daily_tasks'){loadDailyTasks();_lastHbDtHash=JSON.stringify(DAILY_TASKS);}
-              else if(key==='qa3_team_tasks'){loadTeamTasks();_lastHbTtHash=JSON.stringify(TEAM_TASKS);}
-              else if(key==='qa3_releases'){loadReleases();_lastHbRlHash=JSON.stringify(RELEASES);}
-              else if(key.startsWith('qa3_')){
-                // Per-project key — update STORE with merged result (don't re-render to avoid flicker)
-                const pid=key.replace('qa3_','');
-                if(STORE[pid]&&sd.value&&typeof sd.value==='object'){
-                  Object.assign(STORE[pid],sd.value);
-                  _deduplicateStoreProject(STORE[pid]);
-                  // Sync heartbeat hash so the next 15s tick doesn't re-save unchanged data
-                  _lastHbStoreHash[pid]=JSON.stringify(STORE[pid]);
-                }
-              }
-            }
+      // FIX B+C: server returns mergedValue — use it directly, no extra re-fetch needed.
+      // Update heartbeat hashes BEFORE touching STORE so next tick sees no change.
+      const mv=j.mergedValue;
+      if(mv!==undefined){
+        _serverData[key]=mv;
+        if(key==='qa3_daily_tasks'){
+          _lastHbDtHash=JSON.stringify(mv); // set hash first
+          DAILY_TASKS=mv;
+        } else if(key==='qa3_team_tasks'){
+          _lastHbTtHash=JSON.stringify(mv);
+          TEAM_TASKS=mv;
+        } else if(key==='qa3_releases'){
+          _lastHbRlHash=JSON.stringify(mv);
+          RELEASES=mv;
+        } else if(key.startsWith('qa3_')&&mv&&typeof mv==='object'&&!Array.isArray(mv)){
+          const pid=key.replace('qa3_','');
+          if(STORE[pid]){
+            Object.assign(STORE[pid],mv);
+            _deduplicateStoreProject(STORE[pid]);
+            _lastHbStoreHash[pid]=JSON.stringify(STORE[pid]); // hash after all mutations
           }
-        }catch(_){}
+        }
       }
       delete _pendingRetries[key];
       _activeSaves=Math.max(0,_activeSaves-1);
@@ -6634,10 +6633,9 @@ function initSseListener(){
   });
   _sseSource.addEventListener('qa-data-update',e=>{
     try{
-      const {key,value}=JSON.parse(e.data);
-      // Ignore echo of our own saves within 3s
-      if(_recentSaves[key]&&(Date.now()-_recentSaves[key])<3000)return;
-      // Log conflict if we have a pending unsaved write for this key
+      const {key,value,sourceClientId}=JSON.parse(e.data);
+      // FIX A: skip events we sent ourselves — server echoes MY_CLIENT_ID back
+      if(sourceClientId&&sourceClientId===MY_CLIENT_ID)return;
       if(_pendingRetries[key])console.warn('[sse] conflict: remote update for key',key,'while local save pending — remote wins');
       _serverData[key]=value;
       _applySseUpdate(key,value);
@@ -7246,26 +7244,34 @@ function _flushAllUnsaved(){
 // Heartbeat: retry any failed saves + re-save key volatile data as safety net
 let _lastHbDtHash='', _lastHbTtHash='', _lastHbRlHash='';
 let _lastHbStoreHash={};
+let _hbSaving=false; // FIX E: prevent overlapping heartbeat saves
 function _autoSaveHeartbeat(){
+  if(_hbSaving)return; // skip if previous heartbeat's saves still in-flight
   // Retry any pending failed saves first
   if(Object.keys(_pendingRetries).length > 0){
     _retryAllFailed();
     return;
   }
+  let anySaved=false;
   // Re-save daily tasks only if changed
   const dtHash=JSON.stringify(DAILY_TASKS);
-  if(dtHash!==_lastHbDtHash){_lastHbDtHash=dtHash;saveDailyTasks();}
+  if(dtHash!==_lastHbDtHash){_lastHbDtHash=dtHash;saveDailyTasks();anySaved=true;}
   // Re-save team tasks only if changed
   const ttHash=JSON.stringify(TEAM_TASKS);
-  if(ttHash!==_lastHbTtHash){_lastHbTtHash=ttHash;saveTeamTasks();}
+  if(ttHash!==_lastHbTtHash){_lastHbTtHash=ttHash;saveTeamTasks();anySaved=true;}
   // Re-save releases only if changed
   const rlHash=JSON.stringify(RELEASES);
-  if(rlHash!==_lastHbRlHash){_lastHbRlHash=rlHash;saveReleases();}
+  if(rlHash!==_lastHbRlHash){_lastHbRlHash=rlHash;saveReleases();anySaved=true;}
   // Re-save project stores (smoke, feedback, thirdparty, etc.) only if changed
   PROJECTS.forEach(p=>{
     const h=JSON.stringify(STORE[p.id]);
-    if(h&&h!==_lastHbStoreHash[p.id]){_lastHbStoreHash[p.id]=h;saveToLS(p.id);}
+    if(h&&h!==_lastHbStoreHash[p.id]){_lastHbStoreHash[p.id]=h;saveToLS(p.id);anySaved=true;}
   });
+  if(anySaved){
+    _hbSaving=true;
+    // Clear guard once all in-flight saves finish (activeSaves drops to 0)
+    const poll=setInterval(()=>{if(_activeSaves===0){_hbSaving=false;clearInterval(poll);}},500);
+  }
 }
 
 </script>

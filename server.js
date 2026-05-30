@@ -71,9 +71,9 @@ const IS_PROD = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_E
 
 // ── Real-time SSE broadcast ──
 const _sseClients = new Set();
-function broadcastSseEvent(eventName, data) {
+function broadcastSseEvent(eventName, data, sourceClientId) {
     if (!_sseClients.size) return;
-    const payload = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
+    const payload = `event: ${eventName}\ndata: ${JSON.stringify({ ...data, sourceClientId: sourceClientId || null })}\n\n`;
     for (const client of _sseClients) {
         try { client.write(payload); } catch (_) { _sseClients.delete(client); }
     }
@@ -4473,7 +4473,7 @@ function mergeProjectData(existing, incoming) {
 app.post('/api/qa-data/:key', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     const key = req.params.key;
-    const { value } = req.body;
+    const { value, _clientId } = req.body;
     if (value === undefined) return res.status(400).json({ error: 'Missing value' });
 
     try {
@@ -4493,9 +4493,10 @@ app.post('/api/qa-data/:key', async (req, res) => {
         });
         // Persist merged value to MongoDB
         await writeKey(key, _qaCache[key]);
-        res.json({ status: 'saved', key, dbSaved: true });
-        // Broadcast merged value to all connected clients
-        try { broadcastSseEvent('qa-data-update', { key, value: _qaCache[key] }); } catch (_) {}
+        // Return merged value so client doesn't need a separate re-fetch
+        res.json({ status: 'saved', key, dbSaved: true, mergedValue: _qaCache[key] });
+        // Broadcast to OTHER clients only (sourceClientId lets sender skip its own echo)
+        try { broadcastSseEvent('qa-data-update', { key, value: _qaCache[key] }, _clientId); } catch (_) {}
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
