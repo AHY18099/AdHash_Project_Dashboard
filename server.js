@@ -275,6 +275,16 @@ async function restoreFromBackupIfNeeded(token) {
 const app = express();
 const PORT = Number(process.env.PORT) || 7777;
 const IS_PROD = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
+
+// ── Real-time SSE broadcast ──
+const _sseClients = new Set();
+function broadcastSseEvent(eventName, data) {
+    if (!_sseClients.size) return;
+    const payload = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
+    for (const client of _sseClients) {
+        try { client.write(payload); } catch (_) { _sseClients.delete(client); }
+    }
+}
 const SUPER_ADMIN_EMAIL = process.env.QA_ADMIN_EMAIL || 'thenilavan@adhashtech.com';
 const SUPER_ADMIN_PASSWORD = process.env.QA_ADMIN_PASSWORD || 'Qateam@123';
 
@@ -4430,6 +4440,23 @@ app.get('/api/health', (req, res) => {
     }
 });
 
+// GET /api/events — SSE stream; pushes qa-data-update/delete events to all connected clients
+app.get('/api/events', (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).end();
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // disable nginx proxy buffering
+    res.flushHeaders();
+    res.write('event: connected\ndata: {"ok":true}\n\n');
+    _sseClients.add(res);
+    // Keepalive ping every 25s to prevent proxy/load-balancer timeouts
+    const ping = setInterval(() => {
+        try { res.write(': ping\n\n'); } catch (_) { clearInterval(ping); _sseClients.delete(res); }
+    }, 25000);
+    req.on('close', () => { clearInterval(ping); _sseClients.delete(res); });
+});
+
 // GET /api/backup — download full qa-shared.json as a file (for manual backup)
 app.get('/api/backup', (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
@@ -4466,8 +4493,11 @@ app.delete('/api/qa-data/:key', (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     const data = readQaData();
     delete data[req.params.key];
-    try { writeQaData(data); res.json({ status: 'deleted', key: req.params.key }); }
-    catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        writeQaData(data);
+        res.json({ status: 'deleted', key: req.params.key });
+        broadcastSseEvent('qa-data-delete', { key: req.params.key });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // POST /api/qa-data-bulk — restore many keys at once (used by restore tool), await GitHub push
@@ -4494,6 +4524,13 @@ app.post('/api/qa-data-bulk', async (req, res) => {
         let ghSaved = false;
         try { await persistQaDataToGitHub(); ghSaved = true; } catch (_) {}
         res.json({ status: 'saved', count, ghSaved });
+        // Broadcast all restored keys so connected clients reload them
+        try {
+            const fresh = readQaData();
+            for (const k of Object.keys(records)) {
+                if (fresh[k] !== undefined) broadcastSseEvent('qa-data-update', { key: k, value: fresh[k] });
+            }
+        } catch (_) {}
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -4651,6 +4688,8 @@ app.post('/api/qa-data/:key', async (req, res) => {
             console.error('[save] GitHub push failed for key', key, ':', ghErr.message);
         }
         res.json({ status: 'saved', key, ghSaved });
+        // Broadcast merged value to all other connected clients
+        try { broadcastSseEvent('qa-data-update', { key, value: readQaData()[key] }); } catch (_) {}
     } catch (e) {
         res.status(500).json({ error: e.message });
     }

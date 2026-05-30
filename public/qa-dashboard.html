@@ -6502,6 +6502,8 @@ function saveState(p){
 // _serverData is the in-memory mirror of qa-shared.json on the server.
 // All reads come from here; all writes go straight to the server.
 let _serverData={};
+let _sseSource=null;
+let _recentSaves={}; // key → timestamp of last local save (used to suppress own-update echo)
 
 // ── SAVE STATUS INDICATOR ──
 // Shows "✓ Saved", "⏳ Saving…", or "❌ Failed – Tap to retry" in top bar badge
@@ -6530,6 +6532,7 @@ function _updateSaveStatusBadge(){
 // POST to server — updates in-memory mirror immediately, retries up to 3× with backoff
 function serverPost(key,value){
   _serverData[key]=value; // update mirror immediately for instant UI reads
+  _recentSaves[key]=Date.now(); // suppress own SSE echo for 3s
   _doServerPost(key,value,3);
 }
 async function _doServerPost(key,value,retriesLeft){
@@ -6617,6 +6620,62 @@ function serverDelete(key){
 }
 
 // Load all data from server into _serverData (called once on init, awaited)
+// ── REAL-TIME MULTI-USER SYNC (SSE) ──
+function initSseListener(){
+  if(_sseSource){_sseSource.close();_sseSource=null;}
+  _sseSource=new EventSource('/api/events');
+  _sseSource.addEventListener('connected',()=>{
+    console.log('[sse] live update stream connected');
+  });
+  _sseSource.addEventListener('qa-data-update',e=>{
+    try{
+      const {key,value}=JSON.parse(e.data);
+      // Ignore echo of our own saves within 3s
+      if(_recentSaves[key]&&(Date.now()-_recentSaves[key])<3000)return;
+      // Log conflict if we have a pending unsaved write for this key
+      if(_pendingRetries[key])console.warn('[sse] conflict: remote update for key',key,'while local save pending — remote wins');
+      _serverData[key]=value;
+      _applySseUpdate(key,value);
+    }catch(_){}
+  });
+  _sseSource.addEventListener('qa-data-delete',e=>{
+    try{const {key}=JSON.parse(e.data);delete _serverData[key];}catch(_){}
+  });
+  _sseSource.onerror=()=>{ console.warn('[sse] connection lost — browser will auto-reconnect'); };
+}
+
+function _applySseUpdate(key,value){
+  // Don't clobber an input the user is actively typing in
+  const ae=document.activeElement;
+  const userTyping=ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.isContentEditable);
+  if(key==='qa3_daily_tasks'){
+    loadDailyTasks();
+    if(curView==='dailytasks'&&!userTyping)renderDailyTasksPage();
+    else toast('📡 Daily tasks updated live');
+  }else if(key==='qa3_team_tasks'){
+    loadTeamTasks();
+    if(curView==='teamtasks'&&!userTyping)renderTeamTasksPage();
+    else toast('📡 Team tasks updated live');
+  }else if(key==='qa3_releases'){
+    loadReleases();
+  }else if(key==='qa_users'){
+    initUsers();
+    if(curView==='users'&&!userTyping)renderUsersPage();
+  }else if(key.startsWith('qa3_')){
+    const pid=key.replace('qa3_','');
+    if(STORE[pid]&&value&&typeof value==='object'&&!Array.isArray(value)){
+      Object.assign(STORE[pid],value);_deduplicateStoreProject(STORE[pid]);
+    }
+    if(curView==='project'&&curProj===pid&&!userTyping){
+      renderProject(pid);
+      const pname=PROJECTS.find(p=>p.id===pid)?.name||pid;
+      toast('📡 '+pname+' updated live');
+    }
+  }
+  // Always refresh the project grid summary counts
+  if(typeof renderProjectGrid==='function')renderProjectGrid();
+}
+
 async function loadFromServer(){
   try{
     const r=await fetch('/api/qa-data',{cache:'no-store'});
@@ -7163,6 +7222,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
     // ── Auto-transition check: runs at startup + every 60s ──
     setTimeout(()=>rlCheckAutoTransitions(), 3000);
     setInterval(()=>rlCheckAutoTransitions(), 60000);
+    // ── Real-time multi-user sync via SSE ──
+    initSseListener();
     // ── Flush all unsaved data when user closes or navigates away ──
     window.addEventListener('beforeunload', ()=>_flushAllUnsaved());
   }
