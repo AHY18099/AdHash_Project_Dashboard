@@ -3671,15 +3671,19 @@ function showDailyTasks(){
   _dtMonth=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;
   _dtTodayStr=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
   _dtWeekOpen={};
-  // collapse all weeks; open only the one containing today
   const weeks=dtGetWeeks(_dtMonth);
-  weeks.forEach(({weekNum,days})=>{
-    _dtWeekOpen[weekNum]=days.includes(_dtTodayStr);
-  });
+  // Find the target date: today if weekday, otherwise most recent Friday
+  let targetDate=_dtTodayStr;
+  const dow=n.getDay(); // 0=Sun,6=Sat
+  if(dow===0||dow===6){
+    const friday=new Date(n);friday.setDate(n.getDate()-(dow===0?2:1));
+    targetDate=`${friday.getFullYear()}-${String(friday.getMonth()+1).padStart(2,'0')}-${String(friday.getDate()).padStart(2,'0')}`;
+  }
+  weeks.forEach(({weekNum,days})=>{_dtWeekOpen[weekNum]=days.includes(targetDate);});
   renderDailyTasksPage();
-  // scroll to today after render
+  // scroll to target date after render
   setTimeout(()=>{
-    const el=document.getElementById(`dt-day-group-${_dtTodayStr}`);
+    const el=document.getElementById(`dt-day-group-${targetDate}`);
     if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
   },80);
 }
@@ -4163,15 +4167,19 @@ function showTeamTasks(){
   _ttMonth=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;
   _ttTodayStr=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
   _ttWeekOpen={};
-  // collapse all weeks; open only the one containing today
   const weeks=ttGetWeeks(_ttMonth);
-  weeks.forEach(({weekNum,days})=>{
-    _ttWeekOpen[weekNum]=days.includes(_ttTodayStr);
-  });
+  // Find the target date: today if weekday, otherwise most recent Friday
+  let targetDate=_ttTodayStr;
+  const dow=n.getDay(); // 0=Sun,6=Sat
+  if(dow===0||dow===6){
+    const friday=new Date(n);friday.setDate(n.getDate()-(dow===0?2:1));
+    targetDate=`${friday.getFullYear()}-${String(friday.getMonth()+1).padStart(2,'0')}-${String(friday.getDate()).padStart(2,'0')}`;
+  }
+  weeks.forEach(({weekNum,days})=>{_ttWeekOpen[weekNum]=days.includes(targetDate);});
   renderTeamTasksPage();
-  // scroll to today after render
+  // scroll to target date after render
   setTimeout(()=>{
-    const el=document.getElementById(`tt-day-group-${_ttTodayStr}`);
+    const el=document.getElementById(`tt-day-group-${targetDate}`);
     if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
   },80);
 }
