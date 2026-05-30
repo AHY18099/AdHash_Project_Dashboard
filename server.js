@@ -345,7 +345,7 @@ app.use('/api', (req, res, next) => {
 });
 
 // Routes that don't require authentication
-const PUBLIC_API_ROUTES = new Set(['/api/auth/login', '/api/auth/session', '/api/auth/logout']);
+const PUBLIC_API_ROUTES = new Set(['/api/auth/login', '/api/auth/session', '/api/auth/logout', '/api/health']);
 
 // Guard all non-public API routes
 app.use('/api', (req, res, next) => {
