@@ -6,11 +6,15 @@ const { readLatestApiResultsPayload } = require('./utils/latest-api-results.js')
 const { sendZohoMail } = require('./utils/zoho-mail');
 const { sendSlackNotification } = require('./utils/slack-notify');
 
-// ── SHARED DATA (must be defined before login handler uses it) ──
-const QA_DATA_PATH = path.join(__dirname, 'data', 'qa-shared.json');
+// ── MongoDB data layer ──
+const { connectDB, pingDB, readKey, writeKey, deleteKey, readAllData } = require('./src/db');
 
-// In-memory write lock: prevents concurrent POST handlers from reading the
-// same on-disk snapshot and clobbering each other's writes (race condition).
+// ── In-memory cache — loaded from MongoDB on startup ──
+// All synchronous readQaData() calls read from this cache.
+// All writes update the cache and persist to MongoDB.
+let _qaCache = {};
+
+// Write lock: prevents concurrent writes from clobbering each other in the cache.
 let _writeQueue = Promise.resolve();
 function _withWriteLock(fn) {
     _writeQueue = _writeQueue.then(fn).catch(e => {
@@ -19,54 +23,39 @@ function _withWriteLock(fn) {
     return _writeQueue;
 }
 
-function _stripBOM(str) { return str.charCodeAt(0) === 0xFEFF ? str.slice(1) : str; }
-function readQaData() {
-    try {
-        if (fs.existsSync(QA_DATA_PATH)) return JSON.parse(_stripBOM(fs.readFileSync(QA_DATA_PATH, 'utf8')));
-    } catch (e) { console.error('readQaData error:', e.message); }
-    return {};
-}
+function readQaData() { return _qaCache; }
+
 function writeQaData(data) {
-    fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
-    fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
-    schedulePersistQaData();
+    _qaCache = data;
+    // Persist changed keys to MongoDB asynchronously (fire and forget)
+    // Full-data writes are only used by dedup on startup — safe to be async.
+    Promise.resolve().then(async () => {
+        for (const key of Object.keys(data)) {
+            try { await writeKey(key, data[key]); } catch (e) {
+                console.error('[mongo] writeQaData key failed:', key, e.message);
+            }
+        }
+    });
 }
 
-// ── GitHub Contents API helpers ──
-// Uses PUT /repos/.../contents/... which is a single HTTPS call completing in ~500ms.
-// This replaces git commands entirely — no git process, no 5-8s delay, works under SIGTERM.
-
+// ── MongoDB is now the single source of truth — GitHub file sync removed ──
+// _ghRequest and GH_API_REPO are kept ONLY for workflow-doc file uploads to GitHub Releases.
 const GH_API_REPO = 'AHY18099/AdHash_Project_Dashboard';
-const GH_API_FILE = 'data/qa-shared.json';
-const GH_BACKUPS_DIR = 'backups';
-const GH_MAX_BACKUPS = 10;
-let _ghFileSha = null; // cached SHA needed for GitHub API updates
-let _lastGitHubSync = null; // ISO timestamp of last successful push
-let _lastBackup = null;     // ISO timestamp of last successful backup
-
-function _ghRequest(method, path, body, token) {
+function _ghRequest(method, ghPath, body, token) {
     return new Promise((resolve, reject) => {
         const https = require('https');
         const payload = body ? JSON.stringify(body) : null;
-        const options = {
-            hostname: 'api.github.com',
-            path,
-            method,
+        const req = https.request({
+            hostname: 'api.github.com', path: ghPath, method,
             headers: {
-                'Authorization': `token ${token}`,
-                'User-Agent': 'AdHash-Dashboard',
-                'Accept': 'application/vnd.github.v3+json',
-                'Content-Type': 'application/json',
+                'Authorization': `token ${token}`, 'User-Agent': 'AdHash-Dashboard',
+                'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json',
                 ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {})
             }
-        };
-        const req = https.request(options, res => {
+        }, res => {
             let data = '';
             res.on('data', d => data += d);
-            res.on('end', () => {
-                try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
-                catch (e) { resolve({ status: res.statusCode, body: data }); }
-            });
+            res.on('end', () => { try { resolve({ status: res.statusCode, body: JSON.parse(data) }); } catch (_) { resolve({ status: res.statusCode, body: data }); } });
         });
         req.on('error', reject);
         req.setTimeout(12000, () => { req.destroy(); reject(new Error('GitHub API timeout')); });
@@ -75,202 +64,6 @@ function _ghRequest(method, path, body, token) {
     });
 }
 
-// On startup: fetch latest qa-shared.json from GitHub API and write to disk.
-// Railway wipes disk on every redeploy — this recovers data before accepting requests.
-async function pullQaDataFromGitHub() {
-    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
-    if (!token) { console.log('[startup] No GITHUB_TOKEN — skipping GitHub data pull'); return; }
-    try {
-        const result = await _ghRequest('GET', `/repos/${GH_API_REPO}/contents/${GH_API_FILE}`, null, token);
-        if (result.status === 200 && result.body.content) {
-            _ghFileSha = result.body.sha;
-            const decoded = _stripBOM(Buffer.from(result.body.content.replace(/\n/g, ''), 'base64').toString('utf8'));
-            const remoteData = JSON.parse(decoded);
-            fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
-            fs.writeFileSync(QA_DATA_PATH, JSON.stringify(remoteData, null, 2));
-            // Log a detailed inventory so Railway logs show exactly what was restored
-            console.log(`[startup] ✅ Restored qa-shared.json from GitHub (sha=${_ghFileSha.slice(0,7)})`);
-            let totalItems = 0;
-            for (const [k, v] of Object.entries(remoteData)) {
-                if (Array.isArray(v) && v.length > 0) { console.log(`  ${k}: ${v.length} items`); totalItems += v.length; }
-                else if (v && typeof v === 'object') {
-                    for (const [sk, sv] of Object.entries(v)) {
-                        if (Array.isArray(sv) && sv.length > 0) { console.log(`  ${k}.${sk}: ${sv.length} items`); totalItems += sv.length; }
-                    }
-                }
-            }
-            console.log(`[startup] Total data items restored: ${totalItems}`);
-        } else {
-            console.log('[startup] GitHub pull failed:', result.status, (result.body && result.body.message) || '');
-            // Main file unavailable — try backup
-            await restoreFromBackupIfNeeded(token);
-        }
-    } catch (e) {
-        console.error('[startup] Failed to pull qa-shared.json from GitHub:', e.message);
-        await restoreFromBackupIfNeeded(token);
-    }
-    // If main data is empty/missing after pull, try backup as last resort
-    try {
-        const current = readQaData();
-        if (!current || Object.keys(current).length === 0) {
-            console.log('[startup] qa-shared.json is empty — attempting backup restore');
-            await restoreFromBackupIfNeeded(token);
-        }
-    } catch (_) {}
-}
-
-// Push qa-shared.json to GitHub via Contents API — single HTTPS call, ~500ms, no git process.
-// Uses a serial queue so concurrent saves are serialised (no SHA conflicts from parallel pushes).
-let _persistQaTimer = null;
-let _persistPending = false;
-let _persistInFlight = false;   // true while a GitHub push is in progress
-let _persistQueue = [];         // waiters: resolve functions to notify when current push completes
-
-function schedulePersistQaData(urgent = false) {
-    _persistPending = true;
-    if (_persistQaTimer) clearTimeout(_persistQaTimer);
-    const delay = urgent ? 300 : 800;
-    _persistQaTimer = setTimeout(() => { _persistQaTimer = null; persistQaDataToGitHub(); }, delay);
-}
-
-async function persistQaDataToGitHub() {
-    // If a push is already in flight, queue this call and return when that push completes
-    if (_persistInFlight) {
-        return new Promise(resolve => {
-            _persistQueue.push(resolve);
-        });
-    }
-    _persistInFlight = true;
-    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
-    if (!token) { _persistInFlight = false; _drainPersistQueue(); return; }
-    _persistPending = false;
-    try {
-        const content = fs.existsSync(QA_DATA_PATH) ? fs.readFileSync(QA_DATA_PATH, 'utf8') : '{}';
-        const encoded = Buffer.from(content).toString('base64');
-
-        // Always fetch the latest SHA from GitHub before pushing — prevents stale SHA errors
-        // when an external script pushes directly to GitHub (force-sync, fix scripts, etc.)
-        const meta = await _ghRequest('GET', `/repos/${GH_API_REPO}/contents/${GH_API_FILE}`, null, token);
-        if (meta.status === 200) {
-            const remoteSha = meta.body.sha;
-            // Check if remote content already matches what we want to push
-            const remoteContent = Buffer.from(meta.body.content.replace(/\n/g, ''), 'base64').toString('utf8');
-            if (remoteContent === content) {
-                // Already in sync — update our SHA cache and done
-                _ghFileSha = remoteSha;
-                console.log('[persist] GitHub already up to date — no push needed');
-                _persistInFlight = false; _drainPersistQueue(); return;
-            }
-            _ghFileSha = remoteSha;
-        } else {
-            // Can't get SHA — use cached or skip
-            if (!_ghFileSha) {
-                console.error('[persist] Cannot get GitHub SHA:', meta.status);
-                _persistInFlight = false; _drainPersistQueue(); return;
-            }
-        }
-
-        const body = {
-            message: 'chore: persist qa-shared.json',
-            content: encoded,
-            sha: _ghFileSha
-        };
-
-        const result = await _ghRequest('PUT', `/repos/${GH_API_REPO}/contents/${GH_API_FILE}`, body, token);
-        if (result.status === 200 || result.status === 201) {
-            _ghFileSha = result.body.content && result.body.content.sha;
-            _lastGitHubSync = new Date().toISOString();
-            console.log(`[persist] qa-shared.json saved to GitHub OK (sha=${_ghFileSha && _ghFileSha.slice(0,7)})`);
-            // Create versioned backup asynchronously (don't block the write path)
-            persistBackupToGitHub(content, token).catch(e => console.error('[backup] error:', e.message));
-        } else if (result.status === 409 || result.status === 422) {
-            // Conflict — reset SHA and retry
-            console.log(`[persist] GitHub conflict (${result.status}) — will retry`);
-            _ghFileSha = null;
-            _persistInFlight = false; _drainPersistQueue();
-            setTimeout(() => persistQaDataToGitHub(), 500);
-            return;
-        } else {
-            console.error('[persist] GitHub API error:', result.status, result.body && result.body.message);
-        }
-    } catch (e) {
-        console.error('[persist] Failed to save qa-shared.json to GitHub:', e.message);
-        _persistInFlight = false; _drainPersistQueue();
-        setTimeout(() => persistQaDataToGitHub(), 3000);
-        return;
-    }
-    _persistInFlight = false;
-    _drainPersistQueue();
-}
-
-// Notify all queued waiters that the current push has finished
-function _drainPersistQueue() {
-    const waiters = _persistQueue.splice(0);
-    waiters.forEach(resolve => resolve());
-}
-
-// Create a timestamped backup in /backups/ and prune to GH_MAX_BACKUPS entries.
-async function persistBackupToGitHub(content, token) {
-    if (!token) return;
-    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const backupPath = `${GH_BACKUPS_DIR}/qa-backup-${ts}.json`;
-    try {
-        const putResult = await _ghRequest('PUT', `/repos/${GH_API_REPO}/contents/${backupPath}`, {
-            message: `backup: qa-shared.json snapshot ${ts}`,
-            content: Buffer.from(content).toString('base64')
-        }, token);
-        if (putResult.status === 200 || putResult.status === 201) {
-            _lastBackup = new Date().toISOString();
-            console.log(`[backup] created ${backupPath}`);
-        } else {
-            console.error('[backup] PUT failed:', putResult.status, putResult.body && putResult.body.message);
-            return;
-        }
-        // Prune: keep only the newest GH_MAX_BACKUPS files
-        const list = await _ghRequest('GET', `/repos/${GH_API_REPO}/contents/${GH_BACKUPS_DIR}`, null, token);
-        if (list.status === 200 && Array.isArray(list.body)) {
-            const files = list.body
-                .filter(f => f.name.startsWith('qa-backup-') && f.name.endsWith('.json'))
-                .sort((a, b) => a.name.localeCompare(b.name));
-            const toDelete = files.slice(0, Math.max(0, files.length - GH_MAX_BACKUPS));
-            for (const f of toDelete) {
-                await _ghRequest('DELETE', `/repos/${GH_API_REPO}/contents/${f.path}`, {
-                    message: `backup: prune old snapshot ${f.name}`,
-                    sha: f.sha
-                }, token);
-                console.log(`[backup] pruned ${f.name}`);
-            }
-        }
-    } catch (e) {
-        console.error('[backup] Failed:', e.message);
-    }
-}
-
-// If main qa-shared.json is empty/invalid, try to restore from the latest backup.
-async function restoreFromBackupIfNeeded(token) {
-    if (!token) return false;
-    try {
-        const list = await _ghRequest('GET', `/repos/${GH_API_REPO}/contents/${GH_BACKUPS_DIR}`, null, token);
-        if (list.status !== 200 || !Array.isArray(list.body)) return false;
-        const files = list.body
-            .filter(f => f.name.startsWith('qa-backup-') && f.name.endsWith('.json'))
-            .sort((a, b) => b.name.localeCompare(a.name)); // newest first
-        if (!files.length) return false;
-        const latest = files[0];
-        const res = await _ghRequest('GET', `/repos/${GH_API_REPO}/contents/${latest.path}`, null, token);
-        if (res.status !== 200 || !res.body.content) return false;
-        const decoded = _stripBOM(Buffer.from(res.body.content.replace(/\n/g, ''), 'base64').toString('utf8'));
-        const data = JSON.parse(decoded);
-        if (!data || typeof data !== 'object' || Object.keys(data).length === 0) return false;
-        fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
-        fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
-        console.log(`[startup] ✅ Restored from backup ${latest.name} (${Object.keys(data).length} keys)`);
-        return true;
-    } catch (e) {
-        console.error('[startup] Backup restore failed:', e.message);
-        return false;
-    }
-}
 
 const app = express();
 const PORT = Number(process.env.PORT) || 7777;
@@ -4417,26 +4210,26 @@ app.get('/api/qa-data', (req, res) => {
     res.json(out);
 });
 
-// GET /api/health — public status check; confirms server is up and data is loaded
-app.get('/api/health', (req, res) => {
+// GET /api/health — public status check; pings MongoDB and reports cache state
+app.get('/api/health', async (req, res) => {
     try {
-        const data = readQaData();
-        const keys = Object.keys(data);
+        await pingDB();
+        const keys = Object.keys(_qaCache);
         const projectCount = keys.filter(k => k.startsWith('qa3_') &&
             !['qa3_daily_tasks','qa3_team_tasks','qa3_releases'].includes(k) &&
             !k.includes('test') && !k.includes('heartbeat')).length;
         res.json({
-            status: 'ok',
-            dataLoaded: keys.length > 0,
+            status:       'ok',
+            database:     'connected',
+            dataLoaded:   keys.length > 0,
             projectCount,
-            totalKeys: keys.length,
-            lastGitHubSync: _lastGitHubSync,
-            lastBackup: _lastBackup,
+            totalKeys:    keys.length,
+            activeUsers:  _sseClients.size,
             deployVersion: _DEPLOY_VERSION,
-            uptime: Math.floor(process.uptime())
+            uptime:       Math.floor(process.uptime())
         });
     } catch (e) {
-        res.status(500).json({ status: 'error', error: e.message });
+        res.status(500).json({ status: 'error', database: 'disconnected', error: e.message });
     }
 });
 
@@ -4489,25 +4282,25 @@ app.get('/api/qa-data/:key', (req, res) => {
 });
 
 // DELETE /api/qa-data/:key — remove a key
-app.delete('/api/qa-data/:key', (req, res) => {
+app.delete('/api/qa-data/:key', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
-    const data = readQaData();
-    delete data[req.params.key];
+    const key = req.params.key;
     try {
-        writeQaData(data);
-        res.json({ status: 'deleted', key: req.params.key });
-        broadcastSseEvent('qa-data-delete', { key: req.params.key });
+        delete _qaCache[key];
+        await deleteKey(key);
+        res.json({ status: 'deleted', key });
+        broadcastSseEvent('qa-data-delete', { key });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/qa-data-bulk — restore many keys at once (used by restore tool), await GitHub push
+// POST /api/qa-data-bulk — restore many keys at once (used by restore tool)
 app.post('/api/qa-data-bulk', async (req, res) => {
     const { records } = req.body || {};
     if (!records || typeof records !== 'object') return res.status(400).json({ error: 'Missing records' });
     let count = 0;
     try {
         await _withWriteLock(async () => {
-            const data = readQaData();
+            const data = _qaCache;
             for (const [k, v] of Object.entries(records)) {
                 if (!k || v === undefined || v === null) continue;
                 if (k === 'qa3_daily_tasks') data[k] = mergeDailyTasks(data[k], v);
@@ -4517,20 +4310,15 @@ app.post('/api/qa-data-bulk', async (req, res) => {
                 else data[k] = v;
                 count++;
             }
-            fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
-            fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
-            if (_persistQaTimer) { clearTimeout(_persistQaTimer); _persistQaTimer = null; }
         });
-        let ghSaved = false;
-        try { await persistQaDataToGitHub(); ghSaved = true; } catch (_) {}
-        res.json({ status: 'saved', count, ghSaved });
-        // Broadcast all restored keys so connected clients reload them
-        try {
-            const fresh = readQaData();
-            for (const k of Object.keys(records)) {
-                if (fresh[k] !== undefined) broadcastSseEvent('qa-data-update', { key: k, value: fresh[k] });
-            }
-        } catch (_) {}
+        // Persist all changed keys to MongoDB
+        for (const k of Object.keys(records)) {
+            try { await writeKey(k, _qaCache[k]); } catch (e) { console.error('[mongo] bulk write failed for', k, e.message); }
+        }
+        res.json({ status: 'saved', count, dbSaved: true });
+        for (const k of Object.keys(records)) {
+            if (_qaCache[k] !== undefined) broadcastSseEvent('qa-data-update', { key: k, value: _qaCache[k] });
+        }
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -4661,35 +4449,26 @@ app.post('/api/qa-data/:key', async (req, res) => {
     const { value } = req.body;
     if (value === undefined) return res.status(400).json({ error: 'Missing value' });
 
-    let ghSaved = false;
     try {
         await _withWriteLock(async () => {
-            const data = readQaData(); // always reads fresh from disk inside lock
-            // Smart merge — prevents one user overwriting another's concurrent changes
+            // Merge into in-memory cache (prevents concurrent writes clobbering each other)
             if (key === 'qa3_daily_tasks') {
-                data[key] = mergeDailyTasks(data[key], value);
+                _qaCache[key] = mergeDailyTasks(_qaCache[key], value);
             } else if (key === 'qa3_team_tasks') {
-                data[key] = mergeTeamTasks(data[key], value);
+                _qaCache[key] = mergeTeamTasks(_qaCache[key], value);
             } else if (key === 'qa3_releases') {
-                data[key] = mergeReleases(data[key], value);
+                _qaCache[key] = mergeReleases(_qaCache[key], value);
             } else if (key.startsWith('qa3_') && value && typeof value === 'object' && !Array.isArray(value)) {
-                data[key] = mergeProjectData(data[key], value);
+                _qaCache[key] = mergeProjectData(_qaCache[key], value);
             } else {
-                data[key] = value;
+                _qaCache[key] = value;
             }
-            fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
-            fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
-            if (_persistQaTimer) { clearTimeout(_persistQaTimer); _persistQaTimer = null; }
         });
-        try {
-            await persistQaDataToGitHub();
-            ghSaved = true;
-        } catch (ghErr) {
-            console.error('[save] GitHub push failed for key', key, ':', ghErr.message);
-        }
-        res.json({ status: 'saved', key, ghSaved });
-        // Broadcast merged value to all other connected clients
-        try { broadcastSseEvent('qa-data-update', { key, value: readQaData()[key] }); } catch (_) {}
+        // Persist merged value to MongoDB
+        await writeKey(key, _qaCache[key]);
+        res.json({ status: 'saved', key, dbSaved: true });
+        // Broadcast merged value to all connected clients
+        try { broadcastSseEvent('qa-data-update', { key, value: _qaCache[key] }); } catch (_) {}
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -4958,10 +4737,11 @@ async function deduplicateAllProjectData() {
         }
     }
     if (changed) {
-        fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
-        fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
-        console.log('[dedup] cleaned duplicates — saving to GitHub');
-        try { await persistQaDataToGitHub(); } catch (e) { console.error('[dedup] GitHub push failed:', e.message); }
+        _qaCache = data;
+        console.log('[dedup] cleaned duplicates — persisting to MongoDB');
+        for (const [k, v] of Object.entries(data)) {
+            try { await writeKey(k, v); } catch (e) { console.error('[dedup] MongoDB write failed:', k, e.message); }
+        }
     } else {
         console.log('[dedup] no duplicates found');
     }
@@ -5031,11 +4811,18 @@ async function migrateWfDocsToGitHub() {
     if (anyChanged) { writeQaData(shared); console.log('[migrate] wfdoc dedup/migration complete, qa-shared.json updated'); }
 }
 
-// Start server — pull latest data from GitHub, dedup synchronously, THEN start listening
+// Start server — connect to MongoDB, load cache, THEN start listening
 (async () => {
-    try { await pullQaDataFromGitHub(); } catch (e) { console.error('[startup] pullQaDataFromGitHub failed:', e.message); }
-    // Dedup BEFORE accepting requests so no client ever receives duplicate data
-    try { await deduplicateAllProjectData(); console.log('[startup] dedup complete — server ready'); } catch (e) { console.error('[startup] dedup failed:', e.message); }
+    try {
+        await connectDB();
+        _qaCache = await readAllData();
+        const keyCount = Object.keys(_qaCache).length;
+        console.log(`[startup] ✅ Loaded ${keyCount} keys from MongoDB into cache`);
+    } catch (e) {
+        console.error('[startup] ❌ MongoDB connection failed:', e.message);
+        console.error('[startup] Check MONGODB_URI environment variable on Railway');
+        process.exit(1); // Railway will auto-restart
+    }
     app.listen(PORT, () => {
     testRunning = false;
     testResults = null;
@@ -5056,20 +4843,8 @@ async function migrateWfDocsToGitHub() {
     logToArray('info', `Server started successfully on port ${PORT}`);
     logToArray('info', 'Project dashboard available at http://localhost:' + PORT);
 
-    // ── Server-side heartbeat: force-persist all data to GitHub every 30s ──
-    // Shorter interval = smaller window of data loss between saves and redeploys.
-    setInterval(() => {
-        schedulePersistQaData();
-        console.log('[heartbeat] scheduled GitHub persist');
-    }, 30000); // every 30 seconds
-
-    // On startup, migrate wfdocs to GitHub Releases + recover persisted test results.
+    // On startup, recover persisted test results.
     (async () => {
-        try {
-            await migrateWfDocsToGitHub();
-        } catch (e) {
-            console.error('[startup] wfdoc migration failed:', e.message);
-        }
         try {
             const recovered = await recoverCompletedRunFromState();
             if (recovered) {
@@ -5085,27 +4860,18 @@ async function migrateWfDocsToGitHub() {
 });
 })(); // end startup async IIFE
 
-// On Railway redeploy, SIGTERM is sent before the process is killed (~30s window).
-// Drain the write queue first, then push to GitHub, then exit.
+// Graceful shutdown — wait for in-flight writes then close MongoDB connection.
 process.on('SIGTERM', async () => {
-    console.log('[shutdown] SIGTERM received — flushing write queue and saving to GitHub');
-    // Hard-exit failsafe: Railway gives 30s; use 25s to be safe
-    const killTimer = setTimeout(() => {
-        console.log('[shutdown] Hard exit — GitHub save took too long');
-        process.exit(0);
-    }, 25000);
-    killTimer.unref(); // don't let this keep the process alive if we exit cleanly first
+    console.log('[shutdown] SIGTERM received — waiting for write queue then closing MongoDB');
+    const killTimer = setTimeout(() => { process.exit(0); }, 10000);
+    killTimer.unref();
     try {
-        if (_persistQaTimer) { clearTimeout(_persistQaTimer); _persistQaTimer = null; }
-        // Wait for any in-progress write-locked operations to complete
-        await _writeQueue;
-        const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
-        if (token) {
-            await persistQaDataToGitHub();
-            console.log('[shutdown] qa-shared.json saved to GitHub successfully');
-        }
+        await _writeQueue; // wait for any in-flight cache writes
+        const { closeDB } = require('./src/db');
+        await closeDB();
+        console.log('[shutdown] MongoDB connection closed cleanly');
     } catch (e) {
-        console.error('[shutdown] Save failed:', e.message);
+        console.error('[shutdown] Error during shutdown:', e.message);
     }
     process.exit(0);
 });
