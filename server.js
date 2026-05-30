@@ -4852,7 +4852,7 @@ async function migrateWfDocsToGitHub() {
             setTimeout(() => connectWithRetry(attempt + 1), 5000);
         }
     })(1);
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
     testRunning = false;
     testResults = null;
     testLogs = [];
