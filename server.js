@@ -4246,7 +4246,17 @@ app.get('/api/health', async (req, res) => {
         });
     } catch (e) {
         // Return 200 so Railway health checks don't kill the container — database is just disconnected
-        res.json({ status: 'degraded', database: 'disconnected', error: e.message, uptime: Math.floor(process.uptime()) });
+        const uri = process.env.MONGODB_URI || '';
+        res.json({
+            status: 'degraded',
+            database: 'disconnected',
+            error: e.message,
+            uptime: Math.floor(process.uptime()),
+            uriSet: !!uri,
+            uriProtocol: uri.split('://')[0] || '(not set)',
+            uriStart: uri ? uri.substring(0, 40).replace(/:[^:@]+@/, ':***@') : '(none)',
+            cacheKeys: Object.keys(_qaCache).length
+        });
     }
 });
 
