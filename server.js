@@ -37,7 +37,11 @@ function writeQaData(data) {
 
 const GH_API_REPO = 'AHY18099/AdHash_Project_Dashboard';
 const GH_API_FILE = 'data/qa-shared.json';
+const GH_BACKUPS_DIR = 'backups';
+const GH_MAX_BACKUPS = 10;
 let _ghFileSha = null; // cached SHA needed for GitHub API updates
+let _lastGitHubSync = null; // ISO timestamp of last successful push
+let _lastBackup = null;     // ISO timestamp of last successful backup
 
 function _ghRequest(method, path, body, token) {
     return new Promise((resolve, reject) => {
@@ -97,10 +101,21 @@ async function pullQaDataFromGitHub() {
             console.log(`[startup] Total data items restored: ${totalItems}`);
         } else {
             console.log('[startup] GitHub pull failed:', result.status, (result.body && result.body.message) || '');
+            // Main file unavailable — try backup
+            await restoreFromBackupIfNeeded(token);
         }
     } catch (e) {
         console.error('[startup] Failed to pull qa-shared.json from GitHub:', e.message);
+        await restoreFromBackupIfNeeded(token);
     }
+    // If main data is empty/missing after pull, try backup as last resort
+    try {
+        const current = readQaData();
+        if (!current || Object.keys(current).length === 0) {
+            console.log('[startup] qa-shared.json is empty — attempting backup restore');
+            await restoreFromBackupIfNeeded(token);
+        }
+    } catch (_) {}
 }
 
 // Push qa-shared.json to GitHub via Contents API — single HTTPS call, ~500ms, no git process.
@@ -163,7 +178,10 @@ async function persistQaDataToGitHub() {
         const result = await _ghRequest('PUT', `/repos/${GH_API_REPO}/contents/${GH_API_FILE}`, body, token);
         if (result.status === 200 || result.status === 201) {
             _ghFileSha = result.body.content && result.body.content.sha;
+            _lastGitHubSync = new Date().toISOString();
             console.log(`[persist] qa-shared.json saved to GitHub OK (sha=${_ghFileSha && _ghFileSha.slice(0,7)})`);
+            // Create versioned backup asynchronously (don't block the write path)
+            persistBackupToGitHub(content, token).catch(e => console.error('[backup] error:', e.message));
         } else if (result.status === 409 || result.status === 422) {
             // Conflict — reset SHA and retry
             console.log(`[persist] GitHub conflict (${result.status}) — will retry`);
@@ -188,6 +206,69 @@ async function persistQaDataToGitHub() {
 function _drainPersistQueue() {
     const waiters = _persistQueue.splice(0);
     waiters.forEach(resolve => resolve());
+}
+
+// Create a timestamped backup in /backups/ and prune to GH_MAX_BACKUPS entries.
+async function persistBackupToGitHub(content, token) {
+    if (!token) return;
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const backupPath = `${GH_BACKUPS_DIR}/qa-backup-${ts}.json`;
+    try {
+        const putResult = await _ghRequest('PUT', `/repos/${GH_API_REPO}/contents/${backupPath}`, {
+            message: `backup: qa-shared.json snapshot ${ts}`,
+            content: Buffer.from(content).toString('base64')
+        }, token);
+        if (putResult.status === 200 || putResult.status === 201) {
+            _lastBackup = new Date().toISOString();
+            console.log(`[backup] created ${backupPath}`);
+        } else {
+            console.error('[backup] PUT failed:', putResult.status, putResult.body && putResult.body.message);
+            return;
+        }
+        // Prune: keep only the newest GH_MAX_BACKUPS files
+        const list = await _ghRequest('GET', `/repos/${GH_API_REPO}/contents/${GH_BACKUPS_DIR}`, null, token);
+        if (list.status === 200 && Array.isArray(list.body)) {
+            const files = list.body
+                .filter(f => f.name.startsWith('qa-backup-') && f.name.endsWith('.json'))
+                .sort((a, b) => a.name.localeCompare(b.name));
+            const toDelete = files.slice(0, Math.max(0, files.length - GH_MAX_BACKUPS));
+            for (const f of toDelete) {
+                await _ghRequest('DELETE', `/repos/${GH_API_REPO}/contents/${f.path}`, {
+                    message: `backup: prune old snapshot ${f.name}`,
+                    sha: f.sha
+                }, token);
+                console.log(`[backup] pruned ${f.name}`);
+            }
+        }
+    } catch (e) {
+        console.error('[backup] Failed:', e.message);
+    }
+}
+
+// If main qa-shared.json is empty/invalid, try to restore from the latest backup.
+async function restoreFromBackupIfNeeded(token) {
+    if (!token) return false;
+    try {
+        const list = await _ghRequest('GET', `/repos/${GH_API_REPO}/contents/${GH_BACKUPS_DIR}`, null, token);
+        if (list.status !== 200 || !Array.isArray(list.body)) return false;
+        const files = list.body
+            .filter(f => f.name.startsWith('qa-backup-') && f.name.endsWith('.json'))
+            .sort((a, b) => b.name.localeCompare(a.name)); // newest first
+        if (!files.length) return false;
+        const latest = files[0];
+        const res = await _ghRequest('GET', `/repos/${GH_API_REPO}/contents/${latest.path}`, null, token);
+        if (res.status !== 200 || !res.body.content) return false;
+        const decoded = Buffer.from(res.body.content.replace(/\n/g, ''), 'base64').toString('utf8');
+        const data = JSON.parse(decoded);
+        if (!data || typeof data !== 'object' || Object.keys(data).length === 0) return false;
+        fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
+        fs.writeFileSync(QA_DATA_PATH, JSON.stringify(data, null, 2));
+        console.log(`[startup] ✅ Restored from backup ${latest.name} (${Object.keys(data).length} keys)`);
+        return true;
+    } catch (e) {
+        console.error('[startup] Backup restore failed:', e.message);
+        return false;
+    }
 }
 
 const app = express();
@@ -4323,6 +4404,29 @@ app.get('/api/qa-data', (req, res) => {
         }
     }
     res.json(out);
+});
+
+// GET /api/health — public status check; confirms server is up and data is loaded
+app.get('/api/health', (req, res) => {
+    try {
+        const data = readQaData();
+        const keys = Object.keys(data);
+        const projectCount = keys.filter(k => k.startsWith('qa3_') &&
+            !['qa3_daily_tasks','qa3_team_tasks','qa3_releases'].includes(k) &&
+            !k.includes('test') && !k.includes('heartbeat')).length;
+        res.json({
+            status: 'ok',
+            dataLoaded: keys.length > 0,
+            projectCount,
+            totalKeys: keys.length,
+            lastGitHubSync: _lastGitHubSync,
+            lastBackup: _lastBackup,
+            deployVersion: _DEPLOY_VERSION,
+            uptime: Math.floor(process.uptime())
+        });
+    } catch (e) {
+        res.status(500).json({ status: 'error', error: e.message });
+    }
 });
 
 // GET /api/backup — download full qa-shared.json as a file (for manual backup)
