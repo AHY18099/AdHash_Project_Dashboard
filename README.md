@@ -29,7 +29,7 @@ npm start
 
 Open your browser and navigate to:
 ```
-http://localhost:5001
+http://localhost:7777
 ```
 
 ### 3. Run Tests
@@ -83,8 +83,25 @@ If you encounter any issues:
 
 1. Make sure all dependencies are installed: `npm install`
 2. Ensure Playwright browsers are installed: `npx playwright install chromium`
-3. Check that port 5001 is not in use by another application
+3. Check that port 7777 is not in use by another application
 4. Clear your browser cache and refresh the page
+
+## Fresh Email Workflow
+
+Use this workflow when generating the email report so stale artifacts cannot leak into the DDP API counts:
+
+```bash
+npm run workflow:email
+```
+
+This enforces the required order:
+
+1. Clean `suite-reports`, `test-results`, `unified-dashboard`, `final-dashboard-bundle`, and `email-preview`
+2. Run `tests/api/api-tests.spec.ts`
+3. Run `ts-node run-all-tests.ts --skip-clean`
+4. Run `ts-node regenerate-dashboard.ts`
+
+`run-all-tests.ts` no longer sends the email. The email is generated only during `regenerate-dashboard.ts`, after the dashboard has been rebuilt from the current run.
 
 ## Support
 
