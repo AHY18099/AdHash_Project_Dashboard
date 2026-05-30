@@ -149,7 +149,7 @@ app.use('/api', (req, res, next) => {
 });
 
 // Routes that don't require authentication
-const PUBLIC_API_ROUTES = new Set(['/api/auth/login', '/api/auth/session', '/api/auth/logout', '/api/health']);
+const PUBLIC_API_ROUTES = new Set(['/api/auth/login', '/api/auth/session', '/api/auth/logout', '/api/health', '/api/db-diag']);
 
 // Guard all non-public API routes
 app.use('/api', (req, res, next) => {
@@ -4208,6 +4208,22 @@ app.get('/api/qa-data', (req, res) => {
         }
     }
     res.json(out);
+});
+
+// GET /api/db-diag — public diagnostic: shows MONGODB_URI prefix and connection state
+app.get('/api/db-diag', (req, res) => {
+    const uri = process.env.MONGODB_URI || '';
+    const { getDB } = require('./src/db');
+    let dbOk = false;
+    try { getDB(); dbOk = true; } catch (_) {}
+    res.json({
+        uriSet: !!uri,
+        uriProtocol: uri.split('://')[0] || '(empty)',
+        uriStart: uri.substring(0, 40).replace(/:[^@]+@/, ':***@'),
+        cacheKeys: Object.keys(_qaCache).length,
+        dbConnected: dbOk,
+        uptime: Math.floor(process.uptime())
+    });
 });
 
 // GET /api/health — public status check; pings MongoDB and reports cache state
