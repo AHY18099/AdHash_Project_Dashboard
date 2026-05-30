@@ -27,7 +27,36 @@ async function connectDB() {
     await _client.connect();
     _db = _client.db(process.env.MONGODB_DB || 'adhash_qa');
     console.log('[mongodb] ✅ Connected —', _db.databaseName);
+    // Ensure correct indexes: unique on (id + projectId) so projects can share logical IDs
+    await _ensureIndexes(_db);
     return _db;
+}
+
+const ALL_COLLECTIONS = [
+    'credentials', 'smoke_tests', 'prod_checklist', 'task_checklist',
+    'third_party', 'client_feedback', 'workflow_docs', 'api_tests',
+    'pending_tasks', 'saved_reports', 'release_notes', 'test_data',
+    'env_details', 'daily_tasks', 'team_tasks', 'releases', 'users', 'projects',
+];
+
+async function _ensureIndexes(db) {
+    for (const col of ALL_COLLECTIONS) {
+        try {
+            // Drop the old single-field unique index on id (if it exists) — it conflicts
+            // when two projects share the same logical ID (e.g. SMK-01 in DDP and AiSignPro).
+            await db.collection(col).dropIndex('id_1').catch(() => {});
+            // Compound unique index: (id + projectId) allows same ID in different projects.
+            await db.collection(col).createIndex(
+                { id: 1, projectId: 1 },
+                { unique: true, sparse: true, background: true, name: 'id_projectId_unique' }
+            );
+            // Fast lookup by projectId
+            await db.collection(col).createIndex({ projectId: 1 }, { background: true });
+        } catch (e) {
+            console.warn('[mongodb] Index ensure failed for', col, ':', e.message);
+        }
+    }
+    console.log('[mongodb] ✅ Indexes verified');
 }
 
 function getDB() {
@@ -66,8 +95,10 @@ async function _upsertDoc(colName, projectId, doc) {
     safe.projectId = projectId;
     safe.updatedAt = new Date();
     if (!safe.createdAt) safe.createdAt = new Date();
+    // Filter by both id AND projectId so projects with the same logical IDs
+    // (e.g. SMK-01 in DDP and SMK-01 in AiSignPro) are stored as separate docs.
     await getDB().collection(colName).updateOne(
-        { id: safe.id },
+        { id: safe.id, projectId },
         { $set: safe },
         { upsert: true }
     );
