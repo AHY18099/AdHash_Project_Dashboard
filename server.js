@@ -4814,17 +4814,18 @@ async function migrateWfDocsToGitHub() {
 
 // Start server — connect to MongoDB, load cache, THEN start listening
 (async () => {
-    try {
-        await connectDB();
-        _qaCache = await readAllData();
-        const keyCount = Object.keys(_qaCache).length;
-        console.log(`[startup] ✅ Loaded ${keyCount} keys from MongoDB into cache`);
-    } catch (e) {
-        console.error('[startup] ⚠️  MongoDB connection failed:', e.message);
-        console.error('[startup] Starting with empty cache — data will be unavailable until MongoDB connects');
-        // Do NOT exit — let the server start so Railway health checks pass.
-        // Reconnection will be attempted on first data request.
-    }
+    // Connect to MongoDB with retries — keeps trying every 5s until it succeeds.
+    // Server starts listening immediately so Railway health checks pass, even before DB is ready.
+    (async function connectWithRetry(attempt) {
+        try {
+            await connectDB();
+            _qaCache = await readAllData();
+            console.log(`[startup] ✅ Loaded ${Object.keys(_qaCache).length} keys from MongoDB (attempt ${attempt})`);
+        } catch (e) {
+            console.error(`[startup] ⚠️  MongoDB attempt ${attempt} failed: ${e.message} — retrying in 5s`);
+            setTimeout(() => connectWithRetry(attempt + 1), 5000);
+        }
+    })(1);
     app.listen(PORT, () => {
     testRunning = false;
     testResults = null;
