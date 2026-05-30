@@ -19,9 +19,10 @@ function _withWriteLock(fn) {
     return _writeQueue;
 }
 
+function _stripBOM(str) { return str.charCodeAt(0) === 0xFEFF ? str.slice(1) : str; }
 function readQaData() {
     try {
-        if (fs.existsSync(QA_DATA_PATH)) return JSON.parse(fs.readFileSync(QA_DATA_PATH, 'utf8'));
+        if (fs.existsSync(QA_DATA_PATH)) return JSON.parse(_stripBOM(fs.readFileSync(QA_DATA_PATH, 'utf8')));
     } catch (e) { console.error('readQaData error:', e.message); }
     return {};
 }
@@ -83,7 +84,7 @@ async function pullQaDataFromGitHub() {
         const result = await _ghRequest('GET', `/repos/${GH_API_REPO}/contents/${GH_API_FILE}`, null, token);
         if (result.status === 200 && result.body.content) {
             _ghFileSha = result.body.sha;
-            const decoded = Buffer.from(result.body.content.replace(/\n/g, ''), 'base64').toString('utf8');
+            const decoded = _stripBOM(Buffer.from(result.body.content.replace(/\n/g, ''), 'base64').toString('utf8'));
             const remoteData = JSON.parse(decoded);
             fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
             fs.writeFileSync(QA_DATA_PATH, JSON.stringify(remoteData, null, 2));
@@ -258,7 +259,7 @@ async function restoreFromBackupIfNeeded(token) {
         const latest = files[0];
         const res = await _ghRequest('GET', `/repos/${GH_API_REPO}/contents/${latest.path}`, null, token);
         if (res.status !== 200 || !res.body.content) return false;
-        const decoded = Buffer.from(res.body.content.replace(/\n/g, ''), 'base64').toString('utf8');
+        const decoded = _stripBOM(Buffer.from(res.body.content.replace(/\n/g, ''), 'base64').toString('utf8'));
         const data = JSON.parse(decoded);
         if (!data || typeof data !== 'object' || Object.keys(data).length === 0) return false;
         fs.mkdirSync(path.dirname(QA_DATA_PATH), { recursive: true });
