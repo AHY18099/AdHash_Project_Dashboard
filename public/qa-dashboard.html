@@ -369,7 +369,7 @@ body.dark .udd{background:rgba(10,15,28,0.98);border-color:rgba(126,179,255,0.15
 .login-glow2{position:absolute;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(139,92,246,.08) 0%,transparent 65%);bottom:-100px;right:-100px;pointer-events:none}
 body.dark .login-glow{background:radial-gradient(circle,rgba(0,212,255,.1) 0%,transparent 65%)}
 body.dark .login-glow2{background:radial-gradient(circle,rgba(0,255,198,.07) 0%,transparent 65%)}
-.login-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:100%;max-width:400px;position:relative;z-index:1;box-shadow:var(--sh-xl);animation:fadeInDown .4s cubic-bezier(.16,1,.3,1)}
+.login-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:40px 36px;width:100%;max-width:400px;position:relative;z-index:1;box-shadow:var(--sh-xl,0 16px 48px rgba(0,0,0,0.12));animation:fadeInDown .4s cubic-bezier(.16,1,.3,1)}
 .login-logo{text-align:center;margin-bottom:8px;font-size:28px;font-weight:800;letter-spacing:-.5px;display:flex;align-items:center;justify-content:center;gap:4px}
 .login-logo .brand{background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-weight:800}
 .login-logo .qa-badge{font-size:13px;color:#fff;font-weight:700;background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);padding:2px 9px;border-radius:6px;-webkit-text-fill-color:#fff}
@@ -569,8 +569,8 @@ body.dark .sbar-fill{box-shadow:0 0 8px rgba(0,212,255,.4)}
 
 /* ── STATS GRID ── */
 .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
-.sc{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;text-align:center;transition:all .15s;box-shadow:var(--card-shadow)}
-.sc:hover{transform:translateY(-2px);box-shadow:0 4px 16px var(--shadow);border-color:var(--border2)}
+.sc{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg,14px);padding:16px 18px;text-align:center;transition:var(--t-base);box-shadow:var(--card-shadow)}
+.sc:hover{transform:translateY(-2px);box-shadow:var(--sh-md);border-color:var(--border2)}
 .sc .sl{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;font-weight:700}
 .sc .sv{font-size:32px;font-weight:800}
 body.dark .sc .sv{text-shadow:0 0 18px currentColor}
@@ -597,7 +597,7 @@ body.dark .srch:focus{box-shadow:0 0 10px rgba(0,212,255,.15)}
 /* ── TABLE ── */
 .tbl-outer{border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:0}
 table.qa{width:100%;border-collapse:collapse;font-size:13px}
-.qa thead th{background:var(--card2);padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--mut);border-bottom:1px solid var(--border);white-space:nowrap;font-weight:600}
+.qa thead th{background:var(--card2);padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--mut);border-bottom:1px solid var(--border);white-space:nowrap;font-weight:600}
 .qa tbody tr{border-bottom:1px solid var(--border);transition:background .15s}
 .qa tbody tr:last-child{border-bottom:none}
 .qa tbody tr:hover{background:rgba(37,99,235,.03)}
@@ -678,10 +678,10 @@ body.dark .btn-download{color:#fff}
 .gate-row:last-child{border-bottom:none}.gate-txt{flex:1;color:var(--txt2);line-height:1.45}
 
 /* ── MODAL ── */
-.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(10px);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px;animation:fadeIn .2s ease}
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px;animation:fadeIn .2s ease}
 body.dark .modal-ov{background:rgba(10,22,40,.85)}
 .modal-ov.open{display:flex}
-.modal-box{background:var(--card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:680px;max-height:90vh;display:flex;flex-direction:column;animation:slideUp .2s cubic-bezier(.16,1,.3,1);box-shadow:0 20px 60px rgba(15,23,42,0.2),0 0 0 1px rgba(15,23,42,0.05)}
+.modal-box{background:var(--card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:680px;max-height:90vh;display:flex;flex-direction:column;animation:slideUp .2s cubic-bezier(.16,1,.3,1);box-shadow:var(--sh-xl),0 0 0 1px rgba(15,23,42,0.05)}
 body.dark .modal-box{background:var(--card);border-color:var(--border2);box-shadow:0 20px 60px rgba(0,0,0,0.5)}
 .modal-hdr{padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .modal-hdr h3{font-size:15px;font-weight:700;background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
@@ -694,7 +694,7 @@ body.dark .modal-body{color:rgba(160,212,200,.9)}
 .fg label{display:block;font-size:11px;color:var(--mut);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px;font-weight:700}
 .fg input,.fg textarea,.fg select{width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;color:var(--txt);font-size:13px;outline:none;font-family:inherit;transition:all .2s}
 body.dark .fg input,body.dark .fg textarea,body.dark .fg select{background:rgba(0,0,0,.3);border-color:rgba(0,212,170,.2)}
-.fg input:focus,.fg textarea:focus,.fg select:focus{border-color:var(--grad-a);box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.fg input:focus,.fg textarea:focus,.fg select:focus{border-color:var(--grad-a);box-shadow:0 0 0 3px rgba(99,102,241,0.12)}
 body.dark .fg input:focus,body.dark .fg textarea:focus,body.dark .fg select:focus{box-shadow:0 0 10px rgba(0,212,255,.15)}
 .fg textarea{min-height:65px;resize:vertical;line-height:1.5}
 .fg select option{background:var(--card);color:var(--txt)}
@@ -1480,6 +1480,9 @@ body.dark .rl-past-badge{background:rgba(100,116,139,.2);color:#94a3b8}
 .rl-status-badge.hold{background:rgba(239,68,68,.1);color:#ef4444}
 .rl-status-badge.partial{background:rgba(245,158,11,.12);color:#f59e0b}
 .rl-status-badge.skip{background:rgba(139,92,246,.12);color:#8b5cf6}
+
+/* ── TODAY CHIP PREMIUM ── */
+.dt-today-badge,.today-badge{background:var(--brand-solid,#6366f1);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:var(--r-full,9999px);text-transform:uppercase;letter-spacing:0.5px}
 </style>
 </head>
 <body>
