@@ -4,7 +4,7 @@
   "description": "AdHash Projects Status Dashboard - Unified Test Execution & Monitoring",
   "main": "server.js",
   "scripts": {
-    "postinstall": "node node_modules/@playwright/test/cli.js install --with-deps chromium || echo 'Playwright browser install skipped'",
+    "postinstall": "node -e \"try{require('@playwright/test/cli')}catch(e){process.exit(0)}\" && npx playwright install --with-deps chromium || echo 'Playwright browser install skipped'",
     "clean:artifacts": "node scripts/clean-artifacts.mjs",
     "clean:workflow": "node -e \"const fs=require('fs');['suite-reports','test-results','unified-dashboard','final-dashboard-bundle','email-preview'].forEach((target)=>fs.rmSync(target,{recursive:true,force:true}));\"",
     "start": "node server.js",
@@ -36,6 +36,7 @@
     "@types/nodemailer": "^7.0.9",
     "axios": "^1.13.4",
     "bcryptjs": "^3.0.3",
+    "compression": "^1.8.1",
     "dotenv": "^17.2.4",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.3",
