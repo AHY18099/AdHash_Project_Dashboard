@@ -88,9 +88,16 @@ const SECTION_MAP = {
 // ── Core helpers ─────────────────────────────────────────────────────────────
 function newId() { return new ObjectId().toString(); }
 
-// Strip MongoDB metadata fields that must never appear in client-facing data.
-// If these fields leak into _qaCache → mergedValue → STORE, the hash changes
-// on every write (updatedAt is always a new Date), causing an infinite save loop.
+// Strip ALL MongoDB/storage metadata that must never appear in client-facing data.
+// _id, updatedAt, createdAt — MongoDB adds these on every write; they make
+//   JSON.stringify(STORE) differ from the hash set before the write → infinite save loop.
+// projectId — stored on every item doc for querying; the client stores items inside
+//   per-project STORE objects so projectId is redundant and causes hash drift.
+// envType — internal field used to split env_details into production/staging; the client
+//   receives them already split so envType in individual items is redundant.
+// Strip MongoDB/storage metadata from a single document.
+// projectId is kept — it's needed on global arrays (daily_tasks, team_tasks etc.)
+// and harmless on project sub-items; removing it would break client-side filtering.
 function _strip(doc) {
     if (!doc || typeof doc !== 'object') return doc;
     const { _id, updatedAt, createdAt, ...clean } = doc;
@@ -98,6 +105,16 @@ function _strip(doc) {
 }
 function _stripArray(arr) {
     return Array.isArray(arr) ? arr.map(_strip) : arr;
+}
+// Strip for project sub-items only: also removes projectId (redundant inside STORE[pid])
+// and envType (internal split field for env_details already split on read).
+function _stripItem(doc) {
+    if (!doc || typeof doc !== 'object') return doc;
+    const { _id, updatedAt, createdAt, projectId, envType, ...clean } = doc;
+    return clean;
+}
+function _stripItemArray(arr) {
+    return Array.isArray(arr) ? arr.map(_stripItem) : arr;
 }
 
 async function _upsertDoc(colName, projectId, doc) {
@@ -124,11 +141,13 @@ async function _upsertMany(colName, projectId, items) {
 
 async function _findByProject(colName, projectId) {
     const docs = await getDB().collection(colName).find({ projectId }).sort({ createdAt: 1 }).toArray();
-    return _stripArray(docs);
+    // Strip projectId too — it's redundant inside STORE[projectId] on the client
+    return _stripItemArray(docs);
 }
 
 async function _findAll(colName) {
     const docs = await getDB().collection(colName).find({}).sort({ createdAt: 1 }).toArray();
+    // Keep projectId on global arrays — client needs it for filtering (e.g. daily_tasks)
     return _stripArray(docs);
 }
 
@@ -144,15 +163,15 @@ async function assembleProject(projectId) {
         proj[field] = await _findByProject(col, projectId);
     }
 
-    // env_details split back into { production:[], staging:[] }
-    const envDocs = await _findByProject('env_details', projectId);
+    // env_details: fetch raw (keep envType for split), then strip after
+    const envRaw = await getDB().collection('env_details').find({ projectId }).sort({ createdAt: 1 }).toArray();
     proj.envDetails = {
-        production: envDocs
+        production: envRaw
             .filter(e => e.envType === 'production')
-            .map(({ envType, ...rest }) => rest),
-        staging: envDocs
+            .map(e => _stripItem(e)),
+        staging: envRaw
             .filter(e => e.envType === 'staging')
-            .map(({ envType, ...rest }) => rest),
+            .map(e => _stripItem(e)),
     };
 
     return proj;
