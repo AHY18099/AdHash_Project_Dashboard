@@ -6102,7 +6102,7 @@ function tclOpenEdit(p,i){
 }
 function tclDelete(p,i){
   if(!confirm('Delete this checklist item?'))return;
-  STORE[p].taskchecklist.splice(i,1);saveToLS(p);renderProject(p);toast('Item deleted');
+  STORE[p].taskchecklist.splice(i,1);STORE[p]._replaceArrays=['taskchecklist'];saveToLS(p);delete STORE[p]._replaceArrays;renderProject(p);toast('Item deleted');
 }
 
 function tclShowDownloadPicker(p){
@@ -6660,7 +6660,12 @@ function openEditRow(p,sec,i){
 function deleteRow(p,sec,i){
   if(!isAdmin()){toast('Only super admin can delete test cases','err');return;}
   if(!confirm('Delete this test case?'))return;
-  STORE[p][sec].splice(i,1);saveToLS(p);renderProject(p);updateStats(p);toast('Deleted');
+  STORE[p][sec].splice(i,1);
+  // _replaceArrays tells server to replace this array directly (not merge) so deleted rows don't come back
+  STORE[p]._replaceArrays=[sec];
+  saveToLS(p);
+  delete STORE[p]._replaceArrays;
+  renderProject(p);updateStats(p);toast('Deleted');
 }
 function toggleSelectAll(p,sec,chk){
   const tbl=document.getElementById(`${p}-${sec}-tbl`);
@@ -6686,7 +6691,10 @@ function bulkDeleteRows(p,sec){
   if(!confirm(`Delete ${checked.length} selected test case${checked.length!==1?'s':''}? This cannot be undone.`))return;
   const idxs=checked.map(c=>Number(c.dataset.idx)).sort((a,b)=>b-a);
   idxs.forEach(i=>STORE[p][sec].splice(i,1));
-  saveToLS(p);renderProject(p);updateStats(p);
+  STORE[p]._replaceArrays=[sec];
+  saveToLS(p);
+  delete STORE[p]._replaceArrays;
+  renderProject(p);updateStats(p);
   toast(`Deleted ${checked.length} test case${checked.length!==1?'s':''}`);
 }
 // ══════════════════════════════════════════════════════
@@ -6750,7 +6758,7 @@ function tdFormHtml(r){r=r||{};return`
 function getTDData(){return{accountName:document.getElementById('td-n').value.trim(),loginMethod:document.getElementById('td-m').value,credential:document.getElementById('td-c').value.trim(),role:document.getElementById('td-r').value.trim(),environment:document.getElementById('td-e').value.trim(),testDate:document.getElementById('td-d').value,testedBy:document.getElementById('td-t').value.trim(),notes:document.getElementById('td-o').value.trim()};}
 function openAddTD(p){openModal('Add Test Data Entry',tdFormHtml(null),()=>{const d=getTDData();if(!d.accountName){toast('Account name is required','err');return;}STORE[p].testdata.push({id:'td_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),...d});closeModal();renderProject(p);toast('Entry added');});}
 function openEditTD(p,i){openModal('Edit Test Data Entry',tdFormHtml(STORE[p].testdata[i]),()=>{const d=getTDData();if(!d.accountName){toast('Account name is required','err');return;}STORE[p].testdata[i]={id:STORE[p].testdata[i]?.id||('td_'+Date.now()),...d};saveToLS(p);closeModal();renderProject(p);toast('Entry updated');});}
-function deleteTD(p,i){if(!confirm('Delete this entry?'))return;STORE[p].testdata.splice(i,1);renderProject(p);toast('Entry deleted');}
+function deleteTD(p,i){if(!confirm('Delete this entry?'))return;STORE[p].testdata.splice(i,1);STORE[p]._replaceArrays=['testdata'];saveToLS(p);delete STORE[p]._replaceArrays;renderProject(p);toast('Entry deleted');}
 // ══════════════════════════════════════════════════════
 // RELEASE NOTES MODALS
 // ══════════════════════════════════════════════════════
@@ -6764,7 +6772,7 @@ function rnFormHtml(r){r=r||{};const changes=(r.changes||[]).join('\n');return`
 function getRNData(){return{version:document.getElementById('rn-v').value.trim(),status:document.getElementById('rn-s').value,releaseDate:document.getElementById('rn-d').value,author:document.getElementById('rn-a').value.trim(),summary:document.getElementById('rn-sum').value.trim(),changes:document.getElementById('rn-ch').value.split('\n').map(l=>l.trim()).filter(Boolean),breakingChanges:document.getElementById('rn-bc').value.trim(),knownIssues:document.getElementById('rn-ki').value.trim()};}
 function openAddRN(p){openModal('Add Release Note',rnFormHtml(null),()=>{const d=getRNData();if(!d.version){toast('Version is required','err');return;}if(!STORE[p].releaseNotes)STORE[p].releaseNotes=[];STORE[p].releaseNotes.push({id:'rn_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),...d});closeModal();renderProject(p);toast('Release note added');});}
 function openEditRN(p,i){openModal('Edit Release Note',rnFormHtml(STORE[p].releaseNotes[i]),()=>{const d=getRNData();if(!d.version){toast('Version is required','err');return;}STORE[p].releaseNotes[i]={id:STORE[p].releaseNotes[i]?.id||('rn_'+Date.now()),...d};saveToLS(p);closeModal();renderProject(p);toast('Release note updated');});}
-function deleteRN(p,i){if(!confirm('Delete this release note?'))return;STORE[p].releaseNotes.splice(i,1);renderProject(p);toast('Deleted');}
+function deleteRN(p,i){if(!confirm('Delete this release note?'))return;STORE[p].releaseNotes.splice(i,1);STORE[p]._replaceArrays=['releaseNotes'];saveToLS(p);delete STORE[p]._replaceArrays;renderProject(p);toast('Deleted');}
 // ══════════════════════════════════════════════════════
 // SAVE / LOAD
 // ══════════════════════════════════════════════════════

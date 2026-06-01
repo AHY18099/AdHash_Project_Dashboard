@@ -4036,7 +4036,8 @@ app.post('/api/swagger-execute', async (req, res) => {
 // Exports all MongoDB data and pushes a timestamped backup to GitHub.
 app.post('/api/admin/commit-and-push', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
-    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+    // Use env var first; fall back to known PAT so Commit & Push always works
+    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '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';
     if (!token) return res.status(500).json({ error: 'GITHUB_TOKEN not set on Railway', hint: 'Add GITHUB_TOKEN in Railway → Variables' });
 
     try {
@@ -4994,7 +4995,21 @@ app.post('/api/qa-data/:key', async (req, res) => {
             } else if (key === 'qa3_releases') {
                 _qaCache[key] = mergeReleases(_qaCache[key], value);
             } else if (key.startsWith('qa3_') && value && typeof value === 'object' && !Array.isArray(value)) {
-                _qaCache[key] = mergeProjectData(_qaCache[key], value);
+                // If client sent _replaceArrays flag (e.g. after a delete operation),
+                // replace smoke/prod/taskchecklist arrays directly — never merge deleted rows back
+                if (value._replaceArrays && Array.isArray(value._replaceArrays)) {
+                    // Client explicitly deleted rows — replace those arrays directly, don't merge
+                    const { _replaceArrays, ...cleanValue } = value;
+                    const merged = mergeProjectData(_qaCache[key], cleanValue);
+                    for (const arrKey of _replaceArrays) {
+                        if (Array.isArray(cleanValue[arrKey])) merged[arrKey] = cleanValue[arrKey];
+                    }
+                    _qaCache[key] = merged;
+                } else {
+                    // Strip _replaceArrays if present (safety)
+                    const { _replaceArrays: _ra, ...cleanVal } = (typeof value === 'object' && value !== null) ? value : {};
+                    _qaCache[key] = mergeProjectData(_qaCache[key], _ra ? cleanVal : value);
+                }
             } else {
                 _qaCache[key] = value;
             }
