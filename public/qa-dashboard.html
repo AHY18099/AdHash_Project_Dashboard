@@ -976,7 +976,7 @@ body.dark .fb-type-badge.bug{background:rgba(255,68,68,.1);border-color:rgba(255
 .fb-chip .fb-chip-key{color:var(--mut);font-weight:500}
 .fb-chip .fb-chip-val{color:var(--txt2);font-weight:700}
 
-.fb-status-badge{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;transition:all .15s;border:none;font-family:inherit;width:auto;max-width:160px;display:inline-flex;align-items:center}
+.fb-status-badge{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;transition:all .15s;border:none;font-family:inherit;width:auto;max-width:none;white-space:nowrap;overflow:visible;display:inline-flex;align-items:center;flex-shrink:0}
 .fb-status-badge.open{background:rgba(245,158,11,.12);color:var(--blk);border:1px solid rgba(245,158,11,.3)}
 .fb-status-badge.inprogress{background:rgba(59,130,246,.1);color:var(--inp);border:1px solid rgba(59,130,246,.3)}
 .fb-status-badge.resolved{background:rgba(16,185,129,.1);color:var(--pass);border:1px solid rgba(16,185,129,.3)}
@@ -2186,14 +2186,15 @@ function renderProjectGrid(){
     const _allFb=(STORE[p.id]?.feedback||[]);
     const _fbReqs=_allFb.filter(f=>f.type==='req');
     const _fbBugs=_allFb.filter(f=>f.type==='bug');
-    const _fbDoneStatuses=['resolved','closed','wontfix'];
-    const _fbReqOpen=_fbReqs.filter(f=>f.status==='open').length;
-    const _fbReqInp=_fbReqs.filter(f=>f.status==='inprogress'||f.status==='clarification'||f.status==='deferred').length;
-    const _fbReqDone=_fbReqs.filter(f=>_fbDoneStatuses.includes(f.status)).length;
-    const _fbBugOpen=_fbBugs.filter(f=>f.status==='open').length;
-    const _fbBugInp=_fbBugs.filter(f=>f.status==='inprogress'||f.status==='clarification'||f.status==='deferred').length;
-    const _fbBugDone=_fbBugs.filter(f=>_fbDoneStatuses.includes(f.status)).length;
-    const _fbBugCrit=_fbBugs.filter(f=>f.priority==='critical').length;
+    // Status label map — must match fb-status-badge CSS classes
+    const _fbStatusLabel={open:'Open',inprogress:'In Progress',clarification:'Clarification Required',resolved:'Resolved',closed:'Closed',wontfix:"Won't Fix",deferred:'Deferred'};
+    const _fbStatusClass={open:'open',inprogress:'inp',clarification:'inp',resolved:'done',closed:'done',wontfix:'done',deferred:'inp'};
+    // Build per-status chips from actual data (shows exact status, not grouped label)
+    const _fbChips=(items)=>{
+      const counts={};
+      items.forEach(f=>{const s=f.status||'open';counts[s]=(counts[s]||0)+1;});
+      return Object.entries(counts).map(([s,n])=>`<span class="pj-fb-chip ${_fbStatusClass[s]||'open'}" style="white-space:nowrap">${n} ${_fbStatusLabel[s]||s}</span>`).join('');
+    };
     const hasFeedback=_allFb.length>0;
     const fbCardHtml=!hasFeedback
       ?`<div class="pj-fb-row pj-fb-empty"><span class="pj-fb-empty-txt">No feedback yet</span></div>`
@@ -2202,22 +2203,13 @@ function renderProjectGrid(){
             <span class="pj-fb-icon req">📋</span>
             <span class="pj-fb-type">Requirements</span>
             <span class="pj-fb-total">${_fbReqs.length}</span>
-            <span class="pj-fb-chips">
-              ${_fbReqOpen>0?`<span class="pj-fb-chip open">${_fbReqOpen} Open</span>`:''}
-              ${_fbReqInp>0?`<span class="pj-fb-chip inp">${_fbReqInp} In Progress</span>`:''}
-              ${_fbReqDone>0?`<span class="pj-fb-chip done">${_fbReqDone} Done</span>`:''}
-            </span>
+            <span class="pj-fb-chips">${_fbChips(_fbReqs)}</span>
           </div>
           <div class="pj-fb-row">
             <span class="pj-fb-icon bug">🐛</span>
             <span class="pj-fb-type">Bugs</span>
             <span class="pj-fb-total">${_fbBugs.length}</span>
-            <span class="pj-fb-chips">
-              ${_fbBugOpen>0?`<span class="pj-fb-chip open">${_fbBugOpen} Open</span>`:''}
-              ${_fbBugInp>0?`<span class="pj-fb-chip inp">${_fbBugInp} In Progress</span>`:''}
-              ${_fbBugDone>0?`<span class="pj-fb-chip done">${_fbBugDone} Done</span>`:''}
-              ${_fbBugCrit>0?`<span class="pj-fb-chip crit">🔴 ${_fbBugCrit} Critical</span>`:''}
-            </span>
+            <span class="pj-fb-chips">${_fbChips(_fbBugs)}</span>
           </div>
         </div>`;
     // Card highlight styles when tasks exist today
@@ -2515,7 +2507,7 @@ function renderProjOverview(p){
   const tdLen=(STORE[p].testdata||[]).length;
   const rnLen=(STORE[p].releaseNotes||[]).length;
   const fbLen=(STORE[p].feedback||[]).length;
-  const fbOpen=(STORE[p].feedback||[]).filter(f=>f.status==='open'||f.status==='inprogress').length;
+  const fbOpen=(STORE[p].feedback||[]).filter(f=>['open','inprogress','clarification','deferred'].includes(f.status)).length;
   const apiLen=(STORE[p].apitests||[]).length;
   const apiPass=(STORE[p].apitests||[]).filter(a=>a.lastStatus==='pass').length;
   const apiFail=(STORE[p].apitests||[]).filter(a=>a.lastStatus==='fail').length;
@@ -2845,10 +2837,12 @@ function renderFeedback(p){
   const view=sub==='req'?reqs:sub==='bug'?bugs:all;
   const filtered=q?view.filter(f=>(f.title+f.clientName+f.description+f.status).toLowerCase().includes(q)):view;
 
-  // summary stats
-  const open=all.filter(f=>f.status==='open').length;
-  const inp=all.filter(f=>f.status==='inprogress').length;
-  const res=all.filter(f=>f.status==='resolved'||f.status==='closed').length;
+  // summary stats — active = open + inprogress + clarification + deferred
+  const _activeStatuses=['open','inprogress','clarification','deferred'];
+  const _doneStatuses2=['resolved','closed','wontfix'];
+  const open=all.filter(f=>_activeStatuses.includes(f.status)).length;
+  const inp=0; // merged into open above
+  const res=all.filter(f=>_doneStatuses2.includes(f.status)).length;
   const crit=all.filter(f=>f.priority==='critical').length;
 
   const statsHtml=`<div class="fb-stats">
