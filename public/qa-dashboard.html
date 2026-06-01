@@ -2304,6 +2304,7 @@ function renderProject(p){
     {id:'pendingtasks',label:'📋 Pending Tasks',count:(STORE[p].pendingtasks||[]).length},
     {id:'thirdparty',label:'🔗 Third Party',count:(STORE[p].thirdparty||[]).length},
     {id:'taskchecklist',label:'✔ Task Checklist',count:(STORE[p].taskchecklist||[]).length||null},
+    {id:'swagger',label:'⚡ Swagger'},
     ...(isAdmin()&&pend>0?[{id:'approvals',label:`🔔 Approvals`,count:pend}]:[])
   ];
   const tab=curTab[p]||'projoverview';
@@ -2322,6 +2323,7 @@ function renderProject(p){
   else if(tab==='wfdocs')       content=renderWorkflowDocs(p);
   else if(tab==='credentials')  content=renderCredentials(p);
   else if(tab==='apitests')     content=renderApiTests(p);
+  else if(tab==='swagger')      content=renderSwaggerTab(p);
   else if(tab==='approvals')    content=renderApprovals(p);
 
   const needsBar=tab==='smoke'||tab==='prod';
@@ -7323,6 +7325,61 @@ tr:last-child td.rtd{border-bottom:none}
 .notice-ok{background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:14px 20px;color:#15803d;font-weight:600;font-size:13px;display:flex;align-items:center;gap:10px}
 .notice-fail{background:#fff5f5;border:1.5px solid #fca5a5;border-radius:12px;padding:14px 20px;color:#dc2626;font-size:13px}
 @media print{body{background:#fff}.no-print{display:none!important}.card{box-shadow:none}@page{margin:1.5cm}}
+
+/* ── SWAGGER EXPLORER ─────────────────────────────────────────────────────── */
+.sw-wrap{padding:20px 24px}
+.sw-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;gap:12px;flex-wrap:wrap}
+.sw-url-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.sw-url-tab{padding:6px 14px;border-radius:50px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:6px;transition:all .15s;color:var(--txt2)}
+.sw-url-tab.active{background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;border-color:transparent}
+.sw-env-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sw-env-production{background:#10b981}.sw-env-staging{background:#f59e0b}.sw-env-local{background:#6366f1}.sw-env-development{background:#3b82f6}
+.sw-spec-hdr{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 18px;background:var(--card2);border-radius:12px;margin-bottom:14px;border:1px solid var(--border);gap:12px;flex-wrap:wrap}
+.sw-api-title{font-size:16px;font-weight:800;color:var(--txt)}
+.sw-version{background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;padding:2px 8px;border-radius:50px;font-size:10px;font-weight:700;margin-left:7px}
+.sw-meta{font-size:11px;color:var(--mut);margin-top:3px;font-family:var(--font-mono)}
+.sw-search{width:100%;margin-bottom:12px;padding:9px 14px;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;color:var(--txt);font-size:13px;outline:none;font-family:inherit;transition:all .2s}
+.sw-search:focus{border-color:var(--grad-a);box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
+.sw-auth-bar{display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--card2);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;flex-wrap:wrap}
+.sw-auth-bar input{flex:1;min-width:160px;background:transparent;border:none;outline:none;font-family:var(--font-mono);font-size:12px;color:var(--txt)}
+.sw-auth-bar select{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:12px;color:var(--txt);cursor:pointer;outline:none}
+.sw-tag-group{margin-bottom:10px;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.sw-tag-hdr{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--card2);cursor:pointer;font-weight:600;font-size:13px;color:var(--txt2);transition:background .15s;user-select:none}
+.sw-tag-hdr:hover{background:var(--bg)}
+.sw-tag-name{flex:1}
+.sw-tag-cnt{background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;padding:1px 7px;border-radius:50px;font-size:10px;font-weight:700}
+.sw-tag-body{border-top:1px solid var(--border)}
+.sw-ep{border-bottom:1px solid var(--border)}
+.sw-ep:last-child{border-bottom:none}
+.sw-ep-row{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;transition:background .12s;flex-wrap:wrap}
+.sw-ep-row:hover{background:var(--card2)}
+.sw-method{padding:3px 10px;border-radius:6px;font-size:10px;font-weight:800;font-family:var(--font-mono);text-transform:uppercase;min-width:64px;text-align:center;flex-shrink:0}
+.sw-ep-path{font-family:var(--font-mono);font-size:12px;color:var(--txt);font-weight:500;flex:1;min-width:120px}
+.sw-ep-summary{font-size:11px;color:var(--mut);flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:80px}
+.sw-run-btn{padding:4px 13px;background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;transition:transform .15s}
+.sw-run-btn:hover{transform:translateY(-1px)}
+.sw-panel{padding:18px 20px;background:var(--card2);border-top:1px solid var(--border)}
+.sw-param-ttl{font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.sw-param-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}
+.sw-param-table th{background:var(--bg);padding:6px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--mut);border-bottom:1px solid var(--border)}
+.sw-param-table td{padding:6px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.sw-param-table td input{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:var(--font-mono);color:var(--txt);outline:none;width:100%;transition:border-color .15s}
+.sw-param-table td input:focus{border-color:var(--grad-a)}
+.sw-in-badge{padding:2px 6px;border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase}
+.in-path{background:rgba(251,191,36,.2);color:#92400e}.in-query{background:rgba(59,130,246,.15);color:#1e40af}.in-header{background:rgba(16,185,129,.15);color:#065f46}
+body.dark .in-path{color:#fbbf24}.body.dark .in-query{color:#93c5fd}.body.dark .in-header{color:#34d399}
+.sw-body-ed{width:100%;resize:vertical;min-height:100px;background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-family:var(--font-mono);font-size:12px;color:var(--txt);outline:none;transition:border-color .15s;tab-size:2}
+.sw-body-ed:focus{border-color:var(--grad-a)}
+.sw-actions{display:flex;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap}
+.sw-resp{margin-top:14px;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.sw-resp-status{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--card2);border-bottom:1px solid var(--border)}
+.sw-resp-tabs{display:flex;border-bottom:1px solid var(--border)}
+.sw-resp-tab{padding:7px 14px;font-size:11px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--mut);transition:all .15s}
+.sw-resp-tab.active{color:var(--grad-a);border-bottom-color:var(--grad-a)}
+.sw-resp-panel{max-height:360px;overflow:auto}
+.sw-resp-pre{margin:0;padding:14px;font-family:var(--font-mono);font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-all;color:var(--txt)}
+.sw-empty{text-align:center;padding:48px 20px;color:var(--mut)}
+.sw-empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
 </style>
 </head><body>
 
@@ -7767,6 +7824,278 @@ function _autoSaveHeartbeat(){
     // Clear guard once all in-flight saves finish (activeSaves drops to 0)
     const poll=setInterval(()=>{if(_activeSaves===0){_hbSaving=false;clearInterval(poll);}},500);
   }
+}
+
+// ══ SWAGGER API EXPLORER ═══════════════════════════════════════════════════
+
+const _SW_METHOD_COLORS={
+  get:    {bg:'rgba(59,130,246,.12)',color:'#1d4ed8',border:'rgba(59,130,246,.3)'},
+  post:   {bg:'rgba(16,185,129,.12)',color:'#065f46',border:'rgba(16,185,129,.3)'},
+  put:    {bg:'rgba(245,158,11,.12)',color:'#92400e',border:'rgba(245,158,11,.3)'},
+  patch:  {bg:'rgba(249,115,22,.12)',color:'#c2410c',border:'rgba(249,115,22,.3)'},
+  delete: {bg:'rgba(239,68,68,.12)', color:'#b91c1c',border:'rgba(239,68,68,.3)'},
+  head:   {bg:'rgba(139,92,246,.1)', color:'#6d28d9',border:'rgba(139,92,246,.3)'},
+  options:{bg:'rgba(100,116,139,.1)',color:'#475569',border:'rgba(100,116,139,.3)'},
+};
+let _swSpec=null,_swBaseUrl='',_swProjId='';
+
+// ── Render Swagger tab (returns HTML string for renderProject) ──
+function renderSwaggerTab(p){
+  _swProjId=p;
+  // Return loading placeholder; async load happens after insert
+  setTimeout(()=>_loadSwaggerConfigs(p),50);
+  return`<div id="sw-main-${p}" class="sw-wrap"><div class="sw-empty"><div class="sw-empty-icon">⚡</div><div style="color:var(--mut);font-size:13px">Loading Swagger…</div></div></div>`;
+}
+
+async function _loadSwaggerConfigs(p){
+  const el=document.getElementById('sw-main-'+p);if(!el)return;
+  try{
+    const r=await fetch('/api/swagger-configs/'+encodeURIComponent(p),{headers:{Authorization:'Bearer '+_getToken()},cache:'no-store'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const configs=await r.json();
+    _renderSwaggerShell(p,configs,el);
+    if(configs.length>0)_loadSwaggerSpec(configs[0].id,configs[0].url,null,p);
+  }catch(e){el.innerHTML=`<div class="sw-empty"><div class="sw-empty-icon">⚠️</div><div style="color:var(--fail)">${escH(e.message)}</div></div>`;}
+}
+
+function _renderSwaggerShell(p,configs,el){
+  const urlTabsHtml=configs.map((c,i)=>`<button class="sw-url-tab${i===0?' active':''}" onclick="_swSelectConfig('${c.id}','${escH(c.url)}',this,'${p}')" data-cfg-id="${c.id}"><span class="sw-env-dot sw-env-${c.environment||'production'}"></span>${escH(c.name)}<button class="btn-icon del" onclick="event.stopPropagation();_swDeleteConfig('${c.id}','${p}')" title="Remove" style="padding:1px 5px;font-size:10px;margin-left:4px">✕</button></button>`).join('');
+  el.innerHTML=`
+<div class="sw-hdr">
+  <div><h3 style="font-size:16px;font-weight:800;color:var(--txt);display:flex;align-items:center;gap:7px">⚡ Swagger API Explorer</h3><p style="color:var(--mut);font-size:12px;margin-top:3px">Fetch and run APIs from any Swagger/OpenAPI URL</p></div>
+  <button class="btn btn-primary" onclick="openSwaggerAddModal('${p}')">＋ Add Swagger URL</button>
+</div>
+${configs.length===0?`<div class="sw-empty"><div class="sw-empty-icon">⚡</div><div style="font-weight:600;color:var(--txt2);margin-bottom:6px">No Swagger URLs added yet</div><div style="color:var(--mut);font-size:12px;margin-bottom:14px">Add a Swagger/OpenAPI URL to explore your APIs</div><button class="btn btn-primary" onclick="openSwaggerAddModal('${p}')">＋ Add Swagger URL</button></div>`:`
+<div class="sw-url-tabs">${urlTabsHtml}</div>
+<div id="sw-auth-bar-${p}" class="sw-auth-bar">
+  <span style="font-size:11px;font-weight:700;color:var(--mut);white-space:nowrap">🔐 Auth:</span>
+  <input type="text" id="sw-auth-token-${p}" placeholder="Bearer token or API key…" style="flex:1;min-width:140px;background:transparent;border:none;outline:none;font-family:var(--font-mono);font-size:12px;color:var(--txt)">
+  <select id="sw-auth-type-${p}" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:12px;color:var(--txt);cursor:pointer;outline:none"><option value="Bearer">Bearer</option><option value="Basic">Basic</option><option value="ApiKey">X-API-Key</option><option value="none">None</option></select>
+</div>
+<div id="sw-explorer-${p}"><div class="sw-empty" style="padding:28px"><div class="sw-empty-icon" style="font-size:28px">⏳</div><div style="color:var(--mut);font-size:12px">Loading spec…</div></div></div>`}`;
+}
+
+function _swSelectConfig(cfgId,url,tabEl,p){
+  document.querySelectorAll('.sw-url-tab').forEach(t=>t.classList.remove('active'));
+  if(tabEl)tabEl.classList.add('active');
+  _loadSwaggerSpec(cfgId,url,tabEl,p);
+}
+
+async function _loadSwaggerSpec(cfgId,url,tabEl,p){
+  const ex=document.getElementById('sw-explorer-'+p);if(!ex)return;
+  ex.innerHTML=`<div class="sw-empty" style="padding:28px"><div class="sw-empty-icon" style="font-size:28px">⏳</div><div style="color:var(--mut);font-size:12px">Fetching ${escH(url)}…</div></div>`;
+  try{
+    const r=await fetch('/api/swagger-proxy?url='+encodeURIComponent(url),{headers:{Authorization:'Bearer '+_getToken()},cache:'no-store'});
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||'HTTP '+r.status);}
+    const spec=await r.json();
+    _swSpec=spec;_swBaseUrl=_swBuildBase(spec,url);
+    _renderSwaggerExplorer(spec,ex,p);
+  }catch(e){ex.innerHTML=`<div class="sw-empty"><div class="sw-empty-icon">⚠️</div><div style="color:var(--fail);font-weight:600">Failed to load spec</div><div style="color:var(--mut);font-size:12px;margin-top:6px">${escH(e.message)}</div></div>`;}
+}
+
+function _swBuildBase(spec,url){
+  if(spec.servers&&spec.servers[0])return spec.servers[0].url;
+  if(spec.host){const sc=(spec.schemes&&spec.schemes[0])||'https';return`${sc}://${spec.host}${spec.basePath||''}`;}
+  try{const u=new URL(url);return`${u.protocol}//${u.host}`;}catch(_){return'';}
+}
+
+function _renderSwaggerExplorer(spec,container,p){
+  const title=spec.info?.title||'API Docs',ver=spec.info?.version||'',desc=spec.info?.description||'';
+  const paths=spec.paths||{};
+  const groups={};
+  for(const[path,methods]of Object.entries(paths)){
+    for(const[method,op]of Object.entries(methods)){
+      if(!['get','post','put','patch','delete','head','options'].includes(method))continue;
+      const tags=op.tags?.length?op.tags:['General'];
+      tags.forEach(tag=>{if(!groups[tag])groups[tag]=[];groups[tag].push({path,method,op});});
+    }
+  }
+  const total=Object.values(groups).reduce((s,a)=>s+a.length,0);
+  const groupsHtml=Object.entries(groups).map(([tag,eps])=>`
+<div class="sw-tag-group">
+  <div class="sw-tag-hdr" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.sw-chev').textContent=this.nextElementSibling.style.display==='none'?'▼':'▲'">
+    <span class="sw-tag-name">${escH(tag)}</span><span class="sw-tag-cnt">${eps.length}</span><span class="sw-chev">▲</span>
+  </div>
+  <div class="sw-tag-body">${eps.map(e=>_swEndpointRow(e.path,e.method,e.op,p)).join('')}</div>
+</div>`).join('');
+  container.innerHTML=`
+<div class="sw-spec-hdr">
+  <div><span class="sw-api-title">${escH(title)}</span>${ver?`<span class="sw-version">v${escH(ver)}</span>`:''}</div>
+  <div class="sw-meta">⚡ ${total} endpoints &nbsp;·&nbsp; Base: ${escH(_swBaseUrl)}</div>
+</div>
+<input type="text" class="sw-search" placeholder="🔍 Search endpoints, paths, methods…" oninput="_swFilter(this.value)">
+<div id="sw-endpoints-${p}">${groupsHtml}</div>`;
+}
+
+function _swEndpointRow(path,method,op,p){
+  const mc=_SW_METHOD_COLORS[method]||_SW_METHOD_COLORS.get;
+  const summary=escH(op.summary||op.operationId||path);
+  const eid='sw_'+method+'_'+path.replace(/[^a-z0-9]/gi,'_');
+  return`<div class="sw-ep" data-path="${escH(path)}" data-method="${method}" data-summary="${(op.summary||path).toLowerCase()}">
+  <div class="sw-ep-row" onclick="_swToggle('${eid}')">
+    <span class="sw-method" style="background:${mc.bg};color:${mc.color};border:1px solid ${mc.border}">${method.toUpperCase()}</span>
+    <span class="sw-ep-path">${escH(path)}</span>
+    <span class="sw-ep-summary">${summary}</span>
+    <button class="sw-run-btn" onclick="event.stopPropagation();_swRunQuick('${eid}','${escH(path)}','${method}','${p}')">▶ Run</button>
+    <span style="color:var(--mut);font-size:12px" id="${eid}-chev">▼</span>
+  </div>
+  <div id="${eid}" class="sw-panel" style="display:none">
+    ${op.description?`<p style="font-size:12px;color:var(--mut);margin-bottom:12px">${escH(op.description)}</p>`:''}
+    ${_swParams(op,path,eid)}
+    ${_swBody(op,eid)}
+    <div class="sw-actions">
+      <button class="btn btn-primary" style="font-size:12px;padding:6px 16px" onclick="_swRun('${eid}','${escH(path)}','${method}','${p}')">▶ Execute</button>
+      <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="_swClearResp('${eid}')">Clear</button>
+      <span style="font-size:10px;color:var(--mut);font-family:var(--font-mono);margin-left:auto">${escH(_swBaseUrl)}${escH(path)}</span>
+    </div>
+    <div id="${eid}-resp" class="sw-resp" style="display:none"></div>
+  </div>
+</div>`;
+}
+
+function _swParams(op,path,eid){
+  const params=[...(op.parameters||[])];
+  (path.match(/\{([^}]+)\}/g)||[]).map(x=>x.slice(1,-1)).forEach(n=>{if(!params.find(px=>px.name===n))params.unshift({name:n,in:'path',required:true,schema:{type:'string'}});});
+  if(!params.length)return'';
+  return`<div class="sw-param-ttl">Parameters</div><table class="sw-param-table"><thead><tr><th>Name</th><th>In</th><th>Type</th><th>Required</th><th>Value</th></tr></thead><tbody>${params.map(px=>`<tr><td style="font-family:var(--font-mono);font-weight:600">${escH(px.name)}${px.required?'<span style="color:var(--fail)">*</span>':''}</td><td><span class="sw-in-badge in-${px.in}">${px.in}</span></td><td style="font-size:11px;color:var(--mut)">${px.schema?.type||px.type||'string'}</td><td style="font-size:11px">${px.required?'✅':'—'}</td><td><input type="text" id="${eid}-p-${escH(px.name)}" data-param-name="${escH(px.name)}" data-param-in="${px.in}" placeholder="${escH(px.description||px.name)}" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:var(--font-mono);color:var(--txt);outline:none"></td></tr>`).join('')}</tbody></table>`;
+}
+
+function _swBody(op,eid){
+  if(!op.requestBody)return'';
+  const ct=op.requestBody.content||{},jc=ct['application/json'];
+  let ex='{}';
+  if(jc?.example)ex=JSON.stringify(jc.example,null,2);
+  else if(jc?.schema)ex=_swExampleFromSchema(jc.schema);
+  return`<div class="sw-param-ttl">Request Body${op.requestBody.required?'<span style="color:var(--fail);font-size:10px"> *required</span>':''}</div>
+<textarea id="${eid}-body" class="sw-body-ed">${escH(ex)}</textarea>
+<div style="display:flex;gap:6px;margin-top:6px">
+  <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="try{document.getElementById('${eid}-body').value=JSON.stringify(JSON.parse(document.getElementById('${eid}-body').value),null,2)}catch(_){toast('Invalid JSON','err')}">Format JSON</button>
+</div>`;
+}
+
+function _swExampleFromSchema(s){
+  if(!s)return'{}';const ex={};
+  if(s.properties)for(const[k,p]of Object.entries(s.properties)){
+    if(p.type==='string')ex[k]=p.example||'';
+    else if(p.type==='number'||p.type==='integer')ex[k]=p.example||0;
+    else if(p.type==='boolean')ex[k]=false;
+    else if(p.type==='array')ex[k]=[];
+    else ex[k]=null;
+  }
+  return JSON.stringify(ex,null,2);
+}
+
+function _swToggle(eid){
+  const panel=document.getElementById(eid);const chev=document.getElementById(eid+'-chev');if(!panel)return;
+  const open=panel.style.display!=='none';
+  panel.style.display=open?'none':'block';
+  if(chev)chev.textContent=open?'▼':'▲';
+}
+
+function _swFilter(q){
+  q=q.toLowerCase();
+  document.querySelectorAll('.sw-ep').forEach(ep=>{
+    const match=!q||ep.dataset.path?.toLowerCase().includes(q)||ep.dataset.method?.includes(q)||ep.dataset.summary?.includes(q);
+    ep.style.display=match?'':'none';
+  });
+  document.querySelectorAll('.sw-tag-group').forEach(g=>{
+    const vis=[...g.querySelectorAll('.sw-ep')].some(e=>e.style.display!=='none');
+    g.style.display=vis?'':'none';
+  });
+}
+
+async function _swRun(eid,path,method,p){
+  const respEl=document.getElementById(eid+'-resp');if(!respEl)return;
+  respEl.style.display='block';respEl.innerHTML=`<div style="padding:14px;color:var(--mut);font-size:12px">⏳ Sending ${method.toUpperCase()} ${_swBaseUrl}${path}…</div>`;
+  try{
+    let resolvedPath=path;const qp={},hd={};
+    document.querySelectorAll(`#${eid} [data-param-name]`).forEach(inp=>{
+      const n=inp.dataset.paramName,loc=inp.dataset.paramIn,v=inp.value.trim();if(!v)return;
+      if(loc==='path')resolvedPath=resolvedPath.replace(`{${n}}`,encodeURIComponent(v));
+      else if(loc==='query')qp[n]=v;
+      else if(loc==='header')hd[n]=v;
+    });
+    const authTok=document.getElementById('sw-auth-token-'+p)?.value?.trim();
+    const authType=document.getElementById('sw-auth-type-'+p)?.value;
+    if(authTok&&authType!=='none')hd[authType==='ApiKey'?'X-API-Key':'Authorization']=(authType==='ApiKey'?'':authType+' ')+authTok;
+    let body=null;
+    const bodyEl=document.getElementById(eid+'-body');
+    if(bodyEl?.value?.trim()){try{body=JSON.parse(bodyEl.value);}catch(_){respEl.innerHTML='<div style="padding:14px;color:var(--fail);font-size:13px">❌ Invalid JSON in request body</div>';return;}}
+    const fullUrl=_swBaseUrl+resolvedPath;
+    const r=await fetch('/api/swagger-execute',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},body:JSON.stringify({method,url:fullUrl,headers:hd,body,params:qp})});
+    const result=await r.json();
+    _swRenderResp(respEl,result,eid);
+  }catch(e){respEl.innerHTML=`<div style="padding:14px;color:var(--fail);font-size:13px">❌ ${escH(e.message)}</div>`;}
+}
+
+function _swRunQuick(eid,path,method,p){
+  const panel=document.getElementById(eid);if(panel&&panel.style.display==='none')_swToggle(eid);
+  setTimeout(()=>_swRun(eid,path,method,p),80);
+}
+
+function _swRenderResp(el,result,eid){
+  const ok=result.status>=200&&result.status<300;
+  const sc=ok?'var(--pass)':result.status>=400?'var(--fail)':'var(--blk)';
+  const bodyStr=typeof result.body==='object'?JSON.stringify(result.body,null,2):String(result.body||'');
+  const hdrsStr=JSON.stringify(result.headers||{},null,2);
+  el.innerHTML=`<div class="sw-resp-status"><span style="font-weight:800;color:${sc};font-size:14px">${result.status} ${escH(result.statusText||'')}</span><span style="color:var(--mut);font-size:12px">⏱ ${result.duration}ms</span><button class="btn btn-secondary" style="font-size:11px;padding:3px 10px;margin-left:auto" onclick="navigator.clipboard.writeText(document.getElementById('${eid}-rbody').textContent);toast('Copied ✓')">📋 Copy</button></div>
+<div class="sw-resp-tabs"><button class="sw-resp-tab active" onclick="_swRespTab(this,'${eid}-rbody','${eid}-rhdrs')">Body</button><button class="sw-resp-tab" onclick="_swRespTab(this,'${eid}-rhdrs','${eid}-rbody')">Headers</button></div>
+<div class="sw-resp-panel"><pre id="${eid}-rbody" class="sw-resp-pre">${escH(bodyStr)}</pre></div>
+<div class="sw-resp-panel" style="display:none"><pre id="${eid}-rhdrs" class="sw-resp-pre">${escH(hdrsStr)}</pre></div>`;
+}
+
+function _swRespTab(btn,showId,hideId){
+  const parent=btn.closest('.sw-resp');
+  parent.querySelectorAll('.sw-resp-tab').forEach(t=>t.classList.remove('active'));btn.classList.add('active');
+  const s=document.getElementById(showId),h=document.getElementById(hideId);
+  if(s)s.closest('.sw-resp-panel').style.display='block';
+  if(h)h.closest('.sw-resp-panel').style.display='none';
+}
+
+function _swClearResp(eid){const el=document.getElementById(eid+'-resp');if(el){el.innerHTML='';el.style.display='none';}}
+
+// ── Add Swagger URL modal ──
+function openSwaggerAddModal(p){
+  openModal('⚡ Add Swagger URL',`
+<div class="fg"><label>Name *</label><input id="sw-name" class="finp" placeholder="e.g. Production API, Staging"></div>
+<div class="fg"><label>Swagger / OpenAPI URL *</label><input type="url" id="sw-url" class="finp" placeholder="https://api.example.com/swagger.json"><div style="font-size:11px;color:var(--mut);margin-top:4px">Supports Swagger 2.0 and OpenAPI 3.x (JSON or YAML)</div></div>
+<div class="fg"><label>Environment</label><select id="sw-env" class="finp"><option value="production">Production</option><option value="staging">Staging</option><option value="local">Local</option><option value="development">Development</option></select></div>
+<div id="sw-test-res" style="margin-top:10px;display:none"></div>
+<button class="btn btn-secondary" style="margin-top:8px;font-size:12px" onclick="_swTestUrl()">🔍 Test URL</button>`,
+  async()=>{
+    const name=document.getElementById('sw-name')?.value.trim();
+    const url=document.getElementById('sw-url')?.value.trim();
+    const env=document.getElementById('sw-env')?.value;
+    if(!name){toast('Name is required','err');return false;}
+    if(!url){toast('URL is required','err');return false;}
+    try{
+      const r=await fetch('/api/swagger-configs/'+encodeURIComponent(p),{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},body:JSON.stringify({name,url,environment:env})});
+      if(!r.ok)throw new Error((await r.json()).error||'Failed');
+      toast('Swagger URL added ✓');
+      closeModal();
+      switchTab(p,'swagger');renderProject(p);
+    }catch(e){toast(e.message||'Failed','err');return false;}
+  },{saveLabel:'＋ Add URL'});
+}
+
+async function _swTestUrl(){
+  const url=document.getElementById('sw-url')?.value.trim();
+  const res=document.getElementById('sw-test-res');if(!res)return;
+  if(!url){toast('Enter a URL first','err');return;}
+  res.style.display='block';res.innerHTML='<span style="color:var(--mut);font-size:12px">⏳ Testing…</span>';
+  try{
+    const r=await fetch('/api/swagger-proxy?url='+encodeURIComponent(url),{headers:{Authorization:'Bearer '+_getToken()}});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const spec=await r.json();
+    const cnt=Object.keys(spec.paths||{}).length;
+    res.innerHTML=`<div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:10px 14px;font-size:12px"><div style="color:var(--pass);font-weight:700">✅ Valid spec found!</div><div style="color:var(--mut);margin-top:3px">📘 ${escH(spec.info?.title||'API')} · ⚡ ${cnt} paths</div></div>`;
+  }catch(e){res.innerHTML=`<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--fail)">❌ ${escH(e.message)}</div>`;}
+}
+
+async function _swDeleteConfig(cfgId,p){
+  if(!confirm('Remove this Swagger URL?'))return;
+  await fetch('/api/swagger-configs/'+encodeURIComponent(cfgId),{method:'DELETE',headers:{Authorization:'Bearer '+_getToken()}});
+  toast('Removed ✓');switchTab(p,'swagger');renderProject(p);
 }
 
 </script>

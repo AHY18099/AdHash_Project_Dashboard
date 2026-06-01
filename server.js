@@ -3932,6 +3932,104 @@ app.post('/api/projects/:id/env', (req, res) => {
     res.json({ success: true });
 });
 
+// ══ SWAGGER API EXPLORER ════════════════════════════════════════════════════
+
+// GET /api/swagger-configs/:projectId — list saved swagger URLs
+app.get('/api/swagger-configs/:projectId', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        const configs = db
+            ? await db.collection('swagger_configs').find({ projectId: req.params.projectId }).sort({ createdAt: 1 }).toArray()
+            : [];
+        res.json(configs.map(c => { const { _id, ...safe } = c; return safe; }));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/swagger-configs/:projectId — add swagger URL
+app.post('/api/swagger-configs/:projectId', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const { getDB } = require('./src/db');
+        const { ObjectId } = require('mongodb');
+        const db = getDB();
+        const session = getSessionFromCookie(req);
+        const doc = {
+            id: new ObjectId().toString(),
+            projectId: req.params.projectId,
+            name: req.body.name || 'API Docs',
+            url: req.body.url,
+            environment: req.body.environment || 'production',
+            isActive: true,
+            addedBy: session?.name || 'User',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+        if (db) await db.collection('swagger_configs').insertOne(doc);
+        const { _id, ...safe } = doc;
+        res.json(safe);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/swagger-configs/:id — remove swagger URL
+app.delete('/api/swagger-configs/:id', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        if (db) await db.collection('swagger_configs').deleteOne({ id: req.params.id });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/swagger-proxy?url=... — fetch swagger spec through server to avoid CORS
+app.get('/api/swagger-proxy', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    const { url } = req.query;
+    if (!url) return res.status(400).json({ error: 'url query param required' });
+    try {
+        const fetch = require('node-fetch');
+        const response = await fetch(url, { headers: { Accept: 'application/json, application/yaml, text/yaml, */*' }, timeout: 15000 });
+        if (!response.ok) return res.status(response.status).json({ error: `Upstream returned ${response.status}: ${response.statusText}` });
+        const ct = response.headers.get('content-type') || '';
+        let spec;
+        if (ct.includes('yaml') || url.endsWith('.yaml') || url.endsWith('.yml')) {
+            const yaml = require('js-yaml');
+            spec = yaml.load(await response.text());
+        } else {
+            const text = await response.text();
+            try { spec = JSON.parse(text); } catch (_) { spec = require('js-yaml').load(text); }
+        }
+        res.json(spec);
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch spec: ' + e.message }); }
+});
+
+// POST /api/swagger-execute — proxy API call to avoid CORS when running endpoints
+app.post('/api/swagger-execute', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    const { method, url, headers = {}, body, params = {} } = req.body || {};
+    if (!url || !method) return res.status(400).json({ error: 'method and url required' });
+    try {
+        const fetch = require('node-fetch');
+        let fullUrl = url;
+        const qs = new URLSearchParams(params).toString();
+        if (qs) fullUrl += (url.includes('?') ? '&' : '?') + qs;
+        const t0 = Date.now();
+        const r  = await fetch(fullUrl, {
+            method: method.toUpperCase(),
+            headers: { 'Content-Type': 'application/json', ...headers },
+            body: ['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase()) ? undefined : JSON.stringify(body),
+            timeout: 30000,
+        });
+        const duration = Date.now() - t0;
+        const text = await r.text();
+        let responseBody;
+        try { responseBody = JSON.parse(text); } catch (_) { responseBody = text; }
+        res.json({ status: r.status, statusText: r.statusText, headers: Object.fromEntries(r.headers), body: responseBody, duration });
+    } catch (e) { res.status(500).json({ error: 'Request failed: ' + e.message }); }
+});
+
 // POST /api/push-specs — commit & push regenerated spec files to all 5 GitHub repos
 // Streams NDJSON log lines so the browser can show live progress.
 // POST /api/admin/commit-and-push
