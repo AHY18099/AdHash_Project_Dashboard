@@ -1924,6 +1924,7 @@ function renderTopBar(){
     <div class="tl"><span class="brand">AdHash</span><span class="qa-badge">QA</span></div>
     <div class="topbar-right">
       <span id="save-status-badge" class="save-status-badge save-status-idle" title="Data save status">✓ Saved</span>
+      <span id="sync-status" title="Real-time sync status" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--mut);cursor:default"><span id="sync-dot" style="width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 5px #22c55e;flex-shrink:0"></span><span id="sync-text">Live</span><span id="online-count" style="font-size:10px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#22c55e;padding:1px 5px;border-radius:8px;margin-left:2px" title="Users online">1</span></span>
       <button id="theme-toggle-btn" class="theme-toggle-btn" onclick="toggleTheme()">${isDark?'☀ Light':'🌙 Dark'}</button>
       ${isAdmin()?`<button class="btn-backup" onclick="downloadBackup()" title="Download full data backup">📥 Backup</button>`:''}
       ${isAdmin()&&totalPend>0?`<button class="notif-btn" onclick="showPendingOverview()" title="Pending approvals">🔔<span class="nbadge">${totalPend}</span></button>`:''}
@@ -6713,26 +6714,62 @@ function serverDelete(key){
 
 // Load all data from server into _serverData (called once on init, awaited)
 // ── REAL-TIME MULTI-USER SYNC (SSE) ──
+
+// Connection dot helpers
+function _setSyncDot(color,text){
+  const dot=document.getElementById('sync-dot');
+  const txt=document.getElementById('sync-text');
+  if(!dot||!txt)return;
+  const styles={green:'#22c55e',yellow:'#f59e0b',red:'#ef4444'};
+  const c=styles[color]||styles.green;
+  dot.style.background=c;
+  dot.style.boxShadow=color==='green'?`0 0 5px ${c}`:'none';
+  txt.textContent=text;
+  const cnt=document.getElementById('online-count');
+  if(cnt){cnt.style.background=color==='green'?'rgba(34,197,94,.12)':'rgba(245,158,11,.12)';cnt.style.borderColor=c;cnt.style.color=c;}
+}
+
+let _sseReconnectDelay=1000; // exponential backoff: 1s→2s→4s→8s→16s→30s max
+let _sseReconnectTimer=null;
+
 function initSseListener(){
+  clearTimeout(_sseReconnectTimer);
   if(_sseSource){_sseSource.close();_sseSource=null;}
-  _sseSource=new EventSource('/api/events');
-  _sseSource.addEventListener('connected',()=>{
-    console.log('[sse] live update stream connected');
+  const token=_getToken();
+  // EventSource can't send Authorization header — pass token as query param
+  const url='/api/events'+(token?'?token='+encodeURIComponent(token):'');
+  _sseSource=new EventSource(url);
+
+  _sseSource.addEventListener('connected',e=>{
+    try{
+      const d=JSON.parse(e.data);
+      // Server sends back our clientId — use it for echo-filtering
+      if(d.clientId)window._SSE_CLIENT_ID=d.clientId;
+      console.log('[sse] connected as',d.userName,'clientId=',d.clientId);
+    }catch(_){}
+    _sseReconnectDelay=1000; // reset backoff on successful connect
+    _setSyncDot('green','Live');
+    // Poll active user count once on connect
+    _pollActiveUsers();
   });
+
   _sseSource.addEventListener('qa-data-update',e=>{
     try{
       const {key,value,sourceClientId}=JSON.parse(e.data);
-      // FIX A: skip events we sent ourselves — server echoes MY_CLIENT_ID back
-      if(sourceClientId&&sourceClientId===MY_CLIENT_ID)return;
-      if(_pendingRetries[key])console.warn('[sse] conflict: remote update for key',key,'while local save pending — remote wins');
+      // Skip own events (use both client-side MY_CLIENT_ID and server-assigned _SSE_CLIENT_ID)
+      const myId=window._SSE_CLIENT_ID||MY_CLIENT_ID;
+      if(sourceClientId&&sourceClientId===myId)return;
+      if(_pendingRetries[key])console.warn('[sse] conflict: remote update for key',key,'— remote wins');
       _serverData[key]=value;
       _applySseUpdate(key,value);
     }catch(_){}
   });
+
   _sseSource.addEventListener('qa-data-delete',e=>{
     try{const {key}=JSON.parse(e.data);delete _serverData[key];}catch(_){}
   });
-  // Real-time user list updates — refresh team member dropdowns for all users
+
+  // Real-time user list updates
   _sseSource.addEventListener('qa-users-update',e=>{
     try{
       const {action,user,userId,updates}=JSON.parse(e.data);
@@ -6742,16 +6779,61 @@ function initSseListener(){
       } else if((action==='update'||action==='deactivate')&&userId){
         const idx=_teamMembersCache.findIndex(u=>u.id===userId);
         if(idx>=0){
-          if(action==='deactivate') _teamMembersCache[idx].isActive=false;
-          else if(updates){Object.assign(_teamMembersCache[idx],updates);}
+          if(action==='deactivate')_teamMembersCache[idx].isActive=false;
+          else if(updates)Object.assign(_teamMembersCache[idx],updates);
         }
       }
-      // Refresh users page if currently viewing it
       if(curView==='users')renderUsersPage();
     }catch(_){}
   });
-  _sseSource.onerror=()=>{ console.warn('[sse] connection lost — browser will auto-reconnect'); };
+
+  _sseSource.onerror=()=>{
+    _sseSource.close();_sseSource=null;
+    _setSyncDot('yellow','Reconnecting');
+    console.warn('[sse] disconnected — reconnecting in',_sseReconnectDelay,'ms');
+    _sseReconnectTimer=setTimeout(()=>{
+      _sseReconnectDelay=Math.min(_sseReconnectDelay*2,30000);
+      initSseListener();
+    },_sseReconnectDelay);
+  };
 }
+
+// Poll /api/active-users every 60s and update the online count badge
+let _activeUsersPollTimer=null;
+async function _pollActiveUsers(){
+  try{
+    const r=await fetch('/api/active-users',{headers:{Authorization:'Bearer '+_getToken()},cache:'no-store'});
+    if(r.ok){
+      const users=await r.json();
+      const cnt=document.getElementById('online-count');
+      if(cnt)cnt.textContent=users.length||1;
+    }
+  }catch(_){}
+}
+
+// Reconnect SSE when tab becomes visible again after being hidden
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible')return;
+  if(!_sseSource||_sseSource.readyState===EventSource.CLOSED){
+    console.log('[sse] tab visible — reconnecting SSE');
+    initSseListener();
+  }
+});
+
+// Handle network online/offline
+window.addEventListener('online',()=>{
+  _setSyncDot('yellow','Reconnecting');
+  console.log('[network] back online — reconnecting');
+  initSseListener();
+  // Retry any pending saves
+  const pending=Object.values(_pendingRetries);
+  if(pending.length){_pendingRetries={};pending.forEach(p=>_doServerPost(p.key,p.value,3));}
+});
+window.addEventListener('offline',()=>{
+  _setSyncDot('red','Offline');
+  console.warn('[network] offline');
+  toast('No internet connection — changes will retry when reconnected','err');
+});
 
 // Merge an incoming SSE project snapshot into STORE[pid] without clobbering in-flight local edits.
 // Arrays are merged by id (incoming wins for matching id). Scalar fields replaced by incoming.
@@ -7373,6 +7455,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
     setInterval(()=>rlCheckAutoTransitions(), 60000);
     // ── Real-time multi-user sync via SSE ──
     initSseListener();
+    // Poll active users count every 60s
+    setInterval(_pollActiveUsers, 60000);
     // ── Flush all unsaved data when user closes or navigates away ──
     window.addEventListener('beforeunload', ()=>_flushAllUnsaved());
   }

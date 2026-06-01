@@ -70,13 +70,17 @@ const PORT = Number(process.env.PORT) || 7777;
 const IS_PROD = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
 
 // ── Real-time SSE broadcast ──
-const _sseClients = new Set();
+// Map: clientId → { res, userId, userName, connectedAt }
+const _sseClients = new Map();
+
 function broadcastSseEvent(eventName, data, sourceClientId) {
     if (!_sseClients.size) return;
     const payload = `event: ${eventName}\ndata: ${JSON.stringify({ ...data, sourceClientId: sourceClientId || null })}\n\n`;
-    for (const client of _sseClients) {
-        try { client.write(payload); } catch (_) { _sseClients.delete(client); }
+    const dead = [];
+    for (const [clientId, client] of _sseClients) {
+        try { client.res.write(payload); } catch (_) { dead.push(clientId); }
     }
+    dead.forEach(id => _sseClients.delete(id));
 }
 const bcrypt = require('bcryptjs');
 const jwt    = require('jsonwebtoken');
@@ -4447,19 +4451,58 @@ app.get('/api/health', async (req, res) => {
 
 // GET /api/events — SSE stream; pushes qa-data-update/delete events to all connected clients
 app.get('/api/events', (req, res) => {
-    if (!isAuthenticated(req)) return res.status(401).end();
+    // Accept JWT via query param (EventSource can't send custom headers)
+    // or fall back to cookie auth for legacy clients
+    let userId = 'anonymous', userName = 'User';
+    const qToken = req.query.token;
+    if (qToken) {
+        const p = verifyJwt(qToken);
+        if (!p) return res.status(401).end();
+        userId = p.id || p.email || 'user';
+        userName = p.name || p.email || 'User';
+    } else if (!isAuthenticated(req)) {
+        return res.status(401).end();
+    } else {
+        const s = getSessionFromCookie(req);
+        if (s) { userId = s.email || 'user'; userName = s.name || s.email || 'User'; }
+    }
+
+    const clientId = 'c_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2);
+
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // disable nginx proxy buffering
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
-    res.write('event: connected\ndata: {"ok":true}\n\n');
-    _sseClients.add(res);
-    // Keepalive ping every 25s to prevent proxy/load-balancer timeouts
+
+    // Send client its own ID so it can skip its own broadcasts
+    res.write(`event: connected\ndata: ${JSON.stringify({ ok: true, clientId, userId, userName })}\n\n`);
+
+    _sseClients.set(clientId, { res, userId, userName, connectedAt: new Date() });
+    console.log(`[SSE] ${userName} connected (${clientId}). Total: ${_sseClients.size}`);
+
+    // Keepalive ping every 25s — prevents Railway/proxy timeouts
     const ping = setInterval(() => {
-        try { res.write(': ping\n\n'); } catch (_) { clearInterval(ping); _sseClients.delete(res); }
+        try { res.write(': ping\n\n'); }
+        catch (_) { clearInterval(ping); _sseClients.delete(clientId); }
     }, 25000);
-    req.on('close', () => { clearInterval(ping); _sseClients.delete(res); });
+
+    req.on('close', () => {
+        clearInterval(ping);
+        _sseClients.delete(clientId);
+        console.log(`[SSE] ${userName} disconnected. Total: ${_sseClients.size}`);
+    });
+    req.on('error', () => { clearInterval(ping); _sseClients.delete(clientId); });
+});
+
+// GET /api/active-users — who is currently connected via SSE
+app.get('/api/active-users', (req, res) => {
+    if (!isAuthenticated(req) && !verifyJwt(getBearerToken(req))) return res.status(401).json({ error: 'Unauthorized' });
+    const seen = new Map();
+    for (const { userId, userName, connectedAt } of _sseClients.values()) {
+        if (!seen.has(userId)) seen.set(userId, { userId, userName, connectedAt });
+    }
+    res.json(Array.from(seen.values()));
 });
 
 // GET /api/backup — download full qa-shared.json as a file (for manual backup)
