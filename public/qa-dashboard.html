@@ -1905,6 +1905,16 @@ function doLogout(){
 }
 
 // Apply role-based permissions — hide/show admin-only UI elements
+// Silently refresh JWT every 6h so sessions never expire mid-workday
+async function _silentTokenRefresh(){
+  const token=_getToken();
+  if(!token)return;
+  try{
+    const r=await fetch('/api/auth/refresh',{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}});
+    if(r.ok){const d=await r.json();if(d.token){_setToken(d.token);console.log('[auth] token refreshed silently');}}
+  }catch(_){}
+}
+
 function applyRolePermissions(){
   const admin=isAdmin();
   // All delete buttons hidden for non-admins
@@ -2118,7 +2128,7 @@ function goHome(){curView='home';renderProjectGrid();}
 
 // ══ RENDER PROJECT ══
 function renderProject(p){
-  if(curView==='users'){renderUsersPage();return;}
+  // Users is now a modal overlay — no page nav needed here
   if(curView==='dailytasks'){renderDailyTasksPage();return;}
   if(curView==='teamtasks'){renderTeamTasksPage();return;}
   if(curView==='todayreleases'){renderReleasesPage('today');return;}
@@ -3706,7 +3716,25 @@ function showPendingOverview(){
 
 // USER MANAGEMENT PAGE
 // ══════════════════════════════════════════════════════
-function showUsers(){curView='users';renderUsersPage();}
+function showUsers(){
+  // Open as modal overlay — do NOT change curView so current screen stays intact
+  if(!isAdmin()){toast('Admin access required','err');return;}
+  let modal=document.getElementById('users-overlay-modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='users-overlay-modal';
+    modal.style.cssText='position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;backdrop-filter:blur(2px)';
+    modal.onclick=e=>{if(e.target===modal)closeUsersModal();};
+    document.body.appendChild(modal);
+  }
+  modal.style.display='flex';
+  modal.innerHTML='<div style="background:var(--card);border-radius:16px;width:100%;max-width:760px;box-shadow:0 24px 80px rgba(0,0,0,.3);overflow:hidden" onclick="event.stopPropagation()"><div id="users-modal-inner" style="padding:0"></div></div>';
+  renderUsersModal();
+}
+function closeUsersModal(){
+  const m=document.getElementById('users-overlay-modal');
+  if(m)m.style.display='none';
+}
 function showProject(){curView='project';renderProject(curProj);}
 function showDailyTasks(){
   curView='dailytasks';
@@ -5193,9 +5221,18 @@ async function _apiCall(url,opts={}){
 // ── User Management (uses /api/users routes with JWT auth) ───────────────────
 let _usersCache=[]; // populated by renderUsersPage
 
+// renderUsersPage kept for SSE qa-users-update compatibility — delegates to modal
 async function renderUsersPage(){
-  if(!isAdmin()){toast('Admin access required','err');goHome();return;}
-  document.getElementById('app').innerHTML=`<div style="padding:24px;color:var(--mut)">Loading users…</div>`;
+  // If modal is open, refresh it; otherwise re-open it
+  const m=document.getElementById('users-overlay-modal');
+  if(m&&m.style.display!=='none') await renderUsersModal();
+  // do NOT replace app innerHTML or change curView
+}
+
+async function renderUsersModal(){
+  const inner=document.getElementById('users-modal-inner');
+  if(!inner)return;
+  inner.innerHTML=`<div style="padding:20px 24px;color:var(--mut)">Loading…</div>`;
   try{
     const r=await _apiCall('/api/users');
     if(!r)return;
@@ -5216,15 +5253,15 @@ async function renderUsersPage(){
       </td>
     </tr>`;
   }).join('');
-  document.getElementById('app').innerHTML=`
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding:22px 24px 0">
-      <div><h2 style="font-size:20px;font-weight:800;background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">👥 User Management</h2><div style="font-size:13px;color:var(--mut);margin-top:3px">${_usersCache.length} user${_usersCache.length!==1?'s':''} in workspace</div></div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-primary" onclick="openAddUser()">＋ Add User</button>
-        <button class="btn btn-secondary" onclick="goHome()">← Back to Projects</button>
+  inner.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid var(--border)">
+      <div><h2 style="font-size:18px;font-weight:800;background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">👥 User Management</h2><div style="font-size:12px;color:var(--mut);margin-top:2px">${_usersCache.length} user${_usersCache.length!==1?'s':''} in workspace</div></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-primary" style="font-size:12px;padding:6px 14px" onclick="openAddUser()">＋ Add User</button>
+        <button class="btn-icon" onclick="closeUsersModal()" title="Close" style="font-size:18px;color:var(--mut)">✕</button>
       </div>
     </div>
-    <div style="padding:0 24px 24px"><div class="user-list"><table class="utbl">
+    <div style="padding:0 24px 24px;max-height:70vh;overflow-y:auto"><div class="user-list"><table class="utbl" style="margin-top:16px">
       <thead><tr><th>User</th><th>Role</th><th>Actions</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div></div>`;
@@ -5258,7 +5295,7 @@ function openAddUser(){
       // Also add to local qa_users cache for getTeamMembers() fallback
       const users=getUsers();users.push({id:d.id,name,email,role,isActive:true});saveUsers(users);
       await _loadTeamMembersFromServer();
-      closeModal();renderUsersPage();toast('User added ✓');
+      closeModal();renderUsersModal();toast('User added ✓');
     }catch(e){toast('Failed to add user','err');return false;}
   });
 }
@@ -5294,7 +5331,7 @@ function openEditUser(i){
       if(idx>=0){users[idx]={...users[idx],name,email,role};saveUsers(users);}
       if(_session&&_session.id===u.id){_session.name=name;_session.email=email;_session.role=role;renderTopBar();}
       await _loadTeamMembersFromServer();
-      closeModal();renderUsersPage();toast('User updated ✓');
+      closeModal();renderUsersModal();toast('User updated ✓');
     }catch(e){toast('Failed to update user','err');return false;}
   });
 }
@@ -5314,7 +5351,7 @@ async function deleteUser(i){
       if(r&&r.ok){toast('User deactivated ✓');}
     }
     await _loadTeamMembersFromServer();
-    renderUsersPage();
+    renderUsersModal();
   }catch(e){toast('Failed','err');}
 }
 // ══════════════════════════════════════════════════════
@@ -6783,7 +6820,9 @@ function initSseListener(){
           else if(updates)Object.assign(_teamMembersCache[idx],updates);
         }
       }
-      if(curView==='users')renderUsersPage();
+      // Refresh users modal if it's currently open
+      const _um=document.getElementById('users-overlay-modal');
+      if(_um&&_um.style.display!=='none')renderUsersModal();
     }catch(_){}
   });
 
@@ -6882,7 +6921,8 @@ function _applySseUpdate(key,value){
     loadReleases();
   }else if(key==='qa_users'){
     initUsers();
-    if(curView==='users'&&!userTyping)renderUsersPage();
+    // Users is a modal now — refresh it if open, no page navigation
+    {const _um=document.getElementById('users-overlay-modal');if(_um&&_um.style.display!=='none'&&!userTyping)renderUsersModal();}
   }else if(key.startsWith('qa3_')){
     const pid=key.replace('qa3_','');
     if(STORE[pid]&&value&&typeof value==='object'&&!Array.isArray(value)){
@@ -7464,6 +7504,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
     initSseListener();
     // Poll active users count every 60s
     setInterval(_pollActiveUsers, 60000);
+    // ── Silent token refresh every 6 hours — prevents mid-session logout ──
+    setInterval(_silentTokenRefresh, 6*60*60*1000);
     // ── Flush all unsaved data when user closes or navigates away ──
     window.addEventListener('beforeunload', ()=>_flushAllUnsaved());
   }

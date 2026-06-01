@@ -330,6 +330,18 @@ app.get('/api/auth/me', (req, res) => {
     res.status(401).json({ error: 'Not authenticated' });
 });
 
+// POST /api/auth/refresh — silently issue a new 7-day token before the current one expires
+app.post('/api/auth/refresh', (req, res) => {
+    const jwtPayload = verifyJwt(getBearerToken(req));
+    if (!jwtPayload) {
+        const session = getSessionFromCookie(req);
+        if (!session) return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const p = jwtPayload || {};
+    const token = signJwt({ id: p.id || 'u_sa', name: p.name || 'User', email: p.email || '', role: p.role || 'member' });
+    res.json({ token });
+});
+
 // ── User management routes ────────────────────────────────────────────────────
 // GET /api/users — list all users (no passwords)
 app.get('/api/users', async (req, res) => {

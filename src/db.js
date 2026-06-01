@@ -238,10 +238,12 @@ async function writeKey(key, value) {
         return;
     }
     if (key === 'qa3_team_tasks') {
-        // Team tasks also have their own projectId per task
+        // Team tasks have their own projectId per task — never use 'global'
         await db.collection('team_tasks').deleteMany({});
         if (Array.isArray(value) && value.length > 0) {
-            await Promise.all(value.map(t => _upsertDoc('team_tasks', t.projectId || 'global', t)));
+            // Skip tasks with no real projectId to prevent global pollution
+            const realTasks = value.filter(t => t && t.projectId && t.projectId !== 'global');
+            if (realTasks.length) await Promise.all(realTasks.map(t => _upsertDoc('team_tasks', t.projectId, t)));
         }
         return;
     }
