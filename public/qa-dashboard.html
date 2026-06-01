@@ -6934,6 +6934,17 @@ function _setSyncDot(color,text){
 let _sseReconnectDelay=1000; // exponential backoff: 1s→2s→4s→8s→16s→30s max
 let _sseReconnectTimer=null;
 
+// SSE grace period: ignore data events for 3s after connect to suppress startup noise
+let _sseConnectedAt=0;
+const _SSE_GRACE_MS=3000;
+// Toast cooldown: don't show "updated live" toast more than once per 8s
+let _lastSseToast={};
+function _sseToastCooldown(key){
+  const now=Date.now();
+  if(now-(_lastSseToast[key]||0)<8000)return false;
+  _lastSseToast[key]=now;return true;
+}
+
 function initSseListener(){
   clearTimeout(_sseReconnectTimer);
   if(_sseSource){_sseSource.close();_sseSource=null;}
@@ -6949,6 +6960,7 @@ function initSseListener(){
       if(d.clientId)window._SSE_CLIENT_ID=d.clientId;
       console.log('[sse] connected as',d.userName,'clientId=',d.clientId);
     }catch(_){}
+    _sseConnectedAt=Date.now(); // mark connect time for grace period
     _sseReconnectDelay=1000; // reset backoff on successful connect
     _setSyncDot('green','Live');
     // Poll active user count once on connect
@@ -6961,6 +6973,10 @@ function initSseListener(){
       // Skip own events (use both client-side MY_CLIENT_ID and server-assigned _SSE_CLIENT_ID)
       const myId=window._SSE_CLIENT_ID||MY_CLIENT_ID;
       if(sourceClientId&&sourceClientId===myId)return;
+      // Grace period: ignore data events in the first 3s after connect (startup noise)
+      if(_sseConnectedAt&&Date.now()-_sseConnectedAt<_SSE_GRACE_MS){
+        console.log('[sse] grace period — ignoring startup event for key:',key);return;
+      }
       if(_pendingRetries[key])console.warn('[sse] conflict: remote update for key',key,'— remote wins');
       _serverData[key]=value;
       _applySseUpdate(key,value);
@@ -7103,15 +7119,12 @@ function _applySseUpdate(key,value){
         renderDailyTasksPage();
       }
     } else if(curView!=='dailytasks') {
-      toast('📡 Daily tasks updated live');
+      // Only show toast with cooldown — prevents repeated toasts on startup
+      if(_sseToastCooldown('dt'))toast('📡 Daily tasks updated live');
     }
   }else if(key==='qa3_team_tasks'){
     loadTeamTasks();
-    // Don't re-render team tasks page from SSE — it resets week/scroll state.
-    // User's own saves go through the POST response path; SSE is for OTHER users.
-    // Show a toast only; user can navigate to team tasks to see updates.
-    if(curView!=='teamtasks') toast('📡 Team tasks updated live');
-    // If already on team tasks, only re-render if NOT actively working
+    if(curView!=='teamtasks'){if(_sseToastCooldown('tt'))toast('📡 Team tasks updated live');}
     else if(!userTyping) renderTeamTasksPage();
   }else if(key==='qa3_releases'){
     loadReleases();
@@ -7653,6 +7666,13 @@ window.addEventListener('DOMContentLoaded',async()=>{
 
   initUsers();
   loadAllState();
+  // ── Set heartbeat hashes to CURRENT data immediately after load ──
+  // Without this, the first heartbeat sees all non-empty data as "changed"
+  // (hashes start as '' but data is now loaded) → saves everything on first tick.
+  _lastHbDtHash=JSON.stringify(DAILY_TASKS);
+  _lastHbTtHash=JSON.stringify(TEAM_TASKS);
+  _lastHbRlHash=JSON.stringify(RELEASES);
+  PROJECTS.forEach(p=>{_lastHbStoreHash[p.id]=JSON.stringify(STORE[p.id]);});
 
   // Determine session: JWT token first, then cookie fallback
   try{
