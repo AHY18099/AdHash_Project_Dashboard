@@ -78,8 +78,12 @@ function broadcastSseEvent(eventName, data, sourceClientId) {
         try { client.write(payload); } catch (_) { _sseClients.delete(client); }
     }
 }
-const SUPER_ADMIN_EMAIL = process.env.QA_ADMIN_EMAIL || 'thenilavan@adhashtech.com';
+const bcrypt = require('bcryptjs');
+const jwt    = require('jsonwebtoken');
+
+const SUPER_ADMIN_EMAIL    = process.env.QA_ADMIN_EMAIL    || 'thenilavan@adhashtech.com';
 const SUPER_ADMIN_PASSWORD = process.env.QA_ADMIN_PASSWORD || 'Qateam@123';
+const JWT_SECRET = process.env.JWT_SECRET || 'adhash-qa-jwt-secret-change-in-production-2026';
 
 // Apply defaults so all features work on Railway without manual env var setup
 // GITHUB_TOKEN must be set as a Railway environment variable — no hardcoded fallback
@@ -204,48 +208,229 @@ function setMemberCookie(res, email, name) {
     );
 }
 
-app.post('/api/auth/login', (req, res) => {
-    const email = String(req.body?.email || '').trim().toLowerCase();
-    const password = String(req.body?.password || '');
+// ── JWT helpers ──────────────────────────────────────────────────────────────
+function signJwt(payload) {
+    return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+}
+function verifyJwt(token) {
+    try { return jwt.verify(token, JWT_SECRET); } catch (_) { return null; }
+}
+function getBearerToken(req) {
+    const auth = req.headers.authorization || '';
+    return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+}
+// requireAdmin middleware — returns 403 if not super_admin
+function requireAdmin(req, res, next) {
+    const session = getSessionFromCookie(req);
+    const jwtPayload = verifyJwt(getBearerToken(req));
+    const role = (jwtPayload && jwtPayload.role) || (session && (session.role === SUPER_ADMIN_ROLE ? 'super_admin' : session.role));
+    if (role !== 'super_admin') return res.status(403).json({ error: 'Admin access required' });
+    next();
+}
 
-    // Super admin check
-    if (email === SUPER_ADMIN_EMAIL.toLowerCase() && password === SUPER_ADMIN_PASSWORD) {
-        setAuthCookie(res);
-        return res.json({ success: true, role: SUPER_ADMIN_ROLE, redirectTo: '/landing' });
-    }
-
-    // Member check — look up in shared data file
+// ── Seed super admin in MongoDB on startup ───────────────────────────────────
+async function seedSuperAdmin() {
     try {
-        const data = readQaData();
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        const existing = await db.collection('users').findOne({ role: 'super_admin' });
+        if (existing) return;
+        const hashed = await bcrypt.hash(SUPER_ADMIN_PASSWORD, 12);
+        await db.collection('users').insertOne({
+            id: 'u_sa',
+            name: 'Super Admin',
+            email: SUPER_ADMIN_EMAIL.toLowerCase(),
+            password: hashed,
+            role: 'super_admin',
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        });
+        console.log('[auth] ✅ Super admin seeded in MongoDB');
+    } catch (e) { console.warn('[auth] seedSuperAdmin failed:', e.message); }
+}
+
+app.post('/api/auth/login', async (req, res) => {
+    const email    = String(req.body?.email || '').trim().toLowerCase();
+    const password = String(req.body?.password || '');
+    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+
+        // Look up in MongoDB users collection first
+        const dbUser = db ? await db.collection('users').findOne({ email }) : null;
+        if (dbUser) {
+            if (!dbUser.isActive) return res.status(403).json({ error: 'Account is deactivated' });
+            const valid = await bcrypt.compare(password, dbUser.password).catch(() => false)
+                       || dbUser.password === password; // fallback for legacy plaintext
+            if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
+            // If password was plaintext, upgrade to bcrypt now
+            if (dbUser.password === password) {
+                const hashed = await bcrypt.hash(password, 12);
+                await db.collection('users').updateOne({ email }, { $set: { password: hashed, updatedAt: new Date() } });
+            }
+            const payload = { id: dbUser.id, name: dbUser.name, email: dbUser.email, role: dbUser.role };
+            const token   = signJwt(payload);
+            // Also set legacy cookie so existing cookie-auth routes keep working
+            if (dbUser.role === 'super_admin') setAuthCookie(res);
+            else setMemberCookie(res, dbUser.email, dbUser.name);
+            return res.json({ success: true, token, user: payload, redirectTo: '/landing' });
+        }
+
+        // Legacy fallback: super admin env var check
+        if (email === SUPER_ADMIN_EMAIL.toLowerCase() && password === SUPER_ADMIN_PASSWORD) {
+            setAuthCookie(res);
+            const payload = { id: 'u_sa', name: 'Super Admin', email: SUPER_ADMIN_EMAIL, role: 'super_admin' };
+            return res.json({ success: true, token: signJwt(payload), user: payload, redirectTo: '/landing' });
+        }
+
+        // Legacy member check in qa_users cache
+        const data  = readQaData();
         const users = Array.isArray(data['qa_users']) ? data['qa_users'] : [];
-        const user = users.find(u =>
-            u.email && u.email.toLowerCase() === email &&
-            u.password === password &&
-            u.role === 'member'
-        );
+        const user  = users.find(u => u.email && u.email.toLowerCase() === email && u.password === password);
         if (user) {
             setMemberCookie(res, user.email, user.name);
-            return res.json({ success: true, role: 'member', name: user.name, redirectTo: '/landing' });
+            const payload = { id: user.id || user.email, name: user.name, email: user.email, role: user.role || 'member' };
+            return res.json({ success: true, token: signJwt(payload), user: payload, redirectTo: '/landing' });
         }
-    } catch (_) {}
+    } catch (e) { console.error('[auth] login error:', e.message); }
 
-    return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+    return res.status(401).json({ success: false, error: 'Invalid email or password' });
 });
 
 app.get('/api/auth/session', (req, res) => {
+    // Support both JWT Bearer token and legacy cookie
+    const jwtPayload = verifyJwt(getBearerToken(req));
+    if (jwtPayload) {
+        return res.json({ authenticated: true, role: jwtPayload.role, email: jwtPayload.email, name: jwtPayload.name, id: jwtPayload.id });
+    }
     const session = getSessionFromCookie(req);
-    const authenticated = !!session;
-    res.json({
-        authenticated,
-        role: session ? session.role : null,
-        email: session ? session.email : null,
-        name: session ? session.name : null
-    });
+    if (session) {
+        return res.json({ authenticated: true, role: session.role === SUPER_ADMIN_ROLE ? 'super_admin' : session.role, email: session.email, name: session.name });
+    }
+    res.json({ authenticated: false });
 });
 
 app.post('/api/auth/logout', (req, res) => {
     clearAuthCookie(res);
     res.json({ success: true });
+});
+
+// GET /api/auth/me — verify token
+app.get('/api/auth/me', (req, res) => {
+    const jwtPayload = verifyJwt(getBearerToken(req));
+    if (jwtPayload) return res.json({ user: jwtPayload });
+    const session = getSessionFromCookie(req);
+    if (session) return res.json({ user: { ...session, role: session.role === SUPER_ADMIN_ROLE ? 'super_admin' : session.role } });
+    res.status(401).json({ error: 'Not authenticated' });
+});
+
+// ── User management routes ────────────────────────────────────────────────────
+// GET /api/users — list all users (no passwords)
+app.get('/api/users', async (req, res) => {
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        if (!db) return res.json([]);
+        const users = await db.collection('users')
+            .find({}, { projection: { password: 0, _id: 0, updatedAt: 0, createdAt: 0 } })
+            .sort({ createdAt: 1 }).toArray();
+        res.json(users);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/users/names — lightweight list for dropdowns (active users only)
+app.get('/api/users/names', async (req, res) => {
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        if (!db) {
+            // Fallback to qa_users cache
+            const data = readQaData();
+            const users = Array.isArray(data['qa_users']) ? data['qa_users'] : [];
+            return res.json(users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role || 'member' })));
+        }
+        const users = await db.collection('users')
+            .find({ isActive: true }, { projection: { id: 1, name: 1, email: 1, role: 1, _id: 0 } })
+            .sort({ name: 1 }).toArray();
+        res.json(users);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/users — add new user (admin only)
+app.post('/api/users', requireAdmin, async (req, res) => {
+    try {
+        const { name, email, password, role } = req.body || {};
+        if (!name || !email || !password) return res.status(400).json({ error: 'Name, email and password required' });
+        if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        const existing = db ? await db.collection('users').findOne({ email: email.toLowerCase() }) : null;
+        if (existing) return res.status(400).json({ error: 'Email already exists' });
+        const hashed = await bcrypt.hash(password, 12);
+        const user = {
+            id: 'u_' + Date.now().toString(36),
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            password: hashed,
+            role: (role === 'super_admin') ? 'super_admin' : 'member',
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+        if (db) await db.collection('users').insertOne(user);
+        // Also sync to qa_users cache so legacy getTeamMembers() still works
+        const data = readQaData();
+        const users = Array.isArray(data['qa_users']) ? data['qa_users'] : [];
+        users.push({ id: user.id, name: user.name, email: user.email, role: user.role, password });
+        _qaCache['qa_users'] = users;
+        await require('./src/db').writeKey('qa_users', users).catch(() => {});
+        broadcastSseEvent('qa-users-update', { action: 'add', user: { id: user.id, name: user.name, email: user.email, role: user.role, isActive: true } });
+        res.json({ id: user.id, name: user.name, email: user.email, role: user.role, isActive: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT /api/users/:id — edit user (admin only)
+app.put('/api/users/:id', requireAdmin, async (req, res) => {
+    try {
+        const { name, email, password, role, isActive } = req.body || {};
+        const updates = { updatedAt: new Date() };
+        if (name     !== undefined) updates.name     = name.trim();
+        if (email    !== undefined) updates.email    = email.trim().toLowerCase();
+        if (role     !== undefined) updates.role     = role === 'super_admin' ? 'super_admin' : 'member';
+        if (isActive !== undefined) updates.isActive = !!isActive;
+        if (password) updates.password = await bcrypt.hash(password, 12);
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        if (db) await db.collection('users').updateOne({ id: req.params.id }, { $set: updates });
+        // Sync to qa_users cache
+        const data = readQaData();
+        const users = Array.isArray(data['qa_users']) ? data['qa_users'] : [];
+        const idx = users.findIndex(u => u.id === req.params.id);
+        if (idx >= 0) {
+            if (updates.name)     users[idx].name     = updates.name;
+            if (updates.email)    users[idx].email    = updates.email;
+            if (updates.role)     users[idx].role     = updates.role;
+            if (updates.isActive !== undefined) users[idx].isActive = updates.isActive;
+            if (password)         users[idx].password = password; // plaintext for legacy fallback
+            _qaCache['qa_users'] = users;
+        }
+        broadcastSseEvent('qa-users-update', { action: 'update', userId: req.params.id, updates: { name: updates.name, email: updates.email, role: updates.role, isActive: updates.isActive } });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/users/:id — deactivate (admin only, never hard-delete)
+app.delete('/api/users/:id', requireAdmin, async (req, res) => {
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        if (db) await db.collection('users').updateOne({ id: req.params.id }, { $set: { isActive: false, updatedAt: new Date() } });
+        broadcastSseEvent('qa-users-update', { action: 'deactivate', userId: req.params.id });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Store test execution status
@@ -4850,6 +5035,7 @@ async function migrateWfDocsToGitHub() {
             console.log(`[startup] ✅ Loaded ${Object.keys(_qaCache).length} keys from MongoDB (attempt ${attempt})`);
             // Dedup all project data in MongoDB — removes any accumulated duplicates
             try { await deduplicateAllProjectData(); } catch (e) { console.error('[startup] dedup failed:', e.message); }
+            try { await seedSuperAdmin(); } catch (e) { console.warn('[startup] seedSuperAdmin failed:', e.message); }
         } catch (e) {
             console.error(`[startup] ⚠️  MongoDB attempt ${attempt} failed: ${e.message} — retrying in 5s`);
             setTimeout(() => connectWithRetry(attempt + 1), 5000);

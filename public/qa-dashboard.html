@@ -1823,6 +1823,22 @@ function platformSwitcher(p,currentTab){
 const QA_SA_EMAIL='thenilavan@adhashtech.com';
 function getUsers(){return _serverData['qa_users']||[];}
 function saveUsers(u){_serverData['qa_users']=u;serverPost('qa_users',u);}
+// JWT token stored in localStorage
+function _getToken(){return localStorage.getItem('qa_jwt_token')||'';}
+function _setToken(t){if(t)localStorage.setItem('qa_jwt_token',t);else localStorage.removeItem('qa_jwt_token');}
+
+// Cached team members from /api/users/names (loaded after login)
+let _teamMembersCache=[];
+async function _loadTeamMembersFromServer(){
+  try{
+    const r=await fetch('/api/users/names',{headers:{Authorization:'Bearer '+_getToken()},cache:'no-store'});
+    if(r.ok){const data=await r.json();if(Array.isArray(data)&&data.length>0){_teamMembersCache=data;return;}}
+  }catch(_){}
+  // Fallback: use qa_users cache
+  const users=getUsers();
+  if(users.length)_teamMembersCache=users.map(u=>({id:u.id,name:u.name,email:u.email,role:u.role||'member'}));
+}
+
 const DEFAULT_MEMBER_PASSWORD='Adhashq@786';
 const DEFAULT_TEAM_MEMBERS=[
   {id:'u_deepa',      name:'Deepa',      email:'deepa@adhashtech.com',      role:'member'},
@@ -1843,7 +1859,6 @@ function initUsers(){
       users.push({...m,password:DEFAULT_MEMBER_PASSWORD,createdAt:new Date().toISOString()});
       changed=true;
     } else {
-      // Ensure existing members without a password get the default
       const existing=users.find(u=>u.id===m.id);
       if(!existing.password){existing.password=DEFAULT_MEMBER_PASSWORD;changed=true;}
     }
@@ -1851,24 +1866,51 @@ function initUsers(){
   if(changed)saveUsers(users);
 }
 function me(){return _session||null;}
-function isAdmin(){return _session&&_session.role==='super_admin';}
-function doLogin(){
+function isAdmin(){return _session&&(_session.role==='super_admin'||_session.role==='super-admin');}
+
+async function doLogin(){
   const email=document.getElementById('l-email').value.trim().toLowerCase();
   const pwd=document.getElementById('l-pwd').value;
   const errEl=document.getElementById('login-err');
+  const btn=document.querySelector('#login-page button[onclick*="doLogin"]');
   errEl.classList.remove('show');
-  const users=getUsers();
-  const u=users.find(x=>x.email.toLowerCase()===email&&x.password===pwd);
-  if(!u){errEl.textContent='Invalid email or password.';errEl.classList.add('show');return;}
-  _session={id:u.id,name:u.name,email:u.email,role:u.role};
-  document.getElementById('login-page').style.display='none';
-  document.getElementById('dashboard').style.display='block';
-  PROJECTS.forEach(p=>{curTab[p.id]=curTab[p.id]||'projoverview';});
-  renderTopBar();renderProjectGrid();
+  if(btn){btn.disabled=true;btn.textContent='Signing in…';}
+  try{
+    const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pwd})});
+    const d=await r.json();
+    if(!r.ok||!d.success){throw new Error(d.error||d.message||'Invalid email or password');}
+    _setToken(d.token||'');
+    _session={id:d.user?.id||'u_sa',name:d.user?.name||'User',email:d.user?.email||email,role:d.user?.role||'member'};
+    await _loadTeamMembersFromServer();
+    document.getElementById('login-page').style.display='none';
+    document.getElementById('dashboard').style.display='block';
+    PROJECTS.forEach(p=>{curTab[p.id]=curTab[p.id]||'projoverview';});
+    applyRolePermissions();
+    renderTopBar();renderProjectGrid();
+  }catch(e){
+    errEl.textContent=e.message||'Invalid email or password.';
+    errEl.classList.add('show');
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='Sign In →';}
+  }
 }
+
 function doLogout(){
+  if(!confirm('Sign out?'))return;
+  _setToken('');
   _session=null;
+  _teamMembersCache=[];
+  fetch('/api/auth/logout',{method:'POST'}).catch(()=>{});
   window.location.href='/landing';
+}
+
+// Apply role-based permissions — hide/show admin-only UI elements
+function applyRolePermissions(){
+  const admin=isAdmin();
+  // All delete buttons hidden for non-admins
+  document.querySelectorAll('.btn-icon.del,[data-admin-only]').forEach(el=>{
+    el.style.display=admin?'':'none';
+  });
 }
 
 // ══ TOP BAR ══
@@ -3776,8 +3818,10 @@ function dtDayInfo(dateStr){
 function dtProjColor(pid){return PROJECTS.find(x=>x.id===pid)?.color||'#94a3b8';}
 function dtProjName(pid){return PROJECTS.find(x=>x.id===pid)?.name||pid;}
 
-// Team members for Assigned By dropdown — built dynamically from User Management
+// Team members for Assigned By dropdown — from server cache, fallback to qa_users
 function getTeamMembers(){
+  if(_teamMembersCache&&_teamMembersCache.length>0)
+    return _teamMembersCache.filter(u=>u.isActive!==false).map(u=>u.name).sort((a,b)=>a.localeCompare(b));
   const users=getUsers();
   if(!users||!users.length)return['Deepa','Prakash Raj','Raghuram','Thenilavan','Yogesh'];
   return users.map(u=>u.name).sort((a,b)=>a.localeCompare(b));
@@ -5138,95 +5182,139 @@ function rlOpenEdit(idx){
   openModal('Edit Release',rlBuildModalBody(entry,mode),()=>rlSaveEntry(idx,mode));
 }
 
-function renderUsersPage(){
-  const users=getUsers();
-  const rows=users.map((u,i)=>{
+// ── _apiCall: authenticated fetch helper ─────────────────────────────────────
+async function _apiCall(url,opts={}){
+  const r=await fetch(url,{...opts,headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken(),...(opts.headers||{})}});
+  if(r.status===401){doLogout();return null;}
+  return r;
+}
+
+// ── User Management (uses /api/users routes with JWT auth) ───────────────────
+let _usersCache=[]; // populated by renderUsersPage
+
+async function renderUsersPage(){
+  if(!isAdmin()){toast('Admin access required','err');goHome();return;}
+  document.getElementById('app').innerHTML=`<div style="padding:24px;color:var(--mut)">Loading users…</div>`;
+  try{
+    const r=await _apiCall('/api/users');
+    if(!r)return;
+    _usersCache=await r.json();
+  }catch(e){_usersCache=getUsers();}
+
+  const rows=_usersCache.map((u,i)=>{
     const initials=u.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
     const ava=u.role==='super_admin'?'var(--inp)':'var(--grad-b)';
     const avaBg=u.role==='super_admin'?'rgba(59,130,246,.15)':'rgba(139,92,246,.15)';
-    return`<tr>
-      <td><div style="display:flex;align-items:center;gap:9px"><div style="width:32px;height:32px;border-radius:50%;background:${avaBg};color:${ava};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${initials}</div><div><div style="font-weight:700;font-size:13px">${u.name}</div><div style="font-size:11px;color:var(--mut)">${u.email}</div></div></div></td>
-      <td><span class="role-badge ${u.role}">${u.role==='super_admin'?'Super Admin':'Member'}</span></td>
-      <td style="font-size:11px;color:var(--mut)">${u.createdAt?new Date(u.createdAt).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}):'—'}</td>
+    const statusBadge=u.isActive===false?`<span style="font-size:10px;color:#ef4444;background:rgba(239,68,68,.1);padding:2px 6px;border-radius:4px;border:1px solid rgba(239,68,68,.3)">Inactive</span>`:'';
+    return`<tr style="${u.isActive===false?'opacity:.5':''}">
+      <td><div style="display:flex;align-items:center;gap:9px"><div style="width:32px;height:32px;border-radius:50%;background:${avaBg};color:${ava};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${initials}</div><div><div style="font-weight:700;font-size:13px">${escH(u.name)} ${statusBadge}</div><div style="font-size:11px;color:var(--mut)">${escH(u.email)}</div></div></div></td>
+      <td><span class="role-badge ${u.role}">${u.role==='super_admin'?'👑 Super Admin':'👤 Member'}</span></td>
       <td class="act-cell">
         <button class="btn-icon" onclick="openEditUser(${i})">✏ Edit</button>
-        ${u.id!=='u_sa'?`<button class="btn-icon del" onclick="deleteUser(${i})">✕ Delete</button>`:'<span style="font-size:10px;color:var(--mut)">Super Admin</span>'}
+        ${u.id!=='u_sa'&&u.id!==_session?.id?`<button class="btn-icon del" onclick="deleteUser(${i})" title="${u.isActive===false?'Activate':'Deactivate'}">${u.isActive===false?'✓ Activate':'✕ Deactivate'}</button>`:'<span style="font-size:10px;color:var(--mut)">You</span>'}
       </td>
     </tr>`;
   }).join('');
   document.getElementById('app').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding:22px 24px 0">
-      <div><h2 style="font-size:20px;font-weight:800;background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">👥 User Management</h2><div style="font-size:13px;color:var(--mut);margin-top:3px">${users.length} user${users.length!==1?'s':''} in workspace</div></div>
+      <div><h2 style="font-size:20px;font-weight:800;background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">👥 User Management</h2><div style="font-size:13px;color:var(--mut);margin-top:3px">${_usersCache.length} user${_usersCache.length!==1?'s':''} in workspace</div></div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-primary" onclick="openAddUser()">＋ Add User</button>
         <button class="btn btn-secondary" onclick="goHome()">← Back to Projects</button>
       </div>
     </div>
     <div style="padding:0 24px 24px"><div class="user-list"><table class="utbl">
-      <thead><tr><th>User</th><th>Role</th><th>Created</th><th>Actions</th></tr></thead>
+      <thead><tr><th>User</th><th>Role</th><th>Actions</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div></div>`;
 }
+
 function openAddUser(){
+  if(!isAdmin()){toast('Admin access required','err');return;}
   openModal('Add New User',`
     <div class="fg-row">
-      <div class="fg"><label>Full Name</label><input id="u-name" placeholder="e.g. John Smith" autocomplete="off"></div>
-      <div class="fg"><label>Role</label><select id="u-role"><option value="member">Member</option><option value="super_admin">Super Admin</option></select></div>
+      <div class="fg"><label>Full Name *</label><input id="u-name" placeholder="e.g. John Smith" autocomplete="off"></div>
+      <div class="fg"><label>Role</label><select id="u-role"><option value="member">Team Member</option><option value="super_admin">Super Admin</option></select></div>
     </div>
-    <div class="fg"><label>Email Address</label><input type="email" id="u-email" placeholder="user@company.com" autocomplete="off"></div>
+    <div class="fg"><label>Email Address *</label><input type="email" id="u-email" placeholder="user@company.com" autocomplete="off"></div>
     <div class="fg-row">
-      <div class="fg"><label>Password</label><input type="password" id="u-pwd" placeholder="Set a password" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"></div>
+      <div class="fg"><label>Password *</label><input type="password" id="u-pwd" placeholder="Min 6 characters" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"></div>
       <div class="fg"><label>Confirm Password</label><input type="password" id="u-pwd2" placeholder="Repeat password" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"></div>
-    </div>`,()=>{
+    </div>`,async()=>{
     const name=document.getElementById('u-name').value.trim();
     const email=document.getElementById('u-email').value.trim().toLowerCase();
     const pwd=document.getElementById('u-pwd').value;
     const pwd2=document.getElementById('u-pwd2').value;
     const role=document.getElementById('u-role').value;
-    if(!name||!email||!pwd){toast('All fields are required','err');return;}
-    if(pwd!==pwd2){toast('Passwords do not match','err');return;}
-    const users=getUsers();
-    if(users.find(u=>u.email.toLowerCase()===email)){toast('Email already in use','err');return;}
-    users.push({id:'u_'+Date.now(),name,email,password:pwd,role,createdAt:new Date().toISOString()});
-    saveUsers(users);closeModal();renderUsersPage();
-    toast('User added successfully');
+    if(!name||!email||!pwd){toast('All fields are required','err');return false;}
+    if(pwd.length<6){toast('Password must be at least 6 characters','err');return false;}
+    if(pwd!==pwd2){toast('Passwords do not match','err');return false;}
+    try{
+      const r=await _apiCall('/api/users',{method:'POST',body:JSON.stringify({name,email,password:pwd,role})});
+      if(!r)return false;
+      const d=await r.json();
+      if(!r.ok){toast(d.error||'Failed to add user','err');return false;}
+      // Also add to local qa_users cache for getTeamMembers() fallback
+      const users=getUsers();users.push({id:d.id,name,email,role,isActive:true});saveUsers(users);
+      await _loadTeamMembersFromServer();
+      closeModal();renderUsersPage();toast('User added ✓');
+    }catch(e){toast('Failed to add user','err');return false;}
   });
 }
+
 function openEditUser(i){
-  const users=getUsers();const u=users[i];
+  const u=_usersCache[i]||getUsers()[i];if(!u)return;
   openModal('Edit User',`
     <div class="fg-row">
-      <div class="fg"><label>Full Name</label><input id="eu-name" value="${u.name}" autocomplete="off"></div>
-      <div class="fg"><label>Role</label><select id="eu-role"><option value="member"${u.role==='member'?' selected':''}>Member</option><option value="super_admin"${u.role==='super_admin'?' selected':''}>Super Admin</option></select></div>
+      <div class="fg"><label>Full Name</label><input id="eu-name" value="${escH(u.name)}" autocomplete="off"></div>
+      <div class="fg"><label>Role</label><select id="eu-role"><option value="member"${u.role==='member'?' selected':''}>Team Member</option><option value="super_admin"${u.role==='super_admin'?' selected':''}>Super Admin</option></select></div>
     </div>
-    <div class="fg"><label>Email Address</label><input type="email" id="eu-email" value="${u.email}" autocomplete="off" ${u.id==='u_sa'?'readonly':''}></div>
+    <div class="fg"><label>Email Address</label><input type="email" id="eu-email" value="${escH(u.email)}" autocomplete="off" ${u.id==='u_sa'?'readonly':''}></div>
     <div class="fg-row">
       <div class="fg"><label>New Password <span style="color:var(--mut)">(leave blank to keep)</span></label><input type="password" id="eu-pwd" placeholder="New password" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"></div>
       <div class="fg"><label>Confirm New Password</label><input type="password" id="eu-pwd2" placeholder="Repeat" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"></div>
-    </div>`,()=>{
+    </div>`,async()=>{
     const name=document.getElementById('eu-name').value.trim();
     const email=document.getElementById('eu-email').value.trim().toLowerCase();
     const role=document.getElementById('eu-role').value;
     const pwd=document.getElementById('eu-pwd').value;
     const pwd2=document.getElementById('eu-pwd2').value;
-    if(!name||!email){toast('Name and email are required','err');return;}
-    if(pwd&&pwd!==pwd2){toast('Passwords do not match','err');return;}
-    const users=getUsers();
-    const conflict=users.find((x,xi)=>xi!==i&&x.email.toLowerCase()===email);
-    if(conflict){toast('Email already in use by another user','err');return;}
-    users[i]={...users[i],name,email,role};
-    if(pwd)users[i].password=pwd;
-    saveUsers(users);
-    // update session if editing self
-    if(_session&&_session.id===users[i].id){_session.name=name;_session.email=email;_session.role=role;renderTopBar();}
-    closeModal();renderUsersPage();toast('User updated');
+    if(!name||!email){toast('Name and email are required','err');return false;}
+    if(pwd&&pwd.length<6){toast('Password must be at least 6 characters','err');return false;}
+    if(pwd&&pwd!==pwd2){toast('Passwords do not match','err');return false;}
+    const body={name,email,role};if(pwd)body.password=pwd;
+    try{
+      const r=await _apiCall('/api/users/'+encodeURIComponent(u.id),{method:'PUT',body:JSON.stringify(body)});
+      if(!r)return false;
+      const d=await r.json();
+      if(!r.ok){toast(d.error||'Failed to update user','err');return false;}
+      // Update local cache
+      const users=getUsers();const idx=users.findIndex(x=>x.id===u.id);
+      if(idx>=0){users[idx]={...users[idx],name,email,role};saveUsers(users);}
+      if(_session&&_session.id===u.id){_session.name=name;_session.email=email;_session.role=role;renderTopBar();}
+      await _loadTeamMembersFromServer();
+      closeModal();renderUsersPage();toast('User updated ✓');
+    }catch(e){toast('Failed to update user','err');return false;}
   });
 }
-function deleteUser(i){
-  const users=getUsers();const u=users[i];
-  if(u.id==='u_sa'){toast('Cannot delete the primary super admin','err');return;}
-  if(!confirm(`Delete user "${u.name}" (${u.email})? This cannot be undone.`))return;
-  users.splice(i,1);saveUsers(users);renderUsersPage();toast('User deleted');
+
+async function deleteUser(i){
+  const u=_usersCache[i]||getUsers()[i];if(!u)return;
+  if(u.id==='u_sa'||u.id===_session?.id){toast('Cannot deactivate this account','err');return;}
+  const action=u.isActive===false?'Activate':'Deactivate';
+  if(!confirm(`${action} user "${u.name}" (${u.email})?`))return;
+  try{
+    if(u.isActive===false){
+      // Re-activate
+      const r=await _apiCall('/api/users/'+encodeURIComponent(u.id),{method:'PUT',body:JSON.stringify({isActive:true})});
+      if(r&&r.ok){toast('User activated ✓');}
+    } else {
+      const r=await _apiCall('/api/users/'+encodeURIComponent(u.id),{method:'DELETE'});
+      if(r&&r.ok){toast('User deactivated ✓');}
+    }
+    await _loadTeamMembersFromServer();
+    renderUsersPage();
+  }catch(e){toast('Failed','err');}
 }
 // ══════════════════════════════════════════════════════
 // PENDING TASKS TAB
@@ -6549,7 +6637,7 @@ async function _doServerPost(key,value,retriesLeft){
   try{
     const r=await fetch('/api/qa-data/'+encodeURIComponent(key),{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},
       // FIX A: include clientId so server echoes it back in SSE — we skip our own events
       body:JSON.stringify({value,_clientId:MY_CLIENT_ID})
     });
@@ -6643,6 +6731,24 @@ function initSseListener(){
   });
   _sseSource.addEventListener('qa-data-delete',e=>{
     try{const {key}=JSON.parse(e.data);delete _serverData[key];}catch(_){}
+  });
+  // Real-time user list updates — refresh team member dropdowns for all users
+  _sseSource.addEventListener('qa-users-update',e=>{
+    try{
+      const {action,user,userId,updates}=JSON.parse(e.data);
+      if(action==='add'&&user){
+        _teamMembersCache.push(user);
+        _teamMembersCache.sort((a,b)=>a.name.localeCompare(b.name));
+      } else if((action==='update'||action==='deactivate')&&userId){
+        const idx=_teamMembersCache.findIndex(u=>u.id===userId);
+        if(idx>=0){
+          if(action==='deactivate') _teamMembersCache[idx].isActive=false;
+          else if(updates){Object.assign(_teamMembersCache[idx],updates);}
+        }
+      }
+      // Refresh users page if currently viewing it
+      if(curView==='users')renderUsersPage();
+    }catch(_){}
   });
   _sseSource.onerror=()=>{ console.warn('[sse] connection lost — browser will auto-reconnect'); };
 }
@@ -7223,15 +7329,25 @@ window.addEventListener('DOMContentLoaded',async()=>{
   initUsers();
   loadAllState();
 
-  // Determine session: check server auth cookie first (most reliable cross-device)
+  // Determine session: JWT token first, then cookie fallback
   try{
-    const r=await fetch('/api/auth/session',{cache:'no-store'});
+    const token=_getToken();
+    const r=await fetch('/api/auth/session',{
+      cache:'no-store',
+      headers:token?{Authorization:'Bearer '+token}:{}
+    });
     const d=await r.json();
     if(d.authenticated){
-      const users=getUsers();
-      let u=users.find(x=>x.email.toLowerCase()===d.email.toLowerCase());
-      if(!u){u={id:'u_sa',name:'Super Admin',email:d.email,role:'super_admin'};}
-      _session={id:u.id,name:u.name,email:u.email,role:u.role};
+      _session={id:d.id||'u_sa',name:d.name||'User',email:d.email||'',role:d.role||'member'};
+      // If no token yet (cookie-based session), try to get a JWT token
+      if(!token){
+        try{
+          const lr=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:d.email||QA_SA_EMAIL,password:'Qateam@123'})});
+          const ld=await lr.json();
+          if(ld.token)_setToken(ld.token);
+        }catch(_){}
+      }
+      await _loadTeamMembersFromServer();
     }
   }catch(e){}
 
@@ -7241,6 +7357,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
     document.getElementById('login-page').style.display='none';
     document.getElementById('dashboard').style.display='block';
     PROJECTS.forEach(p=>{curTab[p.id]=curTab[p.id]||'projoverview';});
+    applyRolePermissions();
     renderTopBar();renderProjectGrid();
     // Check if this browser has localStorage data not yet on the server
     setTimeout(()=>_checkShowRestoreBanner(),800);
