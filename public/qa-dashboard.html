@@ -7213,7 +7213,13 @@ async function syncWfDocsFromServer(){
 function loadAllState(){
   // Load from server mirror (_serverData populated by loadFromServer())
   const cp=_serverData['qa3_projects'];
-  if(cp&&Array.isArray(cp)&&cp.length>0)PROJECTS=cp;
+  if(cp&&Array.isArray(cp)&&cp.length>0){
+    // Merge server projects with DEFAULT_PROJ so any project not in MongoDB
+    // still gets its name/color from the hardcoded defaults
+    const serverById=new Map(cp.filter(p=>p&&p.id&&p.name).map(p=>[p.id,p]));
+    DEFAULT_PROJ.forEach(d=>{if(!serverById.has(d.id))serverById.set(d.id,d);});
+    PROJECTS=Array.from(serverById.values());
+  }
   initStore();
   PROJECTS.forEach(p=>{
     const d=_serverData['qa3_'+p.id];

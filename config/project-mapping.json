@@ -1092,6 +1092,17 @@
           }
         }
       ]
+    },
+    {
+      "id": "zaptrade",
+      "name": "ZapTrade",
+      "description": "ZapTrade platform",
+      "color": "#f59e0b",
+      "apps": [],
+      "servers": [],
+      "domains": [],
+      "sslCerts": [],
+      "apis": []
     }
   ]
 }

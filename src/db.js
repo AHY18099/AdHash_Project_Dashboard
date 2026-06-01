@@ -337,9 +337,15 @@ async function readAllData() {
     cache['qa3_daily_tasks'] = daily;
     cache['qa3_team_tasks']  = team;
     cache['qa3_releases']    = releases;
-    cache['qa3_projects']    = projects; // project metadata list — loaded by client's loadAllState()
+    // Return clean project metadata — strip MongoDB _id, filter ghost entries without name
+    cache['qa3_projects'] = projects
+        .filter(p => p.id && p.name)           // skip ghost entries (no name)
+        .map(({ _id, updatedAt, createdAt, ...clean }) => clean); // strip MongoDB metadata
 
-    if (!projects.length) return cache;
+    if (!projects.filter(p => p.id && p.name).length) return cache;
+
+    // Only build project data for projects that have valid names
+    const validProjects = projects.filter(p => p.id && p.name);
 
     // Map col index back to its name
     const colDocs = {};
@@ -347,7 +353,7 @@ async function readAllData() {
 
     // Build per-project skeleton
     const byProject = {};
-    for (const p of projects) {
+    for (const p of validProjects) {
         byProject[p.id] = { env: p.env || {}, gates: p.gates || [], envDetails: { production: [], staging: [] } };
         for (const field of Object.keys(SECTION_MAP)) byProject[p.id][field] = [];
     }
