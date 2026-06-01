@@ -1822,7 +1822,9 @@ function platformSwitcher(p,currentTab){
 // ══ AUTH ══
 const QA_SA_EMAIL='thenilavan@adhashtech.com';
 function getUsers(){return _serverData['qa_users']||[];}
-function saveUsers(u){_serverData['qa_users']=u;serverPost('qa_users',u);}
+// saveUsers only updates the local in-memory mirror — user writes go through /api/users routes
+// NOT through the generic /api/qa-data/qa_users which causes E11000 duplicate key errors
+function saveUsers(u){_serverData['qa_users']=u;} // no serverPost — users managed via /api/users
 // JWT token stored in localStorage
 function _getToken(){return localStorage.getItem('qa_jwt_token')||'';}
 function _setToken(t){if(t)localStorage.setItem('qa_jwt_token',t);else localStorage.removeItem('qa_jwt_token');}

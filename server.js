@@ -4749,6 +4749,12 @@ app.post('/api/qa-data/:key', async (req, res) => {
     const { value, _clientId } = req.body;
     if (value === undefined) return res.status(400).json({ error: 'Missing value' });
 
+    // qa_users is managed exclusively via /api/users routes — never via this generic route.
+    // Accepting it here caused E11000 duplicate key errors due to the email unique index.
+    if (key === 'qa_users') {
+        return res.json({ status: 'skipped', key, reason: 'users managed via /api/users' });
+    }
+
     try {
         await _withWriteLock(async () => {
             // Merge into in-memory cache (prevents concurrent writes clobbering each other)
@@ -4771,6 +4777,11 @@ app.post('/api/qa-data/:key', async (req, res) => {
         // Broadcast to OTHER clients only (sourceClientId lets sender skip its own echo)
         try { broadcastSseEvent('qa-data-update', { key, value: _qaCache[key] }, _clientId); } catch (_) {}
     } catch (e) {
+        // E11000 = duplicate key — treat as non-fatal, return 200 with warning
+        if (e.code === 11000) {
+            console.warn('[save] E11000 on key', key, '— skipping:', e.message);
+            return res.json({ status: 'skipped', key, reason: 'duplicate key' });
+        }
         res.status(500).json({ error: e.message });
     }
 });

@@ -42,6 +42,15 @@ const ALL_COLLECTIONS = [
 async function _ensureIndexes(db) {
     for (const col of ALL_COLLECTIONS) {
         try {
+            if (col === 'users') {
+                // Users are global (no projectId) — use email unique index instead
+                await db.collection('users').dropIndex('id_projectId_unique').catch(() => {});
+                await db.collection('users').dropIndex('projectId_1').catch(() => {});
+                await db.collection('users').dropIndex('id_1').catch(() => {});
+                await db.collection('users').createIndex({ email: 1 }, { unique: true, sparse: true, background: true, name: 'email_unique' }).catch(() => {});
+                await db.collection('users').createIndex({ id: 1 },    { unique: true, sparse: true, background: true, name: 'id_unique'    }).catch(() => {});
+                continue;
+            }
             // Drop the old single-field unique index on id (if it exists) — it conflicts
             // when two projects share the same logical ID (e.g. SMK-01 in DDP and AiSignPro).
             await db.collection(col).dropIndex('id_1').catch(() => {});
@@ -223,8 +232,22 @@ async function readKey(key) {
 async function writeKey(key, value) {
     const db = getDB();
     if (key === 'qa_users') {
-        await db.collection('users').deleteMany({ projectId: 'global' });
-        if (Array.isArray(value) && value.length > 0) await _upsertMany('users', 'global', value);
+        // Users are global — upsert each by email (NOT by projectId).
+        // Never use _upsertMany here: it sets projectId='global' on every doc which
+        // conflicts with the email unique index when multiple users share same email.
+        if (Array.isArray(value) && value.length > 0) {
+            for (const u of value) {
+                if (!u || !u.email) continue;
+                const { _id, projectId, ...safe } = u; // strip _id and projectId
+                safe.id = safe.id || newId();
+                safe.updatedAt = new Date();
+                await db.collection('users').updateOne(
+                    { email: safe.email },
+                    { $set: safe, $setOnInsert: { createdAt: new Date() } },
+                    { upsert: true }
+                );
+            }
+        }
         return;
     }
     if (key === 'qa3_daily_tasks') {
