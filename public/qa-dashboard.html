@@ -4001,7 +4001,7 @@ function dtDayInfo(dateStr){
 function dtProjColor(pid){return PROJECTS.find(x=>x.id===pid)?.color||'#94a3b8';}
 function dtProjName(pid){return PROJECTS.find(x=>x.id===pid)?.name||pid;}
 
-// Team members for Assigned By dropdown — from server cache, fallback to qa_users
+// Team members for Assigned To dropdown — from server cache, fallback to qa_users
 function getTeamMembers(){
   if(_teamMembersCache&&_teamMembersCache.length>0)
     return _teamMembersCache.filter(u=>u.isActive!==false).map(u=>u.name).sort((a,b)=>a.localeCompare(b));
@@ -4010,7 +4010,7 @@ function getTeamMembers(){
   return users.map(u=>u.name).sort((a,b)=>a.localeCompare(b));
 }
 
-// Per-member accent colors for Assigned By highlights
+// Per-member accent colors for Assigned To highlights
 const ASSIGNEE_COLORS={
   'Deepa':      {color:'#db2777',bg:'rgba(219,39,119,.08)',border:'rgba(219,39,119,.45)'},
   'Prakash Raj':{color:'#2563eb',bg:'rgba(37,99,235,.08)', border:'rgba(37,99,235,.45)'},
@@ -4117,7 +4117,7 @@ function renderDayTable(dateStr){
       <thead><tr>
         <th class="col-project">Project</th>
         ${DT_COLS.map(c=>`<th>${escH(c.label)}</th>`).join('')}
-        <th style="min-width:120px;text-align:left">Assigned By</th>
+        <th style="min-width:120px;text-align:left">Assigned To</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -4301,7 +4301,7 @@ function dtBuildModalBody(entry,prefillDate){
       <div class="fg"><label>Project</label><select id="dt-proj">${projOpts}</select></div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">${colRows}</div>
-    <div class="fg"><label>Assigned By</label>
+    <div class="fg"><label>Assigned To</label>
       <select id="dt-assigned">${teamOpts}</select>
     </div>`;
 }
@@ -4759,7 +4759,7 @@ function ttBuildModalBody(entry,prefillDate){
     <div class="tt-form-section">
       <div class="tt-form-section-title">Assignment &amp; Status</div>
       <div class="fg-row">
-        <div class="fg"><label>Assigned By</label><select id="tt-assigned">${assignedOpts}</select></div>
+        <div class="fg"><label>Assigned To</label><select id="tt-assigned">${assignedOpts}</select></div>
         <div class="fg"><label>Current Status</label><select id="tt-cstatus">${csOpts}</select></div>
         <div class="fg"><label>Testing Status</label><select id="tt-tstatus">${tsOpts}</select></div>
       </div>
@@ -5077,7 +5077,7 @@ function renderReleasesPage(mode){
               <select class="rl-sel" onchange="rlInline(${idx},'platform',this)">${platOpts}</select>
             </div>
             <div class="rl-detail-item">
-              <div class="rl-detail-label">Assigned By</div>
+              <div class="rl-detail-label">Assigned To</div>
               <select class="rl-sel" onchange="rlInline(${idx},'assignedBy',this)">${assignedOpts}</select>
             </div>
             <div class="rl-detail-item" style="grid-column:span 3">
@@ -5258,7 +5258,7 @@ function rlBuildModalBody(entry,defaultMode){
     <div class="tt-form-section">
       <div class="tt-form-section-title">Assignment &amp; Status</div>
       <div class="fg-row">
-        <div class="fg"><label>Assigned By</label><select id="rl-assigned">${assignedOpts}</select></div>
+        <div class="fg"><label>Assigned To</label><select id="rl-assigned">${assignedOpts}</select></div>
         <div class="fg"><label>Current Status</label><select id="rl-cstatus">${csOpts}</select></div>
         <div class="fg"><label>Testing Status</label><select id="rl-tstatus">${tsOpts}</select></div>
       </div>
@@ -7097,7 +7097,7 @@ function _applySseUpdate(key,value){
             }).join('');
             const tbl=bodyEl.querySelector('table tbody');
             if(tbl)tbl.innerHTML=rows;
-            else bodyEl.innerHTML=`<table class="dt-table"><thead><tr><th class="col-project">Project</th>${DT_COLS.map(c=>`<th>${escH(c.label)}</th>`).join('')}<th>ASSIGNED BY</th></tr></thead><tbody>${rows}</tbody></table>`;
+            else bodyEl.innerHTML=`<table class="dt-table"><thead><tr><th class="col-project">Project</th>${DT_COLS.map(c=>`<th>${escH(c.label)}</th>`).join('')}<th>ASSIGNED TO</th></tr></thead><tbody>${rows}</tbody></table>`;
           }
         });
       } else {
