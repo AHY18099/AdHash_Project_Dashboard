@@ -2183,12 +2183,13 @@ function renderProjectGrid(){
     const _allFb=(STORE[p.id]?.feedback||[]);
     const _fbReqs=_allFb.filter(f=>f.type==='req');
     const _fbBugs=_allFb.filter(f=>f.type==='bug');
+    const _fbDoneStatuses=['resolved','closed','wontfix'];
     const _fbReqOpen=_fbReqs.filter(f=>f.status==='open').length;
-    const _fbReqInp=_fbReqs.filter(f=>f.status==='inprogress').length;
-    const _fbReqDone=_fbReqs.filter(f=>f.status==='resolved'||f.status==='closed').length;
+    const _fbReqInp=_fbReqs.filter(f=>f.status==='inprogress'||f.status==='clarification'||f.status==='deferred').length;
+    const _fbReqDone=_fbReqs.filter(f=>_fbDoneStatuses.includes(f.status)).length;
     const _fbBugOpen=_fbBugs.filter(f=>f.status==='open').length;
-    const _fbBugInp=_fbBugs.filter(f=>f.status==='inprogress').length;
-    const _fbBugDone=_fbBugs.filter(f=>f.status==='resolved'||f.status==='closed').length;
+    const _fbBugInp=_fbBugs.filter(f=>f.status==='inprogress'||f.status==='clarification'||f.status==='deferred').length;
+    const _fbBugDone=_fbBugs.filter(f=>_fbDoneStatuses.includes(f.status)).length;
     const _fbBugCrit=_fbBugs.filter(f=>f.priority==='critical').length;
     const hasFeedback=_allFb.length>0;
     const fbCardHtml=!hasFeedback
