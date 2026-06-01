@@ -7326,58 +7326,138 @@ tr:last-child td.rtd{border-bottom:none}
 .notice-fail{background:#fff5f5;border:1.5px solid #fca5a5;border-radius:12px;padding:14px 20px;color:#dc2626;font-size:13px}
 @media print{body{background:#fff}.no-print{display:none!important}.card{box-shadow:none}@page{margin:1.5cm}}
 
-/* ── SWAGGER EXPLORER ─────────────────────────────────────────────────────── */
+/* ── SWAGGER EXPLORER — PREMIUM ───────────────────────────────────────────── */
 .sw-wrap{padding:20px 24px}
 .sw-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;gap:12px;flex-wrap:wrap}
+/* URL tab strip */
 .sw-url-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
 .sw-url-tab{padding:6px 14px;border-radius:50px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:6px;transition:all .15s;color:var(--txt2)}
 .sw-url-tab.active{background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;border-color:transparent}
 .sw-env-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .sw-env-production{background:#10b981}.sw-env-staging{background:#f59e0b}.sw-env-local{background:#6366f1}.sw-env-development{background:#3b82f6}
-.sw-spec-hdr{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 18px;background:var(--card2);border-radius:12px;margin-bottom:14px;border:1px solid var(--border);gap:12px;flex-wrap:wrap}
-.sw-api-title{font-size:16px;font-weight:800;color:var(--txt)}
-.sw-version{background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;padding:2px 8px;border-radius:50px;font-size:10px;font-weight:700;margin-left:7px}
-.sw-meta{font-size:11px;color:var(--mut);margin-top:3px;font-family:var(--font-mono)}
-.sw-search{width:100%;margin-bottom:12px;padding:9px 14px;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;color:var(--txt);font-size:13px;outline:none;font-family:inherit;transition:all .2s}
-.sw-search:focus{border-color:var(--grad-a);box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
-.sw-auth-bar{display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--card2);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;flex-wrap:wrap}
-.sw-auth-bar input{flex:1;min-width:160px;background:transparent;border:none;outline:none;font-family:var(--font-mono);font-size:12px;color:var(--txt)}
-.sw-auth-bar select{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:12px;color:var(--txt);cursor:pointer;outline:none}
-.sw-tag-group{margin-bottom:10px;border:1px solid var(--border);border-radius:12px;overflow:hidden}
-.sw-tag-hdr{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--card2);cursor:pointer;font-weight:600;font-size:13px;color:var(--txt2);transition:background .15s;user-select:none}
-.sw-tag-hdr:hover{background:var(--bg)}
-.sw-tag-name{flex:1}
-.sw-tag-cnt{background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;padding:1px 7px;border-radius:50px;font-size:10px;font-weight:700}
-.sw-tag-body{border-top:1px solid var(--border)}
-.sw-ep{border-bottom:1px solid var(--border)}
-.sw-ep:last-child{border-bottom:none}
-.sw-ep-row{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;transition:background .12s;flex-wrap:wrap}
-.sw-ep-row:hover{background:var(--card2)}
-.sw-method{padding:3px 10px;border-radius:6px;font-size:10px;font-weight:800;font-family:var(--font-mono);text-transform:uppercase;min-width:64px;text-align:center;flex-shrink:0}
-.sw-ep-path{font-family:var(--font-mono);font-size:12px;color:var(--txt);font-weight:500;flex:1;min-width:120px}
-.sw-ep-summary{font-size:11px;color:var(--mut);flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:80px}
-.sw-run-btn{padding:4px 13px;background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;transition:transform .15s}
-.sw-run-btn:hover{transform:translateY(-1px)}
-.sw-panel{padding:18px 20px;background:var(--card2);border-top:1px solid var(--border)}
-.sw-param-ttl{font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
-.sw-param-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}
-.sw-param-table th{background:var(--bg);padding:6px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--mut);border-bottom:1px solid var(--border)}
-.sw-param-table td{padding:6px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
-.sw-param-table td input{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:var(--font-mono);color:var(--txt);outline:none;width:100%;transition:border-color .15s}
-.sw-param-table td input:focus{border-color:var(--grad-a)}
-.sw-in-badge{padding:2px 6px;border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase}
-.in-path{background:rgba(251,191,36,.2);color:#92400e}.in-query{background:rgba(59,130,246,.15);color:#1e40af}.in-header{background:rgba(16,185,129,.15);color:#065f46}
-body.dark .in-path{color:#fbbf24}.body.dark .in-query{color:#93c5fd}.body.dark .in-header{color:#34d399}
-.sw-body-ed{width:100%;resize:vertical;min-height:100px;background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-family:var(--font-mono);font-size:12px;color:var(--txt);outline:none;transition:border-color .15s;tab-size:2}
-.sw-body-ed:focus{border-color:var(--grad-a)}
-.sw-actions{display:flex;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap}
-.sw-resp{margin-top:14px;border:1px solid var(--border);border-radius:10px;overflow:hidden}
-.sw-resp-status{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--card2);border-bottom:1px solid var(--border)}
-.sw-resp-tabs{display:flex;border-bottom:1px solid var(--border)}
-.sw-resp-tab{padding:7px 14px;font-size:11px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--mut);transition:all .15s}
-.sw-resp-tab.active{color:var(--grad-a);border-bottom-color:var(--grad-a)}
-.sw-resp-panel{max-height:360px;overflow:auto}
-.sw-resp-pre{margin:0;padding:14px;font-family:var(--font-mono);font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-all;color:var(--txt)}
+/* Info card */
+.sw-info-card{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:18px 20px;background:linear-gradient(135deg,rgba(99,102,241,0.07) 0%,rgba(139,92,246,0.04) 100%);border:1px solid rgba(99,102,241,0.18);border-radius:16px;margin-bottom:16px;flex-wrap:wrap}
+.sw-info-left{display:flex;gap:14px;flex:1;align-items:flex-start}
+.sw-api-icon{font-size:30px;line-height:1;flex-shrink:0;margin-top:2px}
+.sw-api-title{font-size:18px;font-weight:800;color:var(--txt);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sw-version{background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;padding:2px 8px;border-radius:50px;font-size:10px;font-weight:700}
+.sw-api-desc{font-size:12px;color:var(--mut);margin-top:5px;line-height:1.5;max-width:500px}
+.sw-base-url{font-size:11px;color:var(--mut);font-family:var(--font-mono);margin-top:6px}
+.sw-stats-row{display:flex;gap:16px;flex-shrink:0;flex-wrap:wrap;align-items:center}
+.sw-stat{text-align:center;min-width:44px}
+.sw-stat-num{font-size:22px;font-weight:800;color:var(--grad-a)}
+.sw-stat-lbl{font-size:9px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
+.sw-stat-num.m-get{color:#1d4ed8}.sw-stat-num.m-post{color:#15803d}.sw-stat-num.m-put{color:#854d0e}.sw-stat-num.m-delete{color:#b91c1c}.sw-stat-num.m-patch{color:#c2410c}
+/* Toolbar */
+.sw-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.sw-auth-bar2{display:flex;align-items:center;gap:7px;flex:1;min-width:260px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:8px 12px}
+.sw-auth-lbl{font-size:11px;font-weight:700;color:var(--mut);white-space:nowrap;flex-shrink:0}
+.sw-auth-sel{padding:4px 8px;border-radius:6px;font-size:11px;border:1px solid var(--border);background:var(--card);color:var(--txt);width:120px;outline:none;cursor:pointer}
+.sw-auth-inp{flex:1;background:transparent;border:none;outline:none;font-family:var(--font-mono);font-size:12px;color:var(--txt);min-width:0}
+.sw-auth-inp::placeholder{color:var(--mut);font-family:var(--font-sans)}
+.sw-search2{flex:1;min-width:200px;padding:9px 14px;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;color:var(--txt);font-size:13px;outline:none;font-family:inherit;transition:all .2s}
+.sw-search2:focus{border-color:var(--grad-a);box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
+/* Method filter pills */
+.sw-method-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.sw-fpill{padding:5px 13px;border-radius:50px;border:1px solid var(--border);background:var(--card);font-size:11px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .15s;color:var(--txt2)}
+.sw-fpill:hover{transform:translateY(-1px)}
+.sw-fpill.active{background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;border-color:transparent}
+.sw-pcnt{background:rgba(0,0,0,.14);padding:1px 5px;border-radius:99px;font-size:9px}
+.sw-fpill-get.active{background:#1d4ed8;border-color:#1d4ed8}
+.sw-fpill-post.active{background:#15803d;border-color:#15803d}
+.sw-fpill-put.active{background:#854d0e;border-color:#854d0e}
+.sw-fpill-delete.active{background:#b91c1c;border-color:#b91c1c}
+.sw-fpill-patch.active{background:#c2410c;border-color:#c2410c}
+/* Tag groups */
+.sw-ep-list{display:flex;flex-direction:column;gap:12px}
+.sw-grp{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.sw-grp-hdr{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;cursor:pointer;transition:background .15s;user-select:none}
+.sw-grp-hdr:hover{background:var(--card2)}
+.sw-grp-hdr.open{background:rgba(99,102,241,.04)}
+.sw-grp-left{display:flex;align-items:center;gap:10px}
+.sw-grp-chev{font-size:11px;color:var(--mut);transition:transform .2s}
+.sw-grp-name{font-size:14px;font-weight:700;color:var(--txt);letter-spacing:-.1px}
+.sw-grp-badge{font-size:11px;font-weight:600;color:var(--mut);background:var(--card2);padding:3px 10px;border-radius:50px;border:1px solid var(--border)}
+.sw-grp-body{border-top:1px solid var(--border)}
+/* Endpoint rows */
+.sw-ep2{border-bottom:1px solid var(--border);transition:background .1s}
+.sw-ep2:last-child{border-bottom:none}
+.sw-ep2:hover>.sw-ep-row2{background:var(--card2)}
+.sw-ep-row2{display:flex;align-items:center;gap:12px;padding:11px 18px;cursor:pointer;flex-wrap:wrap}
+.sw-mbadge{padding:4px 11px;border-radius:6px;font-size:10px;font-weight:800;font-family:var(--font-mono);min-width:70px;text-align:center;flex-shrink:0;letter-spacing:.4px}
+.sw-ep-path2{font-family:var(--font-mono);font-size:13px;font-weight:500;color:var(--txt);flex-shrink:0;min-width:180px}
+.sw-path-param{color:var(--grad-a);background:rgba(99,102,241,.08);padding:0 3px;border-radius:3px}
+.sw-ep-sum2{font-size:12px;color:var(--mut);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sw-ep-tags2{display:flex;gap:4px;flex-shrink:0}
+.sw-has-tag2{font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700;background:rgba(59,130,246,.1);color:#1d4ed8;border:1px solid rgba(59,130,246,.25)}
+.sw-has-body2{background:rgba(245,158,11,.1);color:#92400e;border-color:rgba(245,158,11,.25)}
+.sw-tryit{padding:5px 13px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid;flex-shrink:0;transition:all .15s}
+.sw-tryit:hover{opacity:.82;transform:translateY(-1px)}
+.sw-ep-chev2{font-size:11px;color:var(--mut);flex-shrink:0}
+.sw-depr{opacity:.55}
+.sw-depr-badge{font-size:9px;background:rgba(239,68,68,.12);color:#b91c1c;padding:1px 6px;border-radius:4px;font-weight:700;margin-right:4px}
+/* Expanded panel */
+.sw-panel2{padding:18px 20px;background:var(--card2);border-top:1px solid var(--border)}
+.sw-ep-desc2{font-size:12px;color:var(--mut);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;line-height:1.5}
+/* Sections */
+.sw-sec{margin-bottom:18px}
+.sw-sec-ttl{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.sw-sec-cnt{background:var(--grad-a);color:#fff;padding:1px 6px;border-radius:50px;font-size:9px}
+.sw-req-chip{background:rgba(239,68,68,.1);color:#b91c1c;font-size:9px;padding:1px 7px;border-radius:50px;border:1px solid rgba(239,68,68,.25)}
+/* Params */
+.sw-params-grid{display:flex;flex-direction:column;gap:8px}
+.sw-prow{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px}
+.sw-prow.sw-preq{border-left:3px solid var(--grad-a)}
+.sw-pmeta{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.sw-pname{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--txt)}
+.sw-req-dot{color:var(--fail)}
+.sw-pin{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:.4px;text-transform:uppercase}
+.sw-pin-path{background:rgba(251,191,36,.18);color:#92400e}
+.sw-pin-query{background:rgba(59,130,246,.12);color:#1e40af}
+.sw-pin-header{background:rgba(16,185,129,.12);color:#065f46}
+.sw-pin-cookie{background:rgba(139,92,246,.12);color:#6b21a8}
+body.dark .sw-pin-path{color:#fbbf24}body.dark .sw-pin-query{color:#93c5fd}body.dark .sw-pin-header{color:#34d399}
+.sw-ptype{font-size:11px;color:var(--mut);font-family:var(--font-mono)}
+.sw-pdesc{font-size:11px;color:var(--mut);margin-bottom:6px;line-height:1.4}
+.sw-pinput{width:100%;padding:6px 11px;border:1px solid var(--border);border-radius:7px;background:var(--card2);font-size:12px;font-family:var(--font-mono);color:var(--txt);outline:none;transition:border-color .15s}
+.sw-pinput:focus{border-color:var(--grad-a);box-shadow:0 0 0 2px rgba(99,102,241,.1)}
+/* Body editor */
+.sw-body-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;flex-wrap:wrap;gap:6px}
+.sw-body-actions{display:flex;gap:6px}
+.sw-body-action{padding:3px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:var(--card);cursor:pointer;color:var(--txt2);transition:background .15s}
+.sw-body-action:hover{background:var(--bg)}
+.sw-body-ed2{width:100%;min-height:110px;resize:vertical;padding:10px 13px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);font-size:12px;font-family:var(--font-mono);color:var(--txt);outline:none;transition:border-color .15s;line-height:1.6;tab-size:2}
+.sw-body-ed2:focus{border-color:var(--grad-a);background:var(--card2);box-shadow:0 0 0 3px rgba(99,102,241,.08)}
+/* Execute bar */
+.sw-exec-bar{display:flex;align-items:center;gap:9px;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-radius:9px;margin-bottom:12px;flex-wrap:wrap}
+.sw-url-prev{flex:1;font-family:var(--font-mono);font-size:11px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.sw-exec-btn{padding:8px 20px;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.sw-exec-btn:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.sw-clr-btn{padding:7px 14px;font-size:12px;border:1px solid var(--border);border-radius:8px;background:var(--card2);color:var(--txt2);cursor:pointer;flex-shrink:0}
+.sw-clr-btn:hover{background:var(--bg)}
+/* Response card */
+.sw-resp-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:14px}
+.sw-rstat{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)}
+.sw-rstat-l{display:flex;align-items:center;gap:10px}
+.sw-rem{font-size:20px}
+.sw-rcode{font-size:20px;font-weight:800;font-family:var(--font-mono)}
+.sw-rtxt{font-size:13px;font-weight:600}
+.sw-rmeta{display:flex;align-items:center;gap:9px}
+.sw-rmi{font-size:11px;color:var(--mut);font-weight:500}
+.sw-rcopy{padding:4px 11px;border-radius:6px;border:1px solid var(--border);background:var(--card2);font-size:11px;cursor:pointer;transition:background .15s}
+.sw-rcopy:hover{background:var(--bg)}
+.sw-rtabs{display:flex;border-bottom:1px solid var(--border)}
+.sw-rtab{padding:8px 16px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--mut);border-bottom:2px solid transparent;transition:all .15s}
+.sw-rtab.active{color:var(--grad-a);border-bottom-color:var(--grad-a)}
+.sw-rpanel{max-height:420px;overflow:auto}
+.sw-rjson{margin:0;padding:14px;font-family:var(--font-mono);font-size:12px;line-height:1.8;white-space:pre-wrap}
+/* JSON syntax */
+.sw-jkey{color:var(--grad-b);font-weight:600}
+.sw-jstr{color:#10b981}
+.sw-jnum{color:#f59e0b}
+.sw-jbool{color:#ef4444;font-weight:600}
+.sw-jnull{color:var(--mut);font-style:italic}
+/* Empty + search */
 .sw-empty{text-align:center;padding:48px 20px;color:var(--mut)}
 .sw-empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
 </style>
@@ -7826,23 +7906,30 @@ function _autoSaveHeartbeat(){
   }
 }
 
-// ══ SWAGGER API EXPLORER ═══════════════════════════════════════════════════
+// ══ SWAGGER API EXPLORER — PREMIUM ═════════════════════════════════════════
 
-const _SW_METHOD_COLORS={
-  get:    {bg:'rgba(59,130,246,.12)',color:'#1d4ed8',border:'rgba(59,130,246,.3)'},
-  post:   {bg:'rgba(16,185,129,.12)',color:'#065f46',border:'rgba(16,185,129,.3)'},
-  put:    {bg:'rgba(245,158,11,.12)',color:'#92400e',border:'rgba(245,158,11,.3)'},
-  patch:  {bg:'rgba(249,115,22,.12)',color:'#c2410c',border:'rgba(249,115,22,.3)'},
-  delete: {bg:'rgba(239,68,68,.12)', color:'#b91c1c',border:'rgba(239,68,68,.3)'},
-  head:   {bg:'rgba(139,92,246,.1)', color:'#6d28d9',border:'rgba(139,92,246,.3)'},
-  options:{bg:'rgba(100,116,139,.1)',color:'#475569',border:'rgba(100,116,139,.3)'},
+const _SW_MC={
+  get:    {bg:'rgba(59,130,246,.12)',color:'#1d4ed8',border:'rgba(59,130,246,.3)',glow:'rgba(29,78,216,.2)'},
+  post:   {bg:'rgba(16,185,129,.12)',color:'#065f46',border:'rgba(16,185,129,.3)',glow:'rgba(21,128,61,.2)'},
+  put:    {bg:'rgba(245,158,11,.12)',color:'#92400e',border:'rgba(245,158,11,.3)',glow:'rgba(133,77,14,.2)'},
+  patch:  {bg:'rgba(249,115,22,.12)',color:'#c2410c',border:'rgba(249,115,22,.3)',glow:'rgba(194,65,12,.2)'},
+  delete: {bg:'rgba(239,68,68,.12)', color:'#b91c1c',border:'rgba(239,68,68,.3)',glow:'rgba(185,28,28,.2)'},
+  head:   {bg:'rgba(139,92,246,.1)', color:'#6d28d9',border:'rgba(139,92,246,.3)',glow:'rgba(109,40,217,.2)'},
+  options:{bg:'rgba(100,116,139,.1)',color:'#475569',border:'rgba(100,116,139,.3)',glow:'transparent'},
 };
 let _swSpec=null,_swBaseUrl='',_swProjId='';
+let _swLoading=false; // prevent concurrent spec loads
 
 // ── Render Swagger tab (returns HTML string for renderProject) ──
+// Guard: if the swagger explorer is already rendered for this project,
+// return the existing content container so SSE re-renders don't wipe it.
 function renderSwaggerTab(p){
   _swProjId=p;
-  // Return loading placeholder; async load happens after insert
+  const existingMain=document.getElementById('sw-main-'+p);
+  if(existingMain&&existingMain.querySelector('.sw-ep-list,.sw-info-card')){
+    // Already rendered — return a marker so renderProject re-uses existing DOM
+    return`<div id="sw-main-${p}-placeholder"></div>`;
+  }
   setTimeout(()=>_loadSwaggerConfigs(p),50);
   return`<div id="sw-main-${p}" class="sw-wrap"><div class="sw-empty"><div class="sw-empty-icon">⚡</div><div style="color:var(--mut);font-size:13px">Loading Swagger…</div></div></div>`;
 }
@@ -7882,15 +7969,18 @@ function _swSelectConfig(cfgId,url,tabEl,p){
 }
 
 async function _loadSwaggerSpec(cfgId,url,tabEl,p){
-  const ex=document.getElementById('sw-explorer-'+p);if(!ex)return;
+  if(_swLoading)return; // prevent concurrent loads causing refresh loop
+  _swLoading=true;
+  const ex=document.getElementById('sw-explorer-'+p);if(!ex){_swLoading=false;return;}
   ex.innerHTML=`<div class="sw-empty" style="padding:28px"><div class="sw-empty-icon" style="font-size:28px">⏳</div><div style="color:var(--mut);font-size:12px">Fetching ${escH(url)}…</div></div>`;
   try{
     const r=await fetch('/api/swagger-proxy?url='+encodeURIComponent(url),{headers:{Authorization:'Bearer '+_getToken()},cache:'no-store'});
     if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||'HTTP '+r.status);}
     const spec=await r.json();
-    _swSpec=spec;_swBaseUrl=_swBuildBase(spec,url);
+    _swSpec=spec;_swBaseUrl=_swBuildBase(spec,url);_swMethodFilter='all';
     _renderSwaggerExplorer(spec,ex,p);
   }catch(e){ex.innerHTML=`<div class="sw-empty"><div class="sw-empty-icon">⚠️</div><div style="color:var(--fail);font-weight:600">Failed to load spec</div><div style="color:var(--mut);font-size:12px;margin-top:6px">${escH(e.message)}</div></div>`;}
+  finally{_swLoading=false;}
 }
 
 function _swBuildBase(spec,url){
@@ -7899,78 +7989,101 @@ function _swBuildBase(spec,url){
   try{const u=new URL(url);return`${u.protocol}//${u.host}`;}catch(_){return'';}
 }
 
+// ── Premium explorer renderer ──
 function _renderSwaggerExplorer(spec,container,p){
   const title=spec.info?.title||'API Docs',ver=spec.info?.version||'',desc=spec.info?.description||'';
   const paths=spec.paths||{};
-  const groups={};
+  const groups={};const methodCounts={};
   for(const[path,methods]of Object.entries(paths)){
     for(const[method,op]of Object.entries(methods)){
       if(!['get','post','put','patch','delete','head','options'].includes(method))continue;
       const tags=op.tags?.length?op.tags:['General'];
       tags.forEach(tag=>{if(!groups[tag])groups[tag]=[];groups[tag].push({path,method,op});});
+      methodCounts[method]=(methodCounts[method]||0)+1;
     }
   }
   const total=Object.values(groups).reduce((s,a)=>s+a.length,0);
-  const groupsHtml=Object.entries(groups).map(([tag,eps])=>`
-<div class="sw-tag-group">
-  <div class="sw-tag-hdr" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.sw-chev').textContent=this.nextElementSibling.style.display==='none'?'▼':'▲'">
-    <span class="sw-tag-name">${escH(tag)}</span><span class="sw-tag-cnt">${eps.length}</span><span class="sw-chev">▲</span>
+  const statsHtml=`<div class="sw-stat"><div class="sw-stat-num">${total}</div><div class="sw-stat-lbl">Endpoints</div></div><div class="sw-stat"><div class="sw-stat-num">${Object.keys(groups).length}</div><div class="sw-stat-lbl">Groups</div></div>`+
+    Object.entries(methodCounts).map(([m,c])=>`<div class="sw-stat"><div class="sw-stat-num m-${m}">${c}</div><div class="sw-stat-lbl">${m.toUpperCase()}</div></div>`).join('');
+  const pillsHtml=`<button class="sw-fpill active" onclick="_swFilterMethod('all',this)">All <span class="sw-pcnt">${total}</span></button>`+
+    Object.entries(methodCounts).map(([m,c])=>`<button class="sw-fpill sw-fpill-${m}" onclick="_swFilterMethod('${m}',this)">${m.toUpperCase()} <span class="sw-pcnt">${c}</span></button>`).join('');
+  const groupsHtml=Object.entries(groups).map(([tag,eps],gi)=>`
+<div class="sw-grp" data-group="${escH(tag)}">
+  <div class="sw-grp-hdr${gi===0?' open':''}" onclick="_swToggleGrp(this)">
+    <div class="sw-grp-left"><span class="sw-grp-chev">${gi===0?'▼':'▶'}</span><span class="sw-grp-name">${escH(tag)}</span></div>
+    <span class="sw-grp-badge">${eps.length} endpoint${eps.length!==1?'s':''}</span>
   </div>
-  <div class="sw-tag-body">${eps.map(e=>_swEndpointRow(e.path,e.method,e.op,p)).join('')}</div>
+  <div class="sw-grp-body" style="${gi===0?'':'display:none'}">${eps.map(e=>_swEpRow(e.path,e.method,e.op,p)).join('')}</div>
 </div>`).join('');
   container.innerHTML=`
-<div class="sw-spec-hdr">
-  <div><span class="sw-api-title">${escH(title)}</span>${ver?`<span class="sw-version">v${escH(ver)}</span>`:''}</div>
-  <div class="sw-meta">⚡ ${total} endpoints &nbsp;·&nbsp; Base: ${escH(_swBaseUrl)}</div>
+<div class="sw-info-card">
+  <div class="sw-info-left">
+    <div class="sw-api-icon">⚡</div>
+    <div>
+      <div class="sw-api-title">${escH(title)}${ver?`<span class="sw-version">v${escH(ver)}</span>`:''}</div>
+      ${desc?`<div class="sw-api-desc">${escH(desc.substring(0,160))}</div>`:''}
+      <div class="sw-base-url">🔗 ${escH(_swBaseUrl)}</div>
+    </div>
+  </div>
+  <div class="sw-stats-row">${statsHtml}</div>
 </div>
-<input type="text" class="sw-search" placeholder="🔍 Search endpoints, paths, methods…" oninput="_swFilter(this.value)">
-<div id="sw-endpoints-${p}">${groupsHtml}</div>`;
+<div class="sw-toolbar">
+  <div class="sw-auth-bar2">
+    <span class="sw-auth-lbl">🔐 Auth</span>
+    <select id="sw-auth-type-${p}" class="sw-auth-sel"><option value="Bearer">Bearer</option><option value="Basic">Basic</option><option value="ApiKey">X-API-Key</option><option value="none">None</option></select>
+    <input type="text" id="sw-auth-token-${p}" class="sw-auth-inp" placeholder="Paste your token here…">
+  </div>
+  <input type="text" class="sw-search2" placeholder="🔍 Search endpoints, paths, methods…" oninput="_swFilter(this.value)">
+</div>
+<div class="sw-method-filters">${pillsHtml}</div>
+<div class="sw-ep-list" id="sw-endpoints-${p}">${groupsHtml}</div>`;
 }
 
-function _swEndpointRow(path,method,op,p){
-  const mc=_SW_METHOD_COLORS[method]||_SW_METHOD_COLORS.get;
-  const summary=escH(op.summary||op.operationId||path);
-  const eid='sw_'+method+'_'+path.replace(/[^a-z0-9]/gi,'_');
-  return`<div class="sw-ep" data-path="${escH(path)}" data-method="${method}" data-summary="${(op.summary||path).toLowerCase()}">
-  <div class="sw-ep-row" onclick="_swToggle('${eid}')">
-    <span class="sw-method" style="background:${mc.bg};color:${mc.color};border:1px solid ${mc.border}">${method.toUpperCase()}</span>
-    <span class="sw-ep-path">${escH(path)}</span>
-    <span class="sw-ep-summary">${summary}</span>
-    <button class="sw-run-btn" onclick="event.stopPropagation();_swRunQuick('${eid}','${escH(path)}','${method}','${p}')">▶ Run</button>
-    <span style="color:var(--mut);font-size:12px" id="${eid}-chev">▼</span>
+function _swEpRow(path,method,op,p){
+  const mc=_SW_MC[method]||_SW_MC.options;
+  const eid='sw2_'+method+'_'+path.replace(/[^a-z0-9]/gi,'_');
+  const summary=op.summary||op.operationId||path;
+  const hasParams=(op.parameters?.length>0)||path.includes('{');
+  const hasBody=!!op.requestBody||['post','put','patch'].includes(method);
+  const pathHtml=escH(path).replace(/%7B([^%]+)%7D/g,'<span class="sw-path-param">{$1}</span>').replace(/\{([^}]+)\}/g,'<span class="sw-path-param">{$1}</span>');
+  return`<div class="sw-ep2${op.deprecated?' sw-depr':''}" data-path="${escH(path)}" data-method="${method}" data-summary="${escH((summary||'').toLowerCase())}">
+  <div class="sw-ep-row2" onclick="_swToggleEp('${eid}')">
+    <span class="sw-mbadge" style="background:${mc.bg};color:${mc.color};border:1.5px solid ${mc.border}">${method.toUpperCase()}</span>
+    <span class="sw-ep-path2">${pathHtml}</span>
+    <span class="sw-ep-sum2">${op.deprecated?'<span class="sw-depr-badge">deprecated</span>':''}${escH(summary)}</span>
+    <span class="sw-ep-tags2">${hasParams?'<span class="sw-has-tag2">params</span>':''}${hasBody?'<span class="sw-has-tag2 sw-has-body2">body</span>':''}</span>
+    <button class="sw-tryit" style="background:${mc.bg};color:${mc.color};border-color:${mc.border}" onclick="event.stopPropagation();_swRunQuick('${eid}','${escH(path)}','${method}','${p}')">▶ Try it</button>
+    <span class="sw-ep-chev2" id="${eid}-chev">▶</span>
   </div>
-  <div id="${eid}" class="sw-panel" style="display:none">
-    ${op.description?`<p style="font-size:12px;color:var(--mut);margin-bottom:12px">${escH(op.description)}</p>`:''}
-    ${_swParams(op,path,eid)}
-    ${_swBody(op,eid)}
-    <div class="sw-actions">
-      <button class="btn btn-primary" style="font-size:12px;padding:6px 16px" onclick="_swRun('${eid}','${escH(path)}','${method}','${p}')">▶ Execute</button>
-      <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="_swClearResp('${eid}')">Clear</button>
-      <span style="font-size:10px;color:var(--mut);font-family:var(--font-mono);margin-left:auto">${escH(_swBaseUrl)}${escH(path)}</span>
+  <div id="${eid}" class="sw-panel2" style="display:none">
+    ${op.description?`<div class="sw-ep-desc2">${escH(op.description)}</div>`:''}
+    ${_swParams2(op,path,eid)}
+    ${_swBody2(op,eid)}
+    <div class="sw-exec-bar">
+      <span class="sw-url-prev" id="${eid}-urlprev">${escH(_swBaseUrl)}${escH(path)}</span>
+      <button class="sw-exec-btn" style="background:${mc.color}" onclick="_swRun('${eid}','${escH(path)}','${method}','${p}')">▶ Execute</button>
+      <button class="sw-clr-btn" onclick="_swClearResp('${eid}')">✕ Clear</button>
     </div>
-    <div id="${eid}-resp" class="sw-resp" style="display:none"></div>
+    <div id="${eid}-resp" style="display:none"></div>
   </div>
 </div>`;
 }
 
-function _swParams(op,path,eid){
+function _swParams2(op,path,eid){
   const params=[...(op.parameters||[])];
   (path.match(/\{([^}]+)\}/g)||[]).map(x=>x.slice(1,-1)).forEach(n=>{if(!params.find(px=>px.name===n))params.unshift({name:n,in:'path',required:true,schema:{type:'string'}});});
   if(!params.length)return'';
-  return`<div class="sw-param-ttl">Parameters</div><table class="sw-param-table"><thead><tr><th>Name</th><th>In</th><th>Type</th><th>Required</th><th>Value</th></tr></thead><tbody>${params.map(px=>`<tr><td style="font-family:var(--font-mono);font-weight:600">${escH(px.name)}${px.required?'<span style="color:var(--fail)">*</span>':''}</td><td><span class="sw-in-badge in-${px.in}">${px.in}</span></td><td style="font-size:11px;color:var(--mut)">${px.schema?.type||px.type||'string'}</td><td style="font-size:11px">${px.required?'✅':'—'}</td><td><input type="text" id="${eid}-p-${escH(px.name)}" data-param-name="${escH(px.name)}" data-param-in="${px.in}" placeholder="${escH(px.description||px.name)}" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:var(--font-mono);color:var(--txt);outline:none"></td></tr>`).join('')}</tbody></table>`;
+  const inCls={path:'sw-pin-path',query:'sw-pin-query',header:'sw-pin-header',cookie:'sw-pin-cookie'};
+  return`<div class="sw-sec"><div class="sw-sec-ttl">📋 Parameters <span class="sw-sec-cnt">${params.length}</span></div><div class="sw-params-grid">${params.map(px=>`<div class="sw-prow${px.required?' sw-preq':''}"><div class="sw-pmeta"><span class="sw-pname">${escH(px.name)}${px.required?'<span class="sw-req-dot">*</span>':''}</span><span class="sw-pin ${inCls[px.in]||'sw-pin-query'}">${(px.in||'query').toUpperCase()}</span><span class="sw-ptype">${px.schema?.type||px.type||'string'}</span></div>${px.description?`<div class="sw-pdesc">${escH(px.description.substring(0,100))}</div>`:''}<input type="text" id="${eid}-p-${escH(px.name)}" data-param-name="${escH(px.name)}" data-param-in="${px.in||'query'}" placeholder="${escH(px.example||px.schema?.example||(px.required?'Required':'Optional'))}" class="sw-pinput" oninput="_swUpdateUrlPrev('${eid}','${escH(path)}')"></div>`).join('')}</div></div>`;
 }
 
-function _swBody(op,eid){
+function _swBody2(op,eid){
   if(!op.requestBody)return'';
   const ct=op.requestBody.content||{},jc=ct['application/json'];
-  let ex='{}';
+  let ex='{\n  \n}';
   if(jc?.example)ex=JSON.stringify(jc.example,null,2);
   else if(jc?.schema)ex=_swExampleFromSchema(jc.schema);
-  return`<div class="sw-param-ttl">Request Body${op.requestBody.required?'<span style="color:var(--fail);font-size:10px"> *required</span>':''}</div>
-<textarea id="${eid}-body" class="sw-body-ed">${escH(ex)}</textarea>
-<div style="display:flex;gap:6px;margin-top:6px">
-  <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="try{document.getElementById('${eid}-body').value=JSON.stringify(JSON.parse(document.getElementById('${eid}-body').value),null,2)}catch(_){toast('Invalid JSON','err')}">Format JSON</button>
-</div>`;
+  return`<div class="sw-sec"><div class="sw-sec-ttl">📦 Request Body ${op.requestBody.required?'<span class="sw-req-chip">required</span>':''}</div><div class="sw-body-bar"><div></div><div class="sw-body-actions"><button class="sw-body-action" onclick="try{document.getElementById('${eid}-body').value=JSON.stringify(JSON.parse(document.getElementById('${eid}-body').value),null,2)}catch(_){toast('Invalid JSON','err')}">⇄ Format</button><button class="sw-body-action" onclick="document.getElementById('${eid}-body').value=''"">✕ Clear</button></div></div><textarea id="${eid}-body" class="sw-body-ed2" rows="6">${escH(ex)}</textarea></div>`;
 }
 
 function _swExampleFromSchema(s){
@@ -7985,31 +8098,64 @@ function _swExampleFromSchema(s){
   return JSON.stringify(ex,null,2);
 }
 
-function _swToggle(eid){
-  const panel=document.getElementById(eid);const chev=document.getElementById(eid+'-chev');if(!panel)return;
+function _swToggleGrp(hdr){
+  const body=hdr.nextElementSibling,chev=hdr.querySelector('.sw-grp-chev');
+  const open=body.style.display!=='none';
+  body.style.display=open?'none':'block';
+  if(chev)chev.textContent=open?'▶':'▼';
+  hdr.classList.toggle('open',!open);
+}
+
+function _swToggleEp(eid){
+  const panel=document.getElementById(eid),chev=document.getElementById(eid+'-chev');if(!panel)return;
   const open=panel.style.display!=='none';
   panel.style.display=open?'none':'block';
-  if(chev)chev.textContent=open?'▼':'▲';
+  if(chev)chev.textContent=open?'▶':'▼';
+}
+
+function _swUpdateUrlPrev(eid,pathTpl){
+  const el=document.getElementById(eid+'-urlprev');if(!el)return;
+  let p=pathTpl;const qp=[];
+  document.querySelectorAll(`#${eid} .sw-pinput`).forEach(inp=>{
+    const n=inp.dataset.paramName,loc=inp.dataset.paramIn,v=inp.value.trim();if(!v)return;
+    if(loc==='path')p=p.replace(`{${n}}`,v);
+    else if(loc==='query')qp.push(`${n}=${encodeURIComponent(v)}`);
+  });
+  el.textContent=_swBaseUrl+p+(qp.length?'?'+qp.join('&'):'');
+}
+
+let _swMethodFilter='all';
+function _swFilterMethod(method,btn){
+  _swMethodFilter=method;
+  document.querySelectorAll('.sw-fpill').forEach(p=>p.classList.remove('active'));btn.classList.add('active');
+  document.querySelectorAll('.sw-ep2').forEach(ep=>{
+    const show=method==='all'||ep.dataset.method===method;
+    ep.style.display=show?'':'none';
+  });
+  document.querySelectorAll('.sw-grp').forEach(g=>{
+    const vis=[...g.querySelectorAll('.sw-ep2')].some(e=>e.style.display!=='none');
+    g.style.display=vis?'':'none';
+  });
 }
 
 function _swFilter(q){
   q=q.toLowerCase();
-  document.querySelectorAll('.sw-ep').forEach(ep=>{
+  document.querySelectorAll('.sw-ep2').forEach(ep=>{
     const match=!q||ep.dataset.path?.toLowerCase().includes(q)||ep.dataset.method?.includes(q)||ep.dataset.summary?.includes(q);
-    ep.style.display=match?'':'none';
+    ep.style.display=(match&&(_swMethodFilter==='all'||ep.dataset.method===_swMethodFilter))?'':'none';
   });
-  document.querySelectorAll('.sw-tag-group').forEach(g=>{
-    const vis=[...g.querySelectorAll('.sw-ep')].some(e=>e.style.display!=='none');
+  document.querySelectorAll('.sw-grp').forEach(g=>{
+    const vis=[...g.querySelectorAll('.sw-ep2')].some(e=>e.style.display!=='none');
     g.style.display=vis?'':'none';
   });
 }
 
 async function _swRun(eid,path,method,p){
   const respEl=document.getElementById(eid+'-resp');if(!respEl)return;
-  respEl.style.display='block';respEl.innerHTML=`<div style="padding:14px;color:var(--mut);font-size:12px">⏳ Sending ${method.toUpperCase()} ${_swBaseUrl}${path}…</div>`;
+  respEl.style.display='block';respEl.innerHTML=`<div style="padding:12px 16px;color:var(--mut);font-size:12px">⏳ Sending ${method.toUpperCase()}…</div>`;
   try{
     let resolvedPath=path;const qp={},hd={};
-    document.querySelectorAll(`#${eid} [data-param-name]`).forEach(inp=>{
+    document.querySelectorAll(`#${eid} .sw-pinput`).forEach(inp=>{
       const n=inp.dataset.paramName,loc=inp.dataset.paramIn,v=inp.value.trim();if(!v)return;
       if(loc==='path')resolvedPath=resolvedPath.replace(`{${n}}`,encodeURIComponent(v));
       else if(loc==='query')qp[n]=v;
@@ -8020,36 +8166,51 @@ async function _swRun(eid,path,method,p){
     if(authTok&&authType!=='none')hd[authType==='ApiKey'?'X-API-Key':'Authorization']=(authType==='ApiKey'?'':authType+' ')+authTok;
     let body=null;
     const bodyEl=document.getElementById(eid+'-body');
-    if(bodyEl?.value?.trim()){try{body=JSON.parse(bodyEl.value);}catch(_){respEl.innerHTML='<div style="padding:14px;color:var(--fail);font-size:13px">❌ Invalid JSON in request body</div>';return;}}
-    const fullUrl=_swBaseUrl+resolvedPath;
-    const r=await fetch('/api/swagger-execute',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},body:JSON.stringify({method,url:fullUrl,headers:hd,body,params:qp})});
-    const result=await r.json();
-    _swRenderResp(respEl,result,eid);
-  }catch(e){respEl.innerHTML=`<div style="padding:14px;color:var(--fail);font-size:13px">❌ ${escH(e.message)}</div>`;}
+    if(bodyEl?.value?.trim()){try{body=JSON.parse(bodyEl.value);}catch(_){respEl.innerHTML=`<div style="padding:12px 16px;color:var(--fail);font-size:12px">❌ Invalid JSON in request body</div>`;return;}}
+    const r=await fetch('/api/swagger-execute',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},body:JSON.stringify({method,url:_swBaseUrl+resolvedPath,headers:hd,body,params:qp})});
+    _swRenderResp2(respEl,await r.json(),eid);
+  }catch(e){respEl.innerHTML=`<div style="padding:12px 16px;color:var(--fail);font-size:12px">❌ ${escH(e.message)}</div>`;}
 }
 
 function _swRunQuick(eid,path,method,p){
-  const panel=document.getElementById(eid);if(panel&&panel.style.display==='none')_swToggle(eid);
+  const panel=document.getElementById(eid);if(panel&&panel.style.display==='none')_swToggleEp(eid);
   setTimeout(()=>_swRun(eid,path,method,p),80);
 }
 
-function _swRenderResp(el,result,eid){
-  const ok=result.status>=200&&result.status<300;
-  const sc=ok?'var(--pass)':result.status>=400?'var(--fail)':'var(--blk)';
-  const bodyStr=typeof result.body==='object'?JSON.stringify(result.body,null,2):String(result.body||'');
-  const hdrsStr=JSON.stringify(result.headers||{},null,2);
-  el.innerHTML=`<div class="sw-resp-status"><span style="font-weight:800;color:${sc};font-size:14px">${result.status} ${escH(result.statusText||'')}</span><span style="color:var(--mut);font-size:12px">⏱ ${result.duration}ms</span><button class="btn btn-secondary" style="font-size:11px;padding:3px 10px;margin-left:auto" onclick="navigator.clipboard.writeText(document.getElementById('${eid}-rbody').textContent);toast('Copied ✓')">📋 Copy</button></div>
-<div class="sw-resp-tabs"><button class="sw-resp-tab active" onclick="_swRespTab(this,'${eid}-rbody','${eid}-rhdrs')">Body</button><button class="sw-resp-tab" onclick="_swRespTab(this,'${eid}-rhdrs','${eid}-rbody')">Headers</button></div>
-<div class="sw-resp-panel"><pre id="${eid}-rbody" class="sw-resp-pre">${escH(bodyStr)}</pre></div>
-<div class="sw-resp-panel" style="display:none"><pre id="${eid}-rhdrs" class="sw-resp-pre">${escH(hdrsStr)}</pre></div>`;
+function _swSyntax(str){
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,m=>{
+      let c='sw-jnum';
+      if(/^"/.test(m)){c=/:$/.test(m)?'sw-jkey':'sw-jstr';}
+      else if(/true|false/.test(m)){c='sw-jbool';}
+      else if(/null/.test(m)){c='sw-jnull';}
+      return`<span class="${c}">${m}</span>`;
+    });
 }
 
-function _swRespTab(btn,showId,hideId){
-  const parent=btn.closest('.sw-resp');
-  parent.querySelectorAll('.sw-resp-tab').forEach(t=>t.classList.remove('active'));btn.classList.add('active');
+function _swRenderResp2(el,result,eid){
+  const ok=result.status>=200&&result.status<300,isErr=result.status>=400;
+  const sc=ok?{bg:'rgba(16,185,129,.1)',border:'rgba(16,185,129,.3)',color:'var(--pass)',em:'✅'}:
+             isErr?{bg:'rgba(239,68,68,.1)',border:'rgba(239,68,68,.3)',color:'var(--fail)',em:'❌'}:
+                   {bg:'rgba(245,158,11,.1)',border:'rgba(245,158,11,.3)',color:'var(--blk)',em:'⚠️'};
+  const bodyStr=typeof result.body==='object'?JSON.stringify(result.body,null,2):String(result.body||'');
+  const hdrsStr=JSON.stringify(result.headers||{},null,2);
+  const rid=eid+'_r';
+  el.innerHTML=`<div class="sw-resp-card">
+<div class="sw-rstat" style="background:${sc.bg};border-bottom-color:${sc.border}">
+  <div class="sw-rstat-l"><span class="sw-rem">${sc.em}</span><span class="sw-rcode" style="color:${sc.color}">${result.status}</span><span class="sw-rtxt" style="color:${sc.color}">${escH(result.statusText||'')}</span></div>
+  <div class="sw-rmeta"><span class="sw-rmi">⏱ ${result.duration}ms</span><span class="sw-rmi">📄 ${bodyStr.split('\n').length} lines</span><button class="sw-rcopy" onclick="navigator.clipboard.writeText(this.dataset.c);this.textContent='✅ Copied!';setTimeout(()=>this.textContent='📋 Copy',2000)" data-c="${escH(bodyStr)}">📋 Copy</button></div>
+</div>
+<div class="sw-rtabs"><button class="sw-rtab active" onclick="_swRTab(this,'${rid}-b','${rid}-h')">📄 Body</button><button class="sw-rtab" onclick="_swRTab(this,'${rid}-h','${rid}-b')">📋 Headers</button></div>
+<div class="sw-rpanel" id="${rid}-b"><pre class="sw-rjson">${_swSyntax(bodyStr)}</pre></div>
+<div class="sw-rpanel" id="${rid}-h" style="display:none"><pre class="sw-rjson">${_swSyntax(hdrsStr)}</pre></div>
+</div>`;
+}
+
+function _swRTab(btn,showId,hideId){
+  btn.closest('.sw-resp-card').querySelectorAll('.sw-rtab').forEach(t=>t.classList.remove('active'));btn.classList.add('active');
   const s=document.getElementById(showId),h=document.getElementById(hideId);
-  if(s)s.closest('.sw-resp-panel').style.display='block';
-  if(h)h.closest('.sw-resp-panel').style.display='none';
+  if(s)s.style.display='block';if(h)h.style.display='none';
 }
 
 function _swClearResp(eid){const el=document.getElementById(eid+'-resp');if(el){el.innerHTML='';el.style.display='none';}}
@@ -8073,6 +8234,7 @@ function openSwaggerAddModal(p){
       if(!r.ok)throw new Error((await r.json()).error||'Failed');
       toast('Swagger URL added ✓');
       closeModal();
+      _swSpec=null;_swLoading=false; // reset so it re-fetches
       switchTab(p,'swagger');renderProject(p);
     }catch(e){toast(e.message||'Failed','err');return false;}
   },{saveLabel:'＋ Add URL'});
