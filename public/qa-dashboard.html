@@ -5249,6 +5249,7 @@ async function renderUsersModal(){
       <td><span class="role-badge ${u.role}">${u.role==='super_admin'?'👑 Super Admin':'👤 Member'}</span></td>
       <td class="act-cell">
         <button class="btn-icon" onclick="openEditUser(${i})">✏ Edit</button>
+        <button class="btn-icon" onclick="resetUserPassword('${u.id}','${escH(u.name)}')" title="Reset Password">🔑 Reset Pwd</button>
         ${u.id!=='u_sa'&&u.id!==_session?.id?`<button class="btn-icon del" onclick="deleteUser(${i})" title="${u.isActive===false?'Activate':'Deactivate'}">${u.isActive===false?'✓ Activate':'✕ Deactivate'}</button>`:'<span style="font-size:10px;color:var(--mut)">You</span>'}
       </td>
     </tr>`;
@@ -5353,6 +5354,18 @@ async function deleteUser(i){
     await _loadTeamMembersFromServer();
     renderUsersModal();
   }catch(e){toast('Failed','err');}
+}
+async function resetUserPassword(userId, userName){
+  const newPwd=prompt(`Set new password for ${userName}:\n(minimum 6 characters)`);
+  if(!newPwd||newPwd.length<6){if(newPwd!==null)toast('Password must be at least 6 characters','err');return;}
+  if(!confirm(`Reset password for ${userName}?`))return;
+  try{
+    const r=await _apiCall('/api/users/'+encodeURIComponent(userId)+'/reset-password',{method:'PUT',body:JSON.stringify({password:newPwd})});
+    if(!r)return;
+    const d=await r.json();
+    if(!r.ok){toast(d.error||'Failed to reset password','err');return;}
+    toast(`Password reset for ${userName} ✓`);
+  }catch(e){toast('Failed to reset password','err');}
 }
 // ══════════════════════════════════════════════════════
 // PENDING TASKS TAB

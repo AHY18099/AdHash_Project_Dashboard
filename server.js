@@ -237,19 +237,36 @@ async function seedSuperAdmin() {
     try {
         const { getDB } = require('./src/db');
         const db = getDB();
+        const adminEmail = SUPER_ADMIN_EMAIL.toLowerCase();
+
+        // Ensure ALL users have isActive=true if it's missing (handles legacy users without the field)
+        await db.collection('users').updateMany(
+            { isActive: { $exists: false } },
+            { $set: { isActive: true, updatedAt: new Date() } }
+        );
+
+        // Check if super admin already exists with a valid bcrypt password
+        const existing = await db.collection('users').findOne({ email: adminEmail, role: 'super_admin' });
+        if (existing && existing.password && existing.password.startsWith('$2')) {
+            // Already has bcrypt password — only ensure isActive=true, never overwrite password
+            if (!existing.isActive) {
+                await db.collection('users').updateOne({ email: adminEmail }, { $set: { isActive: true, updatedAt: new Date() } });
+            }
+            console.log('[auth] ✅ Super admin verified active');
+            return;
+        }
+
+        // Create or fix super admin (only if no bcrypt password exists)
         const hashed = await bcrypt.hash(SUPER_ADMIN_PASSWORD, 12);
-        // Upsert ALL records for the super admin email — ensures isActive=true and role=super_admin
-        // even if an old record exists with wrong role or isActive=false
-        const result = await db.collection('users').updateMany(
-            { email: SUPER_ADMIN_EMAIL.toLowerCase() },
+        await db.collection('users').updateOne(
+            { email: adminEmail },
             {
                 $set: { role: 'super_admin', isActive: true, password: hashed, name: 'Super Admin', updatedAt: new Date() },
                 $setOnInsert: { id: 'u_sa', createdAt: new Date() }
             },
             { upsert: true }
         );
-        if (result.upsertedCount > 0) console.log('[auth] ✅ Super admin created in MongoDB');
-        else console.log('[auth] ✅ Super admin verified active in MongoDB (modified:', result.modifiedCount, ')');
+        console.log('[auth] ✅ Super admin created/fixed in MongoDB');
     } catch (e) { console.warn('[auth] seedSuperAdmin failed:', e.message); }
 }
 
@@ -265,18 +282,22 @@ app.post('/api/auth/login', async (req, res) => {
         // Look up in MongoDB users collection first
         const dbUser = db ? await db.collection('users').findOne({ email }) : null;
         if (dbUser) {
-            if (!dbUser.isActive) return res.status(403).json({ error: 'Account is deactivated' });
-            const valid = await bcrypt.compare(password, dbUser.password).catch(() => false)
-                       || dbUser.password === password; // fallback for legacy plaintext
-            if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
-            // If password was plaintext, upgrade to bcrypt now
-            if (dbUser.password === password) {
+            // isActive defaults to true if field missing (legacy records before this field was added)
+            const active = dbUser.isActive !== false; // undefined → true, false → false
+            if (!active) return res.status(403).json({ error: 'Account is deactivated. Contact your admin.' });
+            if (!dbUser.password) return res.status(401).json({ error: 'Password not set. Contact your admin.' });
+            const isBcrypt = dbUser.password.startsWith('$2');
+            const valid = isBcrypt
+                ? await bcrypt.compare(password, dbUser.password).catch(() => false)
+                : dbUser.password === password; // legacy plaintext fallback
+            if (!valid) return res.status(401).json({ error: 'Incorrect password' });
+            // Upgrade plaintext to bcrypt on first login
+            if (!isBcrypt) {
                 const hashed = await bcrypt.hash(password, 12);
-                await db.collection('users').updateOne({ email }, { $set: { password: hashed, updatedAt: new Date() } });
+                await db.collection('users').updateOne({ email }, { $set: { password: hashed, isActive: true, updatedAt: new Date() } });
             }
             const payload = { id: dbUser.id, name: dbUser.name, email: dbUser.email, role: dbUser.role };
             const token   = signJwt(payload);
-            // Also set legacy cookie so existing cookie-auth routes keep working
             if (dbUser.role === 'super_admin') setAuthCookie(res);
             else setMemberCookie(res, dbUser.email, dbUser.name);
             return res.json({ success: true, token, user: payload, redirectTo: '/landing' });
@@ -444,6 +465,19 @@ app.delete('/api/users/:id', requireAdmin, async (req, res) => {
         const db = getDB();
         if (db) await db.collection('users').updateOne({ id: req.params.id }, { $set: { isActive: false, updatedAt: new Date() } });
         broadcastSseEvent('qa-users-update', { action: 'deactivate', userId: req.params.id });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT /api/users/:id/reset-password — admin resets a user's password
+app.put('/api/users/:id/reset-password', requireAdmin, async (req, res) => {
+    try {
+        const { password } = req.body || {};
+        if (!password || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        const hashed = await bcrypt.hash(password, 12);
+        if (db) await db.collection('users').updateOne({ id: req.params.id }, { $set: { password: hashed, isActive: true, updatedAt: new Date() } });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
