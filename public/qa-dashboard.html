@@ -6870,12 +6870,14 @@ function _applySseUpdate(key,value){
   const userTyping=ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.isContentEditable);
   if(key==='qa3_daily_tasks'){
     loadDailyTasks();
+    // Only re-render daily tasks page if currently viewing it AND user is not typing.
+    // Never navigate away from another view.
     if(curView==='dailytasks'&&!userTyping)renderDailyTasksPage();
-    else toast('📡 Daily tasks updated live');
+    else if(curView!=='dailytasks')toast('📡 Daily tasks updated live');
   }else if(key==='qa3_team_tasks'){
     loadTeamTasks();
     if(curView==='teamtasks'&&!userTyping)renderTeamTasksPage();
-    else toast('📡 Team tasks updated live');
+    else if(curView!=='teamtasks')toast('📡 Team tasks updated live');
   }else if(key==='qa3_releases'){
     loadReleases();
   }else if(key==='qa_users'){
@@ -6892,8 +6894,8 @@ function _applySseUpdate(key,value){
       toast('📡 '+pname+' updated live');
     }
   }
-  // Always refresh the project grid summary counts
-  if(typeof renderProjectGrid==='function')renderProjectGrid();
+  // Only refresh project grid if currently on home view — never navigate away from other views
+  if(curView==='home'&&typeof renderProjectGrid==='function')renderProjectGrid();
 }
 
 async function loadFromServer(){
@@ -6923,7 +6925,12 @@ function saveAllState(){
 // ── DAILY TASKS GLOBAL STATE ──
 let DAILY_TASKS=[];
 function saveDailyTasks(){_serverData['qa3_daily_tasks']=DAILY_TASKS;serverPost('qa3_daily_tasks',DAILY_TASKS);}
-function loadDailyTasks(){DAILY_TASKS=_serverData['qa3_daily_tasks']||[];}
+function loadDailyTasks(){
+  const all=_serverData['qa3_daily_tasks']||[];
+  // Build set of real project IDs — never show rows for 'global' or unknown projects
+  const realIds=new Set(PROJECTS.map(p=>p.id));
+  DAILY_TASKS=realIds.size>0?all.filter(t=>t.projectId&&realIds.has(t.projectId)):all.filter(t=>t.projectId&&t.projectId!=='global');
+}
 
 // Pull wfdocs file metadata from server for all projects — server is the single source of truth.
 // The server already deduplicates by name (keeping the entry with serverId/ghUrl preferred).

@@ -228,13 +228,21 @@ async function writeKey(key, value) {
         return;
     }
     if (key === 'qa3_daily_tasks') {
-        await db.collection('daily_tasks').deleteMany({ projectId: 'global' });
-        if (Array.isArray(value) && value.length > 0) await _upsertMany('daily_tasks', 'global', value);
+        // Delete ALL existing daily_tasks (including any stale 'global' rows) then re-insert
+        // using each task's own projectId — daily tasks belong to specific projects, not 'global'
+        await db.collection('daily_tasks').deleteMany({});
+        if (Array.isArray(value) && value.length > 0) {
+            const realTasks = value.filter(t => t && t.projectId && t.projectId !== 'global');
+            await Promise.all(realTasks.map(t => _upsertDoc('daily_tasks', t.projectId, t)));
+        }
         return;
     }
     if (key === 'qa3_team_tasks') {
-        await db.collection('team_tasks').deleteMany({ projectId: 'global' });
-        if (Array.isArray(value) && value.length > 0) await _upsertMany('team_tasks', 'global', value);
+        // Team tasks also have their own projectId per task
+        await db.collection('team_tasks').deleteMany({});
+        if (Array.isArray(value) && value.length > 0) {
+            await Promise.all(value.map(t => _upsertDoc('team_tasks', t.projectId || 'global', t)));
+        }
         return;
     }
     if (key === 'qa3_releases') {

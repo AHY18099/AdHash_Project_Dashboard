@@ -214,7 +214,7 @@ function setMemberCookie(res, email, name) {
 
 // ── JWT helpers ──────────────────────────────────────────────────────────────
 function signJwt(payload) {
-    return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+    return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
 }
 function verifyJwt(token) {
     try { return jwt.verify(token, JWT_SECRET); } catch (_) { return null; }
