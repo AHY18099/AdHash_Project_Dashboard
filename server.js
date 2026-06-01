@@ -70,8 +70,13 @@ const app = express();
 const PORT = Number(process.env.PORT) || 7777;
 const IS_PROD = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
 
-// Compress all responses — reduces payload size by ~70% for JSON
-app.use(compression());
+// Compress all responses except SSE streams (event-stream must not be compressed/buffered)
+app.use(compression({
+    filter: (req, res) => {
+        if (req.path === '/api/events') return false; // never compress SSE
+        return compression.filter(req, res);
+    }
+}));
 
 // ── Real-time SSE broadcast ──
 // Map: clientId → { res, userId, userName, connectedAt }
