@@ -6924,14 +6924,45 @@ function _applySseUpdate(key,value){
   const userTyping=ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.isContentEditable);
   if(key==='qa3_daily_tasks'){
     loadDailyTasks();
-    // Only re-render daily tasks page if currently viewing it AND user is not typing.
-    // Never navigate away from another view.
-    if(curView==='dailytasks'&&!userTyping)renderDailyTasksPage();
-    else if(curView!=='dailytasks')toast('📡 Daily tasks updated live');
+    if(curView==='dailytasks'&&!userTyping){
+      // Surgical update: re-render only the day tables that actually changed,
+      // preserving scroll position and week open/collapse state.
+      // Find which dates changed and re-render only those day containers.
+      const changedDates=new Set((Array.isArray(value)?value:[]).map(t=>t.date).filter(Boolean));
+      if(changedDates.size>0){
+        changedDates.forEach(ds=>{
+          const bodyEl=document.getElementById('dt-daybody-'+ds);
+          if(bodyEl){
+            // Re-render only the table rows inside this day's body container
+            dtEnsureProjectRows(ds);
+            const tasks=DAILY_TASKS.filter(t=>t.date===ds);
+            tasks.sort((a,b)=>{const na=dtProjName(a.projectId).toLowerCase(),nb=dtProjName(b.projectId).toLowerCase();return na<nb?-1:na>nb?1:0;});
+            const rows=tasks.map(t=>{
+              const tidx=DAILY_TASKS.indexOf(t);
+              const pColor=dtProjColor(t.projectId);
+              const pName=dtProjName(t.projectId);
+              return`<tr><td class="col-project"><span class="dt-proj-badge" style="background:${pColor}18;color:${pColor};border:1px solid ${pColor}44"><span class="dt-proj-dot" style="background:${pColor}"></span>${escH(pName)}</span></td>${DT_COLS.map(c=>`<td>${dtCellSelect(tidx,c.key,t[c.key]||'')}</td>`).join('')}<td>${dtAssignedSelect(tidx,t.assignedBy||'')}</td></tr>`;
+            }).join('');
+            const tbl=bodyEl.querySelector('table tbody');
+            if(tbl)tbl.innerHTML=rows;
+            else bodyEl.innerHTML=`<table class="dt-table"><thead><tr><th class="col-project">Project</th>${DT_COLS.map(c=>`<th>${escH(c.label)}</th>`).join('')}<th>ASSIGNED BY</th></tr></thead><tbody>${rows}</tbody></table>`;
+          }
+        });
+      } else {
+        // Unknown dates — full re-render as fallback (won't cause navigation)
+        renderDailyTasksPage();
+      }
+    } else if(curView!=='dailytasks') {
+      toast('📡 Daily tasks updated live');
+    }
   }else if(key==='qa3_team_tasks'){
     loadTeamTasks();
-    if(curView==='teamtasks'&&!userTyping)renderTeamTasksPage();
-    else if(curView!=='teamtasks')toast('📡 Team tasks updated live');
+    // Don't re-render team tasks page from SSE — it resets week/scroll state.
+    // User's own saves go through the POST response path; SSE is for OTHER users.
+    // Show a toast only; user can navigate to team tasks to see updates.
+    if(curView!=='teamtasks') toast('📡 Team tasks updated live');
+    // If already on team tasks, only re-render if NOT actively working
+    else if(!userTyping) renderTeamTasksPage();
   }else if(key==='qa3_releases'){
     loadReleases();
   }else if(key==='qa_users'){

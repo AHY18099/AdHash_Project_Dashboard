@@ -65,9 +65,13 @@ function _ghRequest(method, ghPath, body, token) {
 }
 
 
+const compression = require('compression');
 const app = express();
 const PORT = Number(process.env.PORT) || 7777;
 const IS_PROD = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
+
+// Compress all responses — reduces payload size by ~70% for JSON
+app.use(compression());
 
 // ── Real-time SSE broadcast ──
 // Map: clientId → { res, userId, userName, connectedAt }
@@ -4468,6 +4472,8 @@ app.get('/api/health', async (req, res) => {
         const projectCount = keys.filter(k => k.startsWith('qa3_') &&
             !['qa3_daily_tasks','qa3_team_tasks','qa3_releases'].includes(k) &&
             !k.includes('test') && !k.includes('heartbeat')).length;
+        let storage = { usedPct: '?', status: 'unknown' };
+        try { const { getStorageStats } = require('./src/gitBackup'); storage = await getStorageStats(); } catch (_) {}
         res.json({
             status:       'ok',
             database:     'connected',
@@ -4476,7 +4482,8 @@ app.get('/api/health', async (req, res) => {
             totalKeys:    keys.length,
             activeUsers:  _sseClients.size,
             deployVersion: _DEPLOY_VERSION,
-            uptime:       Math.floor(process.uptime())
+            uptime:       Math.floor(process.uptime()),
+            storage
         });
     } catch (e) {
         // Return 200 so Railway health checks don't kill the container — database is just disconnected
@@ -4492,6 +4499,25 @@ app.get('/api/health', async (req, res) => {
             cacheKeys: Object.keys(_qaCache).length
         });
     }
+});
+
+// POST /api/admin/backup — trigger full backup to GitHub now (admin only)
+app.post('/api/admin/backup', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const { forceFullBackup } = require('./src/gitBackup');
+        const filename = await forceFullBackup();
+        res.json({ success: true, file: filename });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/storage — MongoDB usage stats (admin only)
+app.get('/api/admin/storage', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const { getStorageStats } = require('./src/gitBackup');
+        res.json(await getStorageStats());
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // GET /api/events — SSE stream; pushes qa-data-update/delete events to all connected clients
@@ -5174,6 +5200,12 @@ async function migrateWfDocsToGitHub() {
             console.error('Startup recovery/mail dispatch failed:', error);
         }
     })();
+    // Schedule automatic GitHub backup every 6 hours (runs if MongoDB >= 70% full)
+    try {
+        const { runBackupIfNeeded } = require('./src/gitBackup');
+        runBackupIfNeeded().catch(e => console.warn('[backup] Startup check failed:', e.message));
+        setInterval(() => runBackupIfNeeded().catch(e => console.warn('[backup]', e.message)), 6 * 60 * 60 * 1000);
+    } catch (e) { console.warn('[backup] Could not schedule backup:', e.message); }
 });
 })(); // end startup async IIFE
 
