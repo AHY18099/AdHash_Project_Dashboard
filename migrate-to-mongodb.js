@@ -206,7 +206,9 @@ async function migrate() {
     'daily_tasks', 'team_tasks', 'releases', 'users', 'projects',
   ];
   for (const c of indexedCols) {
-    await db.collection(c).createIndex({ id: 1 }, { unique: true, sparse: true, background: true });
+    // Compound unique index on (id + projectId) — id alone is not globally unique
+    // (e.g. daily tasks have same dt_ id across different projectIds)
+    await db.collection(c).createIndex({ id: 1, projectId: 1 }, { unique: true, sparse: true, background: true, name: 'id_projectId_unique' });
     await db.collection(c).createIndex({ projectId: 1 }, { background: true });
   }
   console.log('  ✅  Indexes created\n');
