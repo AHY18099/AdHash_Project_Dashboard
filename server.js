@@ -3934,6 +3934,100 @@ app.post('/api/projects/:id/env', (req, res) => {
 
 // POST /api/push-specs — commit & push regenerated spec files to all 5 GitHub repos
 // Streams NDJSON log lines so the browser can show live progress.
+// POST /api/admin/commit-and-push
+// Exports all MongoDB data and pushes a timestamped backup to GitHub.
+app.post('/api/admin/commit-and-push', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+    if (!token) return res.status(500).json({ error: 'GITHUB_TOKEN not set on Railway', hint: 'Add GITHUB_TOKEN in Railway → Variables' });
+
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        const steps = [];
+
+        // Step A: export all collections from MongoDB
+        steps.push('Fetching live data from MongoDB…');
+        const COLLECTIONS = [
+            'projects','credentials','smoke_tests','prod_checklist','task_checklist',
+            'third_party','client_feedback','saved_reports','release_notes',
+            'pending_tasks','daily_tasks','team_tasks','workflow_docs','env_details','releases',
+        ];
+        const backup = { exportedAt: new Date().toISOString(), version: '1.0', collections: {} };
+        let totalRecords = 0;
+        for (const col of COLLECTIONS) {
+            try {
+                backup.collections[col] = await db.collection(col).find({}).toArray();
+                totalRecords += backup.collections[col].length;
+            } catch (_) { backup.collections[col] = []; }
+        }
+        // Users without passwords
+        backup.collections['users'] = await db.collection('users')
+            .find({}, { projection: { password: 0 } }).toArray();
+        totalRecords += backup.collections['users'].length;
+        steps.push(`Exported ${totalRecords} records from ${COLLECTIONS.length + 1} collections`);
+
+        // Step B: push backup file to GitHub
+        steps.push('Pushing backup to GitHub…');
+        const ts       = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const filePath = `backups/data-backup-${ts}.json`;
+        const content  = Buffer.from(JSON.stringify(backup, null, 2)).toString('base64');
+
+        const ghPut = (path, body) => _ghRequest('PUT', `/repos/AHY18099/AdHash_Project_Dashboard/contents/${path}`, body, token);
+        const ghGet = (path) => _ghRequest('GET', `/repos/AHY18099/AdHash_Project_Dashboard/contents/${path}`, null, token);
+
+        // Get sha of existing file if it exists (needed for update)
+        let sha;
+        try { const r = await ghGet(filePath); if (r.status === 200) sha = r.body.sha; } catch (_) {}
+
+        const putResult = await ghPut(filePath, {
+            message: `backup: live data export ${ts}`,
+            content,
+            ...(sha ? { sha } : {}),
+        });
+        if (putResult.status !== 200 && putResult.status !== 201)
+            throw new Error(`GitHub push failed: ${putResult.status} — ${JSON.stringify(putResult.body)}`);
+        steps.push(`Pushed ${filePath}`);
+
+        // Step C: clean old backups (keep last 20)
+        steps.push('Cleaning old backups…');
+        let cleaned = 0;
+        try {
+            const listResult = await _ghRequest('GET', `/repos/AHY18099/AdHash_Project_Dashboard/contents/backups`, null, token);
+            if (listResult.status === 200 && Array.isArray(listResult.body)) {
+                const old = listResult.body
+                    .filter(f => f.name.startsWith('data-backup-'))
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .slice(0, -20);
+                for (const f of old) {
+                    await _ghRequest('DELETE', `/repos/AHY18099/AdHash_Project_Dashboard/contents/${f.path}`,
+                        { message: `cleanup: remove old backup ${f.name}`, sha: f.sha }, token);
+                    cleaned++;
+                }
+            }
+        } catch (_) {}
+        steps.push(`Cleaned ${cleaned} old backup(s)`);
+
+        // Step D: get latest commit info
+        const refResult = await _ghRequest('GET', `/repos/AHY18099/AdHash_Project_Dashboard/git/refs/heads/master`, null, token);
+        const latestSha = refResult.status === 200 ? (refResult.body.object?.sha || '').slice(0, 7) : '?';
+        steps.push('All done!');
+
+        res.json({
+            success: true, steps,
+            backup: { file: filePath, records: totalRecords, exportedAt: backup.exportedAt },
+            github: {
+                latestCommit: latestSha,
+                pushedAt: new Date().toISOString(),
+                url: `https://github.com/AHY18099/AdHash_Project_Dashboard/blob/master/${filePath}`,
+            },
+        });
+    } catch (e) {
+        console.error('[commit-and-push]', e.message);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 app.post('/api/push-specs', (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
 

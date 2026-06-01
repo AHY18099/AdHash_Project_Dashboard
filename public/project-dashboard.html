@@ -4471,30 +4471,40 @@
 
     <!-- ══ COMMIT & PUSH MODAL ══════════════════════════════════════════════ -->
     <div class="push-modal-backdrop" id="pushModalBackdrop" onclick="closePushModal(event)">
-      <div class="push-modal" onclick="event.stopPropagation()">
+      <div class="push-modal" onclick="event.stopPropagation()" style="max-width:520px">
         <div class="push-modal-head">
           <span style="font-size:1.3rem">↑</span>
           <div class="push-modal-title">Commit &amp; Push to GitHub</div>
           <button class="proj-modal-close" onclick="closePushModal()" id="pushModalCloseBtn">✕</button>
         </div>
-        <div class="push-modal-body">
-          <div class="push-log-list" id="pushLogList">
-            <div class="push-log-line log" style="color:var(--text-muted);font-style:italic">
-              Click "Push Now" to commit updated test specs to all 5 GitHub repos.<br>
-              GitHub Actions will automatically pick up the changes and send an updated report.
-            </div>
+        <div class="push-modal-body" style="padding:20px 24px">
+          <div id="pushSteps" style="display:flex;flex-direction:column;gap:10px">
+            <div class="push-step" id="pstep-fetch">  <span class="pstep-icon">⏸</span><span class="pstep-text">Fetch live data from MongoDB</span></div>
+            <div class="push-step" id="pstep-backup"> <span class="pstep-icon">⏸</span><span class="pstep-text">Create timestamped backup</span></div>
+            <div class="push-step" id="pstep-push">   <span class="pstep-icon">⏸</span><span class="pstep-text">Push backup to GitHub</span></div>
+            <div class="push-step" id="pstep-clean">  <span class="pstep-icon">⏸</span><span class="pstep-text">Clean old backups (keep last 20)</span></div>
+            <div class="push-step" id="pstep-done">   <span class="pstep-icon">⏸</span><span class="pstep-text">Finalizing…</span></div>
           </div>
+          <div id="pushResult" style="margin-top:16px"></div>
         </div>
         <div class="push-modal-foot">
           <div style="display:flex;align-items:center;gap:8px;flex:1">
             <div class="push-spinner" id="pushSpinner" style="display:none"></div>
             <span class="push-status-text" id="pushStatusText">Ready to push.</span>
           </div>
-          <button class="push-close-btn" onclick="closePushModal()">Close</button>
-          <button class="pm-save-btn" id="pushNowBtn" onclick="runPushSpecs()" style="min-width:110px">Push Now</button>
+          <button class="push-close-btn" onclick="closePushModal()" id="pushCloseBtn">Close</button>
+          <button class="pm-save-btn" id="pushNowBtn" onclick="runBackupAndPush()" style="min-width:120px">▲ Backup &amp; Push</button>
         </div>
       </div>
     </div>
+    <style>
+      .push-step{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:8px;font-size:13px;transition:all .25s}
+      .push-step .pstep-icon{font-size:16px;width:22px;text-align:center;flex-shrink:0}
+      .pstep-wait{background:var(--bg-secondary,#f9fafb);color:#9ca3af}
+      .pstep-run {background:#eff6ff;color:#2563eb}
+      .pstep-ok  {background:#f0fdf4;color:#15803d}
+      .pstep-err {background:#fef2f2;color:#dc2626}
+    </style>
 
     <script>
     // ── PROJECT MODAL STATE ────────────────────────────────────────────────────
@@ -4999,118 +5009,102 @@
     }
 
     // ── COMMIT & PUSH MODAL ────────────────────────────────────────────────────
+    const _PSTEPS = ['pstep-fetch','pstep-backup','pstep-push','pstep-clean','pstep-done'];
+    function _pstep(id, status, text) {
+        const el = document.getElementById(id); if (!el) return;
+        const icon = { wait:'⏸', run:'⏳', ok:'✅', err:'❌' }[status] || '⏸';
+        const cls  = { wait:'pstep-wait', run:'pstep-run', ok:'pstep-ok', err:'pstep-err' }[status] || 'pstep-wait';
+        el.className = 'push-step ' + cls;
+        el.querySelector('.pstep-icon').textContent = icon;
+        if (text) el.querySelector('.pstep-text').textContent = text;
+    }
+
     async function openPushModal() {
-        const pw = await openPwGate('Enter password to Commit & Push');
-        if (pw === null) return;
-        if (pw !== 'Qagithub@321') {
-            document.getElementById('pwGateError').textContent = 'Incorrect password.';
-            document.getElementById('pwGateBackdrop').classList.add('open');
-            document.getElementById('pwGateInput').value = '';
-            document.getElementById('pwGateInput').focus();
-            const retryPromise = new Promise((resolve) => { _pwGateResolve = resolve; });
-            const pw2 = await retryPromise;
-            if (pw2 !== 'Qagithub@321') { closePwGate(); return; }
-        }
-        const backdrop = document.getElementById('pushModalBackdrop');
-        // Reset to ready state
-        document.getElementById('pushLogList').innerHTML =
-            `<div class="push-log-line log" style="color:var(--text-muted);font-style:italic">
-               Click "Push Now" to commit updated test specs to all 5 GitHub repos.<br>
-               GitHub Actions will automatically pick up the changes and send an updated report.
-             </div>`;
+        // Reset steps
+        _PSTEPS.forEach(id => _pstep(id, 'wait'));
+        document.getElementById('pushResult').innerHTML = '';
         document.getElementById('pushStatusText').textContent = 'Ready to push.';
         document.getElementById('pushSpinner').style.display = 'none';
         document.getElementById('pushNowBtn').disabled = false;
-        document.getElementById('pushNowBtn').textContent = 'Push Now';
+        document.getElementById('pushNowBtn').textContent = '▲ Backup & Push';
         document.getElementById('pushModalCloseBtn').disabled = false;
-        backdrop.classList.add('open');
+        document.getElementById('pushModalBackdrop').classList.add('open');
     }
 
     function closePushModal(e) {
         if (e && e.target !== document.getElementById('pushModalBackdrop')) return;
-        // Don't close while a push is in progress
-        if (document.getElementById('pushNowBtn').disabled) return;
+        if (document.getElementById('pushNowBtn').disabled) return; // in progress
         document.getElementById('pushModalBackdrop').classList.remove('open');
     }
 
-    function appendPushLog(type, msg) {
-        const list = document.getElementById('pushLogList');
-        const line = document.createElement('div');
-        line.className = `push-log-line ${type}`;
-        line.textContent = msg;
-        list.appendChild(line);
-        list.scrollTop = list.scrollHeight;
-    }
+    // Keep appendPushLog for legacy callers (push-specs SSE)
+    function appendPushLog(type, msg) {}
 
-    async function runPushSpecs() {
-        const btn = document.getElementById('pushNowBtn');
-        const spinner = document.getElementById('pushSpinner');
-        const statusText = document.getElementById('pushStatusText');
+    async function runBackupAndPush() {
+        const btn      = document.getElementById('pushNowBtn');
+        const spinner  = document.getElementById('pushSpinner');
+        const statusEl = document.getElementById('pushStatusText');
         const closeBtn = document.getElementById('pushModalCloseBtn');
+        const resultEl = document.getElementById('pushResult');
 
-        btn.disabled = true;
-        btn.textContent = 'Pushing…';
+        btn.disabled = true; btn.textContent = 'Working…';
         spinner.style.display = 'block';
         closeBtn.disabled = true;
-        statusText.textContent = 'Pushing to GitHub…';
-        document.getElementById('pushLogList').innerHTML = '';
+        resultEl.innerHTML = '';
+
+        _pstep('pstep-fetch',  'run', 'Fetching live data from MongoDB…');
+        statusEl.textContent = 'Exporting data…';
 
         try {
-            const res = await fetch('/api/push-specs', { method: 'POST' });
+            // Short delay so UI renders the first step
+            await new Promise(r => setTimeout(r, 80));
 
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                const msg = data.error || `Server error ${res.status}`;
-                const hint = data.hint ? `\n${data.hint}` : '';
-                appendPushLog('error', '❌ ' + msg + hint);
-                statusText.textContent = 'Push failed.';
-                spinner.style.display = 'none';
-                btn.disabled = false;
-                btn.textContent = 'Push Now';
-                closeBtn.disabled = false;
-                return;
-            }
+            _pstep('pstep-fetch',  'run', 'Fetching live data from MongoDB…');
+            _pstep('pstep-backup', 'run', 'Creating timestamped backup…');
 
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
+            const token = localStorage.getItem('qa_jwt_token') || '';
+            const res   = await fetch('/api/admin/commit-and-push', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ message: 'Manual backup' }),
+            });
+            const data = await res.json();
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-                const parts = buffer.split('\n\n');
-                buffer = parts.pop(); // keep incomplete chunk
-                for (const part of parts) {
-                    const line = part.replace(/^data: /, '').trim();
-                    if (!line) continue;
-                    try {
-                        const evt = JSON.parse(line);
-                        if (evt.type === 'done') {
-                            spinner.style.display = 'none';
-                            btn.disabled = false;
-                            btn.textContent = 'Push Now';
-                            closeBtn.disabled = false;
-                            if (evt.success) {
-                                statusText.textContent = '✅ Push complete!';
-                            } else {
-                                statusText.textContent = '⚠️ Push finished with warnings.';
-                            }
-                        } else {
-                            appendPushLog(evt.type || 'log', evt.msg || '');
-                        }
-                    } catch (_) {}
-                }
-            }
-        } catch (err) {
-            appendPushLog('error', '❌ Network error: ' + err.message);
-            statusText.textContent = 'Push failed.';
+            if (!res.ok || !data.success) throw new Error(data.error || 'Push failed');
+
+            _pstep('pstep-fetch',  'ok', `✅ ${data.backup.records} records fetched from MongoDB`);
+            _pstep('pstep-backup', 'ok', `✅ Backup created: ${data.backup.file.split('/').pop()}`);
+            _pstep('pstep-push',   'ok', '✅ Pushed to GitHub');
+            _pstep('pstep-clean',  'ok', `✅ Old backups cleaned`);
+            _pstep('pstep-done',   'ok', '✅ Complete!');
+
+            statusEl.textContent = '✅ Backup & push complete!';
             spinner.style.display = 'none';
-            btn.disabled = false;
-            btn.textContent = 'Push Now';
+            btn.disabled = false; btn.textContent = '▲ Backup & Push';
             closeBtn.disabled = false;
+
+            resultEl.innerHTML = `<div style="margin-top:4px;padding:12px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:12px;color:#15803d">
+              <div style="font-weight:700;margin-bottom:6px">✅ Successfully backed up ${data.backup.records} records</div>
+              <div>📁 File: <code>${data.backup.file.split('/').pop()}</code></div>
+              <div>🔖 Commit: <b>${data.github.latestCommit}</b> &nbsp;·&nbsp; ${new Date(data.github.pushedAt).toLocaleTimeString()}</div>
+              <div style="margin-top:6px"><a href="${data.github.url}" target="_blank" style="color:#2563eb;text-decoration:underline">View on GitHub →</a></div>
+            </div>`;
+
+        } catch (err) {
+            _PSTEPS.forEach(id => { const el=document.getElementById(id); if(el&&el.classList.contains('pstep-run'))_pstep(id,'err'); });
+            statusEl.textContent = '❌ Push failed.';
+            spinner.style.display = 'none';
+            btn.disabled = false; btn.textContent = '▲ Backup & Push';
+            closeBtn.disabled = false;
+            resultEl.innerHTML = `<div style="margin-top:4px;padding:12px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:12px;color:#dc2626">
+              <div style="font-weight:700;margin-bottom:4px">❌ ${err.message}</div>
+              <div style="color:#666;font-size:11px">Ensure GITHUB_TOKEN is set in Railway Variables.</div>
+            </div>`;
         }
     }
+
+    // Legacy wrapper kept so any existing callers still work
+    function runPushSpecs() { runBackupAndPush(); }
 
     // ── RUN REPORT PANEL ─────────────────────────────────────────────────────
     let runReportPanelOpen = false;
