@@ -88,6 +88,18 @@ const SECTION_MAP = {
 // ── Core helpers ─────────────────────────────────────────────────────────────
 function newId() { return new ObjectId().toString(); }
 
+// Strip MongoDB metadata fields that must never appear in client-facing data.
+// If these fields leak into _qaCache → mergedValue → STORE, the hash changes
+// on every write (updatedAt is always a new Date), causing an infinite save loop.
+function _strip(doc) {
+    if (!doc || typeof doc !== 'object') return doc;
+    const { _id, updatedAt, createdAt, ...clean } = doc;
+    return clean;
+}
+function _stripArray(arr) {
+    return Array.isArray(arr) ? arr.map(_strip) : arr;
+}
+
 async function _upsertDoc(colName, projectId, doc) {
     if (!doc || typeof doc !== 'object') return;
     const { _id, ...safe } = doc;
@@ -111,17 +123,20 @@ async function _upsertMany(colName, projectId, items) {
 }
 
 async function _findByProject(colName, projectId) {
-    return getDB().collection(colName).find({ projectId }).sort({ createdAt: 1 }).toArray();
+    const docs = await getDB().collection(colName).find({ projectId }).sort({ createdAt: 1 }).toArray();
+    return _stripArray(docs);
 }
 
 async function _findAll(colName) {
-    return getDB().collection(colName).find({}).sort({ createdAt: 1 }).toArray();
+    const docs = await getDB().collection(colName).find({}).sort({ createdAt: 1 }).toArray();
+    return _stripArray(docs);
 }
 
 // ── Project assembly / disassembly ───────────────────────────────────────────
 async function assembleProject(projectId) {
     const db     = getDB();
-    const config = await db.collection('projects').findOne({ id: projectId }) || {};
+    const rawConfig = await db.collection('projects').findOne({ id: projectId }) || {};
+    const config = _strip(rawConfig);
     const proj   = { env: config.env || {}, gates: config.gates || [] };
 
     // Each section from its collection
