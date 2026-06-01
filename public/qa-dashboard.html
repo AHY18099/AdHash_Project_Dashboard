@@ -2085,14 +2085,17 @@ function renderTopBar(){
   const ava=u.role==='super_admin'?'var(--inp)':'var(--grad-b)';
   const isDark=document.body.classList.contains('dark');
   document.getElementById('topbar').innerHTML=`
-    <div class="tl"><span class="brand">AdHash</span><span class="qa-badge">QA</span></div>
+    <div class="tl">
+      <button class="btn-home" onclick="window.location.href='/landing'" title="Go to AdHash Projects Dashboard" style="margin-right:6px">← Home</button>
+      <span class="brand">AdHash</span><span class="qa-badge">QA</span>
+    </div>
     <div class="topbar-right">
       <span id="save-status-badge" class="save-status-badge save-status-idle" title="Data save status">✓ Saved</span>
       <span id="sync-status" title="Real-time sync status" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--mut);cursor:default"><span id="sync-dot" style="width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 5px #22c55e;flex-shrink:0"></span><span id="sync-text">Live</span><span id="online-count" style="font-size:10px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#22c55e;padding:1px 5px;border-radius:8px;margin-left:2px" title="Users online">1</span></span>
       <button id="theme-toggle-btn" class="theme-toggle-btn" onclick="toggleTheme()">${isDark?'☀ Light':'🌙 Dark'}</button>
       ${isAdmin()?`<button class="btn-backup" onclick="downloadBackup()" title="Download full data backup">📥 Backup</button>`:''}
       ${isAdmin()&&totalPend>0?`<button class="notif-btn" onclick="showPendingOverview()" title="Pending approvals">🔔<span class="nbadge">${totalPend}</span></button>`:''}
-      <button class="btn-home" onclick="window.location.href='/landing'">← Home</button>
+      <button class="btn-home" onclick="goHome()" title="Back to QA Projects list">← Projects</button>
       <div class="uchip" onclick="toggleUDD()">
         <div class="uava" style="background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(139,92,246,.2));color:${ava}">${initials}</div>
         <div><div class="uname">${u.name}</div><div class="urole">${u.role==='super_admin'?'super-admin':'member'}</div></div>
