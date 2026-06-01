@@ -154,19 +154,22 @@ async function writeProject(projectId, proj) {
         { upsert: true }
     );
 
-    // Save each section
+    // Replace each section entirely: delete existing docs first so deleted rows are never
+    // resurrected on next readAllData(). Empty array = user cleared the section — still deletes.
     for (const [field, col] of Object.entries(SECTION_MAP)) {
         const items = proj[field];
-        if (Array.isArray(items) && items.length > 0) {
-            await _upsertMany(col, projectId, items);
-        }
+        if (!Array.isArray(items)) continue;
+        await getDB().collection(col).deleteMany({ projectId });
+        if (items.length > 0) await _upsertMany(col, projectId, items);
     }
 
-    // Save env_details
+    // env_details: same replace strategy
     if (proj.envDetails) {
+        await getDB().collection('env_details').deleteMany({ projectId });
         const prod = (proj.envDetails.production || []).map(e => ({ ...e, envType: 'production' }));
         const stag = (proj.envDetails.staging    || []).map(e => ({ ...e, envType: 'staging' }));
-        await _upsertMany('env_details', projectId, [...prod, ...stag]);
+        const all  = [...prod, ...stag];
+        if (all.length > 0) await _upsertMany('env_details', projectId, all);
     }
 }
 
@@ -182,12 +185,29 @@ async function readKey(key) {
     return null;
 }
 
-/** Write one key to MongoDB. */
+/** Write one key to MongoDB. Delete-then-upsert ensures removed items are never resurrected. */
 async function writeKey(key, value) {
-    if (key === 'qa_users')        { await _upsertMany('users',       'global', Array.isArray(value) ? value : []); return; }
-    if (key === 'qa3_daily_tasks') { await _upsertMany('daily_tasks', 'global', Array.isArray(value) ? value : []); return; }
-    if (key === 'qa3_team_tasks')  { await _upsertMany('team_tasks',  'global', Array.isArray(value) ? value : []); return; }
-    if (key === 'qa3_releases')    { await _upsertMany('releases',    'global', Array.isArray(value) ? value : []); return; }
+    const db = getDB();
+    if (key === 'qa_users') {
+        await db.collection('users').deleteMany({ projectId: 'global' });
+        if (Array.isArray(value) && value.length > 0) await _upsertMany('users', 'global', value);
+        return;
+    }
+    if (key === 'qa3_daily_tasks') {
+        await db.collection('daily_tasks').deleteMany({ projectId: 'global' });
+        if (Array.isArray(value) && value.length > 0) await _upsertMany('daily_tasks', 'global', value);
+        return;
+    }
+    if (key === 'qa3_team_tasks') {
+        await db.collection('team_tasks').deleteMany({ projectId: 'global' });
+        if (Array.isArray(value) && value.length > 0) await _upsertMany('team_tasks', 'global', value);
+        return;
+    }
+    if (key === 'qa3_releases') {
+        await db.collection('releases').deleteMany({ projectId: 'global' });
+        if (Array.isArray(value) && value.length > 0) await _upsertMany('releases', 'global', value);
+        return;
+    }
     if (key.startsWith('qa3_') && value && typeof value === 'object' && !Array.isArray(value)) {
         await writeProject(key.replace('qa3_', ''), value);
     }

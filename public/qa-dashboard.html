@@ -6572,7 +6572,7 @@ async function _doServerPost(key,value,retriesLeft){
         } else if(key.startsWith('qa3_')&&mv&&typeof mv==='object'&&!Array.isArray(mv)){
           const pid=key.replace('qa3_','');
           if(STORE[pid]){
-            Object.assign(STORE[pid],mv);
+            _mergeSseProjectIntoStore(pid,mv);
             _deduplicateStoreProject(STORE[pid]);
             _lastHbStoreHash[pid]=JSON.stringify(STORE[pid]); // hash after all mutations
           }
@@ -6647,6 +6647,35 @@ function initSseListener(){
   _sseSource.onerror=()=>{ console.warn('[sse] connection lost — browser will auto-reconnect'); };
 }
 
+// Merge an incoming SSE project snapshot into STORE[pid] without clobbering in-flight local edits.
+// Arrays are merged by id (incoming wins for matching id). Scalar fields replaced by incoming.
+function _mergeSseProjectIntoStore(pid,incoming){
+  const ex=STORE[pid];
+  if(!ex||!incoming||typeof incoming!=='object')return;
+  const nk=r=>((r&&r.name)||'')+'|'+((r&&r.url)||'')+'|'+((r&&r.environment)||'');
+  for(const key of Object.keys(incoming)){
+    const inVal=incoming[key];
+    if(inVal===null||inVal===undefined)continue;
+    if(_PROJ_ARRAY_KEYS.includes(key)&&Array.isArray(inVal)){
+      const m=new Map();
+      (ex[key]||[]).forEach(r=>{if(r&&r.id)m.set(r.id,r);else if(r)m.set('nk:'+nk(r),r);});
+      inVal.forEach(r=>{if(r&&r.id)m.set(r.id,r);else if(r)m.set('nk:'+nk(r),r);});
+      ex[key]=Array.from(m.values());
+    }else if(key==='envDetails'&&inVal&&typeof inVal==='object'){
+      ex.envDetails=ex.envDetails||{production:[],staging:[]};
+      ['production','staging'].forEach(side=>{
+        if(!Array.isArray(inVal[side]))return;
+        const m=new Map();
+        (ex.envDetails[side]||[]).forEach(r=>{if(r&&r.id)m.set(r.id,r);});
+        inVal[side].forEach(r=>{if(r&&r.id)m.set(r.id,r);});
+        ex.envDetails[side]=Array.from(m.values());
+      });
+    }else{
+      ex[key]=inVal;
+    }
+  }
+}
+
 function _applySseUpdate(key,value){
   // Don't clobber an input the user is actively typing in
   const ae=document.activeElement;
@@ -6667,7 +6696,7 @@ function _applySseUpdate(key,value){
   }else if(key.startsWith('qa3_')){
     const pid=key.replace('qa3_','');
     if(STORE[pid]&&value&&typeof value==='object'&&!Array.isArray(value)){
-      Object.assign(STORE[pid],value);_deduplicateStoreProject(STORE[pid]);
+      _mergeSseProjectIntoStore(pid,value);_deduplicateStoreProject(STORE[pid]);
     }
     if(curView==='project'&&curProj===pid&&!userTyping){
       renderProject(pid);

@@ -4438,7 +4438,7 @@ function mergeTestRows(existing, incoming) {
 // Scalar fields (env, gates) are replaced by incoming (only admin edits those).
 const PROJECT_ARRAY_KEYS = ['smoke', 'prod', 'feedback', 'thirdparty', 'taskchecklist',
                             'pendingtasks', 'credentials', 'apitests', 'testdata',
-                            'releaseNotes', 'reports', 'pending'];
+                            'releaseNotes', 'reports', 'pending', 'wfdocs'];
 
 function mergeProjectData(existing, incoming) {
     if (!existing || typeof existing !== 'object') return incoming;
