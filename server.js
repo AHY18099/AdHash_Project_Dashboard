@@ -237,20 +237,19 @@ async function seedSuperAdmin() {
     try {
         const { getDB } = require('./src/db');
         const db = getDB();
-        const existing = await db.collection('users').findOne({ role: 'super_admin' });
-        if (existing) return;
         const hashed = await bcrypt.hash(SUPER_ADMIN_PASSWORD, 12);
-        await db.collection('users').insertOne({
-            id: 'u_sa',
-            name: 'Super Admin',
-            email: SUPER_ADMIN_EMAIL.toLowerCase(),
-            password: hashed,
-            role: 'super_admin',
-            isActive: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        });
-        console.log('[auth] ✅ Super admin seeded in MongoDB');
+        // Upsert ALL records for the super admin email — ensures isActive=true and role=super_admin
+        // even if an old record exists with wrong role or isActive=false
+        const result = await db.collection('users').updateMany(
+            { email: SUPER_ADMIN_EMAIL.toLowerCase() },
+            {
+                $set: { role: 'super_admin', isActive: true, password: hashed, name: 'Super Admin', updatedAt: new Date() },
+                $setOnInsert: { id: 'u_sa', createdAt: new Date() }
+            },
+            { upsert: true }
+        );
+        if (result.upsertedCount > 0) console.log('[auth] ✅ Super admin created in MongoDB');
+        else console.log('[auth] ✅ Super admin verified active in MongoDB (modified:', result.modifiedCount, ')');
     } catch (e) { console.warn('[auth] seedSuperAdmin failed:', e.message); }
 }
 
