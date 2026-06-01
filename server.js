@@ -5379,6 +5379,16 @@ async function migrateWfDocsToGitHub() {
             // Dedup all project data in MongoDB — removes any accumulated duplicates
             try { await deduplicateAllProjectData(); } catch (e) { console.error('[startup] dedup failed:', e.message); }
             try { await seedSuperAdmin(); } catch (e) { console.warn('[startup] seedSuperAdmin failed:', e.message); }
+            // Sync qa3_projects from cache to MongoDB — ensures any projects added before
+            // this fix are written to the projects collection so they survive redeploys
+            try {
+                const { writeKey } = require('./src/db');
+                const cachedProjects = _qaCache['qa3_projects'];
+                if (Array.isArray(cachedProjects) && cachedProjects.length > 0) {
+                    await writeKey('qa3_projects', cachedProjects);
+                    console.log(`[startup] ✅ Synced ${cachedProjects.length} projects to MongoDB`);
+                }
+            } catch (e) { console.warn('[startup] project sync failed:', e.message); }
         } catch (e) {
             console.error(`[startup] ⚠️  MongoDB attempt ${attempt} failed: ${e.message} — retrying in 5s`);
             setTimeout(() => connectWithRetry(attempt + 1), 5000);

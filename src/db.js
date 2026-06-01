@@ -224,6 +224,7 @@ async function readKey(key) {
     if (key === 'qa3_daily_tasks') return _findAll('daily_tasks');
     if (key === 'qa3_team_tasks')  return _findAll('team_tasks');
     if (key === 'qa3_releases')    return _findAll('releases');
+    if (key === 'qa3_projects')    return getDB().collection('projects').find({}).toArray();
     if (key.startsWith('qa3_'))    return assembleProject(key.replace('qa3_', ''));
     return null;
 }
@@ -275,6 +276,25 @@ async function writeKey(key, value) {
         if (Array.isArray(value) && value.length > 0) await _upsertMany('releases', 'global', value);
         return;
     }
+    if (key === 'qa3_projects' && Array.isArray(value)) {
+        // Project metadata array — upsert each project into the 'projects' collection
+        // This ensures new/edited/deleted projects persist across Railway redeploys
+        for (const proj of value) {
+            if (!proj || !proj.id) continue;
+            const { _id, ...safe } = proj;
+            await db.collection('projects').updateOne(
+                { id: safe.id },
+                { $set: { ...safe, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+                { upsert: true }
+            );
+        }
+        // Remove projects from DB that are no longer in the list
+        const activeIds = value.filter(p => p && p.id).map(p => p.id);
+        if (activeIds.length > 0) {
+            await db.collection('projects').deleteMany({ id: { $nin: activeIds } });
+        }
+        return;
+    }
     if (key.startsWith('qa3_') && value && typeof value === 'object' && !Array.isArray(value)) {
         await writeProject(key.replace('qa3_', ''), value);
     }
@@ -317,6 +337,7 @@ async function readAllData() {
     cache['qa3_daily_tasks'] = daily;
     cache['qa3_team_tasks']  = team;
     cache['qa3_releases']    = releases;
+    cache['qa3_projects']    = projects; // project metadata list — loaded by client's loadAllState()
 
     if (!projects.length) return cache;
 
