@@ -250,8 +250,8 @@
         /* Theme Toggle Button - Modern Design */
         .theme-toggle {
             position: absolute;
-            top: 0;
-            right: 0;
+            top: 16px;
+            right: 16px;
             background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
             border: none;
             border-radius: 50px;
@@ -2761,8 +2761,8 @@
         <!-- Header -->
         <div class="header">
             <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
-                <span class="theme-toggle-icon" id="themeIcon">🌙</span>
-                <span id="themeText">Dark Mode</span>
+                <span class="theme-toggle-icon" id="themeIcon">☀️</span>
+                <span id="themeText">Light Mode</span>
             </button>
             <h1>AdHash Projects Dashboard</h1>
             <p>Real-time monitoring across all platforms</p>
@@ -2916,33 +2916,32 @@
         // Theme Toggle Function
         function toggleTheme() {
             const body = document.body;
-            const themeIcon = document.getElementById('themeIcon');
-            const themeText = document.getElementById('themeText');
-
             body.classList.toggle('light-mode');
+            const isLight = body.classList.contains('light-mode');
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+            _updateThemeBtn(isLight);
+        }
 
-            if (body.classList.contains('light-mode')) {
-                themeIcon.textContent = '☀️';
-                themeText.textContent = 'Light Mode';
-                localStorage.setItem('theme', 'light');
+        function _updateThemeBtn(isLight) {
+            const icon = document.getElementById('themeIcon');
+            const text = document.getElementById('themeText');
+            if (!icon || !text) return;
+            // Show what mode you'll SWITCH TO (not current)
+            if (isLight) {
+                icon.textContent = '🌙';
+                text.textContent = 'Dark Mode';
             } else {
-                themeIcon.textContent = '🌙';
-                themeText.textContent = 'Dark Mode';
-                localStorage.setItem('theme', 'dark');
+                icon.textContent = '☀️';
+                text.textContent = 'Light Mode';
             }
         }
 
         // Load saved theme preference
         function loadTheme() {
             const savedTheme = localStorage.getItem('theme');
-            const themeIcon = document.getElementById('themeIcon');
-            const themeText = document.getElementById('themeText');
-
-            if (savedTheme === 'light') {
-                document.body.classList.add('light-mode');
-                themeIcon.textContent = '☀️';
-                themeText.textContent = 'Light Mode';
-            }
+            const isLight = savedTheme === 'light';
+            if (isLight) document.body.classList.add('light-mode');
+            _updateThemeBtn(isLight);
         }
 
         // Load projects on page load
