@@ -3105,11 +3105,22 @@ function calcSectionStats(p,sec){
   const data=(STORE[p][sec]||[]).filter(r=>!r._pending);
   return{total:data.length,pass:data.filter(r=>r.status==='Pass').length,fail:data.filter(r=>r.status==='Fail').length,blocked:data.filter(r=>r.status==='Blocked').length,ns:data.filter(r=>r.status==='Not Started').length,inp:data.filter(r=>r.status==='In Progress').length};
 }
+function _sortById(arr){
+  // Natural ascending sort: SMK-01 < SMK-02 < SMK-10 < PRD-01 etc.
+  return [...arr].sort((a,b)=>{
+    const pa=String(a.id||'').match(/^([A-Za-z_-]*)(\d*)$/)||[];
+    const pb=String(b.id||'').match(/^([A-Za-z_-]*)(\d*)$/)||[];
+    const pre=String(pa[1]||'').localeCompare(String(pb[1]||''));
+    if(pre!==0)return pre;
+    return(parseInt(pa[2]||'0',10))-(parseInt(pb[2]||'0',10));
+  });
+}
 function renderTestTable(p,sec){
   const isMobile=isMobileProject(p);
   const plat=getPlatform(p);
   const allData=STORE[p][sec]||[];
-  const data=isMobile?allData.filter(r=>!r._pending&&(!r.platform||r.platform===plat)):allData;
+  const unsorted=isMobile?allData.filter(r=>!r._pending&&(!r.platform||r.platform===plat)):allData;
+  const data=_sortById(unsorted);
   const isSm=sec==='smoke';
   const s={total:data.length,pass:data.filter(r=>r.status==='Pass').length,fail:data.filter(r=>r.status==='Fail').length,blocked:data.filter(r=>r.status==='Blocked').length,ns:data.filter(r=>r.status==='Not Started').length,inp:data.filter(r=>r.status==='In Progress').length};
   const pct=s.total?Math.round(s.pass/s.total*100):0;
@@ -3630,19 +3641,38 @@ async function deleteWfDoc(p,idx){
   const doc=(STORE[p].wfdocs||[])[idx];
   if(!doc)return;
   if(!confirm(`Delete "${doc.name}"?`))return;
+  // Remove from server storage first (disk + GitHub Release asset)
   if(doc.serverId){
     try{
       await fetch('/api/wfdocs/'+encodeURIComponent(p)+'/'+encodeURIComponent(doc.serverId),{method:'DELETE'});
     }catch(e){}
   }
+  // Remove from local STORE
   (STORE[p].wfdocs||[]).splice(idx,1);
-  saveToLS(p);
-  switchTab(p,'wfdocs');
+  // Use _replaceArrays flag so server replaces wfdocs array directly
+  // instead of merging (merge would re-add the deleted entry from cache)
+  const payload={...STORE[p],_replaceArrays:['wfdocs']};
+  serverPost('qa3_'+p,payload);
+  // Re-sync from server to confirm deletion took effect
+  setTimeout(async()=>{
+    try{
+      const r=await fetch('/api/wfdocs/'+encodeURIComponent(p),{cache:'no-store'});
+      if(r.ok){
+        const files=await r.json();
+        STORE[p].wfdocs=files.map(sf=>({name:sf.name,size:sf.size||0,uploadedAt:sf.uploadedAt||'',serverId:sf.fileId||sf.serverId||null}));
+      }
+    }catch(e){}
+    switchTab(p,'wfdocs');
+  },600);
 }
 
 // ══ CREDENTIALS ══
 function renderCredentials(p){
-  const creds=STORE[p].credentials||[];
+  const _envOrder={Production:0,Staging:1,UAT:2,QA:3,Development:4};
+  const creds=[...(STORE[p].credentials||[])].sort((a,b)=>{
+    const oa=_envOrder[a.environment]??9,ob=_envOrder[b.environment]??9;
+    return oa!==ob?oa-ob:String(a.name||'').localeCompare(String(b.name||''));
+  });
   const envBadge=env=>{
     const map={Production:'cred-env-prod',Staging:'cred-env-stage',UAT:'cred-env-uat',Development:'cred-env-dev',QA:'cred-env-qa'};
     return`<span class="cred-env-badge ${map[env]||'cred-env-other'}">${env||'—'}</span>`;
