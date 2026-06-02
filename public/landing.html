@@ -662,7 +662,7 @@ function stBuildPayload(){
 function stUpdatePayload(){const r=stBuildPayload();document.getElementById('st-payloadBox').textContent=r.ok?JSON.stringify(r.payload,null,2):'(paste a valid JSON array above)';}
 function stCopyPayload(){const r=stBuildPayload();if(!r.ok){alert('No valid payload to copy.');return;}navigator.clipboard.writeText(JSON.stringify(r.payload,null,2)).then(()=>alert('Payload copied!'));}
 async function stSendAPI(){
-  const r=stBuildPayload();const apiUrl='http://52.140.23.188:8010/market-structure-service/';const apiKey='AlgoSchwab@Api#2026';
+  const r=stBuildPayload();const apiUrl='http://52.140.23.188:8010/market-structure-service/market-structure/start';const apiKey='AlgoSchwab@Api#2026';
   const btn=document.getElementById('st-sendBtn');const resBox=document.getElementById('st-responseBox');const statusLine=document.getElementById('st-apiStatusLine');
   if(!r.ok){resBox.className='response-box err';resBox.textContent='No valid symbols — complete Step 2 first.';return;}
   btn.disabled=true;resBox.className='response-box';resBox.textContent='Sending...';
