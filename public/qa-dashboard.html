@@ -1891,18 +1891,20 @@ const PROJ_ENV_EXTRA={
 };
 function mkEnv(p){const extra=PROJ_ENV_EXTRA[p.id]||{};const extraCustFields=Object.entries(extra).map(([k,v])=>({key:k.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase()),value:v}));return{environment:'Production',website:p.website||'',dashboard:p.dashboard||'',releaseDate:p.releaseDate||'',qaLead:'',appVersion:'',releaseVersion:'',custom:extraCustFields};}
 function mkSmoke(pid){
-  // Known projects have predefined test cases; unknown/custom projects start with empty arrays
-  const KNOWN={'synctag':SYNCTAG_SMOKE_BASE,'ddp':DDP_SMOKE_BASE,'aisignpro':AISIGNPRO_SMOKE_BASE,'wavedin':WAVEDIN_SMOKE_BASE,'humee':SMOKE_BASE,'adhash':SMOKE_BASE,'algomax':SMOKE_BASE,'autochecker':SMOKE_BASE,'metcalf':SMOKE_BASE,'smc':SMOKE_BASE,'sparkme':SMOKE_BASE,'synctrade':SMOKE_BASE,'zapai':SMOKE_BASE,'zapcrm':SMOKE_BASE};
+  // Only projects with their OWN dedicated smoke suite get pre-filled cases.
+  // All others start empty — their data loads from MongoDB.
+  const KNOWN={'synctag':SYNCTAG_SMOKE_BASE,'ddp':DDP_SMOKE_BASE,'aisignpro':AISIGNPRO_SMOKE_BASE,'wavedin':WAVEDIN_SMOKE_BASE,'humee':SMOKE_BASE};
   const base=KNOWN[pid];
-  if(!base)return []; // custom/new project — no default test cases
+  if(!base)return [];
   const defStatus=pid==='humee';const useEmbed=pid==='aisignpro';
   return base.map(r=>({...r,status:useEmbed?(r.status||'Not Started'):defStatus&&r.id!=='SMK-25'?'Pass':defStatus&&r.id==='SMK-25'?'Not Started':'Not Started',owner:useEmbed?(r.owner||''):defStatus?r.id==='SMK-25'?'Release Manager':'QA Lead':'',comment:r.comment||'',_id:'r_'+Math.random().toString(36).slice(2)}));
 }
 function mkProd(pid){
-  // Known projects have predefined checklist items; unknown/custom projects start empty
-  const KNOWN={'synctag':SYNCTAG_PROD_BASE,'ddp':DDP_PROD_BASE,'aisignpro':AISIGNPRO_PROD_BASE,'wavedin':WAVEDIN_PROD_BASE,'humee':PROD_BASE,'adhash':PROD_BASE,'algomax':PROD_BASE,'autochecker':PROD_BASE,'metcalf':PROD_BASE,'smc':PROD_BASE,'sparkme':PROD_BASE,'synctrade':PROD_BASE,'zapai':PROD_BASE,'zapcrm':PROD_BASE};
+  // Only projects with their OWN dedicated prod checklist get pre-filled items.
+  // All others start empty — their data loads from MongoDB.
+  const KNOWN={'synctag':SYNCTAG_PROD_BASE,'ddp':DDP_PROD_BASE,'aisignpro':AISIGNPRO_PROD_BASE,'wavedin':WAVEDIN_PROD_BASE,'humee':PROD_BASE};
   const base=KNOWN[pid];
-  if(!base)return []; // custom/new project — no default checklist
+  if(!base)return [];
   const useEmbed=pid==='aisignpro';
   return base.map(r=>({...r,status:useEmbed?(r.status||'Not Started'):'Not Started',owner:'',comment:r.comment||'',_id:'r_'+Math.random().toString(36).slice(2)}));
 }
