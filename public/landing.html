@@ -426,7 +426,7 @@ body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(24
       <div class="strow">
         <div><label for="st-minPrice">Min Price (₹)</label><input type="number" id="st-minPrice" class="w120" value="100" min="0" step="0.01"/></div>
         <div><label for="st-maxPrice">Max Price (₹)</label><input type="number" id="st-maxPrice" class="w120" value="500" min="0" step="0.01"/></div>
-        <button class="btn-green" onclick="stFetchAndFilter()">Fetch &amp; Filter</button>
+        <button class="btn-green" id="st-fetchBtn" onclick="stFetchAndFilter()">Fetch &amp; Filter</button>
       </div>
       <div id="st-filterStatus" class="stinfo"></div>
       <div id="st-tagSection" style="display:none;margin-top:14px">
@@ -517,11 +517,16 @@ async function checkSession(){
 checkSession();
 
 // ── SYNCTRADE PANEL ──────────────────────────────────────────────────────
-function openSyncTradePanel(){
+async function openSyncTradePanel(){
   document.getElementById('synctrade-overlay').style.display='block';
   requestAnimationFrame(()=>document.getElementById('synctrade-panel').classList.add('open'));
   document.body.style.overflow='hidden';
-  stLoadConfig();
+  // Show loading state on buttons while DB keys load
+  const fetchBtn=document.getElementById('st-fetchBtn');
+  const askBtn=document.getElementById('st-askBtn');
+  if(fetchBtn){fetchBtn.disabled=true;fetchBtn.textContent='Loading config…';}
+  await stLoadConfig();
+  if(fetchBtn){fetchBtn.disabled=false;fetchBtn.textContent='Fetch & Filter';}
   stUpdatePrompt();
 }
 function closeSyncTradePanel(){
@@ -537,23 +542,48 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSyncTradePanel(
 const stLS={get:k=>localStorage.getItem('stk_'+k)||'',set:(k,v)=>localStorage.setItem('stk_'+k,v)};
 function _stToken(){return localStorage.getItem('qa_token')||'';}
 async function stLoadConfig(){
-  // Show localStorage values immediately (fast, no flicker)
-  document.getElementById('st-cfgOpenAI').value    =stLS.get('openaiKey');
-  document.getElementById('st-cfgModel').value     =stLS.get('openaiModel')||'gpt-4o-mini';
-  document.getElementById('st-cfgGoogleKey').value =stLS.get('googleKey');
-  document.getElementById('st-cfgSheetId').value   =stLS.get('sheetId')||'1ykNdxIpC6ALQfqMFG5D_w598sM77bASJ1RH1u9gQI28';
-  document.getElementById('st-cfgSheetRange').value=stLS.get('sheetRange')||'Sheet1';
-  // Then load from DB and overwrite (source of truth)
+  const s=document.getElementById('st-cfgStatus');
+  if(s){s.textContent='Loading config from DB…';s.className='stinfo';}
   try{
+    // DB is source of truth — fetch first, fall back to localStorage only if DB fails
     const r=await fetch('/api/app-config/synctrade-tool',{headers:{Authorization:'Bearer '+_stToken()}});
-    if(!r.ok)return;
-    const d=await r.json();
-    if(d.openaiKey){document.getElementById('st-cfgOpenAI').value=d.openaiKey;stLS.set('openaiKey',d.openaiKey);}
-    if(d.openaiModel){document.getElementById('st-cfgModel').value=d.openaiModel;stLS.set('openaiModel',d.openaiModel);}
-    if(d.googleKey){document.getElementById('st-cfgGoogleKey').value=d.googleKey;stLS.set('googleKey',d.googleKey);}
-    if(d.sheetId){document.getElementById('st-cfgSheetId').value=d.sheetId;stLS.set('sheetId',d.sheetId);}
-    if(d.sheetRange){document.getElementById('st-cfgSheetRange').value=d.sheetRange;stLS.set('sheetRange',d.sheetRange);}
-  }catch(_){}
+    if(r.ok){
+      const d=await r.json();
+      const hasKeys=d.openaiKey||d.googleKey;
+      // Always apply DB values (even empty strings overwrite stale localStorage)
+      document.getElementById('st-cfgOpenAI').value    =d.openaiKey   ||stLS.get('openaiKey')||'';
+      document.getElementById('st-cfgModel').value     =d.openaiModel ||stLS.get('openaiModel')||'gpt-4o-mini';
+      document.getElementById('st-cfgGoogleKey').value =d.googleKey   ||stLS.get('googleKey')||'';
+      document.getElementById('st-cfgSheetId').value   =d.sheetId     ||stLS.get('sheetId')||'1ykNdxIpC6ALQfqMFG5D_w598sM77bASJ1RH1u9gQI28';
+      document.getElementById('st-cfgSheetRange').value=d.sheetRange  ||stLS.get('sheetRange')||'Sheet1';
+      // Mirror to localStorage for offline fallback
+      if(d.openaiKey)stLS.set('openaiKey',d.openaiKey);
+      if(d.openaiModel)stLS.set('openaiModel',d.openaiModel);
+      if(d.googleKey)stLS.set('googleKey',d.googleKey);
+      if(d.sheetId)stLS.set('sheetId',d.sheetId);
+      if(d.sheetRange)stLS.set('sheetRange',d.sheetRange);
+      if(s){
+        if(hasKeys){s.textContent='Config loaded from DB ✓';s.className='stinfo ok';}
+        else{s.textContent='⚠ No keys saved yet — enter keys above and click Save Config';s.className='stinfo err';}
+        setTimeout(()=>{s.textContent='';s.className='stinfo';},3000);
+      }
+    } else {
+      // DB failed — use localStorage fallback
+      document.getElementById('st-cfgOpenAI').value    =stLS.get('openaiKey')||'';
+      document.getElementById('st-cfgModel').value     =stLS.get('openaiModel')||'gpt-4o-mini';
+      document.getElementById('st-cfgGoogleKey').value =stLS.get('googleKey')||'';
+      document.getElementById('st-cfgSheetId').value   =stLS.get('sheetId')||'1ykNdxIpC6ALQfqMFG5D_w598sM77bASJ1RH1u9gQI28';
+      document.getElementById('st-cfgSheetRange').value=stLS.get('sheetRange')||'Sheet1';
+      if(s){s.textContent='Using cached config (DB unavailable)';s.className='stinfo';setTimeout(()=>{s.textContent='';},3000);}
+    }
+  }catch(_){
+    // Network error — localStorage fallback
+    document.getElementById('st-cfgOpenAI').value    =stLS.get('openaiKey')||'';
+    document.getElementById('st-cfgModel').value     =stLS.get('openaiModel')||'gpt-4o-mini';
+    document.getElementById('st-cfgGoogleKey').value =stLS.get('googleKey')||'';
+    document.getElementById('st-cfgSheetId').value   =stLS.get('sheetId')||'1ykNdxIpC6ALQfqMFG5D_w598sM77bASJ1RH1u9gQI28';
+    document.getElementById('st-cfgSheetRange').value=stLS.get('sheetRange')||'Sheet1';
+  }
 }
 async function stSaveConfig(){
   const cfg={
