@@ -1890,13 +1890,29 @@ const PROJ_ENV_EXTRA={
   aisignpro:{clientPortal:'https://client.aisignpro.com/'}
 };
 function mkEnv(p){const extra=PROJ_ENV_EXTRA[p.id]||{};const extraCustFields=Object.entries(extra).map(([k,v])=>({key:k.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase()),value:v}));return{environment:'Production',website:p.website||'',dashboard:p.dashboard||'',releaseDate:p.releaseDate||'',qaLead:'',appVersion:'',releaseVersion:'',custom:extraCustFields};}
-function mkSmoke(pid){const base=pid==='synctag'?SYNCTAG_SMOKE_BASE:pid==='ddp'?DDP_SMOKE_BASE:pid==='aisignpro'?AISIGNPRO_SMOKE_BASE:pid==='wavedin'?WAVEDIN_SMOKE_BASE:SMOKE_BASE;const defStatus=pid==='humee';const useEmbed=pid==='aisignpro';return base.map(r=>({...r,status:useEmbed?(r.status||'Not Started'):defStatus&&r.id!=='SMK-25'?'Pass':defStatus&&r.id==='SMK-25'?'Not Started':'Not Started',owner:useEmbed?(r.owner||''):defStatus?r.id==='SMK-25'?'Release Manager':'QA Lead':'',comment:r.comment||'',_id:'r_'+Math.random().toString(36).slice(2)}));}
-function mkProd(pid){const base=pid==='synctag'?SYNCTAG_PROD_BASE:pid==='ddp'?DDP_PROD_BASE:pid==='aisignpro'?AISIGNPRO_PROD_BASE:pid==='wavedin'?WAVEDIN_PROD_BASE:PROD_BASE;const useEmbed=pid==='aisignpro';return base.map(r=>({...r,status:useEmbed?(r.status||'Not Started'):'Not Started',owner:'',comment:r.comment||'',_id:'r_'+Math.random().toString(36).slice(2)}));}
+function mkSmoke(pid){
+  // Known projects have predefined test cases; unknown/custom projects start with empty arrays
+  const KNOWN={'synctag':SYNCTAG_SMOKE_BASE,'ddp':DDP_SMOKE_BASE,'aisignpro':AISIGNPRO_SMOKE_BASE,'wavedin':WAVEDIN_SMOKE_BASE,'humee':SMOKE_BASE,'adhash':SMOKE_BASE,'algomax':SMOKE_BASE,'autochecker':SMOKE_BASE,'metcalf':SMOKE_BASE,'smc':SMOKE_BASE,'sparkme':SMOKE_BASE,'synctrade':SMOKE_BASE,'zapai':SMOKE_BASE,'zapcrm':SMOKE_BASE};
+  const base=KNOWN[pid];
+  if(!base)return []; // custom/new project — no default test cases
+  const defStatus=pid==='humee';const useEmbed=pid==='aisignpro';
+  return base.map(r=>({...r,status:useEmbed?(r.status||'Not Started'):defStatus&&r.id!=='SMK-25'?'Pass':defStatus&&r.id==='SMK-25'?'Not Started':'Not Started',owner:useEmbed?(r.owner||''):defStatus?r.id==='SMK-25'?'Release Manager':'QA Lead':'',comment:r.comment||'',_id:'r_'+Math.random().toString(36).slice(2)}));
+}
+function mkProd(pid){
+  // Known projects have predefined checklist items; unknown/custom projects start empty
+  const KNOWN={'synctag':SYNCTAG_PROD_BASE,'ddp':DDP_PROD_BASE,'aisignpro':AISIGNPRO_PROD_BASE,'wavedin':WAVEDIN_PROD_BASE,'humee':PROD_BASE,'adhash':PROD_BASE,'algomax':PROD_BASE,'autochecker':PROD_BASE,'metcalf':PROD_BASE,'smc':PROD_BASE,'sparkme':PROD_BASE,'synctrade':PROD_BASE,'zapai':PROD_BASE,'zapcrm':PROD_BASE};
+  const base=KNOWN[pid];
+  if(!base)return []; // custom/new project — no default checklist
+  const useEmbed=pid==='aisignpro';
+  return base.map(r=>({...r,status:useEmbed?(r.status||'Not Started'):'Not Started',owner:'',comment:r.comment||'',_id:'r_'+Math.random().toString(36).slice(2)}));
+}
 // ── Deduplication utility ────────────────────────────────────────────────────
 // Applied every time data enters STORE from the server to prevent any
 // accumulated duplicates from surfacing in the UI.
 const _PROJ_ARRAY_KEYS=['smoke','prod','feedback','thirdparty','taskchecklist',
-  'pendingtasks','credentials','apitests','testdata','releaseNotes','reports','pending','wfdocs'];
+  'pendingtasks','credentials','apitests','testdata','releaseNotes','reports','pending'];
+// wfdocs excluded: they use serverId not id, are synced via syncWfDocsFromServer,
+// and merging via SSE causes duplicates since entries have no stable id field.
 
 function deduplicateById(arr,idField='id'){
   if(!Array.isArray(arr)||arr.length===0)return arr;
@@ -7312,9 +7328,9 @@ async function syncWfDocsFromServer(){
         if(!r.ok)return;
         const serverFiles=await r.json();
         if(!Array.isArray(serverFiles))return;
-        // Server is authoritative — replace STORE entirely (no merging with local copy)
-        STORE[proj.id].wfdocs=serverFiles.map(sf=>({name:sf.name,size:sf.size||0,uploadedAt:sf.uploadedAt||'',serverId:sf.fileId||sf.serverId||null}));
-        _serverData['qa3_'+proj.id]=STORE[proj.id]; // update mirror only, no re-save
+        // Server is authoritative — replace wfdocs array only, no mirror update
+        // (updating _serverData here triggers SSE broadcast → render loop)
+        if(STORE[proj.id])STORE[proj.id].wfdocs=serverFiles.map(sf=>({name:sf.name,size:sf.size||0,uploadedAt:sf.uploadedAt||'',serverId:sf.fileId||sf.serverId||null}));
       }catch(e){}
     }));
   }catch(e){}
@@ -7982,10 +7998,10 @@ window.addEventListener('DOMContentLoaded',async()=>{
     },3000);
     // Check if this browser has localStorage data not yet on the server
     setTimeout(()=>_checkShowRestoreBanner(),800);
-    // sync wfdocs from server after initial render
+    // sync wfdocs from server after initial render — only re-render the active wfdocs tab
+    // do NOT call renderProjectGrid() here — it triggers _serverData updates → SSE loop
     syncWfDocsFromServer().then(()=>{
-      PROJECTS.forEach(p=>{if(curTab[p.id]==='wfdocs')renderProject(p.id);});
-      renderProjectGrid();
+      if(curView==='project'&&curProj&&curTab[curProj]==='wfdocs')renderProject(curProj);
     });
     // ── Auto-save heartbeat every 15s (was 60s — shorter window = less data lost on redeploy) ──
     setInterval(()=>_autoSaveHeartbeat(), 15000);
