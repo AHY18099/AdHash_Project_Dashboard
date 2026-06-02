@@ -5218,6 +5218,29 @@ app.post('/api/qa-data/:key', async (req, res) => {
         return res.json({ status: 'skipped', key, reason: 'users managed via /api/users' });
     }
 
+    // Projects that must NOT have auto-filled smoke/prod test cases.
+    // If an old browser tab tries to heartbeat-save default Humee cases for these projects,
+    // strip smoke/prod from the incoming value before merging — keeps them permanently empty.
+    const NO_DEFAULT_SMOKE_PROD = new Set([
+        'adhash','sparkme','zapai','zapcrm','zaptrade_mpv6v89b',
+        'algomax','autochecker','metcalf','smc','synctrade'
+    ]);
+    if (key.startsWith('qa3_') && value && typeof value === 'object' && !Array.isArray(value)) {
+        const pid = key.replace('qa3_', '');
+        if (NO_DEFAULT_SMOKE_PROD.has(pid) && !value._replaceArrays) {
+            // Only strip if the client is NOT explicitly using _replaceArrays (which is intentional)
+            // and the incoming smoke/prod are non-empty (old-tab heartbeat sending defaults)
+            if (Array.isArray(value.smoke) && value.smoke.length > 0) {
+                value = { ...value, smoke: [] };
+                console.log(`[guard] stripped default smoke for ${pid}`);
+            }
+            if (Array.isArray(value.prod) && value.prod.length > 0) {
+                value = { ...value, prod: [] };
+                console.log(`[guard] stripped default prod for ${pid}`);
+            }
+        }
+    }
+
     try {
         await _withWriteLock(async () => {
             // Merge into in-memory cache (prevents concurrent writes clobbering each other)
