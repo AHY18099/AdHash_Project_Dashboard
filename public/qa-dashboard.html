@@ -2138,9 +2138,12 @@ function renderProjectGrid(){
     ddp:'Due diligence and deal pipeline management system.',
     aisignpro:'Electronic signature and CPA client management platform.'
   };
+  // Deduplicate PROJECTS by id and sort alphabetically
+  const _seenPids=new Set();
+  const _sortedProjects=PROJECTS.filter(p=>{if(!p.id||_seenPids.has(p.id))return false;_seenPids.add(p.id);return true;}).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   // Today's date string for team task lookup
   const _todayStr=(()=>{const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`})();
-  const cards=PROJECTS.map(p=>{
+  const cards=_sortedProjects.map(p=>{
     const s=calcStats(p.id);
     const pct=s.total?Math.round(s.pass/s.total*100):0;
     const ready=isReady(p.id);
@@ -5137,6 +5140,7 @@ function renderReleasesPage(mode){
         </div>
         <div class="dt-header-right">
           ${!isPast?`<button class="rl-add-btn ${isToday?'today':'next'}" onclick="rlOpenAdd('${mode}')">＋ Add Release</button>`:''}
+          ${isPast&&list.length>0&&isAdmin()?`<button class="btn btn-secondary" style="color:var(--fail);border-color:rgba(239,68,68,.4)" onclick="rlDeleteAllPast()">🗑 Delete All Past</button>`:''}
           <button class="btn btn-secondary" onclick="goHome()">← Projects</button>
         </div>
       </div>
@@ -5219,9 +5223,18 @@ function rlDelete(idx){
   if(!confirm('Delete this release?'))return;
   RELEASES.splice(idx,1);
   saveReleases();
-  const mode=curView==='todayreleases'?'today':'next';
+  const mode=curView==='pastreleases'?'past':curView==='todayreleases'?'today':'next';
   renderReleasesPage(mode);
   toast('Release deleted');
+}
+function rlDeleteAllPast(){
+  const pastList=RELEASES.filter(r=>rlClassify(r)==='past');
+  if(!pastList.length)return;
+  if(!confirm(`Delete all ${pastList.length} past release${pastList.length!==1?'s':''}? This cannot be undone.`))return;
+  RELEASES=RELEASES.filter(r=>rlClassify(r)!=='past');
+  saveReleases();
+  renderReleasesPage('past');
+  toast(`Deleted ${pastList.length} past release${pastList.length!==1?'s':''}`);
 }
 
 function rlBuildModalBody(entry,defaultMode){
@@ -7214,11 +7227,14 @@ function loadAllState(){
   // Load from server mirror (_serverData populated by loadFromServer())
   const cp=_serverData['qa3_projects'];
   if(cp&&Array.isArray(cp)&&cp.length>0){
-    // Merge server projects with DEFAULT_PROJ so any project not in MongoDB
-    // still gets its name/color from the hardcoded defaults
+    // Server projects win (have latest data); defaults fill gaps for built-ins not in MongoDB
     const serverById=new Map(cp.filter(p=>p&&p.id&&p.name).map(p=>[p.id,p]));
     DEFAULT_PROJ.forEach(d=>{if(!serverById.has(d.id))serverById.set(d.id,d);});
-    PROJECTS=Array.from(serverById.values());
+    // Sort alphabetically by name — deduplicated by id (Map guarantees uniqueness)
+    PROJECTS=Array.from(serverById.values()).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  } else {
+    // No server data yet — use defaults sorted alphabetically
+    PROJECTS=[...DEFAULT_PROJ].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   }
   initStore();
   PROJECTS.forEach(p=>{

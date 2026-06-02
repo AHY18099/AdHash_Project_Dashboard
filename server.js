@@ -4897,9 +4897,13 @@ function mergeTeamTasks(existing, incoming) {
 // Merge releases: keyed by id
 function mergeReleases(existing, incoming) {
     if (!Array.isArray(incoming)) return existing;
+    // Incoming is authoritative — it reflects the user's current state after any deletes.
+    // Only ADD items from existing that are NOT in incoming (new items added by other users).
+    const incomingIds = new Set(incoming.filter(r => r.id).map(r => r.id));
     const map = new Map();
-    (existing || []).forEach(r => { if (r.id) map.set(r.id, r); });
     incoming.forEach(r => { if (r.id) map.set(r.id, r); });
+    // Add existing items that incoming doesn't know about (added by another user concurrently)
+    (existing || []).forEach(r => { if (r.id && !incomingIds.has(r.id)) map.set(r.id, r); });
     return Array.from(map.values());
 }
 
