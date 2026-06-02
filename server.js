@@ -6,8 +6,24 @@ const { readLatestApiResultsPayload } = require('./utils/latest-api-results.js')
 const { sendZohoMail } = require('./utils/zoho-mail');
 const { sendSlackNotification } = require('./utils/slack-notify');
 
+// ── Required env vars — crash loudly on startup if missing ──
+(function checkRequiredEnvVars() {
+    const required = ['MONGODB_URI'];
+    const missing  = required.filter(k => !process.env[k]);
+    if (missing.length) {
+        console.error('❌ Missing required environment variables:', missing.join(', '));
+        console.error('   Set them in Railway → Variables and redeploy.');
+        process.exit(1);
+    }
+    console.log('[startup] ✅ Required env vars present');
+})();
+
 // ── MongoDB data layer ──
 const { connectDB, pingDB, readKey, writeKey, deleteKey, readAllData } = require('./src/db');
+
+// ── Audit + error logging helpers ──
+const { auditLog } = require('./src/utils/auditLog');
+const { logError  } = require('./src/utils/errorLog');
 
 // ── In-memory cache — loaded from MongoDB on startup ──
 // All synchronous readQaData() calls read from this cache.
@@ -4668,39 +4684,51 @@ app.get('/api/db-diag', (req, res) => {
     });
 });
 
-// GET /api/health — public status check; pings MongoDB and reports cache state
+// GET /api/health — public status check; pings MongoDB and reports full system state
 app.get('/api/health', async (req, res) => {
     try {
+        const { getDB } = require('./src/db');
+        const pingStart = Date.now();
         await pingDB();
+        const pingMs = Date.now() - pingStart;
+        const db = getDB();
         const keys = Object.keys(_qaCache);
         const projectCount = keys.filter(k => k.startsWith('qa3_') &&
             !['qa3_daily_tasks','qa3_team_tasks','qa3_releases'].includes(k) &&
             !k.includes('test') && !k.includes('heartbeat')).length;
         let storage = { usedPct: '?', status: 'unknown' };
         try { const { getStorageStats } = require('./src/gitBackup'); storage = await getStorageStats(); } catch (_) {}
+        // Error count in last hour — non-fatal if error_logs collection doesn't exist yet
+        let errorsLastHour = 0;
+        try {
+            const oneHourAgo = new Date(Date.now() - 3600000);
+            errorsLastHour = await db.collection('error_logs').countDocuments({ timestamp: { $gte: oneHourAgo } });
+        } catch (_) {}
         res.json({
-            status:       'ok',
-            database:     'connected',
-            dataLoaded:   keys.length > 0,
+            status:         'ok',
+            database:       'connected',
+            pingMs,
+            dataLoaded:     keys.length > 0,
             projectCount,
-            totalKeys:    keys.length,
-            activeUsers:  _sseClients.size,
-            deployVersion: _DEPLOY_VERSION,
-            uptime:       Math.floor(process.uptime()),
-            storage
+            totalKeys:      keys.length,
+            activeUsers:    _sseClients.size,
+            deployVersion:  _DEPLOY_VERSION,
+            uptime:         Math.floor(process.uptime()),
+            errors:         { lastHour: errorsLastHour, status: errorsLastHour > 10 ? 'warning' : 'ok' },
+            storage,
         });
     } catch (e) {
         // Return 200 so Railway health checks don't kill the container — database is just disconnected
         const uri = process.env.MONGODB_URI || '';
         res.json({
-            status: 'degraded',
-            database: 'disconnected',
-            error: e.message,
-            uptime: Math.floor(process.uptime()),
-            uriSet: !!uri,
+            status:      'degraded',
+            database:    'disconnected',
+            error:       e.message,
+            uptime:      Math.floor(process.uptime()),
+            uriSet:      !!uri,
             uriProtocol: uri.split('://')[0] || '(not set)',
-            uriStart: uri ? uri.substring(0, 40).replace(/:[^:@]+@/, ':***@') : '(none)',
-            cacheKeys: Object.keys(_qaCache).length
+            uriStart:    uri ? uri.substring(0, 40).replace(/:[^:@]+@/, ':***@') : '(none)',
+            cacheKeys:   Object.keys(_qaCache).length
         });
     }
 });
@@ -4721,6 +4749,30 @@ app.get('/api/admin/storage', async (req, res) => {
     try {
         const { getStorageStats } = require('./src/gitBackup');
         res.json(await getStorageStats());
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/audit-logs — last 500 audit entries (admin only)
+app.get('/api/admin/audit-logs', requireAdmin, async (req, res) => {
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        const limit  = Math.min(parseInt(req.query.limit  || '500', 10), 1000);
+        const action = req.query.action || null;
+        const filter = action ? { action } : {};
+        const logs   = await db.collection('audit_logs').find(filter).sort({ timestamp: -1 }).limit(limit).toArray();
+        res.json(logs);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/error-logs — last 200 server errors (admin only)
+app.get('/api/admin/error-logs', requireAdmin, async (req, res) => {
+    try {
+        const { getDB } = require('./src/db');
+        const db   = getDB();
+        const limit = Math.min(parseInt(req.query.limit || '200', 10), 500);
+        const logs  = await db.collection('error_logs').find({}).sort({ timestamp: -1 }).limit(limit).toArray();
+        res.json(logs);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -5516,6 +5568,21 @@ async function migrateWfDocsToGitHub() {
     } catch (e) { console.warn('[backup] Could not schedule backup:', e.message); }
 });
 })(); // end startup async IIFE
+
+// ── Global Express error handler (must be last app.use) ─────────────────────
+app.use(async (err, req, res, next) => {
+    console.error('[Server Error]', err.message);
+    await logError(err, req, 'express-unhandled').catch(() => {});
+    if (res.headersSent) return next(err);
+    res.status(500).json({ error: 'Something went wrong', message: err.message });
+});
+
+// ── Unhandled promise rejections ─────────────────────────────────────────────
+process.on('unhandledRejection', (reason) => {
+    const err = reason instanceof Error ? reason : new Error(String(reason));
+    console.error('[Unhandled Rejection]', err.message);
+    logError(err, null, 'unhandledRejection').catch(() => {});
+});
 
 // Graceful shutdown — wait for in-flight writes then close MongoDB connection.
 process.on('SIGTERM', async () => {
