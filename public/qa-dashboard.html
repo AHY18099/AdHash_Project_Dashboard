@@ -5201,6 +5201,28 @@ function renderReleasesPage(mode){
       </div>
       <div id="rl-list">${cardsHtml}</div>
     </div>`;
+  // Force all select elements to their correct values after innerHTML set.
+  // Browsers sometimes ignore the 'selected' attribute and default to first option.
+  requestAnimationFrame(()=>{
+    RELEASES.forEach(r=>{
+      const card=document.getElementById('rl-card-'+r.id);
+      if(!card)return;
+      const sel=card.querySelector('.rl-card-body select.rl-sel');
+      if(sel&&sel.onchange&&r.projectId)sel.value=r.projectId;
+      // Force all selects in the card to match their release data
+      const selects=card.querySelectorAll('select.rl-sel');
+      selects.forEach(s=>{
+        const onch=s.getAttribute('onchange')||'';
+        if(onch.includes("'projectId'")&&r.projectId)s.value=r.projectId;
+        else if(onch.includes("'projectType'")&&r.projectType)s.value=r.projectType;
+        else if(onch.includes("'envType'")&&r.envType)s.value=r.envType;
+        else if(onch.includes("'platform'")&&r.platform)s.value=r.platform;
+        else if(onch.includes("'assignedBy'")&&r.assignedBy)s.value=r.assignedBy;
+        else if(onch.includes("'currentStatus'")&&r.currentStatus)s.value=r.currentStatus;
+        else if(onch.includes("'testingStatus'")&&r.testingStatus)s.value=r.testingStatus;
+      });
+    });
+  });
 }
 
 function rlToggleCard(id){
