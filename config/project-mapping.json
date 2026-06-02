@@ -1101,21 +1101,35 @@
       "apps": [],
       "servers": [
         {
-          "name": "Website",
           "url": "https://zaptrade.ai",
+          "name": "Website",
+          "type": "web"
+        },
+        {
+          "url": "https://algo.zaptrade.ai",
+          "name": "Dashboard",
           "type": "web"
         }
       ],
       "domains": [
-        "zaptrade.ai"
+        "zaptrade.ai",
+        "algo.zaptrade.ai"
       ],
       "sslCerts": [
-        "zaptrade.ai"
+        "zaptrade.ai",
+        "algo.zaptrade.ai"
       ],
       "apis": [
         {
-          "name": "ZapTrade Website",
           "url": "https://zaptrade.ai",
+          "name": "Website Home",
+          "expectedStatus": 200,
+          "method": "GET"
+        },
+        {
+          "url": "https://algo.zaptrade.ai",
+          "name": "Dashboard Home",
+          "expectedStatus": 200,
           "method": "GET"
         }
       ]
