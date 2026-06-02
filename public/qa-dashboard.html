@@ -3712,14 +3712,14 @@ function renderCredentials(p){
       <td class="cred-td"><span class="cred-val">${escH(c.username)}</span></td>
       <td class="cred-td">
         <div class="cred-pw-wrap">
-          <span class="cred-pw-val" id="cpw-${p}-${i}" data-show="0">${'•'.repeat(Math.min((c.password||'').length,16)||8)}</span>
-          <button class="cred-eye" onclick="toggleCredPw('${p}',${i})" title="Show/hide">${EYE_CLOSED}</button>
+          <span class="cred-pw-val" id="cpw-${p}-${escH(c.id||String(i))}" data-show="0">${'•'.repeat(Math.min((c.password||'').length,16)||8)}</span>
+          <button class="cred-eye" onclick="toggleCredPw('${p}','${escH(c.id||String(i))}')" title="Show/hide">${EYE_CLOSED}</button>
         </div>
       </td>
       <td class="cred-td"><span class="cred-type-badge ${c.authType==='OTP'?'cred-otp':'cred-pwd'}">${c.authType==='OTP'?'OTP':'Password'}</span></td>
       <td class="cred-td cred-act">
-        ${isAdmin()?`<button class="btn-icon" title="Edit" onclick="openCredentialModal('${p}',${i})">✏</button>
-        <button class="btn-icon del" title="Delete" onclick="deleteCredential('${p}',${i})">✕</button>`:''}
+        ${isAdmin()?`<button class="btn-icon" title="Edit" onclick="openCredentialModal('${p}','${escH(c.id||'')}')">✏</button>
+        <button class="btn-icon del" title="Delete" onclick="deleteCredential('${p}','${escH(c.id||'')}')">✕</button>`:''}
       </td>
     </tr>`).join('');
 
@@ -3745,10 +3745,11 @@ function renderCredentials(p){
 const EYE_OPEN=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
 const EYE_CLOSED=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
 
-function toggleCredPw(p,i){
-  const span=document.getElementById(`cpw-${p}-${i}`);
+function toggleCredPw(p,credId){
+  const span=document.getElementById(`cpw-${p}-${credId}`);
   if(!span)return;
-  const c=(STORE[p].credentials||[])[i];
+  // Look up by id — safe after sort
+  const c=(STORE[p].credentials||[]).find(c=>c.id===credId||(c.id===undefined&&String(credId)===credId));
   if(!c)return;
   const showing=span.dataset.show==='1';
   span.textContent=showing?'•'.repeat(Math.min((c.password||'').length,16)||8):escH(c.password||'');
@@ -3757,9 +3758,10 @@ function toggleCredPw(p,i){
   if(btn)btn.innerHTML=showing?EYE_CLOSED:EYE_OPEN;
 }
 
-function openCredentialModal(p,editIdx){
-  const isEdit=editIdx!==undefined&&editIdx!==null;
-  const existing=isEdit?(STORE[p].credentials||[])[editIdx]:null;
+function openCredentialModal(p,editId){
+  const isEdit=editId!==undefined&&editId!==null&&editId!=='';
+  // Look up by id (stable) not array index (changes after sort)
+  const existing=isEdit?(STORE[p].credentials||[]).find(c=>c.id===editId)||null:null;
   const e=existing||{name:'',environment:'Production',url:'',username:'',password:'',authType:'Password'};
   const envs=['Production','Staging','UAT','Development','QA','Other'];
   const body=`
@@ -3815,8 +3817,12 @@ function openCredentialModal(p,editIdx){
       createdAt:isEdit?(existing.createdAt||new Date().toISOString()):new Date().toISOString()
     };
     if(!STORE[p].credentials)STORE[p].credentials=[];
-    if(isEdit)STORE[p].credentials[editIdx]=entry;
-    else STORE[p].credentials.push(entry);
+    if(isEdit){
+      // Replace by id — safe regardless of sort order
+      const realIdx=STORE[p].credentials.findIndex(c=>c.id===editId);
+      if(realIdx>=0)STORE[p].credentials[realIdx]=entry;
+      else STORE[p].credentials.push(entry);
+    } else STORE[p].credentials.push(entry);
     saveToLS(p);closeModal();switchTab(p,'credentials');
     toast(isEdit?'Credential updated':'Credential added');
   },{saveLabel:isEdit?'Update':'Add'});
@@ -3844,10 +3850,12 @@ function toggleModalPw(){
   else{inp.type='password';if(btn)btn.innerHTML=EYE_CLOSED;}
 }
 
-function deleteCredential(p,idx){
-  const c=(STORE[p].credentials||[])[idx];
+function deleteCredential(p,credId){
+  const creds=STORE[p].credentials||[];
+  const realIdx=creds.findIndex(c=>c.id===credId);
+  const c=realIdx>=0?creds[realIdx]:null;
   if(!c||!confirm(`Delete credential "${c.name}"?`))return;
-  STORE[p].credentials.splice(idx,1);
+  STORE[p].credentials.splice(realIdx,1);
   STORE[p]._replaceArrays=['credentials'];
   saveToLS(p);delete STORE[p]._replaceArrays;
   switchTab(p,'credentials');
