@@ -5426,7 +5426,7 @@ async function migrateWfDocsToGitHub() {
     (async function connectWithRetry(attempt) {
         try {
             await connectDB();
-            _qaCache = await readAllData();
+            _qaCache = await Promise.race([readAllData(), new Promise((_,rej)=>setTimeout(()=>rej(new Error('readAllData timeout')),20000))]).catch(e=>{console.error('[startup] readAllData failed:',e.message);return {};});
             console.log(`[startup] ✅ Loaded ${Object.keys(_qaCache).length} keys from MongoDB (attempt ${attempt})`);
             // Dedup all project data in MongoDB — removes any accumulated duplicates
             try { await deduplicateAllProjectData(); } catch (e) { console.error('[startup] dedup failed:', e.message); }
