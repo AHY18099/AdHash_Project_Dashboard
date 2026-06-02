@@ -336,6 +336,23 @@ body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(24
     </div>
   </a>
 
+  <div class="dash-card" style="cursor:pointer;border-color:rgba(16,185,129,.25)" onclick="openAutoCheckerPanel()">
+    <div class="card-icon" style="background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.25)">🔍</div>
+    <div class="card-body">
+      <div class="card-label" style="color:#10b981">AutoChecker Daily Task</div>
+      <div class="card-title">AutoChecker Production Tests</div>
+      <div class="card-desc">Run automated production test suite for AutoChecker — triggers GitHub Actions workflow, shows live progress and full HTML report.</div>
+    </div>
+    <div class="card-arrow">
+      <div class="card-tags">
+        <span class="tag" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">Run Tests</span>
+        <span class="tag" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">Live Status</span>
+        <span class="tag" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">HTML Report</span>
+      </div>
+      <div class="arrow-btn">→</div>
+    </div>
+  </div>
+
   <div class="dash-card orange" onclick="openSyncTradePanel()" style="cursor:pointer;text-decoration:none">
     <div class="card-icon orange">📈</div>
     <div class="card-body">
@@ -357,6 +374,84 @@ body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(24
 
 <!-- FOOTER -->
 <div class="footer">AdHash Technology · Authorized Personnel Only</div>
+
+<!-- AUTOCHECKER OVERLAY + PANEL -->
+<style>
+#ac-overlay{display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.55);backdrop-filter:blur(4px)}
+#ac-panel{position:fixed;top:0;right:0;bottom:0;width:min(900px,100vw);background:#0f172a;overflow-y:auto;z-index:9001;box-shadow:-8px 0 40px rgba(0,0,0,.5);transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1)}
+#ac-panel.open{transform:translateX(0)}
+#ac-panel-header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid rgba(16,185,129,.2);background:#0f172a;position:sticky;top:0;z-index:1}
+#ac-panel-header h2{font-size:16px;font-weight:700;color:#10b981;margin:0}
+#ac-close{background:none;border:1px solid rgba(255,255,255,.15);color:#94a3b8;border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;font-weight:600}
+#ac-close:hover{background:rgba(255,255,255,.08);color:#e2e8f0}
+#ac-content{padding:28px 28px 40px}
+.ac-run-btn{background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:12px;padding:14px 32px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:10px;transition:opacity .2s,transform .2s}
+.ac-run-btn:hover{opacity:.9;transform:translateY(-1px)}
+.ac-run-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.ac-status-box{background:#0d1b2a;border:1px solid rgba(16,185,129,.2);border-radius:14px;padding:20px;margin-top:20px}
+.ac-status-row{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.ac-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.ac-dot.queued{background:#94a3b8;animation:pulse-dot 1.2s infinite}
+.ac-dot.running{background:#f59e0b;animation:pulse-dot .8s infinite}
+.ac-dot.success{background:#10b981}
+.ac-dot.failure{background:#ef4444}
+.ac-dot.idle{background:#475569}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
+.ac-steps{margin-top:16px;display:flex;flex-direction:column;gap:6px}
+.ac-step{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:500;background:rgba(255,255,255,.03)}
+.ac-step.success{color:#10b981}.ac-step.failure{color:#ef4444}.ac-step.in_progress{color:#f59e0b}.ac-step.skipped{color:#475569}.ac-step.pending{color:#64748b}
+.ac-step-icon{font-size:13px;flex-shrink:0;width:16px;text-align:center}
+.ac-report-box{margin-top:20px;background:#0d1b2a;border:1px solid rgba(16,185,129,.2);border-radius:14px;padding:20px}
+.ac-report-link{display:inline-flex;align-items:center;gap:8px;background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;text-decoration:none;margin-top:12px}
+.ac-report-link:hover{background:rgba(16,185,129,.2)}
+.ac-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
+.ac-stat{background:rgba(255,255,255,.04);border-radius:10px;padding:14px;text-align:center}
+.ac-stat-val{font-size:24px;font-weight:800}
+.ac-stat-lbl{font-size:11px;color:#64748b;margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
+.ac-history{margin-top:20px}
+.ac-history-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,.03);margin-bottom:6px;font-size:12px}
+</style>
+<div id="ac-overlay" onclick="closeAutoCheckerPanel()"></div>
+<div id="ac-panel">
+  <div id="ac-panel-header">
+    <h2>🔍 AutoChecker Daily Task — Production Tests</h2>
+    <button id="ac-close" onclick="closeAutoCheckerPanel()">✕ Close</button>
+  </div>
+  <div id="ac-content">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:24px">
+      <div>
+        <h3 style="color:#e2e8f0;font-size:18px;font-weight:700;margin-bottom:6px">AdHash AutoChecker Production Tests</h3>
+        <p style="color:#64748b;font-size:13px">Runs automated Selenium tests against the AutoChecker production environment. Schedules: 9 AM &amp; 5 PM IST daily.</p>
+      </div>
+      <button class="ac-run-btn" id="ac-run-btn" onclick="acRunWorkflow()">
+        <span id="ac-run-icon">▶</span>
+        <span id="ac-run-label">Run Tests Now</span>
+      </button>
+    </div>
+
+    <!-- Current run status -->
+    <div class="ac-status-box" id="ac-status-box">
+      <div class="ac-status-row">
+        <span class="ac-dot idle" id="ac-dot"></span>
+        <span style="font-size:14px;font-weight:600;color:#e2e8f0" id="ac-status-text">Loading latest run...</span>
+        <span style="margin-left:auto;font-size:11px;color:#475569" id="ac-run-meta"></span>
+      </div>
+      <div class="ac-steps" id="ac-steps"></div>
+    </div>
+
+    <!-- Report section -->
+    <div class="ac-report-box" id="ac-report-box" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:14px;font-weight:700;color:#e2e8f0">📄 Latest Report</span>
+        <span style="font-size:11px;color:#475569" id="ac-report-date"></span>
+      </div>
+      <div class="ac-stat-grid" id="ac-stat-grid"></div>
+      <a class="ac-report-link" id="ac-report-link" href="#" target="_blank" rel="noopener">
+        🔗 View Full Report on GitHub Actions
+      </a>
+    </div>
+  </div>
+</div>
 
 <!-- SYNCTRADE OVERLAY + PANEL -->
 <div id="synctrade-overlay" onclick="closeSyncTradePanel()"></div>
@@ -515,6 +610,111 @@ async function checkSession(){
   }catch(_){window.location.href='/';}
 }
 checkSession();
+
+// ── AUTOCHECKER PANEL ────────────────────────────────────────────────────
+let _acPollTimer=null;
+const STEP_ICON={success:'✓',failure:'✗',in_progress:'⟳',skipped:'↷',pending:'·'};
+const SKIP_STEPS=new Set(['Set up job','Pull ghcr.io/enricomi/publish-unit-test-result-action:v2.23.0','Post Cache Maven packages','Post Set up JDK 16','Post Checkout repository','Complete job']);
+
+function openAutoCheckerPanel(){
+  document.getElementById('ac-overlay').style.display='block';
+  requestAnimationFrame(()=>document.getElementById('ac-panel').classList.add('open'));
+  document.body.style.overflow='hidden';
+  acLoadStatus();
+}
+function closeAutoCheckerPanel(){
+  document.getElementById('ac-panel').classList.remove('open');
+  setTimeout(()=>{document.getElementById('ac-overlay').style.display='none';},300);
+  document.body.style.overflow='';
+  if(_acPollTimer){clearInterval(_acPollTimer);_acPollTimer=null;}
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAutoCheckerPanel();closeSyncTradePanel();}});
+
+async function acRunWorkflow(){
+  const btn=document.getElementById('ac-run-btn');
+  const icon=document.getElementById('ac-run-icon');
+  const lbl=document.getElementById('ac-run-label');
+  btn.disabled=true;icon.textContent='⟳';lbl.textContent='Triggering...';
+  try{
+    const r=await fetch('/api/autochecker/run',{method:'POST',headers:{Authorization:'Bearer '+localStorage.getItem('qa_token')||''}});
+    const d=await r.json();
+    if(d.ok){
+      lbl.textContent='Triggered! Polling...';
+      // Start polling every 8s — GitHub takes ~5s to create the run
+      setTimeout(acLoadStatus,5000);
+      if(_acPollTimer)clearInterval(_acPollTimer);
+      _acPollTimer=setInterval(acLoadStatus,8000);
+    } else {
+      lbl.textContent='Error: '+(d.error||'Unknown');
+      btn.disabled=false;icon.textContent='▶';
+    }
+  }catch(e){lbl.textContent='Network error';btn.disabled=false;icon.textContent='▶';}
+}
+
+async function acLoadStatus(){
+  try{
+    const r=await fetch('/api/autochecker/status',{headers:{Authorization:'Bearer '+localStorage.getItem('qa_token')||''}});
+    const d=await r.json();
+    if(!d.run){document.getElementById('ac-status-text').textContent='No runs found';return;}
+    acRenderStatus(d.run,d.steps||[]);
+    // Stop polling when run finishes
+    if(d.run.status==='completed'&&_acPollTimer){
+      clearInterval(_acPollTimer);_acPollTimer=null;
+      // Re-enable run button
+      const btn=document.getElementById('ac-run-btn');
+      document.getElementById('ac-run-icon').textContent='▶';
+      document.getElementById('ac-run-label').textContent='Run Tests Now';
+      btn.disabled=false;
+      acLoadReport();
+    } else if(d.run.status!=='completed'){
+      // Keep polling if in_progress or queued
+      if(!_acPollTimer)_acPollTimer=setInterval(acLoadStatus,8000);
+    } else {
+      acLoadReport();
+    }
+  }catch(e){document.getElementById('ac-status-text').textContent='Failed to load status';}
+}
+
+function acRenderStatus(run,steps){
+  const dot=document.getElementById('ac-dot');
+  const txt=document.getElementById('ac-status-text');
+  const meta=document.getElementById('ac-run-meta');
+  // Dot colour
+  dot.className='ac-dot '+(run.status==='completed'?(run.conclusion==='success'?'success':'failure'):(run.status==='in_progress'?'running':'queued'));
+  // Status text
+  const statusMap={completed:run.conclusion==='success'?'✓ Completed — Success':'✗ Completed — Failed',in_progress:'⟳ Running…',queued:'● Queued',waiting:'● Waiting'};
+  txt.textContent=statusMap[run.status]||run.status;
+  txt.style.color=run.status==='completed'?(run.conclusion==='success'?'#10b981':'#ef4444'):(run.status==='in_progress'?'#f59e0b':'#94a3b8');
+  // Meta
+  const created=new Date(run.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+  const dur=run.duration_s?`  ·  ${Math.floor(run.duration_s/60)}m ${run.duration_s%60}s`:'';
+  meta.textContent=`Run #${run.run_number}  ·  ${created}${dur}`;
+  // Steps
+  const stepsEl=document.getElementById('ac-steps');
+  const visible=steps.filter(s=>!SKIP_STEPS.has(s.name));
+  stepsEl.innerHTML=visible.map(s=>{
+    const st=s.status==='completed'?s.conclusion:s.status;
+    return`<div class="ac-step ${st||'pending'}"><span class="ac-step-icon">${STEP_ICON[st]||'·'}</span>${s.name}</div>`;
+  }).join('');
+}
+
+async function acLoadReport(){
+  try{
+    const r=await fetch('/api/autochecker/report',{headers:{Authorization:'Bearer '+localStorage.getItem('qa_token')||''}});
+    const d=await r.json();
+    if(!d.runId)return;
+    const box=document.getElementById('ac-report-box');
+    box.style.display='block';
+    document.getElementById('ac-report-date').textContent=new Date(d.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const link=document.getElementById('ac-report-link');
+    link.href=d.reportUrl||d.downloadUrl||'#';
+    // Show stat grid
+    document.getElementById('ac-stat-grid').innerHTML=`
+      <div class="ac-stat"><div class="ac-stat-val" style="color:${d.conclusion==='success'?'#10b981':'#ef4444'}">${d.conclusion==='success'?'PASS':'FAIL'}</div><div class="ac-stat-lbl">Result</div></div>
+      <div class="ac-stat"><div class="ac-stat-val" style="color:#3b82f6">View</div><div class="ac-stat-lbl">Report</div></div>
+      <div class="ac-stat"><div class="ac-stat-val" style="color:#8b5cf6">GitHub</div><div class="ac-stat-lbl">Actions</div></div>`;
+  }catch(e){}
+}
 
 // ── SYNCTRADE PANEL ──────────────────────────────────────────────────────
 async function openSyncTradePanel(){

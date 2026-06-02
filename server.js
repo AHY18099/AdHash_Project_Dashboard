@@ -4122,8 +4122,8 @@ app.post('/api/swagger-execute', async (req, res) => {
 // Exports all MongoDB data and pushes a timestamped backup to GitHub.
 app.post('/api/admin/commit-and-push', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
-    // Use env var first; fall back to known PAT so Commit & Push always works
-    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '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';
+    // Use env var — must be set in Railway → Variables
+    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
     if (!token) return res.status(500).json({ error: 'GITHUB_TOKEN not set on Railway', hint: 'Add GITHUB_TOKEN in Railway → Variables' });
 
     try {
@@ -5006,6 +5006,69 @@ app.post('/api/app-config/:namespace', requireAdmin, async (req, res) => {
             { upsert: true }
         );
         res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── AutoChecker GitHub Actions API ───────────────────────────────────────────
+const AC_REPO = 'AHY18099/autochecker-daily-task';
+const AC_WORKFLOW_ID = '223108562'; // AdHash AutoChecker Production Tests
+
+// POST /api/autochecker/run — trigger workflow_dispatch on the autochecker repo
+app.post('/api/autochecker/run', requireAdmin, async (req, res) => {
+    try {
+        const token = process.env.GITHUB_TOKEN || '';
+        if (!token) return res.status(500).json({ error: 'GITHUB_TOKEN not set' });
+        const r = await _ghRequest('POST', `/repos/${AC_REPO}/actions/workflows/${AC_WORKFLOW_ID}/dispatches`, { ref: 'master' }, token);
+        if (r.status === 204) res.json({ ok: true, message: 'Workflow triggered successfully' });
+        else res.status(r.status).json({ error: `GitHub returned ${r.status}`, body: r.body });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/autochecker/status — get latest workflow run status + steps
+app.get('/api/autochecker/status', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const token = process.env.GITHUB_TOKEN || '';
+        const runs = await _ghRequest('GET', `/repos/${AC_REPO}/actions/runs?per_page=1&workflow_id=${AC_WORKFLOW_ID}`, null, token);
+        if (runs.status !== 200 || !runs.body.workflow_runs?.length) return res.json({ run: null });
+        const run = runs.body.workflow_runs[0];
+        // Get job steps for the run
+        const jobs = await _ghRequest('GET', `/repos/${AC_REPO}/actions/runs/${run.id}/jobs`, null, token);
+        const job = jobs.body?.jobs?.[0] || null;
+        res.json({
+            run: {
+                id: run.id, status: run.status, conclusion: run.conclusion,
+                created_at: run.created_at, updated_at: run.updated_at,
+                html_url: run.html_url, run_number: run.run_number,
+                duration_s: job ? Math.round((new Date(job.completed_at || run.updated_at) - new Date(job.started_at || run.created_at)) / 1000) : null,
+            },
+            steps: job ? job.steps.map(s => ({ name: s.name, status: s.status, conclusion: s.conclusion, number: s.number })) : [],
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/autochecker/report — fetch HTML report artifact content from latest run
+app.get('/api/autochecker/report', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const token = process.env.GITHUB_TOKEN || '';
+        // Get latest completed run
+        const runs = await _ghRequest('GET', `/repos/${AC_REPO}/actions/runs?per_page=5&status=completed&workflow_id=${AC_WORKFLOW_ID}`, null, token);
+        const run = runs.body?.workflow_runs?.find(r => r.conclusion === 'success') || runs.body?.workflow_runs?.[0];
+        if (!run) return res.json({ html: null, runId: null });
+        // Get artifacts for this run
+        const arts = await _ghRequest('GET', `/repos/${AC_REPO}/actions/runs/${run.id}/artifacts`, null, token);
+        const htmlArt = arts.body?.artifacts?.find(a => a.name === 'autochecker-html-report' && !a.expired);
+        if (!htmlArt) return res.json({ html: null, runId: run.id, message: 'No HTML report artifact found' });
+        // Download artifact zip via redirect URL
+        const dl = await _ghRequest('GET', `/repos/${AC_REPO}/actions/artifacts/${htmlArt.id}/zip`, null, token);
+        // GitHub returns a redirect — we can't follow it server-side easily, so return download URL for client
+        res.json({
+            runId: run.id, artifactId: htmlArt.id, artifactName: htmlArt.name,
+            downloadUrl: `https://github.com/${AC_REPO}/actions/runs/${run.id}`,
+            reportUrl: `https://github.com/${AC_REPO}/actions/runs/${run.id}#artifacts`,
+            conclusion: run.conclusion, created_at: run.created_at,
+        });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
