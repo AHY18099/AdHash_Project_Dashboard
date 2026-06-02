@@ -234,6 +234,40 @@ body.dark .dash-card:hover .arrow-btn{color:#000}
 }
 
 @media(max-width:600px){.hero h1{font-size:24px}.dash-card{padding:26px 22px}.grid-wrap{padding:16px 16px 40px}}
+
+/* ── SYNCTRADE PANEL ── */
+.card-icon.orange{background:rgba(245,158,11,.1);border:1.5px solid rgba(245,158,11,.2)}
+body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3)}
+.card-label.orange{color:#f59e0b}
+.tag.orange{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#f59e0b}
+.dash-card.orange:hover{border-color:rgba(245,158,11,.5)}
+
+#synctrade-overlay{
+  display:none;position:fixed;inset:0;z-index:9000;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(4px);
+  animation:fadeInBg .2s ease;
+}
+@keyframes fadeInBg{from{opacity:0}to{opacity:1}}
+#synctrade-panel{
+  position:fixed;top:0;right:0;bottom:0;width:min(820px,100vw);
+  background:#0f1117;overflow-y:auto;z-index:9001;
+  box-shadow:-8px 0 40px rgba(0,0,0,.5);
+  transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
+  padding:0;
+}
+#synctrade-panel.open{transform:translateX(0)}
+#synctrade-panel-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 24px;border-bottom:1px solid #30363d;
+  background:#161b22;position:sticky;top:0;z-index:1;
+}
+#synctrade-panel-header h2{font-size:16px;font-weight:700;color:#f59e0b;margin:0}
+#synctrade-close{
+  background:none;border:1px solid #30363d;color:#8b949e;
+  border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;font-weight:600;
+}
+#synctrade-close:hover{background:#21262d;color:#e1e4e8}
+#synctrade-content{padding:24px}
 </style>
 </head>
 <body>
@@ -302,10 +336,140 @@ body.dark .dash-card:hover .arrow-btn{color:#000}
     </div>
   </a>
 
+  <div class="dash-card orange" onclick="openSyncTradePanel()" style="cursor:pointer;text-decoration:none">
+    <div class="card-icon orange">📈</div>
+    <div class="card-body">
+      <div class="card-label orange">SyncTrade Daily Task</div>
+      <div class="card-title">Stock Filter &amp; API Tool</div>
+      <div class="card-desc">Daily workflow tool — filter stocks by price range, get AI-ranked top picks from GPT-4o, and send directly to Market Structure API.</div>
+    </div>
+    <div class="card-arrow">
+      <div class="card-tags">
+        <span class="tag orange">Stock Filter</span>
+        <span class="tag orange">GPT-4o</span>
+        <span class="tag orange">API Send</span>
+      </div>
+      <div class="arrow-btn">→</div>
+    </div>
+  </div>
+
 </div>
 
 <!-- FOOTER -->
 <div class="footer">AdHash Technology · Authorized Personnel Only</div>
+
+<!-- SYNCTRADE OVERLAY + PANEL -->
+<div id="synctrade-overlay" onclick="closeSyncTradePanel()"></div>
+<div id="synctrade-panel">
+  <div id="synctrade-panel-header">
+    <h2>📈 SyncTrade Daily Task — Stock Filter &amp; API Tool</h2>
+    <button id="synctrade-close" onclick="closeSyncTradePanel()">✕ Close</button>
+  </div>
+  <div id="synctrade-content">
+    <!-- StockTool content embedded inline — styles scoped inside panel -->
+    <style>
+      #synctrade-content h1{font-size:1.4rem;font-weight:700;color:#58a6ff;margin-bottom:4px}
+      #synctrade-content .subtitle{color:#8b949e;font-size:.85rem;margin-bottom:20px}
+      #synctrade-content .stcard{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:20px;margin-bottom:20px}
+      #synctrade-content .step-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+      #synctrade-content .step-num{background:#1f6feb;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:700;flex-shrink:0}
+      #synctrade-content .step-title{font-size:1rem;font-weight:600;color:#c9d1d9}
+      #synctrade-content .strow{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+      #synctrade-content label{font-size:.78rem;color:#8b949e;display:block;margin-bottom:4px}
+      #synctrade-content input[type="text"],#synctrade-content input[type="password"],#synctrade-content input[type="number"]{background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e1e4e8;font-size:.9rem;padding:8px 12px;outline:none}
+      #synctrade-content input:focus{border-color:#58a6ff}
+      #synctrade-content input.w120{width:120px}#synctrade-content input.w160{width:160px}#synctrade-content input.stfull{width:100%}
+      #synctrade-content button{padding:9px 18px;border-radius:6px;font-size:.88rem;font-weight:600;cursor:pointer;border:none;transition:opacity .15s}
+      #synctrade-content button:hover{opacity:.85}#synctrade-content button:disabled{opacity:.4;cursor:not-allowed}
+      #synctrade-content .btn-green{background:#238636;color:#fff}#synctrade-content .btn-blue{background:#1f6feb;color:#fff}
+      #synctrade-content .btn-orange2{background:#b85c00;color:#fff}#synctrade-content .btn-gray{background:#30363d;color:#f0f3f6;font-size:.8rem;padding:7px 14px}
+      #synctrade-content .stinfo{font-size:.8rem;color:#8b949e;margin-top:8px}
+      #synctrade-content .stinfo.ok{color:#3fb950}#synctrade-content .stinfo.err{color:#f85149}
+      #synctrade-content .tag-box{display:flex;flex-wrap:wrap;gap:6px;min-height:44px;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:8px;margin-top:10px}
+      #synctrade-content .sttag{background:#1a3a6b;border:1px solid #2d5fa8;color:#79b8ff;border-radius:4px;padding:3px 10px;font-size:.82rem;font-weight:600;cursor:pointer;user-select:none}
+      #synctrade-content .sttag:hover{background:#1f4a85}#synctrade-content .sttag.off{background:#21262d;color:#8b949e;border-color:#30363d}
+      #synctrade-content .code-box{background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:12px;font-size:.85rem;white-space:pre-wrap;word-break:break-word;color:#c9d1d9;line-height:1.6}
+      #synctrade-content .mono{font-family:'Cascadia Code','Consolas',monospace;color:#a5d6ff}
+      #synctrade-content .response-box{background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:12px;font-size:.85rem;min-height:80px;color:#c9d1d9;white-space:pre-wrap;word-break:break-word}
+      #synctrade-content .response-box.ok{border-color:#238636;color:#3fb950}#synctrade-content .response-box.err{border-color:#b62324;color:#f85149}
+      #synctrade-content .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px}
+      #synctrade-content .dot-green{background:#3fb950}#synctrade-content .dot-red{background:#f85149}#synctrade-content .dot-gray{background:#6e7681}
+      #synctrade-content .stdivider{border:none;border-top:1px solid #21262d;margin:16px 0}
+      #synctrade-content .stpill{display:inline-block;background:#21262d;border:1px solid #30363d;border-radius:20px;padding:3px 12px;font-size:.78rem;color:#8b949e;margin-right:6px}
+      #synctrade-content .stpill span{color:#58a6ff;font-weight:700}
+      #synctrade-content details{margin-top:10px}#synctrade-content summary{cursor:pointer;font-size:.8rem;color:#58a6ff}
+      #synctrade-content .ststeps{margin-top:8px;padding-left:18px;font-size:.8rem;color:#8b949e;line-height:2}
+      #synctrade-content textarea{background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e1e4e8;font-size:.9rem;padding:10px;width:100%;resize:vertical;min-height:60px;outline:none;font-family:inherit}
+      #synctrade-content textarea:focus{border-color:#58a6ff}
+    </style>
+
+    <h1>Stock Filter &amp; API Tool</h1>
+    <p class="subtitle">Daily workflow: Filter stocks → Ask GPT-4o → Send to Market Structure API</p>
+
+    <div class="stcard">
+      <div class="step-header"><div class="step-num" style="background:#6e40c9;">⚙</div><div class="step-title">Configuration (saved in your browser)</div></div>
+      <div class="strow" style="margin-bottom:12px">
+        <div style="flex:1;min-width:240px"><label for="st-cfgOpenAI">OpenAI API Key</label><input type="password" id="st-cfgOpenAI" class="stfull" placeholder="sk-..." autocomplete="off"/></div>
+        <div style="flex:1;min-width:160px"><label for="st-cfgModel">Model</label><input type="text" id="st-cfgModel" class="stfull" value="gpt-4o-mini"/></div>
+      </div>
+      <div class="strow" style="margin-bottom:12px">
+        <div style="flex:1;min-width:240px"><label for="st-cfgGoogleKey">Google Sheets API Key</label><input type="password" id="st-cfgGoogleKey" class="stfull" placeholder="AIza..." autocomplete="off"/></div>
+        <div style="flex:2;min-width:260px"><label for="st-cfgSheetId">Spreadsheet ID</label><input type="text" id="st-cfgSheetId" class="stfull" value="1ykNdxIpC6ALQfqMFG5D_w598sM77bASJ1RH1u9gQI28"/></div>
+        <div><label for="st-cfgSheetRange">Sheet tab</label><input type="text" id="st-cfgSheetRange" class="w120" value="Sheet1"/></div>
+      </div>
+      <div class="strow"><button class="btn-blue" onclick="stSaveConfig()">Save Config</button><span id="st-cfgStatus" class="stinfo" style="margin-top:0"></span></div>
+      <details><summary>How to get API keys</summary><ol class="ststeps"><li><strong>OpenAI:</strong> platform.openai.com → API Keys → Create new secret key</li><li><strong>Google Sheets:</strong> console.cloud.google.com → enable "Google Sheets API" → Create API Key</li><li>Share your sheet as <strong>"Anyone with the link can view"</strong></li></ol></details>
+    </div>
+
+    <div class="stcard">
+      <div class="step-header"><div class="step-num">1</div><div class="step-title">Filter Stocks by Price Range</div></div>
+      <div class="strow">
+        <div><label for="st-minPrice">Min Price (₹)</label><input type="number" id="st-minPrice" class="w120" value="100" min="0" step="0.01"/></div>
+        <div><label for="st-maxPrice">Max Price (₹)</label><input type="number" id="st-maxPrice" class="w120" value="500" min="0" step="0.01"/></div>
+        <button class="btn-green" onclick="stFetchAndFilter()">Fetch &amp; Filter</button>
+      </div>
+      <div id="st-filterStatus" class="stinfo"></div>
+      <div id="st-tagSection" style="display:none;margin-top:14px">
+        <label style="font-size:.78rem;color:#8b949e">Matched symbols — click to deselect:</label>
+        <div class="tag-box" id="st-tagBox"></div>
+        <div id="st-tagCount" class="stinfo"></div>
+      </div>
+    </div>
+
+    <div class="stcard">
+      <div class="step-header"><div class="step-num">2</div><div class="step-title">Ask GPT-4o for Top Stocks</div></div>
+      <div class="strow" style="margin-bottom:10px">
+        <button class="btn-blue" id="st-askBtn" onclick="stAskGPT()" style="padding:10px 24px;font-size:.95rem">✦ Ask GPT-4o Now</button>
+        <button class="btn-gray" onclick="stCopyEl('st-promptBox')">Copy Prompt</button>
+      </div>
+      <div id="st-gptStatus" class="stinfo"></div>
+      <details style="margin-top:10px"><summary>View prompt</summary><div class="code-box" id="st-promptBox" style="margin-top:8px">(filter stocks first)</div></details>
+      <div id="st-gptResult" style="display:none;margin-top:14px">
+        <label style="font-size:.78rem;color:#3fb950">GPT-4o Response — auto-filled in Step 3:</label>
+        <div class="code-box mono" id="st-gptRaw" style="margin-top:6px;color:#3fb950"></div>
+      </div>
+    </div>
+
+    <div class="stcard">
+      <div class="step-header"><div class="step-num">3</div><div class="step-title">Send to Market Structure API</div></div>
+      <p class="stinfo" style="margin-bottom:10px">Auto-filled from Step 2 — or paste manually: <code>["ITI","HFCL","LTF"]</code></p>
+      <textarea id="st-symbolsInput" placeholder='["ITI","HFCL","LTF"]' rows="3"></textarea>
+      <div style="margin-top:12px"><label style="font-size:.78rem;color:#8b949e">Payload preview:</label><div class="code-box mono" id="st-payloadBox" style="margin-top:6px">(paste symbols above)</div></div>
+      <hr class="stdivider"/>
+      <div class="strow">
+        <button class="btn-orange2" id="st-sendBtn" onclick="stSendAPI()">Send to API</button>
+        <button class="btn-gray" onclick="stCopyPayload()">Copy Payload (Postman)</button>
+      </div>
+      <div id="st-apiStatusLine" style="font-size:.8rem;color:#8b949e;margin-top:12px;margin-bottom:6px"><span class="dot dot-gray"></span>Waiting...</div>
+      <div class="response-box" id="st-responseBox">(API response will appear here)</div>
+    </div>
+
+    <div class="stcard" id="st-summaryCard" style="display:none">
+      <div class="step-header"><div class="step-num">4</div><div class="step-title">Daily Summary</div></div>
+      <div id="st-summaryBody"></div>
+    </div>
+  </div>
+</div>
 
 <script>
 // ── THEME ──
@@ -351,6 +515,145 @@ async function checkSession(){
   }catch(_){window.location.href='/';}
 }
 checkSession();
+
+// ── SYNCTRADE PANEL ──────────────────────────────────────────────────────
+function openSyncTradePanel(){
+  document.getElementById('synctrade-overlay').style.display='block';
+  requestAnimationFrame(()=>document.getElementById('synctrade-panel').classList.add('open'));
+  document.body.style.overflow='hidden';
+  stLoadConfig();
+  stUpdatePrompt();
+}
+function closeSyncTradePanel(){
+  document.getElementById('synctrade-panel').classList.remove('open');
+  setTimeout(()=>{document.getElementById('synctrade-overlay').style.display='none';},300);
+  document.body.style.overflow='';
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSyncTradePanel();});
+
+// ── STOCKTOOL LOGIC (scoped with st prefix) ──────────────────────────────
+const stLS={get:k=>localStorage.getItem('stk_'+k)||'',set:(k,v)=>localStorage.setItem('stk_'+k,v)};
+function stLoadConfig(){
+  document.getElementById('st-cfgOpenAI').value    =stLS.get('openaiKey');
+  document.getElementById('st-cfgModel').value     =stLS.get('openaiModel')||'gpt-4o-mini';
+  document.getElementById('st-cfgGoogleKey').value =stLS.get('googleKey');
+  document.getElementById('st-cfgSheetId').value   =stLS.get('sheetId')||'1ykNdxIpC6ALQfqMFG5D_w598sM77bASJ1RH1u9gQI28';
+  document.getElementById('st-cfgSheetRange').value=stLS.get('sheetRange')||'Sheet1';
+}
+function stSaveConfig(){
+  stLS.set('openaiKey',  document.getElementById('st-cfgOpenAI').value.trim());
+  stLS.set('openaiModel',document.getElementById('st-cfgModel').value.trim());
+  stLS.set('googleKey',  document.getElementById('st-cfgGoogleKey').value.trim());
+  stLS.set('sheetId',    document.getElementById('st-cfgSheetId').value.trim());
+  stLS.set('sheetRange', document.getElementById('st-cfgSheetRange').value.trim());
+  const s=document.getElementById('st-cfgStatus');
+  s.textContent='Saved ✓';s.className='stinfo ok';
+  setTimeout(()=>{s.textContent='';},2000);
+}
+function stSetStatus(id,msg,type=''){const el=document.getElementById(id);el.textContent=msg;el.className='stinfo'+(type?' '+type:'');}
+function stCopyEl(id){navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>alert('Copied!'));}
+
+let stAllSymbols=[];
+async function stFetchAndFilter(){
+  const gKey=stLS.get('googleKey');
+  const sheetId=stLS.get('sheetId')||document.getElementById('st-cfgSheetId').value.trim();
+  const sheetRange=stLS.get('sheetRange')||'Sheet1';
+  const minP=parseFloat(document.getElementById('st-minPrice').value);
+  const maxP=parseFloat(document.getElementById('st-maxPrice').value);
+  if(!gKey){stSetStatus('st-filterStatus','Enter your Google Sheets API Key in Configuration above.','err');return;}
+  if(isNaN(minP)||isNaN(maxP)||minP>maxP){stSetStatus('st-filterStatus','Invalid price range.','err');return;}
+  stSetStatus('st-filterStatus','Fetching live data from Google Sheets...');
+  document.getElementById('st-tagSection').style.display='none';
+  const url=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(sheetRange)}?key=${gKey}`;
+  try{
+    const res=await fetch(url);const data=await res.json();
+    if(!res.ok)throw new Error(data.error?data.error.message:`HTTP ${res.status}`);
+    const rows=data.values;
+    if(!rows||rows.length<2)throw new Error('Sheet is empty or returned no data.');
+    const headers=rows[0].map(h=>h.trim().toLowerCase());
+    const symIdx=headers.indexOf('symbol');
+    const priceIdx=headers.findIndex(h=>h.includes('last')||h.includes('price')||h.includes('ltp')||h==='lasts');
+    if(symIdx===-1)throw new Error('No "Symbol" column found.');
+    if(priceIdx===-1)throw new Error('No price column found.');
+    stAllSymbols=[];
+    for(let i=1;i<rows.length;i++){
+      const row=rows[i];const sym=(row[symIdx]||'').trim();
+      const price=parseFloat((row[priceIdx]||'').replaceAll(',',''));
+      if(sym&&!isNaN(price)&&price>=minP&&price<=maxP)stAllSymbols.push({sym,price});
+    }
+    stSetStatus('st-filterStatus',`Fetched ${rows.length-1} stocks. Found ${stAllSymbols.length} in ₹${minP}–₹${maxP}.`,'ok');
+    stRenderTags();stUpdatePrompt();
+  }catch(err){stSetStatus('st-filterStatus','Error: '+err.message,'err');}
+}
+function stRenderTags(){
+  const box=document.getElementById('st-tagBox');box.innerHTML='';
+  stAllSymbols.forEach((item,idx)=>{
+    const t=document.createElement('div');t.className='sttag';t.dataset.idx=idx;t.title='₹'+item.price;t.textContent=item.sym;
+    t.onclick=()=>{t.classList.toggle('off');stUpdatePrompt();stUpdatePayload();};
+    box.appendChild(t);
+  });
+  document.getElementById('st-tagSection').style.display='block';stUpdateTagCount();
+}
+function stSelectedSymbols(){return[...document.querySelectorAll('#st-tagBox .sttag:not(.off)')].map(t=>stAllSymbols[t.dataset.idx].sym);}
+function stUpdateTagCount(){const n=document.querySelectorAll('#st-tagBox .sttag:not(.off)').length;document.getElementById('st-tagCount').textContent=n+' symbol(s) selected';}
+function stUpdatePrompt(){
+  stUpdateTagCount&&stUpdateTagCount();
+  const syms=stSelectedSymbols();const box=document.getElementById('st-promptBox');
+  if(!syms.length){box.textContent='(no symbols selected)';return;}
+  const today=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  box.textContent=`Analyze these NSE stocks and give me the TOP PERFORMING ones ranked by technical strength, momentum, and near-term bullish potential for ${today}.\n\nSymbols: ${JSON.stringify(syms)}\n\nReturn ONLY a JSON array of top symbols in order of preference. No explanation, no markdown.\nExample: ["SYM1","SYM2","SYM3"]`;
+}
+async function stAskGPT(){
+  const apiKey=stLS.get('openaiKey');const model=stLS.get('openaiModel')||'gpt-4o-mini';
+  const prompt=document.getElementById('st-promptBox').textContent.trim();
+  const btn=document.getElementById('st-askBtn');
+  if(!apiKey){stSetStatus('st-gptStatus','Enter your OpenAI API Key in Configuration above.','err');return;}
+  if(!prompt||prompt.startsWith('('))  {stSetStatus('st-gptStatus','Filter stocks in Step 1 first.','err');return;}
+  btn.disabled=true;stSetStatus('st-gptStatus',`Sending to ${model}...`);
+  try{
+    const res=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},body:JSON.stringify({model,messages:[{role:'system',content:'You are an expert NSE stock market analyst. Return ONLY a JSON array of top performing symbols ranked by technical strength. No explanation, no markdown.'},{role:'user',content:prompt}],temperature:0.2,max_tokens:600})});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error?data.error.message:`HTTP ${res.status}`);
+    let reply=data.choices[0].message.content.trim().replace(/^```[a-z]*\n?/i,'').replace(/```$/i,'').trim();
+    const parsed=JSON.parse(reply);
+    if(!Array.isArray(parsed))throw new Error('GPT did not return a JSON array.');
+    document.getElementById('st-symbolsInput').value=JSON.stringify(parsed);stUpdatePayload();
+    document.getElementById('st-gptRaw').textContent=JSON.stringify(parsed,null,2);
+    document.getElementById('st-gptResult').style.display='block';
+    stSetStatus('st-gptStatus',`GPT-4o returned ${parsed.length} symbols — auto-filled in Step 3.`,'ok');
+  }catch(err){stSetStatus('st-gptStatus','Error: '+err.message,'err');}
+  finally{btn.disabled=false;}
+}
+document.addEventListener('DOMContentLoaded',()=>{const si=document.getElementById('st-symbolsInput');if(si)si.addEventListener('input',stUpdatePayload);});
+function stBuildPayload(){
+  const raw=document.getElementById('st-symbolsInput').value.trim();const variant=7;
+  try{const symbols=JSON.parse(raw);if(!Array.isArray(symbols))throw new Error('Not an array.');return{ok:true,payload:{symbols,variant}};}
+  catch{return{ok:false};}
+}
+function stUpdatePayload(){const r=stBuildPayload();document.getElementById('st-payloadBox').textContent=r.ok?JSON.stringify(r.payload,null,2):'(paste a valid JSON array above)';}
+function stCopyPayload(){const r=stBuildPayload();if(!r.ok){alert('No valid payload to copy.');return;}navigator.clipboard.writeText(JSON.stringify(r.payload,null,2)).then(()=>alert('Payload copied!'));}
+async function stSendAPI(){
+  const r=stBuildPayload();const apiUrl='http://52.140.23.188:8010/market-structure-service/';const apiKey='AlgoSchwab@Api#2026';
+  const btn=document.getElementById('st-sendBtn');const resBox=document.getElementById('st-responseBox');const statusLine=document.getElementById('st-apiStatusLine');
+  if(!r.ok){resBox.className='response-box err';resBox.textContent='No valid symbols — complete Step 2 first.';return;}
+  btn.disabled=true;resBox.className='response-box';resBox.textContent='Sending...';
+  statusLine.innerHTML='<span class="dot dot-gray"></span>Sending...';
+  try{
+    const res=await fetch(apiUrl,{method:'POST',headers:{'Content-Type':'application/json','X-API-Key':apiKey},body:JSON.stringify(r.payload)});
+    let text=await res.text();try{text=JSON.stringify(JSON.parse(text),null,2);}catch{}
+    if(res.ok){resBox.className='response-box ok';statusLine.innerHTML=`<span class="dot dot-green"></span>Success — HTTP ${res.status}`;stShowSummary(r.payload,true);}
+    else{resBox.className='response-box err';statusLine.innerHTML=`<span class="dot dot-red"></span>Failed — HTTP ${res.status}`;stShowSummary(r.payload,false);}
+    resBox.textContent=text;
+  }catch(err){
+    resBox.className='response-box err';resBox.textContent=`Network error: ${err.message}\n\nUse "Copy Payload" and send via Postman.`;
+    statusLine.innerHTML='<span class="dot dot-red"></span>Network error';
+  }finally{btn.disabled=false;}
+}
+function stShowSummary(payload,success){
+  const card=document.getElementById('st-summaryCard');card.style.display='block';
+  document.getElementById('st-summaryBody').innerHTML=`<p style="font-size:.82rem;color:#8b949e;margin-bottom:10px">Completed at ${new Date().toLocaleString('en-IN')}</p><div style="margin-bottom:10px"><span class="stpill">Symbols <span>${payload.symbols.length}</span></span><span class="stpill">Variant <span>${payload.variant}</span></span><span class="stpill">Status <span style="color:${success?'#3fb950':'#f85149'}">${success?'SUCCESS':'FAILED'}</span></span></div><p style="font-size:.82rem;color:#8b949e">Symbols: <span style="color:#58a6ff">${payload.symbols.join(', ')}</span></p>`;
+  card.scrollIntoView({behavior:'smooth'});
+}
 </script>
 </body>
 </html>
