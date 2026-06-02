@@ -523,7 +523,6 @@ async function openSyncTradePanel(){
   document.body.style.overflow='hidden';
   // Show loading state on buttons while DB keys load
   const fetchBtn=document.getElementById('st-fetchBtn');
-  const askBtn=document.getElementById('st-askBtn');
   if(fetchBtn){fetchBtn.disabled=true;fetchBtn.textContent='Loading config…';}
   await stLoadConfig();
   if(fetchBtn){fetchBtn.disabled=false;fetchBtn.textContent='Fetch & Filter';}
@@ -689,8 +688,15 @@ async function stAskGPT(){
 document.addEventListener('DOMContentLoaded',()=>{const si=document.getElementById('st-symbolsInput');if(si)si.addEventListener('input',stUpdatePayload);});
 function stBuildPayload(){
   const raw=document.getElementById('st-symbolsInput').value.trim();const variant=7;
-  try{const symbols=JSON.parse(raw);if(!Array.isArray(symbols))throw new Error('Not an array.');return{ok:true,payload:{symbols,variant}};}
-  catch{return{ok:false};}
+  try{
+    const parsed=JSON.parse(raw);
+    // Accept both formats:
+    // 1. Plain array: ["SYM1","SYM2"]
+    // 2. Full payload object: {"symbols":[...],"variant":7}
+    const symbols=Array.isArray(parsed)?parsed:(parsed.symbols&&Array.isArray(parsed.symbols)?parsed.symbols:null);
+    if(!symbols)throw new Error('No symbols array found.');
+    return{ok:true,payload:{symbols,variant}};
+  }catch{return{ok:false};}
 }
 function stUpdatePayload(){const r=stBuildPayload();document.getElementById('st-payloadBox').textContent=r.ok?JSON.stringify(r.payload,null,2):'(paste a valid JSON array above)';}
 function stCopyPayload(){const r=stBuildPayload();if(!r.ok){alert('No valid payload to copy.');return;}navigator.clipboard.writeText(JSON.stringify(r.payload,null,2)).then(()=>alert('Payload copied!'));}
