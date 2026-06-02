@@ -5143,7 +5143,14 @@ app.post('/api/qa-data/:key', async (req, res) => {
                     const { _replaceArrays, ...cleanValue } = value;
                     const merged = mergeProjectData(_qaCache[key], cleanValue);
                     for (const arrKey of _replaceArrays) {
-                        if (Array.isArray(cleanValue[arrKey])) merged[arrKey] = cleanValue[arrKey];
+                        if (arrKey === '_envDetails') {
+                            // Special: replace envDetails object entirely (not merge-by-id)
+                            if (cleanValue.envDetails && typeof cleanValue.envDetails === 'object') {
+                                merged.envDetails = cleanValue.envDetails;
+                            }
+                        } else if (Array.isArray(cleanValue[arrKey])) {
+                            merged[arrKey] = cleanValue[arrKey];
+                        }
                     }
                     _qaCache[key] = merged;
                 } else {

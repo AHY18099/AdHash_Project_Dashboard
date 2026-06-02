@@ -362,6 +362,10 @@ body.dark .udd{background:rgba(10,15,28,0.98);border-color:rgba(126,179,255,0.15
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
 @keyframes mfade{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:none}}
+@keyframes rowFadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes rowFadeOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(16px)}}
+@keyframes rowHighlight{0%{background:rgba(99,102,241,.18)}100%{background:transparent}}
+.row-live-update{animation:rowHighlight 1.2s ease}
 
 /* ── LOGIN ── */
 .login-bg{min-height:100vh;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden}
@@ -2686,7 +2690,10 @@ function deleteEnvDetail(p,type,idx){
   const item=((STORE[p].envDetails||{})[type]||[])[idx];
   if(!item||!confirm(`Remove "${item.name}"?`))return;
   STORE[p].envDetails[type].splice(idx,1);
-  saveToLS(p);switchTab(p,'projoverview');
+  // Send _replaceEnvDetails flag so server replaces envDetails object directly (not merge-by-id)
+  STORE[p]._replaceArrays=['_envDetails'];
+  saveToLS(p);delete STORE[p]._replaceArrays;
+  switchTab(p,'projoverview');
   toast('Environment removed');
 }
 
@@ -2962,7 +2969,9 @@ function changeFbStatus(p,id,status){
 function deleteFeedback(p,id){
   if(!confirm('Delete this feedback item?'))return;
   STORE[p].feedback=(STORE[p].feedback||[]).filter(f=>f.id!==id);
-  saveToLS(p);renderProject(p);toast('Deleted');
+  STORE[p]._replaceArrays=['feedback'];
+  saveToLS(p);delete STORE[p]._replaceArrays;
+  renderProject(p);toast('Deleted');
 }
 
 function openFeedbackModal(p,type,editId){
@@ -3821,7 +3830,9 @@ function deleteCredential(p,idx){
   const c=(STORE[p].credentials||[])[idx];
   if(!c||!confirm(`Delete credential "${c.name}"?`))return;
   STORE[p].credentials.splice(idx,1);
-  saveToLS(p);switchTab(p,'credentials');
+  STORE[p]._replaceArrays=['credentials'];
+  saveToLS(p);delete STORE[p]._replaceArrays;
+  switchTab(p,'credentials');
   toast('Credential deleted');
 }
 
@@ -5646,7 +5657,7 @@ function ptOpenEdit(p,i){
     saveToLS(p);closeModal();renderProject(p);toast('Task updated');
   },{saveLabel:'Update'});
 }
-function ptDelete(p,i){if(!confirm('Delete this task?'))return;STORE[p].pendingtasks.splice(i,1);saveToLS(p);renderProject(p);toast('Task deleted');}
+function ptDelete(p,i){if(!confirm('Delete this task?'))return;STORE[p].pendingtasks.splice(i,1);STORE[p]._replaceArrays=['pendingtasks'];saveToLS(p);delete STORE[p]._replaceArrays;renderProject(p);toast('Task deleted');}
 
 // ══════════════════════════════════════════════════════
 // THIRD PARTY ACCOUNTS TAB
@@ -6372,7 +6383,7 @@ function tpOpenEdit(p,i){
   },{saveLabel:'Update'});
   setTimeout(()=>_tpApiRender(),80);
 }
-function tpDelete(p,i){if(!isAdmin()){toast('Only admin can delete third party accounts','err');return;}if(!confirm('Delete this account?'))return;STORE[p].thirdparty.splice(i,1);saveToLS(p);renderProject(p);toast('Account deleted');}
+function tpDelete(p,i){if(!isAdmin()){toast('Only admin can delete third party accounts','err');return;}if(!confirm('Delete this account?'))return;STORE[p].thirdparty.splice(i,1);STORE[p]._replaceArrays=['thirdparty'];saveToLS(p);delete STORE[p]._replaceArrays;renderProject(p);toast('Account deleted');}
 function tpOpenAddApi(p,acctIdx){
   if(!isAdmin()){toast('Only admin can add APIs','err');return;}
   // quick-add from the tab view (outside modal)
@@ -6394,7 +6405,7 @@ function tpOpenAddApi(p,acctIdx){
     STORE[p].thirdparty[acctIdx].apis.push(api);saveToLS(p);closeModal();renderProject(p);toast('API added');
   },{saveLabel:'Add API'});
 }
-function tpDeleteApi(p,acctIdx,apiIdx){if(!isAdmin()){toast('Only admin can delete APIs','err');return;}if(!confirm('Delete this API?'))return;STORE[p].thirdparty[acctIdx].apis.splice(apiIdx,1);saveToLS(p);renderProject(p);toast('API deleted');}
+function tpDeleteApi(p,acctIdx,apiIdx){if(!isAdmin()){toast('Only admin can delete APIs','err');return;}if(!confirm('Delete this API?'))return;STORE[p].thirdparty[acctIdx].apis.splice(apiIdx,1);STORE[p]._replaceArrays=['thirdparty'];saveToLS(p);delete STORE[p]._replaceArrays;renderProject(p);toast('API deleted');}
 function tpEditApi(p,acctIdx,apiIdx){
   if(!isAdmin()){toast('Only admin can edit APIs','err');return;}
   const api=STORE[p].thirdparty[acctIdx]?.apis?.[apiIdx];
@@ -7211,8 +7222,19 @@ function _applySseUpdate(key,value){
     }
     if(curView==='project'&&curProj===pid&&!userTyping){
       renderProject(pid);
+      // Flash highlight on all visible rows to indicate live update
+      setTimeout(()=>{
+        document.querySelectorAll('tr[data-idx]').forEach(r=>{
+          r.classList.remove('row-live-update');
+          void r.offsetWidth; // force reflow
+          r.classList.add('row-live-update');
+          setTimeout(()=>r.classList.remove('row-live-update'),1200);
+        });
+      },50);
       const pname=PROJECTS.find(p=>p.id===pid)?.name||pid;
-      toast('📡 '+pname+' updated live');
+      const tab=curTab[pid]||'';
+      const tabLabel={smoke:'Smoke Tests',prod:'Prod Checklist',credentials:'Credentials',feedback:'Client Feedback',thirdparty:'Third Party',taskchecklist:'Task Checklist',pendingtasks:'Pending Tasks',releasenotes:'Release Notes',projoverview:'Overview',wfdocs:'Workflow Docs'}[tab]||tab;
+      if(_sseToastCooldown('proj_'+pid))toast(`📡 ${pname}${tabLabel?' — '+tabLabel:''} updated live`);
     }
   }
   // Only refresh project grid if currently on home view — never navigate away from other views
@@ -7307,7 +7329,7 @@ function resetProject(p){
   STORE[p].prod.forEach(r=>{if(!r._pending){r.status='Not Started';r.comment='';}});
   saveToLS(p);renderProject(p);toast('All statuses reset');
 }
-function deleteReport(p,i){if(!confirm('Delete this snapshot?'))return;STORE[p].reports.splice(i,1);saveToLS(p);renderProject(p);toast('Snapshot deleted');}
+function deleteReport(p,i){if(!confirm('Delete this snapshot?'))return;STORE[p].reports.splice(i,1);STORE[p]._replaceArrays=['reports'];saveToLS(p);delete STORE[p]._replaceArrays;renderProject(p);toast('Snapshot deleted');}
 // ══════════════════════════════════════════════════════
 // TOAST
 // ══════════════════════════════════════════════════════
