@@ -4922,6 +4922,37 @@ app.post('/api/admin/sync-default-projects', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/admin/clear-default-smoke-prod — forcibly clear smoke/prod for projects that
+// should not have the Humee default test cases. Clears both MongoDB and in-memory cache.
+// Safe to call multiple times — only wipes if count matches default (29 smoke / 34 prod).
+app.post('/api/admin/clear-default-smoke-prod', requireAdmin, async (req, res) => {
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        // Projects that must NOT have pre-filled smoke/prod (not in dedicated suite list)
+        const targets = req.body.projectIds || ['adhash','sparkme','zapai','zapcrm','zaptrade_mpv6v89b','algomax','autochecker','metcalf','smc','synctrade'];
+        const results = {};
+        for (const pid of targets) {
+            const key = 'qa3_' + pid;
+            const proj = (_qaCache[key] && typeof _qaCache[key] === 'object') ? _qaCache[key] : {};
+            const smokeCount = Array.isArray(proj.smoke) ? proj.smoke.length : 0;
+            const prodCount  = Array.isArray(proj.prod)  ? proj.prod.length  : 0;
+            if (smokeCount === 0 && prodCount === 0) { results[pid] = 'already_empty'; continue; }
+            // Clear in cache
+            if (!_qaCache[key]) _qaCache[key] = {};
+            _qaCache[key].smoke = [];
+            _qaCache[key].prod  = [];
+            // Persist to MongoDB via writeKey (replaces arrays)
+            const { writeKey } = require('./src/db');
+            await writeKey(key, _qaCache[key]);
+            // Broadcast so all connected clients clear their STORE immediately
+            broadcastSseEvent('qa-data-update', { key, value: _qaCache[key] });
+            results[pid] = `cleared (was smoke:${smokeCount} prod:${prodCount})`;
+        }
+        res.json({ ok: true, results });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/events — SSE stream; pushes qa-data-update/delete events to all connected clients
 app.get('/api/events', (req, res) => {
     // Accept JWT via query param (EventSource can't send custom headers)
