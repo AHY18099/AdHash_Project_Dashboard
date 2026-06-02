@@ -407,7 +407,7 @@ body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(24
     <p class="subtitle">Daily workflow: Filter stocks → Ask GPT-4o → Send to Market Structure API</p>
 
     <div class="stcard">
-      <div class="step-header"><div class="step-num" style="background:#6e40c9;">⚙</div><div class="step-title">Configuration (saved in your browser)</div></div>
+      <div class="step-header"><div class="step-num" style="background:#6e40c9;">⚙</div><div class="step-title">Configuration (saved to DB — shared across all users)</div></div>
       <div class="strow" style="margin-bottom:12px">
         <div style="flex:1;min-width:240px"><label for="st-cfgOpenAI">OpenAI API Key</label><input type="password" id="st-cfgOpenAI" class="stfull" placeholder="sk-..." autocomplete="off"/></div>
         <div style="flex:1;min-width:160px"><label for="st-cfgModel">Model</label><input type="text" id="st-cfgModel" class="stfull" value="gpt-4o-mini"/></div>
@@ -584,12 +584,13 @@ function stCopyEl(id){navigator.clipboard.writeText(document.getElementById(id).
 
 let stAllSymbols=[];
 async function stFetchAndFilter(){
-  const gKey=stLS.get('googleKey');
-  const sheetId=stLS.get('sheetId')||document.getElementById('st-cfgSheetId').value.trim();
-  const sheetRange=stLS.get('sheetRange')||'Sheet1';
+  // Always read from DOM inputs — these are populated from DB on panel open
+  const gKey=document.getElementById('st-cfgGoogleKey').value.trim();
+  const sheetId=document.getElementById('st-cfgSheetId').value.trim()||'1ykNdxIpC6ALQfqMFG5D_w598sM77bASJ1RH1u9gQI28';
+  const sheetRange=document.getElementById('st-cfgSheetRange').value.trim()||'Sheet1';
   const minP=parseFloat(document.getElementById('st-minPrice').value);
   const maxP=parseFloat(document.getElementById('st-maxPrice').value);
-  if(!gKey){stSetStatus('st-filterStatus','Enter your Google Sheets API Key in Configuration above.','err');return;}
+  if(!gKey){stSetStatus('st-filterStatus','Google Sheets API Key not configured — ask admin to save it in Configuration.','err');return;}
   if(isNaN(minP)||isNaN(maxP)||minP>maxP){stSetStatus('st-filterStatus','Invalid price range.','err');return;}
   stSetStatus('st-filterStatus','Fetching live data from Google Sheets...');
   document.getElementById('st-tagSection').style.display='none';
@@ -633,10 +634,12 @@ function stUpdatePrompt(){
   box.textContent=`Analyze these NSE stocks and give me the TOP PERFORMING ones ranked by technical strength, momentum, and near-term bullish potential for ${today}.\n\nSymbols: ${JSON.stringify(syms)}\n\nReturn ONLY a JSON array of top symbols in order of preference. No explanation, no markdown.\nExample: ["SYM1","SYM2","SYM3"]`;
 }
 async function stAskGPT(){
-  const apiKey=stLS.get('openaiKey');const model=stLS.get('openaiModel')||'gpt-4o-mini';
+  // Always read from DOM inputs — populated from DB on panel open
+  const apiKey=document.getElementById('st-cfgOpenAI').value.trim();
+  const model=document.getElementById('st-cfgModel').value.trim()||'gpt-4o-mini';
   const prompt=document.getElementById('st-promptBox').textContent.trim();
   const btn=document.getElementById('st-askBtn');
-  if(!apiKey){stSetStatus('st-gptStatus','Enter your OpenAI API Key in Configuration above.','err');return;}
+  if(!apiKey){stSetStatus('st-gptStatus','OpenAI API Key not configured — ask admin to save it in Configuration.','err');return;}
   if(!prompt||prompt.startsWith('('))  {stSetStatus('st-gptStatus','Filter stocks in Step 1 first.','err');return;}
   btn.disabled=true;stSetStatus('st-gptStatus',`Sending to ${model}...`);
   try{
