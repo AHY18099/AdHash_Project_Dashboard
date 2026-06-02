@@ -103,6 +103,8 @@ if (compression) {
 // ── Real-time SSE broadcast ──
 // Map: clientId → { res, userId, userName, connectedAt }
 const _sseClients = new Map();
+// Wire broadcast.service so new modules can import it without circular deps
+require('./src/services/broadcast.service').init(_sseClients);
 
 function broadcastSseEvent(eventName, data, sourceClientId) {
     if (!_sseClients.size) return;
@@ -226,6 +228,13 @@ function getSessionFromCookie(req) {
 }
 
 function isAuthenticated(req) {
+    // Accept JWT Bearer token (API clients, browser fetch with Authorization header)
+    const bearerToken = getBearerToken(req);
+    if (bearerToken) {
+        const payload = verifyJwt(bearerToken);
+        if (payload) return true;
+    }
+    // Cookie-based auth (browser sessions, SSE via cookie)
     const cookies = parseCookies(req);
     const val = cookies[AUTH_COOKIE_NAME] || '';
     if (val === AUTH_COOKIE_VALUE) return true;
