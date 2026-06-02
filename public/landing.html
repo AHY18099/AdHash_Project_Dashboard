@@ -532,23 +532,52 @@ function closeSyncTradePanel(){
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSyncTradePanel();});
 
 // ── STOCKTOOL LOGIC (scoped with st prefix) ──────────────────────────────
+// Keys stored in MongoDB (encrypted) — shared across all browsers/devices
+// localStorage used only as fast fallback while DB loads
 const stLS={get:k=>localStorage.getItem('stk_'+k)||'',set:(k,v)=>localStorage.setItem('stk_'+k,v)};
-function stLoadConfig(){
+function _stToken(){return localStorage.getItem('qa_token')||'';}
+async function stLoadConfig(){
+  // Show localStorage values immediately (fast, no flicker)
   document.getElementById('st-cfgOpenAI').value    =stLS.get('openaiKey');
   document.getElementById('st-cfgModel').value     =stLS.get('openaiModel')||'gpt-4o-mini';
   document.getElementById('st-cfgGoogleKey').value =stLS.get('googleKey');
   document.getElementById('st-cfgSheetId').value   =stLS.get('sheetId')||'1ykNdxIpC6ALQfqMFG5D_w598sM77bASJ1RH1u9gQI28';
   document.getElementById('st-cfgSheetRange').value=stLS.get('sheetRange')||'Sheet1';
+  // Then load from DB and overwrite (source of truth)
+  try{
+    const r=await fetch('/api/app-config/synctrade-tool',{headers:{Authorization:'Bearer '+_stToken()}});
+    if(!r.ok)return;
+    const d=await r.json();
+    if(d.openaiKey){document.getElementById('st-cfgOpenAI').value=d.openaiKey;stLS.set('openaiKey',d.openaiKey);}
+    if(d.openaiModel){document.getElementById('st-cfgModel').value=d.openaiModel;stLS.set('openaiModel',d.openaiModel);}
+    if(d.googleKey){document.getElementById('st-cfgGoogleKey').value=d.googleKey;stLS.set('googleKey',d.googleKey);}
+    if(d.sheetId){document.getElementById('st-cfgSheetId').value=d.sheetId;stLS.set('sheetId',d.sheetId);}
+    if(d.sheetRange){document.getElementById('st-cfgSheetRange').value=d.sheetRange;stLS.set('sheetRange',d.sheetRange);}
+  }catch(_){}
 }
-function stSaveConfig(){
-  stLS.set('openaiKey',  document.getElementById('st-cfgOpenAI').value.trim());
-  stLS.set('openaiModel',document.getElementById('st-cfgModel').value.trim());
-  stLS.set('googleKey',  document.getElementById('st-cfgGoogleKey').value.trim());
-  stLS.set('sheetId',    document.getElementById('st-cfgSheetId').value.trim());
-  stLS.set('sheetRange', document.getElementById('st-cfgSheetRange').value.trim());
+async function stSaveConfig(){
+  const cfg={
+    openaiKey: document.getElementById('st-cfgOpenAI').value.trim(),
+    openaiModel:document.getElementById('st-cfgModel').value.trim(),
+    googleKey:  document.getElementById('st-cfgGoogleKey').value.trim(),
+    sheetId:    document.getElementById('st-cfgSheetId').value.trim(),
+    sheetRange: document.getElementById('st-cfgSheetRange').value.trim()
+  };
+  // Save to localStorage immediately
+  Object.entries(cfg).forEach(([k,v])=>stLS.set(k,v));
   const s=document.getElementById('st-cfgStatus');
-  s.textContent='Saved ✓';s.className='stinfo ok';
-  setTimeout(()=>{s.textContent='';},2000);
+  s.textContent='Saving…';s.className='stinfo';
+  try{
+    // Save to MongoDB (encrypted, shared across devices)
+    const r=await fetch('/api/app-config/synctrade-tool',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+_stToken()},
+      body:JSON.stringify(cfg)
+    });
+    if(r.ok){s.textContent='Saved to DB ✓';s.className='stinfo ok';}
+    else{s.textContent='Saved locally (DB error)';s.className='stinfo ok';}
+  }catch(_){s.textContent='Saved locally';s.className='stinfo ok';}
+  setTimeout(()=>{s.textContent='';},2500);
 }
 function stSetStatus(id,msg,type=''){const el=document.getElementById(id);el.textContent=msg;el.className='stinfo'+(type?' '+type:'');}
 function stCopyEl(id){navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>alert('Copied!'));}

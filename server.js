@@ -4953,6 +4953,62 @@ app.post('/api/admin/clear-default-smoke-prod', requireAdmin, async (req, res) =
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── App Config API — stores shared keys/settings in MongoDB ──────────────────
+// Keys are AES-256 encrypted at rest using the JWT_SECRET so raw values never
+// sit in MongoDB in plaintext.
+const _crypto = require('crypto');
+function _encryptVal(val) {
+    const key = Buffer.from(JWT_SECRET.padEnd(32, '0').slice(0, 32));
+    const iv  = _crypto.randomBytes(16);
+    const cipher = _crypto.createCipheriv('aes-256-cbc', key, iv);
+    const enc = Buffer.concat([cipher.update(val, 'utf8'), cipher.final()]);
+    return iv.toString('hex') + ':' + enc.toString('hex');
+}
+function _decryptVal(enc) {
+    try {
+        const [ivHex, dataHex] = enc.split(':');
+        const key = Buffer.from(JWT_SECRET.padEnd(32, '0').slice(0, 32));
+        const decipher = _crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(ivHex, 'hex'));
+        return Buffer.concat([decipher.update(Buffer.from(dataHex, 'hex')), decipher.final()]).toString('utf8');
+    } catch { return ''; }
+}
+
+// GET /api/app-config/:namespace — load config keys (authenticated)
+app.get('/api/app-config/:namespace', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const { getDB } = require('./src/db');
+        const db  = getDB();
+        const doc = await db.collection('app_config').findOne({ namespace: req.params.namespace });
+        if (!doc) return res.json({});
+        // Decrypt all values before sending to client
+        const out = {};
+        for (const [k, v] of Object.entries(doc.data || {})) {
+            out[k] = v ? _decryptVal(v) : '';
+        }
+        res.json(out);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/app-config/:namespace — save config keys (admin only)
+app.post('/api/app-config/:namespace', requireAdmin, async (req, res) => {
+    try {
+        const { getDB } = require('./src/db');
+        const db   = getDB();
+        const data = {};
+        // Encrypt every value before storing
+        for (const [k, v] of Object.entries(req.body || {})) {
+            data[k] = v ? _encryptVal(String(v)) : '';
+        }
+        await db.collection('app_config').updateOne(
+            { namespace: req.params.namespace },
+            { $set: { namespace: req.params.namespace, data, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+            { upsert: true }
+        );
+        res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/events — SSE stream; pushes qa-data-update/delete events to all connected clients
 app.get('/api/events', (req, res) => {
     // Accept JWT via query param (EventSource can't send custom headers)
