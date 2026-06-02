@@ -7077,8 +7077,10 @@ function initSseListener(){
     try{
       const {key,value,sourceClientId}=JSON.parse(e.data);
       // Skip own events (use both client-side MY_CLIENT_ID and server-assigned _SSE_CLIENT_ID)
-      const myId=window._SSE_CLIENT_ID||MY_CLIENT_ID;
-      if(sourceClientId&&sourceClientId===myId)return;
+      // sourceClientId is MY_CLIENT_ID (sent in serverPost body)
+      // _SSE_CLIENT_ID is the server-assigned SSE connection ID — different value
+      // Check both so own saves are always filtered regardless of which ID was used
+      if(sourceClientId&&(sourceClientId===MY_CLIENT_ID||sourceClientId===window._SSE_CLIENT_ID))return;
       // Grace period: ignore data events in the first 3s after connect (startup noise)
       if(_sseConnectedAt&&Date.now()-_sseConnectedAt<_SSE_GRACE_MS){
         console.log('[sse] grace period — ignoring startup event for key:',key);return;
