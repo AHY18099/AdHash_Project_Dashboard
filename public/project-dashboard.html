@@ -2772,7 +2772,7 @@
         <div class="controls">
             <div class="controls-top-row">
                 <div class="search-box">
-                    <input type="search" id="searchInput" placeholder="🔍 Search projects..." onkeyup="filterProjects()" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" name="project-search-x">
+                    <input type="text" id="searchInput" placeholder="🔍 Search projects..." onkeyup="filterProjects()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="project-search-x" readonly onfocus="this.removeAttribute('readonly')" data-lpignore="true" data-form-type="other">
                 </div>
                 <div class="run-all-btn-container">
                     <button class="run-all-btn" id="runAllBtn" onclick="runAllTests()">
@@ -2947,11 +2947,10 @@
         // Load projects on page load
         document.addEventListener('DOMContentLoaded', async () => {
             loadTheme(); // Load theme preference first
-            // Clear search immediately and again after autofill timing window
+            // Clear search and prevent browser autofill from filling it
             const si = document.getElementById('searchInput');
             si.value = '';
-            setTimeout(() => { si.value = ''; }, 100);
-            setTimeout(() => { si.value = ''; }, 500);
+            [50, 150, 300, 600, 1000].forEach(ms => setTimeout(() => { if(si.value && !si.matches(':focus')) si.value = ''; }, ms));
             await loadProjects();
             await fetchAllTestResults(); // Fetch real test results
             await loadTestStatus();
