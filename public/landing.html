@@ -161,14 +161,17 @@ body.dark .user-dd-item:hover{background:rgba(0,212,255,.08)}
 
 /* ── GRID ── */
 .grid-wrap{
-  flex:1;display:flex;align-items:flex-start;justify-content:center;
-  padding:20px 28px 52px;gap:28px;flex-wrap:wrap;
+  flex:1;display:grid;
+  grid-template-columns:repeat(2,1fr);
+  align-items:start;
+  max-width:960px;width:100%;margin:0 auto;
+  padding:20px 28px 52px;gap:24px;
 }
 .dash-card{
   background:var(--card);
   border:1.5px solid var(--border);
   border-radius:20px;
-  width:100%;max-width:420px;
+  width:100%;
   padding:36px 32px;
   cursor:pointer;
   transition:transform .2s,border-color .2s,box-shadow .2s,background .3s;
@@ -233,7 +236,7 @@ body.dark .dash-card:hover .arrow-btn{color:#000}
   transition:border-color .3s;
 }
 
-@media(max-width:600px){.hero h1{font-size:24px}.dash-card{padding:26px 22px}.grid-wrap{padding:16px 16px 40px}}
+@media(max-width:768px){.grid-wrap{grid-template-columns:1fr;padding:16px 16px 40px}.hero h1{font-size:24px}.dash-card{padding:26px 22px}}
 
 /* ── SYNCTRADE PANEL ── */
 .card-icon.orange{background:rgba(245,158,11,.1);border:1.5px solid rgba(245,158,11,.2)}
