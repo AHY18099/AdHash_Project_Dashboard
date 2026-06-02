@@ -3641,17 +3641,78 @@ app.get('/public/project-dashboard.html', (req, res) => {
 // ─── PROJECT MANAGEMENT API ───────────────────────────────────────────────────
 
 const PROJECT_MAPPING_PATH = path.join(__dirname, 'config', 'project-mapping.json');
+const GH_MAPPING_FILE = 'config/project-mapping.json';
 
-function readProjectMapping() {
+// In-memory cache of project-mapping — loaded from GitHub on startup, updated on every write.
+// This survives Railway redeploys because GitHub is the source of truth, not the Railway disk.
+let _projectMappingCache = null;
+
+// Load project-mapping.json from GitHub API — called once on startup and after every write.
+async function _loadProjectMappingFromGitHub() {
+    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+    if (!token) return null;
     try {
-        return JSON.parse(fs.readFileSync(PROJECT_MAPPING_PATH, 'utf8'));
+        const r = await _ghRequest('GET', `/repos/${GH_API_REPO}/contents/${GH_MAPPING_FILE}`, null, token);
+        if (r.status === 200 && r.body && r.body.content) {
+            const content = Buffer.from(r.body.content, 'base64').toString('utf8');
+            const parsed = JSON.parse(content);
+            _projectMappingCache = parsed;
+            // Also write to local disk as fallback for spec regeneration
+            try { fs.writeFileSync(PROJECT_MAPPING_PATH, JSON.stringify(parsed, null, 2), 'utf8'); } catch (_) {}
+            console.log('[project-mapping] ✅ Loaded from GitHub —', (parsed.projects || []).length, 'projects');
+            return parsed;
+        }
     } catch (e) {
-        return { projects: [] };
+        console.warn('[project-mapping] GitHub load failed:', e.message);
     }
+    return null;
 }
 
+function readProjectMapping() {
+    // 1. In-memory cache (set on startup and after every write)
+    if (_projectMappingCache) return _projectMappingCache;
+    // 2. Local disk fallback (exists if GitHub load succeeded on startup)
+    try {
+        const parsed = JSON.parse(fs.readFileSync(PROJECT_MAPPING_PATH, 'utf8'));
+        _projectMappingCache = parsed;
+        return parsed;
+    } catch (e) {}
+    return { projects: [] };
+}
+
+// Write project-mapping: update cache + disk + GitHub in one atomic operation.
+// GitHub is the source of truth — disk is just a local copy for spec regeneration.
 function writeProjectMapping(data) {
-    fs.writeFileSync(PROJECT_MAPPING_PATH, JSON.stringify(data, null, 2), 'utf8');
+    // 1. Update in-memory cache immediately (UI reads this synchronously)
+    _projectMappingCache = data;
+    // 2. Write to local disk (for spec file regeneration which runs synchronously)
+    try { fs.writeFileSync(PROJECT_MAPPING_PATH, JSON.stringify(data, null, 2), 'utf8'); } catch (_) {}
+    // 3. Push to GitHub asynchronously — this is what survives Railway redeploys
+    _pushProjectMappingToGitHub(data).catch(e => console.warn('[project-mapping] GitHub push failed:', e.message));
+}
+
+// Push project-mapping.json to GitHub via API (not git CLI — works reliably on Railway).
+async function _pushProjectMappingToGitHub(data) {
+    const token = process.env.GITHUB_TOKEN || process.env.GH_PAT || '';
+    if (!token) return;
+    try {
+        // Get current SHA (required for update)
+        const getR = await _ghRequest('GET', `/repos/${GH_API_REPO}/contents/${GH_MAPPING_FILE}`, null, token);
+        const sha = getR.status === 200 && getR.body ? getR.body.sha : undefined;
+        const content = Buffer.from(JSON.stringify(data, null, 2)).toString('base64');
+        const putR = await _ghRequest('PUT', `/repos/${GH_API_REPO}/contents/${GH_MAPPING_FILE}`, {
+            message: 'chore: sync project-mapping.json from dashboard UI',
+            content,
+            ...(sha ? { sha } : {}),
+        }, token);
+        if (putR.status === 200 || putR.status === 201) {
+            console.log('[project-mapping] ✅ Pushed to GitHub');
+        } else {
+            console.warn('[project-mapping] GitHub push returned', putR.status);
+        }
+    } catch (e) {
+        console.warn('[project-mapping] _pushProjectMappingToGitHub error:', e.message);
+    }
 }
 
 // Fire-and-forget: push updated spec files to all 5 GitHub repos in the background.
@@ -5527,6 +5588,9 @@ async function migrateWfDocsToGitHub() {
             // Dedup all project data in MongoDB — removes any accumulated duplicates
             try { await deduplicateAllProjectData(); } catch (e) { console.error('[startup] dedup failed:', e.message); }
             try { await seedSuperAdmin(); } catch (e) { console.warn('[startup] seedSuperAdmin failed:', e.message); }
+            // Load project-mapping.json from GitHub so old dashboard always has latest data
+            // even after Railway wipes the disk on redeploy
+            try { await _loadProjectMappingFromGitHub(); } catch (e) { console.warn('[startup] project-mapping GitHub load failed:', e.message); }
             // Sync qa3_projects from cache to MongoDB — ensures any projects added before
             // this fix are written to the projects collection so they survive redeploys
             try {
