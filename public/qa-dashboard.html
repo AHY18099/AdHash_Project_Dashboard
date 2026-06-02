@@ -6499,11 +6499,15 @@ function openAddProject(){
     const name=document.getElementById('np-name').value.trim();
     if(!name){toast('Project name is required','err');return;}
     const id=name.toLowerCase().replace(/[^a-z0-9]/g,'')+'_'+Date.now().toString(36);
-    const proj={id,name,color:document.getElementById('np-color').value,website:document.getElementById('np-web').value,dashboard:document.getElementById('np-dash').value,releaseDate:document.getElementById('np-date').value};
+    const proj={id,name,color:document.getElementById('np-color').value,website:document.getElementById('np-web').value,dashboard:document.getElementById('np-dash').value,releaseDate:document.getElementById('np-date').value,defaultAssignee:''};
     PROJECTS.push(proj);
-    STORE[id]={env:mkEnv(proj),gates:[...DEFAULT_GATES],smoke:mkSmoke(id),prod:mkProd(id),testdata:[],releaseNotes:[],reports:[],pending:[]};
+    STORE[id]={env:mkEnv(proj),gates:[...DEFAULT_GATES],smoke:mkSmoke(id),prod:mkProd(id),testdata:[],releaseNotes:[],reports:[],pending:[],credentials:[],wfdocs:[],envDetails:{production:[],staging:[]}};
     curProj=id;curTab[id]='projoverview';curView='project';
-    saveAllState();closeModal();switchProj(id);toast(`Project "${name}" created`);
+    // Save project list first, then immediately save this project's empty STORE to MongoDB
+    // so other users see it via SSE without needing a Commit & Push
+    serverPost('qa3_projects',PROJECTS);
+    serverPost('qa3_'+id,STORE[id]);
+    closeModal();switchProj(id);toast(`Project "${name}" created`);
   });
 }
 function openEditProject(pid){
@@ -7185,6 +7189,21 @@ function _applySseUpdate(key,value){
     initUsers();
     // Users is a modal now — refresh it if open, no page navigation
     {const _um=document.getElementById('users-overlay-modal');if(_um&&_um.style.display!=='none'&&!userTyping)renderUsersModal();}
+  }else if(key==='qa3_projects'){
+    // Another user added/removed/edited a project — update PROJECTS and re-render grid
+    if(Array.isArray(value)&&value.length>0){
+      const serverById=new Map(value.filter(p=>p&&p.id&&p.name).map(p=>[p.id,p]));
+      // Keep hardcoded defaults for built-ins not in the incoming list
+      DEFAULT_PROJ.forEach(d=>{if(!serverById.has(d.id))serverById.set(d.id,d);});
+      PROJECTS=Array.from(serverById.values()).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+      // Ensure STORE entries exist for any newly added projects
+      PROJECTS.forEach(p=>{
+        if(!STORE[p.id])STORE[p.id]={env:mkEnv(p),gates:[...DEFAULT_GATES],smoke:mkSmoke(p.id),prod:mkProd(p.id),testdata:[],releaseNotes:[],reports:[],pending:[],credentials:[],wfdocs:[],envDetails:{production:[],staging:[]}};
+      });
+    }
+    if(curView==='home'&&typeof renderProjectGrid==='function')renderProjectGrid();
+    if(_sseToastCooldown('proj'))toast('📡 Projects updated live');
+    return; // handled — skip the generic qa3_ branch and the final renderProjectGrid below
   }else if(key.startsWith('qa3_')){
     const pid=key.replace('qa3_','');
     if(STORE[pid]&&value&&typeof value==='object'&&!Array.isArray(value)){
