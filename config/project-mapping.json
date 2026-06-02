@@ -260,7 +260,7 @@
           "name": "Sparkme App Login",
           "url": "https://spark.synctag.com/api/auth/login",
           "method": "POST",
-          "expectedStatus": 200,
+          "expectedStatus": 201,
           "body": {
             "key": "z8zY9agO/zG58XoDO6QW+mkPueQVBAGXwPCbsyAIPxmbvDYcouZ/ssu6jpPMct47MGerqC9we10NCiVzoijbNwohTjUh+ozT0NUPmK4s2hpDCXxBlqitk2TpfqwxEL2at+DW8bPJ69BBSnbG/PRM3VItB8USK2N5iBGiHaOG1ngUdOzDFJT3FU//ZQ1ATW8BBEUtJ9rGIQ2+Uqg/0f/tVk9+yGQQyITObqIPXWvIQ+AMxs/0XNELfe90Ou+D5eMuGwH3ZiMe8SpCU9Uo0ZXdXC+me/xjlyEu1uXduyTcYV2ZP9+Qe7pZgSHJrpUHsgLFVEVcZp89DQG9VeVcz8P8zwXLumfIaTacMLPWzl+j1XBWMLD2cBq4gGvVNbPKTl/OwnDMgYz0XYBR5E6VPbDk6zjAT0cns14L/vhuwIAorVmTX2fbfvDWWIQD8zy4A0vNtPe206zYNMLwWRHkonvEvpqxvL4Ri2gfjN1kV7kwxwjYOwQ+vAkfTZpEbH2CHVTVsCyKVNfGphZDdQYECe0UzwlKTdxr/jrVno4V8kRschF6E8jwXlukeNpdryN/zAdRFkRZSGbHIbIwIScwmsmBIKkbYRt9Bzrl4Xn3ksKwVRM6zh66z9YSmksvwkTmk9vQ"
           }
@@ -275,7 +275,7 @@
           "name": "Sparkme Web Login",
           "url": "https://spark.synctag.com/analyticsapi/auth/login",
           "method": "POST",
-          "expectedStatus": 200,
+          "expectedStatus": 201,
           "body": {
             "phone": 9999999999,
             "password": "Synctag@1"
