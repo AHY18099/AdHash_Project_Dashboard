@@ -2297,9 +2297,11 @@ function switchProj(id){
   curProj=id;curView='project';
   if(!curTab[id])curTab[id]='projoverview';
   renderProject(id);
+  // Scroll to top when entering a project page
+  window.scrollTo({top:0,behavior:'instant'});
 }
-function switchTab(p,tab){curTab[p]=tab;renderProject(p);}
-function goHome(){curView='home';renderProjectGrid();}
+function switchTab(p,tab){curTab[p]=tab;renderProject(p);window.scrollTo({top:0,behavior:'instant'});}
+function goHome(){curView='home';renderProjectGrid();window.scrollTo({top:0,behavior:'instant'});}
 
 // ══ RENDER PROJECT ══
 function renderProject(p){
@@ -3976,11 +3978,12 @@ function showDailyTasks(){
   }
   weeks.forEach(({weekNum,days})=>{_dtWeekOpen[weekNum]=days.includes(targetDate);});
   renderDailyTasksPage();
-  // scroll to target date after render
+  // Reset to top first, then scroll to today's date section
+  window.scrollTo({top:0,behavior:'instant'});
   setTimeout(()=>{
     const el=document.getElementById(`dt-day-group-${targetDate}`);
     if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
-  },80);
+  },120);
 }
 
 // ══ DAILY TASK UPDATES — Week-wise view ══
@@ -4474,11 +4477,12 @@ function showTeamTasks(){
   }
   weeks.forEach(({weekNum,days})=>{_ttWeekOpen[weekNum]=days.includes(targetDate);});
   renderTeamTasksPage();
-  // scroll to target date after render
+  // Reset to top first, then scroll to today's date section
+  window.scrollTo({top:0,behavior:'instant'});
   setTimeout(()=>{
     const el=document.getElementById(`tt-day-group-${targetDate}`);
     if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
-  },80);
+  },120);
 }
 
 function ttCurrentMonth(){

@@ -138,7 +138,7 @@ body.dark .user-dd-item:hover{background:rgba(0,212,255,.08)}
 
 /* ── HERO ── */
 .hero{
-  padding:52px 28px 32px;text-align:center;position:relative;overflow:hidden;
+  padding:28px 28px 16px;text-align:center;position:relative;overflow:hidden;
 }
 .hero::before{
   content:'';position:absolute;width:600px;height:360px;border-radius:50%;
@@ -152,7 +152,7 @@ body.dark .user-dd-item:hover{background:rgba(0,212,255,.08)}
   bottom:-80px;right:10%;pointer-events:none;
   transition:background .3s;
 }
-.hero h1{font-size:32px;font-weight:800;letter-spacing:-.5px;margin-bottom:8px;position:relative;z-index:1}
+.hero h1{font-size:26px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;position:relative;z-index:1}
 .hero h1 .wm{
   background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
@@ -163,16 +163,16 @@ body.dark .user-dd-item:hover{background:rgba(0,212,255,.08)}
 .grid-wrap{
   flex:1;display:grid;
   grid-template-columns:repeat(2,1fr);
-  align-items:start;
+  align-items:start;align-content:start;
   max-width:960px;width:100%;margin:0 auto;
-  padding:20px 28px 52px;gap:24px;
+  padding:12px 28px 24px;gap:18px;
 }
 .dash-card{
   background:var(--card);
   border:1.5px solid var(--border);
-  border-radius:20px;
+  border-radius:16px;
   width:100%;
-  padding:36px 32px;
+  padding:24px 26px;
   cursor:pointer;
   transition:transform .2s,border-color .2s,box-shadow .2s,background .3s;
   position:relative;overflow:hidden;
