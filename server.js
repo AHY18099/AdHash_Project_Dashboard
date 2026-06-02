@@ -4772,6 +4772,34 @@ app.post('/api/admin/fix-zaptrade', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/admin/sync-default-projects — upsert DEFAULT_PROJ metadata (name/color/defaultAssignee/website)
+// into MongoDB projects collection so all fields survive redeploys without depending on client hardcodes.
+app.post('/api/admin/sync-default-projects', requireAdmin, async (req, res) => {
+    try {
+        const { getDB, readAllData } = require('./src/db');
+        const db = getDB();
+        const defaults = req.body.projects;
+        if (!Array.isArray(defaults) || !defaults.length) return res.status(400).json({ error: 'projects array required' });
+        let synced = 0;
+        for (const p of defaults) {
+            if (!p || !p.id) continue;
+            const now = new Date();
+            await db.collection('projects').updateOne(
+                { id: p.id },
+                {
+                    $set: { name: p.name, color: p.color, defaultAssignee: p.defaultAssignee || '', website: p.website || '', dashboard: p.dashboard || '', releaseDate: p.releaseDate || '', updatedAt: now },
+                    $setOnInsert: { createdAt: now }
+                },
+                { upsert: true }
+            );
+            synced++;
+        }
+        _qaCache = await readAllData();
+        broadcastSseEvent('qa-data-update', { key: 'qa3_projects', value: _qaCache['qa3_projects'] || [] });
+        res.json({ ok: true, synced });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/events — SSE stream; pushes qa-data-update/delete events to all connected clients
 app.get('/api/events', (req, res) => {
     // Accept JWT via query param (EventSource can't send custom headers)

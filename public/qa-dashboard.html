@@ -6813,8 +6813,8 @@ function saveState(p){
   toast(`✓ Report #${STORE[p].reports.length} saved — statuses reset, test cases preserved`);
 }
 // ── SERVER-FIRST STORAGE ──
-// _serverData is the in-memory mirror of qa-shared.json on the server.
-// All reads come from here; all writes go straight to the server.
+// _serverData mirrors MongoDB data loaded via /api/qa-data on startup.
+// All reads come from here; all writes persist directly to MongoDB.
 let _serverData={};
 let _sseSource=null;
 // Unique ID for this browser tab — server echoes it back so we can skip our own SSE events
@@ -7880,6 +7880,13 @@ window.addEventListener('DOMContentLoaded',async()=>{
     PROJECTS.forEach(p=>{curTab[p.id]=curTab[p.id]||'projoverview';});
     applyRolePermissions();
     renderTopBar();renderProjectGrid();
+    // Sync DEFAULT_PROJ metadata (name/color/defaultAssignee) to MongoDB — silent background call.
+    // Ensures MongoDB projects collection always has full records independent of client hardcodes.
+    setTimeout(()=>{
+      const _tok=_getToken();
+      if(!_tok||!DEFAULT_PROJ.length)return;
+      fetch('/api/admin/sync-default-projects',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_tok},body:JSON.stringify({projects:DEFAULT_PROJ})}).catch(()=>{});
+    },3000);
     // Check if this browser has localStorage data not yet on the server
     setTimeout(()=>_checkShowRestoreBanner(),800);
     // sync wfdocs from server after initial render
