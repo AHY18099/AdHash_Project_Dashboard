@@ -439,17 +439,8 @@ body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(24
       <div class="ac-steps" id="ac-steps"></div>
     </div>
 
-    <!-- Report section -->
-    <div class="ac-report-box" id="ac-report-box" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:14px;font-weight:700;color:#e2e8f0">📄 Latest Report</span>
-        <span style="font-size:11px;color:#475569" id="ac-report-date"></span>
-      </div>
-      <div class="ac-stat-grid" id="ac-stat-grid"></div>
-      <a class="ac-report-link" id="ac-report-link" href="#" target="_blank" rel="noopener">
-        🔗 View Full Report on GitHub Actions
-      </a>
-    </div>
+    <!-- Report section — fully managed by acLoadReport() -->
+    <div id="ac-report-box" style="margin-top:20px;background:#fff;border-radius:14px;padding:20px;overflow:hidden"></div>
   </div>
 </div>
 
@@ -699,21 +690,111 @@ function acRenderStatus(run,steps){
 }
 
 async function acLoadReport(){
+  const box=document.getElementById('ac-report-box');
+  box.style.display='block';
+  box.innerHTML='<div style="color:#64748b;font-size:13px;padding:20px;text-align:center">⟳ Loading report...</div>';
   try{
     const r=await fetch('/api/autochecker/report',{headers:{Authorization:'Bearer '+localStorage.getItem('qa_token')||''}});
-    const d=await r.json();
-    if(!d.runId)return;
-    const box=document.getElementById('ac-report-box');
-    box.style.display='block';
-    document.getElementById('ac-report-date').textContent=new Date(d.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    const link=document.getElementById('ac-report-link');
-    link.href=d.reportUrl||d.downloadUrl||'#';
-    // Show stat grid
-    document.getElementById('ac-stat-grid').innerHTML=`
-      <div class="ac-stat"><div class="ac-stat-val" style="color:${d.conclusion==='success'?'#10b981':'#ef4444'}">${d.conclusion==='success'?'PASS':'FAIL'}</div><div class="ac-stat-lbl">Result</div></div>
-      <div class="ac-stat"><div class="ac-stat-val" style="color:#3b82f6">View</div><div class="ac-stat-lbl">Report</div></div>
-      <div class="ac-stat"><div class="ac-stat-val" style="color:#8b5cf6">GitHub</div><div class="ac-stat-lbl">Actions</div></div>`;
-  }catch(e){}
+    const resp=await r.json();
+    if(!resp.data){box.innerHTML=`<div style="color:#ef4444;font-size:13px;padding:20px;text-align:center">No report available${resp.message?' — '+resp.message:''}</div>`;return;}
+    const d=resp.data;
+    const created=new Date(d.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    // ── Stat cards (2 per row, matching the report style) ──
+    const statsHtml=d.stats.map(s=>`
+      <div style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border-radius:14px;padding:22px 20px;box-shadow:0 8px 20px rgba(102,126,234,.25)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;opacity:.9;margin-bottom:8px">${s.title}</div>
+        <div style="font-size:2rem;font-weight:800;margin-bottom:4px">${s.value}</div>
+        <div style="font-size:11px;opacity:.8">${s.label}</div>
+      </div>`).join('');
+
+    // ── Summary table ──
+    const summaryRows=d.summary.map(r=>`
+      <tr>
+        <td style="padding:12px 16px;font-weight:600;color:#1e293b;border-bottom:1px solid #e9ecef">${r.module}</td>
+        <td style="padding:12px 16px;font-size:1.15em;font-weight:700;color:#667eea;border-bottom:1px solid #e9ecef">${r.total}</td>
+        <td style="padding:12px 16px;font-size:1.15em;font-weight:700;color:#667eea;border-bottom:1px solid #e9ecef">${r.today}</td>
+      </tr>`).join('');
+
+    // ── Badge table helper ──
+    const badgeTable=(rows)=>rows.map(r=>{
+      const cls=r.badge.toLowerCase().includes('no data')?'warning':'success';
+      const bg=cls==='success'?'#d4edda':cls==='warning'?'#fff3cd':'#f8d7da';
+      const fg=cls==='success'?'#155724':cls==='warning'?'#856404':'#721c24';
+      return`<tr>
+        <td style="padding:12px 16px;font-weight:600;color:#1e293b;border-bottom:1px solid #e9ecef">${r.status}</td>
+        <td style="padding:12px 16px;font-size:1.15em;font-weight:700;color:#667eea;border-bottom:1px solid #e9ecef">${r.count}</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #e9ecef"><span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;background:${bg};color:${fg}">${r.badge}</span></td>
+      </tr>`;}).join('');
+
+    // ── Failed rows ──
+    const failRows=d.failed.map(r=>{
+      const isRed=r.status.toLowerCase().includes('red');
+      const bg=isRed?'#dc3545':'#fd7e14';
+      return`<tr>
+        <td style="padding:10px 14px;border-bottom:1px solid #e9ecef;color:#64748b">${r.num}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #e9ecef;font-weight:700">${r.part}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #e9ecef;color:#64748b;font-size:12px">${r.date}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #e9ecef">${r.brand}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #e9ecef"><span style="background:${bg};color:#fff;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600">${r.status}</span></td>
+      </tr>`;}).join('');
+
+    const tHead=(cols)=>`<thead><tr>${cols.map(c=>`<th style="padding:13px 16px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px">${c}</th>`).join('')}</tr></thead>`;
+
+    box.innerHTML=`
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border-radius:14px 14px 0 0;padding:28px;text-align:center;margin:-20px -20px 24px">
+        <div style="font-size:1.6em;font-weight:800;margin-bottom:6px">🔍 Auto Checker</div>
+        <div style="opacity:.9;font-size:14px">Production — Order Listing Status Report</div>
+        ${d.reportDate?`<div style="display:inline-block;background:rgba(255,255,255,.18);padding:6px 18px;border-radius:20px;font-size:12px;margin-top:10px">📅 ${d.reportDate}</div>`:''}
+        ${d.datePeriod?`<div style="display:inline-block;background:rgba(255,255,255,.18);padding:6px 18px;border-radius:20px;font-size:12px;margin-top:8px;margin-left:8px">📊 ${d.datePeriod}</div>`:''}
+      </div>
+
+      <!-- Stats grid — 2 per row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">${statsHtml}</div>
+
+      <!-- Detailed Summary -->
+      ${summaryRows?`<div style="background:#f8f9fa;border-radius:12px;padding:20px;margin-bottom:20px">
+        <div style="font-size:1.1em;font-weight:700;color:#667eea;margin-bottom:14px;padding-bottom:8px;border-bottom:3px solid #667eea">📊 Detailed Summary</div>
+        <table style="width:100%;border-radius:10px;overflow:hidden;border-collapse:separate;border-spacing:0;box-shadow:0 4px 12px rgba(0,0,0,.06)">
+          ${tHead(['Module','Total Count',"Today's Count"])}
+          <tbody>${summaryRows}</tbody>
+        </table>
+      </div>`:''}
+
+      <!-- Website Scrape -->
+      ${d.websiteScrape?.length?`<div style="background:#f8f9fa;border-radius:12px;padding:20px;margin-bottom:20px">
+        <div style="font-size:1.1em;font-weight:700;color:#667eea;margin-bottom:14px;padding-bottom:8px;border-bottom:3px solid #667eea">🌐 Website Scrap Details</div>
+        <table style="width:100%;border-radius:10px;overflow:hidden;border-collapse:separate;border-spacing:0;box-shadow:0 4px 12px rgba(0,0,0,.06)">
+          ${tHead(['Status','Count','Badge'])}
+          <tbody>${badgeTable(d.websiteScrape)}</tbody>
+        </table>
+      </div>`:''}
+
+      <!-- Failed -->
+      ${d.failed?.length?`<div style="background:#f8f9fa;border-radius:12px;padding:20px;margin-bottom:20px">
+        <div style="font-size:1.1em;font-weight:700;color:#e74c3c;margin-bottom:14px;padding-bottom:8px;border-bottom:3px solid #e74c3c">❌ Failed Report</div>
+        <table style="width:100%;border-radius:10px;overflow:hidden;border-collapse:separate;border-spacing:0;box-shadow:0 4px 12px rgba(0,0,0,.06)">
+          ${tHead(['#','Part Number','Date','Brand','Status'])}
+          <tbody>${failRows}</tbody>
+        </table>
+      </div>`:''}
+
+      <!-- PartSouq -->
+      ${d.partSouq?.length?`<div style="background:#f8f9fa;border-radius:12px;padding:20px;margin-bottom:20px">
+        <div style="font-size:1.1em;font-weight:700;color:#667eea;margin-bottom:14px;padding-bottom:8px;border-bottom:3px solid #667eea">🔧 PartSouq Compatibility API</div>
+        <table style="width:100%;border-radius:10px;overflow:hidden;border-collapse:separate;border-spacing:0;box-shadow:0 4px 12px rgba(0,0,0,.06)">
+          ${tHead(['Status','Count','Badge'])}
+          <tbody>${badgeTable(d.partSouq)}</tbody>
+        </table>
+      </div>`:''}
+
+      <!-- Footer -->
+      <div style="background:#2c3e50;color:#fff;border-radius:12px;padding:20px;text-align:center;font-size:12px;margin-top:4px">
+        <div style="font-weight:700;margin-bottom:6px">🔍 Auto Checker — Production</div>
+        <div style="opacity:.8">Run #${d.run_number} · ${created}</div>
+        <a href="${d.html_url}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;background:rgba(255,255,255,.15);color:#fff;padding:6px 18px;border-radius:20px;text-decoration:none;font-size:12px">View on GitHub Actions →</a>
+      </div>`;
+  }catch(e){box.innerHTML=`<div style="color:#ef4444;font-size:13px;padding:20px;text-align:center">Error loading report: ${e.message}</div>`;}
 }
 
 // ── SYNCTRADE PANEL ──────────────────────────────────────────────────────

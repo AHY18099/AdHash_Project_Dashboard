@@ -5047,30 +5047,143 @@ app.get('/api/autochecker/status', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// GET /api/autochecker/report — fetch HTML report artifact content from latest run
+// GET /api/autochecker/report — download artifact zip, extract HTML, parse and return structured data
 app.get('/api/autochecker/report', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     try {
         const token = process.env.GITHUB_TOKEN || '';
+        const https = require('https');
+        const zlib  = require('zlib');
+
         // Get latest completed run
         const runs = await _ghRequest('GET', `/repos/${AC_REPO}/actions/runs?per_page=5&status=completed&workflow_id=${AC_WORKFLOW_ID}`, null, token);
-        const run = runs.body?.workflow_runs?.find(r => r.conclusion === 'success') || runs.body?.workflow_runs?.[0];
-        if (!run) return res.json({ html: null, runId: null });
-        // Get artifacts for this run
-        const arts = await _ghRequest('GET', `/repos/${AC_REPO}/actions/runs/${run.id}/artifacts`, null, token);
-        const htmlArt = arts.body?.artifacts?.find(a => a.name === 'autochecker-html-report' && !a.expired);
-        if (!htmlArt) return res.json({ html: null, runId: run.id, message: 'No HTML report artifact found' });
-        // Download artifact zip via redirect URL
-        const dl = await _ghRequest('GET', `/repos/${AC_REPO}/actions/artifacts/${htmlArt.id}/zip`, null, token);
-        // GitHub returns a redirect — we can't follow it server-side easily, so return download URL for client
-        res.json({
-            runId: run.id, artifactId: htmlArt.id, artifactName: htmlArt.name,
-            downloadUrl: `https://github.com/${AC_REPO}/actions/runs/${run.id}`,
-            reportUrl: `https://github.com/${AC_REPO}/actions/runs/${run.id}#artifacts`,
-            conclusion: run.conclusion, created_at: run.created_at,
+        const run  = runs.body?.workflow_runs?.find(r => r.conclusion === 'success') || runs.body?.workflow_runs?.[0];
+        if (!run) return res.json({ data: null, runId: null });
+
+        const arts     = await _ghRequest('GET', `/repos/${AC_REPO}/actions/runs/${run.id}/artifacts`, null, token);
+        const htmlArt  = arts.body?.artifacts?.find(a => a.name === 'autochecker-html-report' && !a.expired);
+        if (!htmlArt) return res.json({ data: null, runId: run.id, message: 'No HTML report artifact' });
+
+        // Download zip — GitHub redirects to S3, so follow the redirect
+        const zipUrl = await new Promise((resolve, reject) => {
+            const req2 = https.request({
+                hostname: 'api.github.com',
+                path: `/repos/${AC_REPO}/actions/artifacts/${htmlArt.id}/zip`,
+                method: 'GET',
+                headers: { Authorization: `token ${token}`, 'User-Agent': 'AdHash-Dashboard', Accept: 'application/vnd.github.v3+json' }
+            }, r2 => {
+                if (r2.statusCode === 302 || r2.statusCode === 301) resolve(r2.headers.location);
+                else reject(new Error(`Unexpected status ${r2.statusCode}`));
+            });
+            req2.on('error', reject);
+            req2.setTimeout(10000, () => { req2.destroy(); reject(new Error('Redirect timeout')); });
+            req2.end();
         });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+
+        // Fetch the actual zip from S3
+        const zipBuf = await new Promise((resolve, reject) => {
+            const chunks = [];
+            const u = new URL(zipUrl);
+            const req3 = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: 'GET', headers: { 'User-Agent': 'AdHash-Dashboard' } }, r3 => {
+                r3.on('data', c => chunks.push(c));
+                r3.on('end', () => resolve(Buffer.concat(chunks)));
+                r3.on('error', reject);
+            });
+            req3.on('error', reject);
+            req3.setTimeout(30000, () => { req3.destroy(); reject(new Error('Download timeout')); });
+            req3.end();
+        });
+
+        // Parse zip in-memory (ZIP format: local file headers + data)
+        let htmlContent = '';
+        let offset = 0;
+        while (offset < zipBuf.length - 4) {
+            const sig = zipBuf.readUInt32LE(offset);
+            if (sig !== 0x04034b50) break; // Local file header signature
+            const flags      = zipBuf.readUInt16LE(offset + 6);
+            const compression = zipBuf.readUInt16LE(offset + 8);
+            const compSize   = zipBuf.readUInt32LE(offset + 18);
+            const nameLen    = zipBuf.readUInt16LE(offset + 26);
+            const extraLen   = zipBuf.readUInt16LE(offset + 28);
+            const name       = zipBuf.slice(offset + 30, offset + 30 + nameLen).toString('utf8');
+            const dataOffset = offset + 30 + nameLen + extraLen;
+            const data       = zipBuf.slice(dataOffset, dataOffset + compSize);
+            if (name.endsWith('.html') || name.endsWith('.htm')) {
+                try {
+                    htmlContent = compression === 8 ? zlib.inflateRawSync(data).toString('utf8') : data.toString('utf8');
+                    break;
+                } catch (_) {}
+            }
+            offset = dataOffset + compSize;
+        }
+
+        if (!htmlContent) return res.json({ data: null, runId: run.id, message: 'Could not extract HTML from artifact' });
+
+        // Parse structured data from the HTML
+        const data = _parseAutoCheckerReport(htmlContent);
+        data.runId      = run.id;
+        data.conclusion = run.conclusion;
+        data.created_at = run.created_at;
+        data.run_number = run.run_number;
+        data.html_url   = run.html_url;
+        res.json({ data, rawHtml: htmlContent });
+    } catch (e) {
+        console.error('[autochecker/report]', e.message);
+        res.status(500).json({ error: e.message });
+    }
 });
+
+// Parse AutoChecker HTML report into structured data
+function _parseAutoCheckerReport(html) {
+    const result = { reportDate: '', datePeriod: '', stats: [], summary: [], websiteScrape: [], partSouq: [], failed: [] };
+    try {
+        // Date badges
+        const dateBadges = [...html.matchAll(/date-badge[^>]*>([^<]+)</g)].map(m => m[1].trim());
+        result.reportDate = dateBadges[0]?.replace(/^[^\:]+:\s*/,'').trim() || '';
+        result.datePeriod = dateBadges[1]?.replace(/^[^\:]+:\s*/,'').trim() || '';
+
+        // Stats cards — extract h3 label, value, label
+        const statMatches = [...html.matchAll(/<div class='stat-card'>[\s\S]*?<h3>([\s\S]*?)<\/h3>[\s\S]*?<div class='value'>([\s\S]*?)<\/div>[\s\S]*?<div class='label'>([\s\S]*?)<\/div>/g)];
+        result.stats = statMatches.map(m => ({
+            title: m[1].replace(/<[^>]+>/g,'').trim(),
+            value: m[2].replace(/<[^>]+>/g,'').trim().replace(/\s+/g,' '),
+            label: m[3].replace(/<[^>]+>/g,'').trim()
+        }));
+
+        // Summary table rows
+        const summaryRows = [...html.matchAll(/<tr>[\s\S]*?<strong>([\s\S]*?)<\/strong>[\s\S]*?class='metric-value'>([\s\S]*?)<\/td>[\s\S]*?class='metric-value'>([\s\S]*?)<\/td>/g)];
+        result.summary = summaryRows.map(m => ({
+            module: m[1].replace(/<[^>]+>/g,'').trim(),
+            total:  m[2].replace(/<[^>]+>/g,'').trim().replace(/\s+/g,' '),
+            today:  m[3].replace(/<[^>]+>/g,'').trim()
+        }));
+
+        // Website Scrap + PartSouq — badge tables
+        const tables = [...html.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/g)];
+        tables.forEach(t => {
+            const heading = t[1].replace(/<[^>]+>/g,'').trim();
+            const rows = [...t[2].matchAll(/<strong>([\s\S]*?)<\/strong>[\s\S]*?class='metric-value'>([\s\S]*?)<\/td>[\s\S]*?badge[^']*'>([\s\S]*?)<\/span>/g)];
+            const parsed = rows.map(r => ({
+                status: r[1].replace(/<[^>]+>/g,'').trim(),
+                count:  r[2].replace(/<[^>]+>/g,'').trim(),
+                badge:  r[3].replace(/<[^>]+>/g,'').replace(/&\w+;/g,'').trim()
+            }));
+            if (/Website Scrap/i.test(heading)) result.websiteScrape = parsed;
+            if (/PartSouq/i.test(heading)) result.partSouq = parsed;
+        });
+
+        // Failed report rows
+        const failRows = [...html.matchAll(/<td>(\d+)<\/td>[\s\S]*?<strong>([\s\S]*?)<\/strong>[\s\S]*?<td>([\s\S]*?)<\/td>[\s\S]*?<td>([\s\S]*?)<\/td>[\s\S]*?badge[^>]*>([\s\S]*?)<\/span>/g)];
+        result.failed = failRows.map(r => ({
+            num:       r[1].trim(),
+            part:      r[2].replace(/<[^>]+>/g,'').trim(),
+            date:      r[3].replace(/<[^>]+>/g,'').trim(),
+            brand:     r[4].replace(/<[^>]+>/g,'').trim(),
+            status:    r[5].replace(/<[^>]+>/g,'').replace(/&\w+;/g,'').trim()
+        }));
+    } catch (e) { console.warn('[parseReport]', e.message); }
+    return result;
+}
 
 // GET /api/events — SSE stream; pushes qa-data-update/delete events to all connected clients
 app.get('/api/events', (req, res) => {
