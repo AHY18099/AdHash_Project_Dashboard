@@ -4724,6 +4724,54 @@ app.get('/api/admin/storage', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/admin/delete-past-releases — wipe all releases classified as 'past' from MongoDB
+app.post('/api/admin/delete-past-releases', requireAdmin, async (req, res) => {
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        const all = await db.collection('releases').find({}).toArray();
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const pastIds = all
+            .filter(r => r.testingStatus === 'Ready for Client' || (r.releaseDate && r.releaseDate.slice(0, 10) < todayStr))
+            .map(r => r._id);
+        if (!pastIds.length) return res.json({ deleted: 0 });
+        await db.collection('releases').deleteMany({ _id: { $in: pastIds } });
+        // Rebuild cache
+        const { readAllData } = require('./src/db');
+        _qaCache = await readAllData();
+        broadcastSseEvent('qa-data-update', { key: 'qa3_releases', value: _qaCache['qa3_releases'] || [] });
+        res.json({ deleted: pastIds.length });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/admin/fix-zaptrade — remove duplicate ZapTrade project and set defaultAssignee=Deepa
+app.post('/api/admin/fix-zaptrade', requireAdmin, async (req, res) => {
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        const keepId = 'zaptrade_mpv6v89b';
+        const removeId = 'zaptrade_mpvcoq7f';
+        // Delete all data for the duplicate project
+        const { SECTION_MAP, readAllData: _readAll } = require('./src/db');
+        for (const col of Object.values(SECTION_MAP)) {
+            await db.collection(col).deleteMany({ projectId: removeId });
+        }
+        await db.collection('env_details').deleteMany({ projectId: removeId });
+        await db.collection('daily_tasks').deleteMany({ projectId: removeId });
+        await db.collection('team_tasks').deleteMany({ projectId: removeId });
+        await db.collection('projects').deleteOne({ id: removeId });
+        // Set defaultAssignee on the kept project
+        await db.collection('projects').updateOne(
+            { id: keepId },
+            { $set: { defaultAssignee: 'Deepa', updatedAt: new Date() } }
+        );
+        // Rebuild cache
+        _qaCache = await _readAll();
+        broadcastSseEvent('qa-data-update', { key: 'qa3_projects', value: _qaCache['qa3_projects'] || [] });
+        res.json({ ok: true, removed: removeId, kept: keepId, defaultAssignee: 'Deepa' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/events — SSE stream; pushes qa-data-update/delete events to all connected clients
 app.get('/api/events', (req, res) => {
     // Accept JWT via query param (EventSource can't send custom headers)

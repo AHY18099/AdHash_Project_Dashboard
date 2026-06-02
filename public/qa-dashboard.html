@@ -7201,7 +7201,11 @@ function loadDailyTasks(){
   const all=_serverData['qa3_daily_tasks']||[];
   // Build set of real project IDs — never show rows for 'global' or unknown projects
   const realIds=new Set(PROJECTS.map(p=>p.id));
-  DAILY_TASKS=realIds.size>0?all.filter(t=>t.projectId&&realIds.has(t.projectId)):all.filter(t=>t.projectId&&t.projectId!=='global');
+  const filtered=realIds.size>0?all.filter(t=>t.projectId&&realIds.has(t.projectId)):all.filter(t=>t.projectId&&t.projectId!=='global');
+  // Deduplicate by projectId+date — keep the last entry (most recent save wins)
+  const seen=new Map();
+  filtered.forEach(t=>{const k=t.projectId+'|'+t.date;seen.set(k,t);});
+  DAILY_TASKS=Array.from(seen.values());
 }
 
 // Pull wfdocs file metadata from server for all projects — server is the single source of truth.
