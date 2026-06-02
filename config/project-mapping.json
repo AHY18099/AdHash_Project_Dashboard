@@ -1099,10 +1099,26 @@
       "description": "ZapTrade platform",
       "color": "#f59e0b",
       "apps": [],
-      "servers": [],
-      "domains": [],
-      "sslCerts": [],
-      "apis": []
+      "servers": [
+        {
+          "name": "Website",
+          "url": "https://zaptrade.ai",
+          "type": "web"
+        }
+      ],
+      "domains": [
+        "zaptrade.ai"
+      ],
+      "sslCerts": [
+        "zaptrade.ai"
+      ],
+      "apis": [
+        {
+          "name": "ZapTrade Website",
+          "url": "https://zaptrade.ai",
+          "method": "GET"
+        }
+      ]
     }
   ]
 }
