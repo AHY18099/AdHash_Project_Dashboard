@@ -247,6 +247,7 @@ async function doLogin(){
     });
     const d=await r.json();
     if(!r.ok||!d.success)throw new Error(d.message||'Invalid email or password.');
+    if(d.token){localStorage.setItem('qa_jwt_token',d.token);localStorage.setItem('qa_token',d.token);}
     window.location.href='/landing';
   }catch(err){
     errEl.textContent=err.message;errEl.classList.add('show');

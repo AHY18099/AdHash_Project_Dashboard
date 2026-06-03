@@ -2913,6 +2913,9 @@
         let projectsData = [];
         let testRunning = false;
 
+        function _getToken() { return localStorage.getItem('qa_jwt_token') || localStorage.getItem('qa_token') || ''; }
+        function _authHeaders(extra) { const t = _getToken(); return t ? { 'Authorization': 'Bearer ' + t, ...extra } : { ...extra }; }
+
         // Theme Toggle Function
         function toggleTheme() {
             const body = document.body;
@@ -2962,7 +2965,7 @@
 
         async function loadProjects() {
             try {
-                const response = await fetch('/api/projects');
+                const response = await fetch('/api/projects', { headers: _authHeaders() });
                 if (!response.ok) {
                     throw new Error(`Projects API failed: ${response.status} ${response.statusText}`);
                 }
@@ -3196,7 +3199,7 @@
         // Fetch test results for all projects
         async function fetchAllTestResults() {
             try {
-                const response = await fetch('/api/projects');
+                const response = await fetch('/api/projects', { headers: _authHeaders() });
                 if (!response.ok) {
                     throw new Error(`Projects API failed: ${response.status} ${response.statusText}`);
                 }
@@ -3204,7 +3207,7 @@
                 const projects = Array.isArray(data) ? data : Array.isArray(data.projects) ? data.projects : [];
 
                 for (const project of projects) {
-                    const resultsResponse = await fetch(`/api/project/${project.id}/test-results`);
+                    const resultsResponse = await fetch(`/api/project/${project.id}/test-results`, { headers: _authHeaders() });
                     if (!resultsResponse.ok) {
                         throw new Error(`Project results API failed for ${project.id}: ${resultsResponse.status} ${resultsResponse.statusText}`);
                     }
@@ -3485,14 +3488,14 @@
 
             try {
                 // Fetch project info
-                const projectResponse = await fetch(`/api/project/${projectId}`);
+                const projectResponse = await fetch(`/api/project/${projectId}`, { headers: _authHeaders() });
                 if (!projectResponse.ok) {
                     throw new Error(`Failed to fetch project: ${projectResponse.status} ${projectResponse.statusText}`);
                 }
                 const project = await projectResponse.json();
 
                 // Fetch test results
-                const resultsResponse = await fetch(`/api/project/${projectId}/test-results`);
+                const resultsResponse = await fetch(`/api/project/${projectId}/test-results`, { headers: _authHeaders() });
                 if (!resultsResponse.ok) {
                     throw new Error(`Failed to fetch test results: ${resultsResponse.status} ${resultsResponse.statusText}`);
                 }
@@ -4302,7 +4305,7 @@
             btn.disabled = true;
             btn.textContent = '⏳ Clearing…';
             try {
-                await fetch('/api/clear-results', { method: 'POST' });
+                await fetch('/api/clear-results', { method: 'POST', headers: _authHeaders() });
                 await loadProjects();
                 await fetchAllTestResults();
                 renderSummaryTiles();
@@ -4323,7 +4326,7 @@
             testRunning = true;
 
             try {
-                const response = await fetch('/api/run-tests', { method: 'POST' });
+                const response = await fetch('/api/run-tests', { method: 'POST', headers: _authHeaders() });
                 const data = await response.json();
 
                 if (data.success || data.status === 'started' || data.status === 'already-running') {
@@ -4345,7 +4348,7 @@
 
         async function loadTestStatus() {
             try {
-                const response = await fetch('/api/test-status');
+                const response = await fetch('/api/test-status', { headers: _authHeaders() });
                 const data = await response.json();
 
                 const btn = document.getElementById('runAllBtn');
@@ -4438,7 +4441,7 @@
 
         async function loadServerLogs() {
             try {
-                const response = await fetch('/api/logs');
+                const response = await fetch('/api/logs', { headers: _authHeaders() });
                 if (!response.ok) {
                     throw new Error(`Logs API failed: ${response.status} ${response.statusText}`);
                 }
@@ -4896,7 +4899,7 @@
             const method = pmEditId ? 'PUT' : 'POST';
             const res = await fetch(url, {
                 method,
-                headers: { 'Content-Type': 'application/json' },
+                headers: _authHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify(payload)
             });
             const data = await res.json();
@@ -4954,7 +4957,7 @@
         list.innerHTML = '<div style="color:#9ca3af;font-size:0.82rem;text-align:center;padding:8px;">Loading…</div>';
         document.getElementById('secretsModalBackdrop').classList.add('open');
         try {
-            const res = await fetch('/api/env-secrets');
+            const res = await fetch('/api/env-secrets', { headers: _authHeaders() });
             const data = await res.json();
             list.innerHTML = '';
             const entries = Object.entries(data.secrets || {});
@@ -5002,7 +5005,7 @@
         try {
             const res = await fetch('/api/env-secrets', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: _authHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ secrets })
             });
             const data = await res.json();
@@ -5051,7 +5054,7 @@
 
     async function _doDeleteProject(projectId) {
         try {
-            const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
+            const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE', headers: _authHeaders() });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Server error');
             await loadProjects();
@@ -5066,7 +5069,7 @@
         if (!statusEl) return;
         setCardRunStatus(statusEl, 'running', '⏳ Starting tests…');
         try {
-            const res = await fetch(`/api/run-project/${projectId}`, { method: 'POST' });
+            const res = await fetch(`/api/run-project/${projectId}`, { method: 'POST', headers: _authHeaders() });
             const data = await res.json();
             if (!res.ok) {
                 setCardRunStatus(statusEl, 'failed', '❌ ' + (data.error || 'Failed to start'));
@@ -5101,7 +5104,7 @@
         const interval = setInterval(async () => {
             polls++;
             try {
-                const res = await fetch(`/api/run-project/${projectId}/status`);
+                const res = await fetch(`/api/run-project/${projectId}/status`, { headers: _authHeaders() });
                 if (!res.ok) return;
                 const data = await res.json();
                 if (data.running) {
@@ -5237,7 +5240,7 @@
 
     async function checkRunReportAvailable() {
         try {
-            const res = await fetch('/api/run-report-status');
+            const res = await fetch('/api/run-report-status', { headers: _authHeaders() });
             if (!res.ok) return;
             const data = await res.json();
             const btn = document.getElementById('viewReportBtn');
