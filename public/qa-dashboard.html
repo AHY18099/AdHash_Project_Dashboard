@@ -3202,7 +3202,8 @@ function rowHtml(p,sec,r,i,isSm){
   const opts=STATUS_OPTS.map(s=>`<option value="${s}"${s===r.status?' selected':''}>${s}</option>`).join('');
   const isPend=r._pending;
   const ptag=isPend?`<span class="ptag">⏳ Pending</span>`:'';
-  return`<tr data-idx="${i}" data-status="${r.status}" class="${isPend?'prow':''}">
+  const _suiteKey=isSm?'smoke':'prod';
+  return`<tr data-idx="${i}" data-status="${r.status}" data-case-id="${r.id||''}" data-product="${p}" data-suite="${_suiteKey}" class="${isPend?'prow':''}">
     ${isAdmin()?`<td style="width:32px;padding:4px 8px;text-align:center"><input type="checkbox" class="row-chk" data-idx="${i}" onchange="updateBulkDelBtn('${p}','${sec}')" style="cursor:pointer"></td>`:''}
     <td class="idc">${r.id}${ptag}</td>
     <td class="mod">${r.module}</td>
@@ -8479,6 +8480,81 @@ async function _swDeleteConfig(cfgId,p){
   if(!confirm('Remove this Swagger URL?'))return;
   await fetch('/api/swagger-configs/'+encodeURIComponent(cfgId),{method:'DELETE',headers:{Authorization:'Bearer '+_getToken()}});
   toast('Removed ✓');switchTab(p,'swagger');renderProject(p);
+}
+
+// ══ QA STATE — MongoDB persistence via /api/qa-state ══════════════════════
+// Loads previously saved test case statuses from MongoDB and overlays them
+// on the rendered rows. Complementary to the existing STORE/serverPost system.
+
+async function loadQaState(){
+  try{
+    const res=await fetch('/api/qa-state',{headers:{Authorization:'Bearer '+(_getToken()||'')}});
+    if(!res.ok)return;
+    const {testCases={}}=await res.json();
+    Object.entries(testCases).forEach(([caseId,state])=>{
+      if(!caseId||!state)return;
+      const row=document.querySelector(`tr[data-case-id="${CSS.escape(caseId)}"]`);
+      if(!row)return;
+      // Apply status to the select
+      const ssel=row.querySelector('select.ssel');
+      if(ssel&&state.status){
+        ssel.value=state.status;
+        ssel.className=ssel.className.replace(/\bPass\b|\bFail\b|\bBlocked\b|\bNot-Started\b|\bIn-Progress\b/g,'').trim();
+        const sc=(state.status||'').replace(' ','-');
+        if(sc)ssel.classList.add(sc);
+      }
+      // Apply comment
+      const commentInp=row.querySelector('.inp-sm');
+      if(commentInp&&state.comment!==undefined)commentInp.value=state.comment;
+    });
+  }catch(e){console.warn('[QAState] loadQaState failed:',e.message);}
+}
+
+async function saveCaseField(caseId,fields){
+  if(!caseId)return false;
+  try{
+    const res=await fetch(`/api/qa-state/${encodeURIComponent(caseId)}`,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+(_getToken()||'')},
+      body:JSON.stringify(fields)
+    });
+    return res.ok;
+  }catch(e){console.warn('[QAState] saveCaseField failed:',e.message);return false;}
+}
+
+async function bulkSaveQaState(){
+  const rows=document.querySelectorAll('tr[data-case-id]');
+  const testCases={};
+  rows.forEach(row=>{
+    const caseId=row.dataset.caseId;if(!caseId)return;
+    const ssel=row.querySelector('select.ssel');
+    const commentInp=row.querySelector('.inp-sm');
+    testCases[caseId]={
+      status:ssel?.value||'Not Started',
+      comment:commentInp?.value?.trim()||'',
+      product:row.dataset.product||'',
+      suite:row.dataset.suite||''
+    };
+  });
+  if(!Object.keys(testCases).length)return;
+  try{
+    const res=await fetch('/api/qa-state/bulk',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+(_getToken()||'')},
+      body:JSON.stringify({testCases})
+    });
+    const d=await res.json();
+    if(res.ok)toast(`Saved ${d.updated||0} test cases to DB`,'suc');
+    else toast('Bulk save failed','err');
+  }catch(e){toast('Bulk save error','err');console.warn('[QAState] bulkSaveQaState failed:',e.message);}
+}
+
+// Wire loadQaState to run after the page renders (called from DOMContentLoaded above)
+// This is additive — it overlays DB states on top of STORE-rendered rows
+if(typeof _qaStateAutoLoad==='undefined'){
+  window._qaStateAutoLoad=true;
+  // Delay slightly to let renderProjectGrid() finish first
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>loadQaState(),1500));
 }
 
 </script>

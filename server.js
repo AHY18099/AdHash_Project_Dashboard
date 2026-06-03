@@ -201,6 +201,16 @@ app.use('/api', (req, res, next) => {
     next();
 });
 
+// ── NEW: Mongoose-backed route modules (mounted before legacy file-based routes) ──
+// These handle /api/projects CRUD and /api/qa-state — mounted early so Express matches them first.
+try {
+    app.use('/api/projects', require('./routes/projects'));
+    app.use('/api/qa-state', require('./routes/qaState'));
+    console.log('[startup] ✅ Mongoose route modules mounted (/api/projects, /api/qa-state)');
+} catch (e) {
+    console.warn('[startup] ⚠️  Mongoose route modules failed to load:', e.message, '— falling back to legacy routes');
+}
+
 // Cookie value encodes email:password for super admin, or email:role:member for members
 const MEMBER_COOKIE_PREFIX = 'member:';
 
@@ -5899,6 +5909,13 @@ async function migrateWfDocsToGitHub() {
             // Dedup all project data in MongoDB — removes any accumulated duplicates
             try { await deduplicateAllProjectData(); } catch (e) { console.error('[startup] dedup failed:', e.message); }
             try { await seedSuperAdmin(); } catch (e) { console.warn('[startup] seedSuperAdmin failed:', e.message); }
+            // ── Mongoose connection for new /api/projects and /api/qa-state routes ──
+            try {
+                const { connectDB: mongooseConnect } = require('./db/connection');
+                const { seedProjectsIfEmpty }        = require('./db/seed');
+                await mongooseConnect();
+                await seedProjectsIfEmpty();
+            } catch (e) { console.warn('[startup] Mongoose init failed (non-fatal):', e.message); }
             // Load project-mapping.json from GitHub so old dashboard always has latest data
             // even after Railway wipes the disk on redeploy
             try { await _loadProjectMappingFromGitHub(); } catch (e) { console.warn('[startup] project-mapping GitHub load failed:', e.message); }
