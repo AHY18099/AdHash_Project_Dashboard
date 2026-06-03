@@ -133,7 +133,7 @@ if (!process.env.ZOHO_CLIENT_ID)       process.env.ZOHO_CLIENT_ID       = '1000.
 if (!process.env.ZOHO_CLIENT_SECRET)   process.env.ZOHO_CLIENT_SECRET   = 'b297abaa2202667173c98f59fd3ac8185fcdd71969';
 if (!process.env.ZOHO_REFRESH_TOKEN)   process.env.ZOHO_REFRESH_TOKEN   = '1000.df711cadb21bd11351c2127e4e6ded37.6367f4b9c445fb1f42e5625479cb5a29';
 if (!process.env.ZOHO_ACCOUNT_ID)      process.env.ZOHO_ACCOUNT_ID      = '8370649000000008002';
-if (!process.env.SLACK_BOT_TOKEN)    process.env.SLACK_BOT_TOKEN    = 'xoxb-419650362022-11217403721126-XiJEnpEJPpklhzcauEXfsmSi';
+if (!process.env.SLACK_BOT_TOKEN)    process.env.SLACK_BOT_TOKEN    = process.env.SLACK_BOT_TOKEN || '';
 if (!process.env.SLACK_CHANNEL)      process.env.SLACK_CHANNEL      = '#testing-team';
 if (!process.env.SLACK_ENABLED)      process.env.SLACK_ENABLED      = 'true';
 const SUPER_ADMIN_ROLE = 'super-admin';
@@ -5508,6 +5508,27 @@ app.post('/api/qa-data/:key', async (req, res) => {
                     // Strip _replaceArrays if present (safety)
                     const { _replaceArrays: _ra, ...cleanVal } = (typeof value === 'object' && value !== null) ? value : {};
                     _qaCache[key] = mergeProjectData(_qaCache[key], _ra ? cleanVal : value);
+                }
+                // ── DATA LOSS PREVENTION ──────────────────────────────────────────────────
+                // If the incoming value did NOT include credentials/envDetails (e.g. a heartbeat
+                // save that only has smoke/prod), preserve the existing values from cache.
+                // This prevents partial saves from wiping critical data.
+                const prevCache = (_qaCache[key] && typeof _qaCache[key] === 'object') ? _qaCache[key] : {};
+                const incomingVal = (typeof value === 'object' && value !== null) ? value : {};
+                const replaceList = Array.isArray(incomingVal._replaceArrays) ? incomingVal._replaceArrays : [];
+                if (!Object.prototype.hasOwnProperty.call(incomingVal, 'credentials') && !replaceList.includes('credentials')) {
+                    if (Array.isArray(prevCache.credentials) && prevCache.credentials.length > 0) {
+                        _qaCache[key].credentials = prevCache.credentials;
+                    }
+                }
+                if (!Object.prototype.hasOwnProperty.call(incomingVal, 'envDetails') && !replaceList.includes('_envDetails')) {
+                    const prevEnv = prevCache.envDetails;
+                    if (prevEnv && (
+                        (Array.isArray(prevEnv.production) && prevEnv.production.length > 0) ||
+                        (Array.isArray(prevEnv.staging) && prevEnv.staging.length > 0)
+                    )) {
+                        _qaCache[key].envDetails = prevEnv;
+                    }
                 }
             } else {
                 _qaCache[key] = value;
