@@ -2320,7 +2320,7 @@ function renderProject(p){
   const tabs=[
     {id:'projoverview', label:'Overview'},
     {id:'credentials',  label:'🔐 Credentials',     count:(STORE[p].credentials||[]).length||null},
-    {id:'wfdocs',       label:'📁 Workflow Docs',    count:(STORE[p].wfdocs||[]).length||null},
+    {id:'wfdocs',       label:'📁 Workflow Docs',    count:(()=>{const _s=new Set();return(STORE[p].wfdocs||[]).filter(d=>{const k=(d.name||'')+'__'+(d.size||0);return _s.has(k)?false:(_s.add(k),true);}).length||null;})()},
     {id:'smoke',        label:`🔥 Smoke Tests`,      count:STORE[p].smoke.filter(r=>!r._pending).length},
     {id:'prod',         label:`✅ Prod Checklist`,   count:STORE[p].prod.filter(r=>!r._pending).length},
     {id:'testdata',     label:'🧪 Test Data'},
@@ -2532,7 +2532,7 @@ function renderProjOverview(p){
   const smokeLabel=isMobile?`🔥 Smoke Tests (${plat==='android'?'Android':'iOS'})`:'🔥 Smoke Tests';
   const prodLabel=isMobile?`✅ Prod Checklist (${plat==='android'?'Android':'iOS'})`:'✅ Prod Checklist';
   const credsLen=(STORE[p].credentials||[]).length;
-  const docsLen=(STORE[p].wfdocs||[]).length;
+  const docsLen=(()=>{const _s=new Set();return(STORE[p].wfdocs||[]).filter(d=>{const k=(d.name||'')+'__'+(d.size||0);return _s.has(k)?false:(_s.add(k),true);}).length;})();
   const repsLen=(STORE[p].reports||[]).length;
   const tdLen=(STORE[p].testdata||[]).length;
   const rnLen=(STORE[p].releaseNotes||[]).length;

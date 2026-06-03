@@ -41,17 +41,30 @@ function _withWriteLock(fn) {
 
 function readQaData() { return _qaCache; }
 
+// Serialized write queue — prevents race conditions on rapid successive writes.
+// Writes to the same key are coalesced: only the latest value is persisted.
+let _writeLockQueue  = Promise.resolve();
+let _pendingWrites   = {};
+
 function writeQaData(data) {
-    _qaCache = data;
-    // Persist changed keys to MongoDB asynchronously (fire and forget)
-    // Full-data writes are only used by dedup on startup — safe to be async.
-    Promise.resolve().then(async () => {
-        for (const key of Object.keys(data)) {
-            try { await writeKey(key, data[key]); } catch (e) {
+    // Merge into in-memory cache immediately (synchronous, instant reads)
+    _qaCache = { ..._qaCache, ...data };
+    // Coalesce: later write for same key overwrites earlier pending write
+    _pendingWrites = { ..._pendingWrites, ...data };
+    // Chain onto the lock — writes are sequential, never concurrent
+    _writeLockQueue = _writeLockQueue.then(async () => {
+        if (!Object.keys(_pendingWrites).length) return;
+        const toWrite   = { ..._pendingWrites };
+        _pendingWrites  = {};
+        for (const [key, value] of Object.entries(toWrite)) {
+            try { await writeKey(key, value); }
+            catch (e) {
                 console.error('[mongo] writeQaData key failed:', key, e.message);
+                // Re-queue failed write so it retries on next call
+                _pendingWrites[key] = value;
             }
         }
-    });
+    }).catch(e => console.error('[mongo] write queue error:', e.message));
 }
 
 // ── MongoDB is now the single source of truth — GitHub file sync removed ──
@@ -199,6 +212,51 @@ app.use('/api', (req, res, next) => {
     if (PUBLIC_API_ROUTES.has('/api' + req.path)) return next();
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     next();
+});
+
+// ── ProjectBackup model — snapshot before destructive operations ──────────
+let _ProjectBackup = null;
+try {
+    const mongoose = require('mongoose');
+    const BackupSchema = new mongoose.Schema({
+        projectId:   String, projectName: String,
+        snapshot:    mongoose.Schema.Types.Mixed, reason: String,
+        createdAt:   { type: Date, default: Date.now }
+    }, { strict: false });
+    _ProjectBackup = mongoose.models.ProjectBackup || mongoose.model('ProjectBackup', BackupSchema);
+} catch (_) {}
+
+async function backupProject(projectId, reason = 'pre-update') {
+    if (!_ProjectBackup) return;
+    try {
+        const Project = require('./db/models/Project');
+        const project = await Project.findOne({ id: projectId }).lean();
+        if (!project) return;
+        await _ProjectBackup.create({ projectId: project.id, projectName: project.name, snapshot: project, reason });
+        console.log(`[Backup] Snapshot saved for ${project.name} — reason: ${reason}`);
+    } catch (e) { console.error('[Backup] Failed:', e.message); }
+}
+
+// GET project backup history
+app.get('/api/projects/:id/backups', isAuthenticated, async (req, res) => {
+    if (!_ProjectBackup) return res.json({ backups: [] });
+    try {
+        const backups = await _ProjectBackup.find({ projectId: req.params.id }, { snapshot: 0 }).sort({ createdAt: -1 }).limit(20).lean();
+        res.json({ backups });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST restore from backup
+app.post('/api/projects/:id/restore/:backupId', isAuthenticated, async (req, res) => {
+    if (!_ProjectBackup) return res.status(503).json({ error: 'Backup service unavailable' });
+    try {
+        const backup = await _ProjectBackup.findById(req.params.backupId).lean();
+        if (!backup || backup.projectId !== req.params.id) return res.status(404).json({ error: 'Backup not found' });
+        const { _id, __v, createdAt, updatedAt, ...snapshot } = backup.snapshot;
+        const Project = require('./db/models/Project');
+        await Project.findOneAndUpdate({ id: req.params.id }, { $set: snapshot }, { new: true });
+        res.json({ success: true, message: `Restored from backup: ${backup.reason}` });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── NEW: Mongoose-backed route modules (mounted before legacy file-based routes) ──

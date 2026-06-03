@@ -17,7 +17,9 @@
     "validate:report": "node scripts/validate-report-consistency.mjs",
     "regenerate:specs": "node scripts/regenerate-specs.mjs",
     "push:specs": "node scripts/push-specs-to-github.mjs",
-    "qa:enterprise": "npm run regenerate:specs && node scripts/run-enterprise-qa-pipeline.mjs"
+    "qa:enterprise": "npm run regenerate:specs && node scripts/run-enterprise-qa-pipeline.mjs",
+    "integrity": "node scripts/integrity-check.js",
+    "fix:duplicate-docs": "node scripts/fix-duplicate-docs.js"
   },
   "keywords": [
     "dashboard",
