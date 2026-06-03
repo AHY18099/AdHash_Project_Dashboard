@@ -275,8 +275,17 @@ async function writeKey(key, value) {
         return;
     }
     if (key === 'qa3_releases') {
-        await db.collection('releases').deleteMany({ projectId: 'global' });
-        if (Array.isArray(value) && value.length > 0) await _upsertMany('releases', 'global', value);
+        // Delete all releases (both legacy 'global' entries and project-specific ones)
+        // then re-insert each release with its real projectId preserved.
+        await db.collection('releases').deleteMany({});
+        if (Array.isArray(value) && value.length > 0) {
+            // Each release must keep its own projectId — never force 'global'
+            await Promise.all(value.map(r => {
+                if (!r || !r.id) return Promise.resolve();
+                const pid = (r.projectId && r.projectId !== 'global') ? r.projectId : (r.projectId || 'global');
+                return _upsertDoc('releases', pid, r);
+            }));
+        }
         return;
     }
     if (key === 'qa3_projects' && Array.isArray(value)) {
