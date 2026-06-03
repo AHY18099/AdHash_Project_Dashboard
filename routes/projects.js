@@ -154,6 +154,31 @@ router.delete('/:id/:arrayField/:itemIndex', requireAuth, ensureConnected, async
     }
 });
 
+// ── GET backup history for a project ─────────────────────────
+router.get('/:id/backups', requireAuth, async (req, res) => {
+    try {
+        const mongoose = require('mongoose');
+        const PB = mongoose.models.ProjectBackup;
+        if (!PB) return res.json({ backups: [] });
+        const backups = await PB.find({ projectId: req.params.id }, { snapshot: 0 }).sort({ createdAt: -1 }).limit(20).lean();
+        return res.json({ backups });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+});
+
+// ── POST restore project from backup ──────────────────────────
+router.post('/:id/restore/:backupId', requireAuth, ensureConnected, async (req, res) => {
+    try {
+        const mongoose = require('mongoose');
+        const PB = mongoose.models.ProjectBackup;
+        if (!PB) return res.status(503).json({ error: 'Backup service unavailable' });
+        const backup = await PB.findById(req.params.backupId).lean();
+        if (!backup || backup.projectId !== req.params.id) return res.status(404).json({ error: 'Backup not found' });
+        const { _id, __v, createdAt, updatedAt, ...snapshot } = backup.snapshot;
+        await Project.findOneAndUpdate({ id: req.params.id }, { $set: snapshot }, { new: true });
+        return res.json({ success: true, message: `Restored from backup: ${backup.reason}` });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+});
+
 // ── DELETE project ────────────────────────────────────────────
 router.delete('/:id', requireAuth, ensureConnected, async (req, res) => {
     try {

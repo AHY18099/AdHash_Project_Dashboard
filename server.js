@@ -237,27 +237,8 @@ async function backupProject(projectId, reason = 'pre-update') {
     } catch (e) { console.error('[Backup] Failed:', e.message); }
 }
 
-// GET project backup history
-app.get('/api/projects/:id/backups', isAuthenticated, async (req, res) => {
-    if (!_ProjectBackup) return res.json({ backups: [] });
-    try {
-        const backups = await _ProjectBackup.find({ projectId: req.params.id }, { snapshot: 0 }).sort({ createdAt: -1 }).limit(20).lean();
-        res.json({ backups });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// POST restore from backup
-app.post('/api/projects/:id/restore/:backupId', isAuthenticated, async (req, res) => {
-    if (!_ProjectBackup) return res.status(503).json({ error: 'Backup service unavailable' });
-    try {
-        const backup = await _ProjectBackup.findById(req.params.backupId).lean();
-        if (!backup || backup.projectId !== req.params.id) return res.status(404).json({ error: 'Backup not found' });
-        const { _id, __v, createdAt, updatedAt, ...snapshot } = backup.snapshot;
-        const Project = require('./db/models/Project');
-        await Project.findOneAndUpdate({ id: req.params.id }, { $set: snapshot }, { new: true });
-        res.json({ success: true, message: `Restored from backup: ${backup.reason}` });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
+// NOTE: /api/projects backup routes are added via routes/projects.js router below.
+// They are NOT mounted here directly to avoid route conflicts with the router.
 
 // ── NEW: Mongoose-backed route modules (mounted before legacy file-based routes) ──
 // These handle /api/projects CRUD and /api/qa-state — mounted early so Express matches them first.
