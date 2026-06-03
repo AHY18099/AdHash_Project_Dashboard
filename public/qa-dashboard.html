@@ -7985,8 +7985,9 @@ window.addEventListener('DOMContentLoaded',async()=>{
     const d=await r.json();
     if(d.authenticated){
       _session={id:d.id||'u_sa',name:d.name||'User',email:d.email||'',role:d.role||'member'};
-      // If no token yet (cookie-based session), try to get a JWT token
-      if(!token){
+      // If no token yet (cookie-based session), only auto-fetch JWT for super admin.
+      // Members must log in via the login form — never auto-login with a hardcoded password.
+      if(!token&&d.role==='super_admin'){
         try{
           const lr=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:d.email||QA_SA_EMAIL,password:'Qateam@123'})});
           const ld=await lr.json();
