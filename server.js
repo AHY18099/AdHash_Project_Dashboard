@@ -4553,6 +4553,15 @@ app.post('/api/wfdocs/:projectId', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     const { name, data: b64data, size } = req.body || {};
     if (!name || !b64data) return res.status(400).json({ error: 'Missing name or data' });
+
+    // Dedup check: same filename AND same size = duplicate — reject before doing any work
+    const _existingWfd = ((_qaCache['qa3_' + req.params.projectId] || {}).wfdocs || []);
+    const _incomingSize = size || 0;
+    const _isDuplicate = _existingWfd.some(f => f.name === name && (f.size || 0) === _incomingSize);
+    if (_isDuplicate) {
+        return res.status(409).json({ error: `"${name}" already exists in this project's workflow docs.` });
+    }
+
     const now = new Date();
     const pad = n => String(n).padStart(2, '0');
     const uploadedAt = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
