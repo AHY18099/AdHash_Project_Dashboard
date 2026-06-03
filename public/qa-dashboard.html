@@ -4466,7 +4466,7 @@ async function notifyAssignment(type, details, extra){
       details,
       dashboardUrl:'https://adhashprojectdashboard-production.up.railway.app/'
     };
-    const r=await fetch('/api/notify-assignment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const r=await fetch('/api/notify-assignment',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},body:JSON.stringify(body)});
     const j=await r.json();
     if(j.queued||j.sent) console.log('[notify] notification queued →',j.type,j.projectName||'');
     else console.log('[notify] notification NOT sent:',j.error||j.reason||JSON.stringify(j));
@@ -5460,6 +5460,8 @@ function rlSaveEntry(editIdx,mode){
   };
   const isNewRl=editIdx==null||editIdx<0;
   const oldTestingStatus=!isNewRl&&RELEASES[editIdx]?RELEASES[editIdx].testingStatus:null;
+  // Pre-stamp _notifiedAs so rlCheckAutoTransitions doesn't fire a duplicate on the same event
+  entry._notifiedAs=rlClassify(entry);
   if(!isNewRl){RELEASES[editIdx]=entry;}
   else{RELEASES.push(entry);_rlCardOpen[entry.id]=true;}
   saveReleases();

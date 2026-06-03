@@ -350,8 +350,8 @@ async function seedSuperAdmin() {
         await db.collection('users').updateOne(
             { email: adminEmail },
             {
-                $set: { role: 'super_admin', isActive: true, password: hashed, name: 'Super Admin', updatedAt: new Date() },
-                $setOnInsert: { id: 'u_sa', createdAt: new Date() }
+                $set: { role: 'super_admin', isActive: true, password: hashed, updatedAt: new Date() },
+                $setOnInsert: { id: 'u_sa', name: 'Super Admin', createdAt: new Date() }
             },
             { upsert: true }
         );
@@ -5662,9 +5662,10 @@ async function _sendNotificationsAsync({ type, assignedBy, assignedTo, projectNa
 
     // Type labels
     const typeLabels = {
-        'teamtask': '📋 Team Task Assigned',
-        'release_today': '🚀 Today\'s Release',
+        'teamtask':     '📋 Team Task Assigned',
+        'release_today':'🚀 Today\'s Release',
         'release_next': '📆 Next Release',
+        'release_past': '✅ Past Release',
         'feedback_req': '📋 New Client Requirement',
         'feedback_bug': '🐛 New Bug Reported',
     };
