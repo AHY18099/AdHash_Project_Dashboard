@@ -6977,6 +6977,9 @@ function _updateSaveStatusBadge(){
 
 // POST to server — updates in-memory mirror immediately, retries up to 3× with backoff
 function serverPost(key,value){
+  // Block qa3_ project saves until server data has been successfully loaded.
+  // Without this guard, empty-initialized STORE arrays wipe real MongoDB data.
+  if(!_serverDataLoaded && key.startsWith('qa3_')){console.warn('[serverPost] blocked pre-load save for',key);return;}
   _serverData[key]=value; // update mirror immediately for instant UI reads
   _doServerPost(key,value,3);
 }
@@ -7324,11 +7327,13 @@ function _applySseUpdate(key,value){
   if(curView==='home'&&typeof renderProjectGrid==='function')renderProjectGrid();
 }
 
+let _serverDataLoaded=false; // guard: never save until server data has been fetched at least once
 async function loadFromServer(){
   try{
-    const r=await fetch('/api/qa-data',{cache:'no-store'});
+    const r=await fetch('/api/qa-data',{cache:'no-store',headers:{Authorization:'Bearer '+_getToken()}});
     if(!r.ok)return;
     _serverData=await r.json();
+    _serverDataLoaded=true;
     // Strip any legacy base64 wfdoc blobs to keep memory clean
     for(const k of Object.keys(_serverData)){
       if(k.startsWith('qa3_')&&_serverData[k]&&_serverData[k].wfdocs){
@@ -7339,6 +7344,9 @@ async function loadFromServer(){
 }
 
 function saveToLS(p){
+  // Never post to server before loadFromServer has successfully completed — prevents
+  // empty-initialized STORE arrays from overwriting real MongoDB data on auth failure.
+  if(!_serverDataLoaded){console.warn('[saveToLS] blocked — server data not yet loaded, skipping post for',p);return;}
   _serverData['qa3_'+p]=STORE[p];
   serverPost('qa3_'+p,STORE[p]);
 }
@@ -7968,7 +7976,7 @@ async function migrateLocalStorageToServer(){
   for(const [k,v] of Object.entries(migData)){
     try{
       await fetch('/api/qa-data/'+encodeURIComponent(k),{
-        method:'POST',headers:{'Content-Type':'application/json'},
+        method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},
         body:JSON.stringify({value:v})
       });
     }catch(e){}
