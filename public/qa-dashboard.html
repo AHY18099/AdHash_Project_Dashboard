@@ -2702,7 +2702,11 @@ function openEnvDetailModal(p,type,editIdx){
     if(!STORE[p].envDetails[type])STORE[p].envDetails[type]=[];
     if(isEdit)STORE[p].envDetails[type][editIdx]=entry;
     else STORE[p].envDetails[type].push(entry);
-    saveToLS(p);closeModal();switchTab(p,'projoverview');
+    // Use _replaceArrays so server replaces envDetails entirely (not merge-by-id)
+    // This guarantees the exact array the user sees is what gets saved to MongoDB
+    STORE[p]._replaceArrays=['_envDetails'];
+    saveToLS(p);delete STORE[p]._replaceArrays;
+    closeModal();switchTab(p,'projoverview');
     toast(isEdit?'Environment updated':'Environment added');
   },{saveLabel:isEdit?'Update':'Add'});
 }
@@ -4158,6 +4162,9 @@ function dtAssignedChange(taskIdx,sel){
     sel.style.color='';sel.style.borderColor='';sel.style.background='';
   }
   const date=DAILY_TASKS[taskIdx].date;
+  const pid=DAILY_TASKS[taskIdx].projectId;
+  // Mark as pending so SSE from other users doesn't overwrite this local change
+  _dtPendingSave.set(pid+'|'+date,Date.now());
   const saveBtn=document.getElementById('dt-save-'+date);
   if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='✓ Saved';}
   saveDailyTasks();
@@ -4210,6 +4217,9 @@ function dtInlineChange(taskIdx,colKey,sel){
   DAILY_TASKS[taskIdx][colKey]=sel.value;
   sel.className=`dt-cell-select ${sel.value==='PASS'?'val-pass':sel.value==='FAIL'?'val-fail':sel.value==='NA'?'val-na':'val-blank'}`;
   const date=DAILY_TASKS[taskIdx].date;
+  const pid=DAILY_TASKS[taskIdx].projectId;
+  // Mark as pending so SSE from other users doesn't overwrite this local change
+  _dtPendingSave.set(pid+'|'+date,Date.now());
   const saveBtn=document.getElementById('dt-save-'+date);
   if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='✓ Saved';}
   saveDailyTasks();
@@ -6973,6 +6983,8 @@ async function _doServerPost(key,value,retriesLeft){
       if(mv!==undefined){
         _serverData[key]=mv;
         if(key==='qa3_daily_tasks'){
+          // Server confirmed save — clear pending flags for tasks in this response
+          if(Array.isArray(mv))mv.forEach(t=>{if(t.projectId&&t.date)_dtPendingSave.delete(t.projectId+'|'+t.date);});
           _lastHbDtHash=JSON.stringify(mv); // set hash first
           DAILY_TASKS=mv;
         } else if(key==='qa3_team_tasks'){
@@ -7212,7 +7224,8 @@ function _applySseUpdate(key,value){
   const ae=document.activeElement;
   const userTyping=ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.isContentEditable);
   if(key==='qa3_daily_tasks'){
-    loadDailyTasks();
+    // Use merge instead of full replace — preserves locally-edited tasks not yet confirmed by server
+    _mergeSseDailyTasks(value);
     if(curView==='dailytasks'&&!userTyping){
       // Surgical update: re-render only the day tables that actually changed,
       // preserving scroll position and week open/collapse state.
@@ -7322,7 +7335,14 @@ function saveAllState(){
 
 // ── DAILY TASKS GLOBAL STATE ──
 let DAILY_TASKS=[];
-function saveDailyTasks(){_serverData['qa3_daily_tasks']=DAILY_TASKS;serverPost('qa3_daily_tasks',DAILY_TASKS);}
+// Track tasks that have been modified locally but not yet confirmed saved by server.
+// SSE updates from other users must not overwrite these pending local changes.
+const _dtPendingSave=new Map(); // key: 'projectId|date' → timestamp of last local edit
+
+function saveDailyTasks(){
+  _serverData['qa3_daily_tasks']=DAILY_TASKS;
+  serverPost('qa3_daily_tasks',DAILY_TASKS);
+}
 function loadDailyTasks(){
   const all=_serverData['qa3_daily_tasks']||[];
   // Build set of real project IDs — never show rows for 'global' or unknown projects
@@ -7331,6 +7351,34 @@ function loadDailyTasks(){
   // Deduplicate by projectId+date — keep the last entry (most recent save wins)
   const seen=new Map();
   filtered.forEach(t=>{const k=t.projectId+'|'+t.date;seen.set(k,t);});
+  DAILY_TASKS=Array.from(seen.values());
+}
+// Merge incoming SSE daily tasks — preserve locally-modified tasks that haven't
+// been confirmed by server yet (within 10s grace window)
+function _mergeSseDailyTasks(incomingArr){
+  if(!Array.isArray(incomingArr))return;
+  const now=Date.now();
+  const GRACE=10000; // 10s — if user edited within 10s, keep local version
+  const localByKey=new Map();
+  DAILY_TASKS.forEach(t=>{localByKey.set(t.projectId+'|'+t.date,t);});
+  incomingArr.forEach(incoming=>{
+    const k=incoming.projectId+'|'+incoming.date;
+    const pendingTs=_dtPendingSave.get(k)||0;
+    const isLocallyPending=(now-pendingTs)<GRACE;
+    if(!isLocallyPending){
+      // No recent local edit — accept server version
+      localByKey.set(k,incoming);
+    }
+    // else: local edit is still "in-flight" — keep local version
+  });
+  // Rebuild _serverData with merged result (so next loadDailyTasks uses it)
+  const merged=Array.from(localByKey.values());
+  _serverData['qa3_daily_tasks']=merged;
+  // Reload DAILY_TASKS from merged data
+  const realIds=new Set(PROJECTS.map(p=>p.id));
+  const seen=new Map();
+  merged.filter(t=>t.projectId&&(realIds.size===0||realIds.has(t.projectId))&&t.projectId!=='global')
+    .forEach(t=>{seen.set(t.projectId+'|'+t.date,t);});
   DAILY_TASKS=Array.from(seen.values());
 }
 

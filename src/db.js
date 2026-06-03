@@ -206,13 +206,16 @@ async function writeProject(projectId, proj) {
         if (items.length > 0) await _upsertMany(col, projectId, items);
     }
 
-    // env_details: same replace strategy
-    if (proj.envDetails) {
+    // env_details: write whenever envDetails is present in the incoming object.
+    // hasOwnProperty check ensures we only wipe+rewrite when client explicitly sent envDetails
+    // (not when it was simply omitted from a partial update).
+    if (Object.prototype.hasOwnProperty.call(proj, 'envDetails') && proj.envDetails) {
         await getDB().collection('env_details').deleteMany({ projectId });
         const prod = (proj.envDetails.production || []).map(e => ({ ...e, envType: 'production' }));
         const stag = (proj.envDetails.staging    || []).map(e => ({ ...e, envType: 'staging' }));
         const all  = [...prod, ...stag];
         if (all.length > 0) await _upsertMany('env_details', projectId, all);
+        console.log(`[writeProject] envDetails saved for ${projectId}: prod=${prod.length} stag=${stag.length}`);
     }
 }
 

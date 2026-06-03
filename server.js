@@ -5492,8 +5492,12 @@ app.post('/api/qa-data/:key', async (req, res) => {
                     for (const arrKey of _replaceArrays) {
                         if (arrKey === '_envDetails') {
                             // Special: replace envDetails object entirely (not merge-by-id)
+                            // Accept even if production/staging arrays are empty (user cleared them)
                             if (cleanValue.envDetails && typeof cleanValue.envDetails === 'object') {
-                                merged.envDetails = cleanValue.envDetails;
+                                merged.envDetails = {
+                                    production: Array.isArray(cleanValue.envDetails.production) ? cleanValue.envDetails.production : [],
+                                    staging:    Array.isArray(cleanValue.envDetails.staging)    ? cleanValue.envDetails.staging    : []
+                                };
                             }
                         } else if (Array.isArray(cleanValue[arrKey])) {
                             merged[arrKey] = cleanValue[arrKey];
