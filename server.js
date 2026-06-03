@@ -2014,6 +2014,21 @@ app.post('/api/env-secrets', (req, res) => {
     }
 });
 
+// POST /api/admin/set-slack-token — super_admin only, sets SLACK_BOT_TOKEN at runtime and persists to .env
+app.post('/api/admin/set-slack-token', requireAdmin, (req, res) => {
+    const { token } = req.body || {};
+    if (!token || !String(token).startsWith('xoxb-')) return res.status(400).json({ error: 'Invalid Slack bot token' });
+    process.env.SLACK_BOT_TOKEN = String(token).trim();
+    // Persist to .env so it survives server restarts (within the same Railway deployment)
+    try {
+        const existing = readEnvFile();
+        existing['SLACK_BOT_TOKEN'] = process.env.SLACK_BOT_TOKEN;
+        writeEnvFile(existing);
+    } catch (_) {}
+    console.log('[slack] ✅ SLACK_BOT_TOKEN updated at runtime');
+    res.json({ success: true });
+});
+
 // Clear all cached per-project run results
 app.post('/api/clear-results', (req, res) => {
     // Wipe in-memory override cache
