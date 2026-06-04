@@ -3645,16 +3645,14 @@ function handleWfDocUpload(p,input){
     const uploadedAt=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     try{
       const resp=await fetch('/api/wfdocs/'+encodeURIComponent(p),{
-        method:'POST',headers:{'Content-Type':'application/json'},
+        method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},
         body:JSON.stringify({name:file.name,size:file.size,data:e.target.result})
       });
       const result=await resp.json();
       if(resp.status===409){toast(result.error||'File already exists','err');if(lbl)lbl.innerHTML='＋ Upload Document<input type="file" accept=".pdf,.xls,.xlsx,.doc,.docx,.txt" style="display:none" onchange="handleWfDocUpload(\''+p+'\',this)">';return;}
       if(!resp.ok||!result.success)throw new Error(result.error||'Upload failed');
-      // Re-sync wfdocs from server (authoritative) instead of manually pushing to STORE.
-      // This prevents duplicates that occur when saveToLS+server both write the new entry.
       try{
-        const r=await fetch('/api/wfdocs/'+encodeURIComponent(p),{cache:'no-store'});
+        const r=await fetch('/api/wfdocs/'+encodeURIComponent(p),{cache:'no-store',headers:{Authorization:'Bearer '+_getToken()}});
         if(r.ok){
           const files=await r.json();
           if(!STORE[p])STORE[p]={};
@@ -3672,21 +3670,20 @@ function handleWfDocUpload(p,input){
   input.value='';
 }
 
-function downloadWfDoc(p,idx){
+async function downloadWfDoc(p,idx){
   const doc=(STORE[p].wfdocs||[])[idx];
   if(!doc)return;
   if(doc.serverId){
-    // Server-stored file
-    const a=document.createElement('a');
-    a.href='/api/wfdocs/'+encodeURIComponent(p)+'/'+encodeURIComponent(doc.serverId);
-    a.download=doc.name;
-    a.click();
+    try{
+      const r=await fetch('/api/wfdocs/'+encodeURIComponent(p)+'/'+encodeURIComponent(doc.serverId),{headers:{Authorization:'Bearer '+_getToken()}});
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      const blob=await r.blob();
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download=doc.name;a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }catch(e){toast('Download failed: '+e.message,'err');}
   }else if(doc.data){
-    // Legacy base64 stored file
-    const a=document.createElement('a');
-    a.href=doc.data;
-    a.download=doc.name;
-    a.click();
+    const a=document.createElement('a');a.href=doc.data;a.download=doc.name;a.click();
   }
 }
 
@@ -3697,7 +3694,7 @@ async function deleteWfDoc(p,idx){
   // Remove from server storage first (disk + GitHub Release asset)
   if(doc.serverId){
     try{
-      await fetch('/api/wfdocs/'+encodeURIComponent(p)+'/'+encodeURIComponent(doc.serverId),{method:'DELETE'});
+      await fetch('/api/wfdocs/'+encodeURIComponent(p)+'/'+encodeURIComponent(doc.serverId),{method:'DELETE',headers:{Authorization:'Bearer '+_getToken()}});
     }catch(e){}
   }
   // Remove from local STORE
@@ -3709,7 +3706,7 @@ async function deleteWfDoc(p,idx){
   // Re-sync from server to confirm deletion took effect
   setTimeout(async()=>{
     try{
-      const r=await fetch('/api/wfdocs/'+encodeURIComponent(p),{cache:'no-store'});
+      const r=await fetch('/api/wfdocs/'+encodeURIComponent(p),{cache:'no-store',headers:{Authorization:'Bearer '+_getToken()}});
       if(r.ok){
         const files=await r.json();
         STORE[p].wfdocs=files.map(sf=>({name:sf.name,size:sf.size||0,uploadedAt:sf.uploadedAt||'',serverId:sf.fileId||sf.serverId||null}));
@@ -4488,7 +4485,12 @@ let _ttWeekOpen={};
 let _ttProjFilter='all';
 let _ttTodayStr=(()=>{const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`})();
 
-function saveTeamTasks(){_serverData['qa3_team_tasks']=TEAM_TASKS;serverPost('qa3_team_tasks',TEAM_TASKS);}
+function saveTeamTasks(){
+  const now=Date.now();
+  TEAM_TASKS.forEach(t=>{t._savedAt=now;});
+  _serverData['qa3_team_tasks']=TEAM_TASKS;
+  serverPost('qa3_team_tasks',TEAM_TASKS);
+}
 function loadTeamTasks(){TEAM_TASKS=_serverData['qa3_team_tasks']||TEAM_TASKS;}
 
 function showTeamTasks(){
@@ -4994,7 +4996,12 @@ const RL_TEST_STATUS=[
   'Bugs Reported','Waiting for Dev Build','Waiting for Prod Build'
 ];
 
-function saveReleases(){_serverData['qa3_releases']=RELEASES;serverPost('qa3_releases',RELEASES);}
+function saveReleases(){
+  const now=Date.now();
+  RELEASES.forEach(r=>{r._savedAt=now;});
+  _serverData['qa3_releases']=RELEASES;
+  serverPost('qa3_releases',RELEASES);
+}
 function loadReleases(){RELEASES=_serverData['qa3_releases']||RELEASES;}
 
 function rlTodayStr(){
@@ -7030,6 +7037,11 @@ async function _doServerPost(key,value,retriesLeft){
           if(STORE[pid]){
             _mergeSseProjectIntoStore(pid,mv);
             _deduplicateStoreProject(STORE[pid]);
+            // Deduplicate reports by id then datetime after every server response
+            if(Array.isArray(STORE[pid].reports)){
+              const seen=new Set();
+              STORE[pid].reports=STORE[pid].reports.filter(r=>{const k=r.id||r.datetime;if(seen.has(k))return false;seen.add(k);return true;});
+            }
             _lastHbStoreHash[pid]=JSON.stringify(STORE[pid]); // hash after all mutations
           }
         }
@@ -7325,6 +7337,11 @@ function _applySseUpdate(key,value){
     const pid=key.replace('qa3_','');
     if(STORE[pid]&&value&&typeof value==='object'&&!Array.isArray(value)){
       _mergeSseProjectIntoStore(pid,value);_deduplicateStoreProject(STORE[pid]);
+      // Always deduplicate reports after any SSE update
+      if(Array.isArray(STORE[pid].reports)){
+        const seen=new Set();
+        STORE[pid].reports=STORE[pid].reports.filter(r=>{const k=r.id||r.datetime;if(seen.has(k))return false;seen.add(k);return true;});
+      }
     }
     if(curView==='project'&&curProj===pid&&!userTyping){
       renderProject(pid);
