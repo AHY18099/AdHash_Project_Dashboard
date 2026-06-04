@@ -202,13 +202,15 @@ async function writeProject(projectId, proj) {
     // Only delete+replace when incoming array is non-empty (real save) OR when
     // the proj._replaceArrays flag explicitly lists the field (intentional clear).
     const replaceArrays = Array.isArray(proj._replaceArrays) ? new Set(proj._replaceArrays) : new Set();
-    const PROTECTED = new Set(['credentials', 'thirdparty', 'pendingtasks', 'apitests', 'reports']);
-
+    // ALL section arrays are protected — never delete+replace unless:
+    // (a) incoming array is non-empty (real user save with data), OR
+    // (b) _replaceArrays explicitly lists the field (intentional clear/replace)
+    // This prevents empty STORE arrays from wiping MongoDB on heartbeat saves.
     for (const [field, col] of Object.entries(SECTION_MAP)) {
         const items = proj[field];
         if (!Array.isArray(items)) continue;
-        // Skip empty arrays for protected fields unless explicitly flagged for replace
-        if (items.length === 0 && PROTECTED.has(field) && !replaceArrays.has(field)) continue;
+        // Skip empty arrays unless explicitly flagged for replace
+        if (items.length === 0 && !replaceArrays.has(field)) continue;
         await getDB().collection(col).deleteMany({ projectId });
         if (items.length > 0) await _upsertMany(col, projectId, items);
     }

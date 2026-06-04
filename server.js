@@ -5528,19 +5528,14 @@ function mergeById(existing, incoming) {
     return [...Array.from(byId.values()), ...Array.from(noIdMap.values())];
 }
 
-// Merge smoke/prod rows: stable 'id' like SMK-01, PRD-01 — merge by that id
-// Status, owner, comment are the mutable fields; structure fields are trusted from incoming
+// Merge smoke/prod rows: incoming is authoritative — it is the full array from the client
+// and already reflects any edits (including id changes). We simply use incoming directly,
+// preserving order. The old merge-by-id approach caused edited IDs (e.g. PRD_40→PRD-40)
+// to survive as ghost rows alongside the updated ones.
 function mergeTestRows(existing, incoming) {
     if (!Array.isArray(incoming)) return existing || [];
-    if (!Array.isArray(existing) || existing.length === 0) return incoming;
-    const byId = new Map();
-    const byNk = new Map();
-    // Natural key for legacy rows without id: module+step (or module+item for prod)
-    const nk = r => ((r && r.module) || '') + '|' + ((r && r.step) || '') + '|' + ((r && r.item) || '');
-    existing.forEach(r => { if (r && r.id) byId.set(r.id, r); else if (r) byNk.set(nk(r), r); });
-    // Incoming wins — preserves status/comment updates
-    incoming.forEach(r => { if (r && r.id) byId.set(r.id, r); else if (r) byNk.set(nk(r), r); });
-    return [...Array.from(byId.values()), ...Array.from(byNk.values())];
+    // Incoming is always the full array — trust it completely
+    return incoming;
 }
 
 // Deep merge a qa3_<projectId> project object.

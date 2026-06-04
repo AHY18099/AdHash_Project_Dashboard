@@ -6795,12 +6795,7 @@ function openEditRow(p,sec,i){
     const d=getRowData(isSm,r);
     if(!d.module||!(d.step||d.item)){toast('Module and step/item are required','err');return;}
     STORE[p][sec][i]={...r,...d};
-    // Use _replaceArrays so server replaces the whole array rather than merging by id.
-    // This is essential when the user edits the id field itself — merge-by-id would keep
-    // both the old-keyed and new-keyed row, reverting the change on next sync.
-    STORE[p]._replaceArrays=[sec];
-    closeModal();saveToLS(p);delete STORE[p]._replaceArrays;
-    updateStats(p);renderProject(p);toast('Test case updated');
+    closeModal();saveToLS(p);updateStats(p);renderProject(p);toast('Test case updated');
   },{saveLabel:'Update'});
 }
 function deleteRow(p,sec,i){
