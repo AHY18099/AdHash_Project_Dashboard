@@ -2014,18 +2014,21 @@ app.post('/api/env-secrets', (req, res) => {
     }
 });
 
-// POST /api/admin/set-slack-token — super_admin only, sets SLACK_BOT_TOKEN at runtime and persists to .env
-app.post('/api/admin/set-slack-token', requireAdmin, (req, res) => {
+// POST /api/admin/set-slack-token — super_admin only, persists token to MongoDB (survives redeploys)
+app.post('/api/admin/set-slack-token', requireAdmin, async (req, res) => {
     const { token } = req.body || {};
     if (!token || !String(token).startsWith('xoxb-')) return res.status(400).json({ error: 'Invalid Slack bot token' });
     process.env.SLACK_BOT_TOKEN = String(token).trim();
-    // Persist to .env so it survives server restarts (within the same Railway deployment)
     try {
-        const existing = readEnvFile();
-        existing['SLACK_BOT_TOKEN'] = process.env.SLACK_BOT_TOKEN;
-        writeEnvFile(existing);
-    } catch (_) {}
-    console.log('[slack] ✅ SLACK_BOT_TOKEN updated at runtime');
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        if (db) await db.collection('app_config').updateOne(
+            { namespace: '_system' },
+            { $set: { 'data.SLACK_BOT_TOKEN': _encryptVal(process.env.SLACK_BOT_TOKEN), updatedAt: new Date() } },
+            { upsert: true }
+        );
+        console.log('[slack] ✅ SLACK_BOT_TOKEN saved to MongoDB');
+    } catch (e) { console.warn('[slack] MongoDB save failed:', e.message); }
     res.json({ success: true });
 });
 
@@ -5167,27 +5170,43 @@ app.get('/api/autochecker/report', async (req, res) => {
             req3.end();
         });
 
-        // Parse zip in-memory (ZIP format: local file headers + data)
+        // Parse zip in-memory — scan ALL local file headers (handles subdirectories + ZIP64 extras)
         let htmlContent = '';
         let offset = 0;
-        while (offset < zipBuf.length - 4) {
+        while (offset < zipBuf.length - 30) {
             const sig = zipBuf.readUInt32LE(offset);
-            if (sig !== 0x04034b50) break; // Local file header signature
-            const flags      = zipBuf.readUInt16LE(offset + 6);
+            if (sig !== 0x04034b50) { offset++; continue; } // scan for next header
             const compression = zipBuf.readUInt16LE(offset + 8);
-            const compSize   = zipBuf.readUInt32LE(offset + 18);
-            const nameLen    = zipBuf.readUInt16LE(offset + 26);
-            const extraLen   = zipBuf.readUInt16LE(offset + 28);
-            const name       = zipBuf.slice(offset + 30, offset + 30 + nameLen).toString('utf8');
-            const dataOffset = offset + 30 + nameLen + extraLen;
-            const data       = zipBuf.slice(dataOffset, dataOffset + compSize);
-            if (name.endsWith('.html') || name.endsWith('.htm')) {
+            let   compSize    = zipBuf.readUInt32LE(offset + 18);
+            let   uncompSize  = zipBuf.readUInt32LE(offset + 22);
+            const nameLen     = zipBuf.readUInt16LE(offset + 26);
+            const extraLen    = zipBuf.readUInt16LE(offset + 28);
+            const name        = zipBuf.slice(offset + 30, offset + 30 + nameLen).toString('utf8');
+            const dataOffset  = offset + 30 + nameLen + extraLen;
+            // Handle ZIP64 extra field (sizes stored as 8-byte values)
+            if (compSize === 0xFFFFFFFF || uncompSize === 0xFFFFFFFF) {
+                let extraOff = offset + 30 + nameLen;
+                const extraEnd = extraOff + extraLen;
+                while (extraOff + 4 <= extraEnd) {
+                    const hdrId = zipBuf.readUInt16LE(extraOff);
+                    const hdrSz = zipBuf.readUInt16LE(extraOff + 2);
+                    if (hdrId === 0x0001 && extraOff + 4 + hdrSz <= extraEnd) {
+                        if (uncompSize === 0xFFFFFFFF) uncompSize = Number(zipBuf.readBigUInt64LE(extraOff + 4));
+                        if (compSize   === 0xFFFFFFFF) compSize   = Number(zipBuf.readBigUInt64LE(extraOff + 12));
+                        break;
+                    }
+                    extraOff += 4 + hdrSz;
+                }
+            }
+            if ((name.endsWith('.html') || name.endsWith('.htm')) && compSize > 0) {
+                const data = zipBuf.slice(dataOffset, dataOffset + compSize);
                 try {
                     htmlContent = compression === 8 ? zlib.inflateRawSync(data).toString('utf8') : data.toString('utf8');
-                    break;
+                    if (htmlContent.includes('<html') || htmlContent.includes('<!DOCTYPE')) break;
+                    htmlContent = ''; // not valid HTML, keep scanning
                 } catch (_) {}
             }
-            offset = dataOffset + compSize;
+            offset = dataOffset + (compSize || 0);
         }
 
         if (!htmlContent) return res.json({ data: null, runId: run.id, message: 'Could not extract HTML from artifact' });
@@ -6007,6 +6026,18 @@ async function migrateWfDocsToGitHub() {
             // Dedup all project data in MongoDB — removes any accumulated duplicates
             try { await deduplicateAllProjectData(); } catch (e) { console.error('[startup] dedup failed:', e.message); }
             try { await seedSuperAdmin(); } catch (e) { console.warn('[startup] seedSuperAdmin failed:', e.message); }
+            // Load Slack token from MongoDB (survives Railway redeploys unlike .env on disk)
+            try {
+                const { getDB } = require('./src/db');
+                const db2 = getDB();
+                if (db2) {
+                    const sysCfg = await db2.collection('app_config').findOne({ namespace: '_system' });
+                    if (sysCfg && sysCfg.data && sysCfg.data.SLACK_BOT_TOKEN) {
+                        process.env.SLACK_BOT_TOKEN = _decryptVal(sysCfg.data.SLACK_BOT_TOKEN);
+                        console.log('[startup] ✅ SLACK_BOT_TOKEN loaded from MongoDB');
+                    }
+                }
+            } catch (e) { console.warn('[startup] Slack token load failed:', e.message); }
             // ── Mongoose connection for new /api/projects and /api/qa-state routes ──
             try {
                 const { connectDB: mongooseConnect } = require('./db/connection');

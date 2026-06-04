@@ -796,8 +796,35 @@ async function acLoadReport(){
         <div style="font-weight:700;margin-bottom:6px">🔍 Auto Checker — Production</div>
         <div style="opacity:.8">Run #${d.run_number} · ${created}</div>
         <a href="${d.html_url}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;background:rgba(255,255,255,.15);color:#fff;padding:6px 18px;border-radius:20px;text-decoration:none;font-size:12px">View on GitHub Actions →</a>
-      </div>`;
+      </div>
+      ${resp.rawHtml?`
+      <!-- Raw HTML Report Toggle -->
+      <div style="margin-top:16px">
+        <button onclick="acToggleRawHtml(this)" style="width:100%;padding:10px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">
+          📄 Show Full HTML Report
+        </button>
+        <div id="ac-raw-html-frame" style="display:none;margin-top:10px;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0">
+          <iframe id="ac-html-iframe" style="width:100%;height:700px;border:none;background:#fff" sandbox="allow-same-origin allow-scripts"></iframe>
+        </div>
+      </div>`:''}`;
+  // Store rawHtml on window for the iframe toggle
+  window._acRawHtml=resp.rawHtml||'';
   }catch(e){box.innerHTML=`<div style="color:#ef4444;font-size:13px;padding:20px;text-align:center">Error loading report: ${e.message}</div>`;}
+}
+function acToggleRawHtml(btn){
+  const wrap=document.getElementById('ac-raw-html-frame');
+  const iframe=document.getElementById('ac-html-iframe');
+  if(wrap.style.display==='none'){
+    wrap.style.display='block';
+    btn.textContent='▲ Hide Full HTML Report';
+    // Write HTML into iframe srcdoc for safe rendering
+    if(iframe&&window._acRawHtml&&!iframe.srcdoc){
+      iframe.srcdoc=window._acRawHtml;
+    }
+  }else{
+    wrap.style.display='none';
+    btn.textContent='📄 Show Full HTML Report';
+  }
 }
 
 // ── SYNCTRADE PANEL ──────────────────────────────────────────────────────
