@@ -7053,14 +7053,22 @@ async function _doServerPost(key,value,retriesLeft){
         } else if(key.startsWith('qa3_')&&mv&&typeof mv==='object'&&!Array.isArray(mv)){
           const pid=key.replace('qa3_','');
           if(STORE[pid]){
-            _mergeSseProjectIntoStore(pid,mv);
-            _deduplicateStoreProject(STORE[pid]);
-            // Deduplicate reports by id then datetime after every server response
-            if(Array.isArray(STORE[pid].reports)){
-              const seen=new Set();
-              STORE[pid].reports=STORE[pid].reports.filter(r=>{const k=r.id||r.datetime;if(seen.has(k))return false;seen.add(k);return true;});
+            // Server's mergedValue is authoritative — fully replace STORE arrays with server versions.
+            // This prevents stale browser STORE from being re-saved by the next heartbeat.
+            // Only replace arrays present in mv; preserve local fields not returned by server.
+            const FULL_REPLACE_KEYS=['smoke','prod','reports','credentials','thirdparty',
+              'feedback','apitests','pendingtasks','taskchecklist','testdata','releaseNotes','wfdocs'];
+            FULL_REPLACE_KEYS.forEach(k=>{
+              if(mv[k]!==undefined&&mv[k]!==null){
+                STORE[pid][k]=Array.isArray(mv[k])?mv[k]:STORE[pid][k];
+              }
+            });
+            if(mv.envDetails&&typeof mv.envDetails==='object'){
+              STORE[pid].envDetails=mv.envDetails;
             }
-            _lastHbStoreHash[pid]=JSON.stringify(STORE[pid]); // hash after all mutations
+            _deduplicateStoreProject(STORE[pid]);
+            // Hash updated from server state — next heartbeat sees no change, no re-save of stale data
+            _lastHbStoreHash[pid]=JSON.stringify(STORE[pid]);
           }
         }
       }
@@ -7353,12 +7361,27 @@ function _applySseUpdate(key,value){
   }else if(key.startsWith('qa3_')){
     const pid=key.replace('qa3_','');
     if(STORE[pid]&&value&&typeof value==='object'&&!Array.isArray(value)){
-      _mergeSseProjectIntoStore(pid,value);_deduplicateStoreProject(STORE[pid]);
-      // Always deduplicate reports after any SSE update
-      if(Array.isArray(STORE[pid].reports)){
-        const seen=new Set();
-        STORE[pid].reports=STORE[pid].reports.filter(r=>{const k=r.id||r.datetime;if(seen.has(k))return false;seen.add(k);return true;});
+      // Full-replace authoritative arrays from server — same as mergedValue handling
+      const FULL_REPLACE_KEYS=['smoke','prod','reports','credentials','thirdparty',
+        'feedback','apitests','pendingtasks','taskchecklist','testdata','releaseNotes','wfdocs'];
+      FULL_REPLACE_KEYS.forEach(k=>{
+        if(value[k]!==undefined&&value[k]!==null&&Array.isArray(value[k])){
+          // Only replace if incoming is non-empty OR field is not protected
+          const _PROTECTED=new Set(['credentials','thirdparty','wfdocs','pendingtasks','apitests','reports']);
+          if(value[k].length>0||!_PROTECTED.has(k)) STORE[pid][k]=value[k];
+        }
+      });
+      if(value.envDetails&&typeof value.envDetails==='object'){
+        ['production','staging'].forEach(side=>{
+          if(Array.isArray(value.envDetails[side])&&(value.envDetails[side].length>0||(STORE[pid].envDetails?.[side]||[]).length===0)){
+            if(!STORE[pid].envDetails)STORE[pid].envDetails={production:[],staging:[]};
+            STORE[pid].envDetails[side]=value.envDetails[side];
+          }
+        });
       }
+      _deduplicateStoreProject(STORE[pid]);
+      // Update hash so heartbeat doesn't re-save the old stale state
+      _lastHbStoreHash[pid]=JSON.stringify(STORE[pid]);
     }
     if(curView==='project'&&curProj===pid&&!userTyping){
       renderProject(pid);
