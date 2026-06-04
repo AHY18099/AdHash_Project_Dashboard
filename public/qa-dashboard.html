@@ -1920,7 +1920,8 @@ const _PROJ_ARRAY_KEYS=['smoke','prod','feedback','thirdparty','taskchecklist',
 function deduplicateById(arr,idField='id'){
   if(!Array.isArray(arr)||arr.length===0)return arr;
   const seen=new Map();
-  const nk=r=>((r&&r.name)||'')+'|'+((r&&r.url)||'')+'|'+((r&&r.environment)||'');
+  // For reports (which have datetime but may lack id), use datetime as fallback key
+  const nk=r=>r&&r.datetime?'dt:'+r.datetime:((r&&r.name)||'')+'|'+((r&&r.url)||'')+'|'+((r&&r.environment)||'');
   arr.forEach(r=>{
     if(r&&r[idField])seen.set(r[idField],r);
     else if(r){const k=nk(r);if(!seen.has('nk:'+k))seen.set('nk:'+k,r);}
@@ -3165,7 +3166,10 @@ function renderTestTable(p,sec){
   else{bannerCls='pass';bannerTxt='✓ All tests passing — ready to proceed';}
   const pend=(STORE[p].pending||[]).filter(x=>x.section===sec&&x.status==='pending');
   const pendBanner=isAdmin()&&pend.length?`<div style="background:rgba(245,158,11,.07);border:1.5px solid rgba(245,158,11,.3);border-radius:12px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:var(--blk)"><span>🔔 <b>${pend.length}</b> change${pend.length!==1?'s':''} awaiting approval</span><button class="btn btn-secondary" style="font-size:11px;padding:4px 13px" onclick="switchTab('${p}','approvals')">Review →</button></div>`:'';
-  const rows=data.map((r,i)=>rowHtml(p,sec,r,i,isSm)).join('');
+  // Use the STORE index (not the sorted visual index) so edit/delete/status handlers
+  // always operate on the correct row even when the list is sorted by ID.
+  const storeArr=STORE[p][sec]||[];
+  const rows=data.map(r=>rowHtml(p,sec,r,storeArr.indexOf(r),isSm)).join('');
   const platHeader=isMobile?`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><span style="font-size:13px;font-weight:700;color:var(--txt)">${sec==='smoke'?'🔥 Smoke Tests':'✅ Prod Checklist'} — <span style="color:${plat==='android'?'#3ddc84':'#007aff'}">${plat==='android'?'Android':'iOS'}</span></span>${platformSwitcher(p,sec)}</div>`:'';
   return`${platHeader}${pendBanner}
   <div class="sbanner ${bannerCls}">
@@ -6014,6 +6018,7 @@ function tclSaveReport(p){
   const now=new Date();
   // Deep-copy items into snapshot BEFORE resetting
   const snap={
+    id:'rpt_'+Date.now()+'_'+Math.random().toString(36).slice(2,8),
     type:'checklist',
     datetime:now.toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})+' '+now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),
     label:`Task Checklist — ${proj?.name||p}`,
@@ -6917,6 +6922,7 @@ function saveState(p){
   const now=new Date();
   // Deep-copy current data into snapshot BEFORE resetting
   const snap={
+    id:'rpt_'+Date.now()+'_'+Math.random().toString(36).slice(2,8),
     datetime:now.toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})+' '+now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),
     label:STORE[p].env.releaseVersion||'',
     summary:s,
