@@ -5809,18 +5809,14 @@ app.post('/api/qa-data/:key', async (req, res) => {
                 _qaCache[key] = value;
             }
         });
-        // Persist merged value to MongoDB (writeProject may deduplicate reports)
-        await writeKey(key, _qaCache[key]);
-        // After writeKey, sync _qaCache reports back from the deduplicated DB version
-        // so mergedValue and SSE broadcast reflect the clean deduped state, not the stale 17-item array
-        if (key.startsWith('qa3_') && _qaCache[key] && Array.isArray(_qaCache[key].reports)) {
-            try {
-                const { readKey } = require('./src/db');
-                const fresh = await readKey(key);
-                if (fresh && Array.isArray(fresh.reports)) {
-                    _qaCache[key].reports = fresh.reports;
-                }
-            } catch (_) {}
+        // Persist merged value to MongoDB — writeProject returns dedupedFields when
+        // it collapsed duplicate reports. Apply those directly to _qaCache so mergedValue
+        // and SSE broadcast send the clean deduped array, not the stale full set.
+        const dedupedFields = await writeKey(key, _qaCache[key]);
+        if (dedupedFields && typeof dedupedFields === 'object') {
+            for (const [f, v] of Object.entries(dedupedFields)) {
+                if (_qaCache[key]) _qaCache[key][f] = v;
+            }
         }
         // Return merged value so client doesn't need a separate re-fetch
         res.json({ status: 'saved', key, dbSaved: true, mergedValue: _qaCache[key] });

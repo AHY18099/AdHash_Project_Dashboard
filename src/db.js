@@ -195,7 +195,9 @@ async function assembleProject(projectId) {
 }
 
 async function writeProject(projectId, proj) {
-    if (!proj || typeof proj !== 'object') return;
+    if (!proj || typeof proj !== 'object') return {};
+    // Tracks fields that were deduplicated — caller uses this to fix _qaCache
+    const dedupedFields = {};
     const db = getDB();
 
     // Save project config
@@ -223,14 +225,18 @@ async function writeProject(projectId, proj) {
         // from being re-written by stale browser heartbeats that have the full set
         if (field === 'reports' && items.length > 0) {
             const seenDt = new Map();
-            items = items.filter(r => {
+            const deduped = items.filter(r => {
                 if (r && r.id && String(r.id).startsWith('rpt_')) {
-                    seenDt.set(r.id, true); return true; // new-format always unique
+                    seenDt.set(r.id, true); return true;
                 }
                 const k = (r && r.datetime) || (r && r.id) || JSON.stringify(r);
                 if (seenDt.has(k)) return false;
                 seenDt.set(k, true); return true;
             });
+            if (deduped.length !== items.length) {
+                dedupedFields.reports = deduped; // caller must update _qaCache with this
+            }
+            items = deduped;
         }
         await getDB().collection(col).deleteMany({ projectId });
         if (items.length > 0) await _upsertMany(col, projectId, items);
@@ -248,6 +254,7 @@ async function writeProject(projectId, proj) {
             console.log(`[writeProject] envDetails saved for ${projectId}: prod=${prod.length} stag=${stag.length}`);
         }
     }
+    return dedupedFields; // non-empty only when dedup changed something
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -339,8 +346,9 @@ async function writeKey(key, value) {
         return;
     }
     if (key.startsWith('qa3_') && value && typeof value === 'object' && !Array.isArray(value)) {
-        await writeProject(key.replace('qa3_', ''), value);
+        return await writeProject(key.replace('qa3_', ''), value); // returns dedupedFields
     }
+    return {};
 }
 
 /** Delete one key from MongoDB. */
