@@ -197,25 +197,33 @@ async function writeProject(projectId, proj) {
         { upsert: true }
     );
 
-    // Replace each section entirely: delete existing docs first so deleted rows are never
-    // resurrected on next readAllData(). Empty array = user cleared the section — still deletes.
+    // CRITICAL SECTIONS — never delete existing data when incoming array is empty.
+    // Empty array from an uninitialised STORE must not wipe real saved data.
+    // Only delete+replace when incoming array is non-empty (real save) OR when
+    // the proj._replaceArrays flag explicitly lists the field (intentional clear).
+    const replaceArrays = Array.isArray(proj._replaceArrays) ? new Set(proj._replaceArrays) : new Set();
+    const PROTECTED = new Set(['credentials', 'thirdparty', 'pendingtasks', 'apitests']);
+
     for (const [field, col] of Object.entries(SECTION_MAP)) {
         const items = proj[field];
         if (!Array.isArray(items)) continue;
+        // Skip empty arrays for protected fields unless explicitly flagged for replace
+        if (items.length === 0 && PROTECTED.has(field) && !replaceArrays.has(field)) continue;
         await getDB().collection(col).deleteMany({ projectId });
         if (items.length > 0) await _upsertMany(col, projectId, items);
     }
 
-    // env_details: write whenever envDetails is present in the incoming object.
-    // hasOwnProperty check ensures we only wipe+rewrite when client explicitly sent envDetails
-    // (not when it was simply omitted from a partial update).
+    // env_details: only write when envDetails is present AND non-empty OR explicitly replacing.
     if (Object.prototype.hasOwnProperty.call(proj, 'envDetails') && proj.envDetails) {
-        await getDB().collection('env_details').deleteMany({ projectId });
         const prod = (proj.envDetails.production || []).map(e => ({ ...e, envType: 'production' }));
         const stag = (proj.envDetails.staging    || []).map(e => ({ ...e, envType: 'staging' }));
         const all  = [...prod, ...stag];
-        if (all.length > 0) await _upsertMany('env_details', projectId, all);
-        console.log(`[writeProject] envDetails saved for ${projectId}: prod=${prod.length} stag=${stag.length}`);
+        // Only wipe+replace if we have data OR if client explicitly flagged _envDetails for replace
+        if (all.length > 0 || replaceArrays.has('_envDetails')) {
+            await getDB().collection('env_details').deleteMany({ projectId });
+            if (all.length > 0) await _upsertMany('env_details', projectId, all);
+            console.log(`[writeProject] envDetails saved for ${projectId}: prod=${prod.length} stag=${stag.length}`);
+        }
     }
 }
 
