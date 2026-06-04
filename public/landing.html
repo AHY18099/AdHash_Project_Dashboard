@@ -860,18 +860,19 @@ async function stLoadConfig(){
     if(r.ok){
       const d=await r.json();
       const hasKeys=d.openaiKey||d.googleKey;
-      // Always apply DB values (even empty strings overwrite stale localStorage)
-      document.getElementById('st-cfgOpenAI').value    =d.openaiKey   ||stLS.get('openaiKey')||'';
-      document.getElementById('st-cfgModel').value     =d.openaiModel ||stLS.get('openaiModel')||'gpt-4o-mini';
-      document.getElementById('st-cfgGoogleKey').value =d.googleKey   ||stLS.get('googleKey')||'';
-      document.getElementById('st-cfgSheetId').value   =d.sheetId     ||stLS.get('sheetId')||'1ykNdxIpC6ALQfqMFG5D_w598sM77bASJ1RH1u9gQI28';
-      document.getElementById('st-cfgSheetRange').value=d.sheetRange  ||stLS.get('sheetRange')||'Sheet1';
-      // Mirror to localStorage for offline fallback
-      if(d.openaiKey)stLS.set('openaiKey',d.openaiKey);
-      if(d.openaiModel)stLS.set('openaiModel',d.openaiModel);
+      // DB is always authoritative — use DB value as-is, never fall back to localStorage
+      // Using ?? (nullish) not || (falsy) so empty string from DB is preserved correctly
+      document.getElementById('st-cfgOpenAI').value    =d.openaiKey   ??'';
+      document.getElementById('st-cfgModel').value     =d.openaiModel ??'gpt-4o-mini';
+      document.getElementById('st-cfgGoogleKey').value =d.googleKey   ??'';
+      document.getElementById('st-cfgSheetId').value   =d.sheetId     ??'';
+      document.getElementById('st-cfgSheetRange').value=d.sheetRange  ??'Sheet1';
+      // Mirror DB values to localStorage (overwrite stale cache)
+      stLS.set('openaiKey',d.openaiKey||'');
+      stLS.set('openaiModel',d.openaiModel||'gpt-4o-mini');
       if(d.googleKey)stLS.set('googleKey',d.googleKey);
-      if(d.sheetId)stLS.set('sheetId',d.sheetId);
-      if(d.sheetRange)stLS.set('sheetRange',d.sheetRange);
+      stLS.set('sheetId',d.sheetId||'');
+      stLS.set('sheetRange',d.sheetRange||'Sheet1');
       if(s){
         if(hasKeys){s.textContent='Config loaded from DB ✓';s.className='stinfo ok';}
         else{s.textContent='⚠ No keys saved yet — enter keys above and click Save Config';s.className='stinfo err';}
@@ -882,7 +883,7 @@ async function stLoadConfig(){
       document.getElementById('st-cfgOpenAI').value    =stLS.get('openaiKey')||'';
       document.getElementById('st-cfgModel').value     =stLS.get('openaiModel')||'gpt-4o-mini';
       document.getElementById('st-cfgGoogleKey').value =stLS.get('googleKey')||'';
-      document.getElementById('st-cfgSheetId').value   =stLS.get('sheetId')||'1ykNdxIpC6ALQfqMFG5D_w598sM77bASJ1RH1u9gQI28';
+      document.getElementById('st-cfgSheetId').value   =stLS.get('sheetId')||'';
       document.getElementById('st-cfgSheetRange').value=stLS.get('sheetRange')||'Sheet1';
       if(s){s.textContent='Using cached config (DB unavailable)';s.className='stinfo';setTimeout(()=>{s.textContent='';},3000);}
     }
@@ -891,7 +892,7 @@ async function stLoadConfig(){
     document.getElementById('st-cfgOpenAI').value    =stLS.get('openaiKey')||'';
     document.getElementById('st-cfgModel').value     =stLS.get('openaiModel')||'gpt-4o-mini';
     document.getElementById('st-cfgGoogleKey').value =stLS.get('googleKey')||'';
-    document.getElementById('st-cfgSheetId').value   =stLS.get('sheetId')||'1ykNdxIpC6ALQfqMFG5D_w598sM77bASJ1RH1u9gQI28';
+    document.getElementById('st-cfgSheetId').value   =stLS.get('sheetId')||'';
     document.getElementById('st-cfgSheetRange').value=stLS.get('sheetRange')||'Sheet1';
   }
 }
