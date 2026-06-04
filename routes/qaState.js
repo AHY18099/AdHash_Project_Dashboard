@@ -3,8 +3,10 @@ const express        = require('express');
 const router         = express.Router();
 const QAState        = require('../db/models/QAState');
 const { requireAuth } = require('../middleware/auth');
+const { ensureConnected } = require('../db/connection');
 
 // GET all saved test case states (optional ?product= ?suite= filters)
+// Returns empty state gracefully if mongoose isn't connected yet (non-fatal).
 router.get('/', requireAuth, async (req, res) => {
     try {
         const filter = {};
@@ -16,6 +18,10 @@ router.get('/', requireAuth, async (req, res) => {
         return res.json({ testCases, total: all.length, lastUpdated: all.length ? all[all.length - 1].updatedAt : null });
     } catch (err) {
         console.error('[QAState] GET / error:', err.message);
+        // Return empty state instead of 500 — dashboard loads fine, just no saved states
+        if (err.message && (err.message.includes('not connected') || err.message.includes('buffering timed out') || err.message.includes('connection') || err.name === 'MongoNotConnectedError')) {
+            return res.json({ testCases: {}, total: 0, lastUpdated: null });
+        }
         return res.status(500).json({ error: 'Failed to load QA state' });
     }
 });
@@ -30,12 +36,12 @@ router.get('/summary', requireAuth, async (req, res) => {
         return res.json({ summary: results });
     } catch (err) {
         console.error('[QAState] GET /summary error:', err.message);
-        return res.status(500).json({ error: 'Failed to get summary' });
+        return res.json({ summary: [] });
     }
 });
 
 // PATCH single test case (upsert — creates if not exists)
-router.patch('/:caseId', requireAuth, async (req, res) => {
+router.patch('/:caseId', requireAuth, ensureConnected, async (req, res) => {
     try {
         const updates = { ...req.body };
         delete updates._id; delete updates.caseId; delete updates.createdAt;
@@ -52,7 +58,7 @@ router.patch('/:caseId', requireAuth, async (req, res) => {
 });
 
 // POST /bulk — save many test cases in one request
-router.post('/bulk', requireAuth, async (req, res) => {
+router.post('/bulk', requireAuth, ensureConnected, async (req, res) => {
     try {
         const updates = req.body.testCases || {};
         const entries = Object.entries(updates);
