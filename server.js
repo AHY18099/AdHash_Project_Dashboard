@@ -5483,7 +5483,7 @@ app.post('/api/qa-data-bulk', async (req, res) => {
 // for 5 minutes. Any subsequent save that tries to bring the row back is blocked.
 // This prevents stale browser tabs from resurrecting deleted rows.
 const _deletedRowRegistry = new Map(); // key: 'qa3_pid:rowId' → expiry timestamp
-const DELETED_ROW_TTL = 5 * 60 * 1000; // 5 minutes
+const DELETED_ROW_TTL = 30 * 60 * 1000; // 30 minutes
 
 function _registerDeletedRows(qaKey, prevArray, newArray) {
     const prevIds = new Set((prevArray || []).filter(r => r && r.id).map(r => r.id));
@@ -5809,8 +5809,19 @@ app.post('/api/qa-data/:key', async (req, res) => {
                 _qaCache[key] = value;
             }
         });
-        // Persist merged value to MongoDB
+        // Persist merged value to MongoDB (writeProject may deduplicate reports)
         await writeKey(key, _qaCache[key]);
+        // After writeKey, sync _qaCache reports back from the deduplicated DB version
+        // so mergedValue and SSE broadcast reflect the clean deduped state, not the stale 17-item array
+        if (key.startsWith('qa3_') && _qaCache[key] && Array.isArray(_qaCache[key].reports)) {
+            try {
+                const { readKey } = require('./src/db');
+                const fresh = await readKey(key);
+                if (fresh && Array.isArray(fresh.reports)) {
+                    _qaCache[key].reports = fresh.reports;
+                }
+            } catch (_) {}
+        }
         // Return merged value so client doesn't need a separate re-fetch
         res.json({ status: 'saved', key, dbSaved: true, mergedValue: _qaCache[key] });
         // Broadcast to OTHER clients only (sourceClientId lets sender skip its own echo)
