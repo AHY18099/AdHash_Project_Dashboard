@@ -5616,6 +5616,10 @@ function mergeProjectData(existing, incoming) {
                 Array.isArray(merged[key]) && merged[key].length > 0) continue;
             if (key === 'smoke' || key === 'prod') {
                 merged[key] = mergeTestRows(existing[key], inVal);
+            } else if (key === 'reports') {
+                // Reports: incoming is authoritative when non-empty (deletions must be respected).
+                // mergeById keeps deleted items alive — use incoming directly instead.
+                merged[key] = inVal.length > 0 ? inVal : (merged[key] || []);
             } else {
                 merged[key] = mergeById(existing[key], inVal);
             }

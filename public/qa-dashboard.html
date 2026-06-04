@@ -7248,6 +7248,9 @@ function _mergeSseProjectIntoStore(pid,incoming){
     if(_PROJ_ARRAY_KEYS.includes(key)&&Array.isArray(inVal)){
       // Never overwrite non-empty local data with empty SSE array for protected fields
       if(_SSE_NEVER_WIPE.has(key)&&inVal.length===0&&(ex[key]||[]).length>0)continue;
+      // Reports: SSE incoming is authoritative when non-empty — a delete reduces the array.
+      // Using Map-merge for reports keeps deleted items alive. Use replace instead.
+      if(key==='reports'&&inVal.length>0){ex[key]=inVal;continue;}
       const m=new Map();
       (ex[key]||[]).forEach(r=>{if(r&&r.id)m.set(r.id,r);else if(r)m.set('nk:'+nk(r),r);});
       inVal.forEach(r=>{if(r&&r.id)m.set(r.id,r);else if(r)m.set('nk:'+nk(r),r);});
