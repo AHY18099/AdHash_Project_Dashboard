@@ -5549,7 +5549,10 @@ function _filterDeletedRows(qaKey, arr) {
 // Smart merge helpers — prevent multi-user overwrite on shared arrays
 // Each user's browser only has their slice of data; a full replace would clobber other users' rows.
 
-// Merge daily tasks: keyed by (date, projectId) — each row is unique per project per day
+// Merge daily tasks: keyed by (date, projectId) — each row is unique per project per day.
+// Per-row merge: if incoming has a row for that key, newer _savedAt wins.
+// If incoming does NOT have a row for that key, the existing row is always kept
+// (it belongs to another project/date edited by a different user — never drop it).
 function mergeDailyTasks(existing, incoming) {
     if (!Array.isArray(incoming)) return existing;
     const nk = r => (r.date||'') + '|' + (r.projectId||'');
@@ -5557,56 +5560,31 @@ function mergeDailyTasks(existing, incoming) {
         if (!a) return b; if (!b) return a;
         return ((b._savedAt||0) >= (a._savedAt||0)) ? b : a;
     };
-    // Use incoming's max timestamp as the "save time" for this batch
-    const incomingMaxTs = Math.max(0, ...incoming.map(r => r._savedAt || 0));
-    const byId  = new Map();
-    const byNk  = new Map();
-    // Seed from existing, but only keep rows newer than incoming's batch timestamp
-    // (rows with _savedAt > incomingMaxTs were edited by another user after this save)
-    (existing || []).forEach(r => {
-        if ((r._savedAt||0) > incomingMaxTs) {
-            if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r);
-        }
-    });
-    // Overlay all incoming rows (winner by _savedAt on conflict)
-    incoming.forEach(r => {
-        if (r.id) byId.set(r.id, winner(byId.get(r.id), r));
-        else byNk.set(nk(r), winner(byNk.get(nk(r)), r));
-    });
-    const coveredById = new Set(Array.from(byId.values()).map(nk));
-    const nkOnly = Array.from(byNk.entries())
-        .filter(([k]) => !coveredById.has(k))
-        .map(([, v]) => v);
-    return [...Array.from(byId.values()), ...nkOnly];
+    // Build a set of keys that incoming explicitly covers
+    const incomingKeys = new Set(incoming.map(nk));
+    const map = new Map();
+    // Seed from ALL existing rows — keep every row not covered by incoming
+    (existing || []).forEach(r => { map.set(nk(r), r); });
+    // Overlay incoming rows: per-row winner by _savedAt (newer edit wins)
+    incoming.forEach(r => { map.set(nk(r), winner(map.get(nk(r)), r)); });
+    return Array.from(map.values());
 }
 
-// Merge team tasks: keyed by id. Newer _savedAt wins. Rows deleted in incoming
-// (with older _savedAt than the batch) are not resurrected from existing.
+// Merge team tasks: keyed by id. Newer _savedAt wins per row.
+// Rows in existing but not in incoming are kept (added by another user).
+// Rows explicitly deleted must use _replaceArrays flag — not this merge path.
 function mergeTeamTasks(existing, incoming) {
     if (!Array.isArray(incoming)) return existing;
-    const nk = r => (r.date||'') + '|' + (r.projectId||'');
     const winner = (a, b) => {
         if (!a) return b; if (!b) return a;
         return ((b._savedAt||0) >= (a._savedAt||0)) ? b : a;
     };
-    const incomingMaxTs = Math.max(0, ...incoming.map(r => r._savedAt || 0));
-    const byId  = new Map();
-    const byNk  = new Map();
-    // Only keep existing rows that are newer than this incoming batch (concurrent adds)
-    (existing || []).forEach(r => {
-        if ((r._savedAt||0) > incomingMaxTs) {
-            if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r);
-        }
-    });
-    incoming.forEach(r => {
-        if (r.id) byId.set(r.id, winner(byId.get(r.id), r));
-        else byNk.set(nk(r), winner(byNk.get(nk(r)), r));
-    });
-    const coveredById = new Set(Array.from(byId.values()).map(nk));
-    const nkOnly = Array.from(byNk.entries())
-        .filter(([k]) => !coveredById.has(k))
-        .map(([, v]) => v);
-    return [...Array.from(byId.values()), ...nkOnly];
+    const map = new Map();
+    // Seed from all existing rows
+    (existing || []).forEach(r => { if (r.id) map.set(r.id, r); });
+    // Overlay incoming: per-row winner
+    incoming.forEach(r => { if (r.id) map.set(r.id, winner(map.get(r.id), r)); });
+    return Array.from(map.values());
 }
 
 // Merge releases: keyed by id
