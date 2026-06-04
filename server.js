@@ -5596,24 +5596,39 @@ app.post('/api/qa-data/:key', async (req, res) => {
                     _qaCache[key] = mergeProjectData(_qaCache[key], _ra ? cleanVal : value);
                 }
                 // ── DATA LOSS PREVENTION ──────────────────────────────────────────────────
-                // If the incoming value did NOT include credentials/envDetails (e.g. a heartbeat
-                // save that only has smoke/prod), preserve the existing values from cache.
-                // This prevents partial saves from wiping critical data.
+                // Preserve critical arrays if incoming is missing OR empty.
+                // Empty arrays from an uninitialised STORE must never wipe real data.
                 const prevCache = (_qaCache[key] && typeof _qaCache[key] === 'object') ? _qaCache[key] : {};
                 const incomingVal = (typeof value === 'object' && value !== null) ? value : {};
                 const replaceList = Array.isArray(incomingVal._replaceArrays) ? incomingVal._replaceArrays : [];
-                if (!Object.prototype.hasOwnProperty.call(incomingVal, 'credentials') && !replaceList.includes('credentials')) {
-                    if (Array.isArray(prevCache.credentials) && prevCache.credentials.length > 0) {
-                        _qaCache[key].credentials = prevCache.credentials;
+                // Protect credentials — keep existing if incoming is missing OR empty
+                if (!replaceList.includes('credentials')) {
+                    const inCreds = incomingVal.credentials;
+                    const prevCreds = prevCache.credentials;
+                    if (Array.isArray(prevCreds) && prevCreds.length > 0 &&
+                        (!Array.isArray(inCreds) || inCreds.length === 0)) {
+                        _qaCache[key].credentials = prevCreds;
                     }
                 }
-                if (!Object.prototype.hasOwnProperty.call(incomingVal, 'envDetails') && !replaceList.includes('_envDetails')) {
+                // Protect envDetails — keep existing if incoming is missing OR empty
+                if (!replaceList.includes('_envDetails')) {
                     const prevEnv = prevCache.envDetails;
-                    if (prevEnv && (
+                    const inEnv = incomingVal.envDetails;
+                    const prevHasData = prevEnv && (
                         (Array.isArray(prevEnv.production) && prevEnv.production.length > 0) ||
-                        (Array.isArray(prevEnv.staging) && prevEnv.staging.length > 0)
-                    )) {
-                        _qaCache[key].envDetails = prevEnv;
+                        (Array.isArray(prevEnv.staging)    && prevEnv.staging.length    > 0));
+                    const incomingIsEmpty = !inEnv ||
+                        ((!Array.isArray(inEnv.production) || inEnv.production.length === 0) &&
+                         (!Array.isArray(inEnv.staging)    || inEnv.staging.length    === 0));
+                    if (prevHasData && incomingIsEmpty) _qaCache[key].envDetails = prevEnv;
+                }
+                // Protect thirdparty — keep existing if incoming is missing OR empty
+                if (!replaceList.includes('thirdparty')) {
+                    const inTP = incomingVal.thirdparty;
+                    const prevTP = prevCache.thirdparty;
+                    if (Array.isArray(prevTP) && prevTP.length > 0 &&
+                        (!Array.isArray(inTP) || inTP.length === 0)) {
+                        _qaCache[key].thirdparty = prevTP;
                     }
                 }
             } else {
@@ -5659,20 +5674,26 @@ async function _sendNotificationsAsync({ type, assignedBy, assignedTo, projectNa
         return;
     }
 
-    // Resolve assignedBy → email using qa_users from shared data
-    const sharedData = readQaData();
-    const users = sharedData['qa_users'] || [];
+    // Resolve name → email: MongoDB users collection is authoritative, DEFAULT_EMAILS as fallback
+    let dbUsers = [];
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        if (db) dbUsers = await db.collection('users').find({}, { projection: { name: 1, email: 1 } }).toArray();
+    } catch (_) {}
     const DEFAULT_EMAILS = {
-        'Deepa': 'deepa@adhashtech.com',
-        'Prakash Raj': 'prakashraj@adhashtech.com',
-        'Raghuram': 'raghuram@adhashtech.com',
+        'Deepa':      'deepa@adhashtech.com',
+        'Prakash Raj':'prakashraj.p@adhashtech.com',
+        'Raghuram':   'raghuram@synctag.com',
         'Thenilavan': 'thenilavan@adhashtech.com',
-        'Yogesh': 'yogesh@adhashtech.com',
+        'Yogesh':     'yogesh@synctag.com',
     };
     const findEmail = (name) => {
         if (!name) return null;
-        const u = users.find(u => u.name && u.name.toLowerCase() === name.toLowerCase());
-        if (u && u.email) return u.email;
+        // Check MongoDB users first (always up to date)
+        const dbU = dbUsers.find(u => u.name && u.name.toLowerCase() === name.toLowerCase());
+        if (dbU && dbU.email) return dbU.email;
+        // Fallback to hardcoded defaults
         for (const [k, v] of Object.entries(DEFAULT_EMAILS)) {
             if (k.toLowerCase() === name.toLowerCase()) return v;
         }
