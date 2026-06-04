@@ -4131,6 +4131,7 @@ function saveDayMeta(){_serverData['qa3_day_meta']=DT_DAY_META;serverPost('qa3_d
 function loadDayMeta(){DT_DAY_META=_serverData['qa3_day_meta']||DT_DAY_META;}
 
 // Ensure all projects have a row for the given date (auto-create if missing)
+let _dtEnsureSaveTimer=null;
 function dtEnsureProjectRows(dateStr){
   let changed=false;
   PROJECTS.forEach(p=>{
@@ -4142,12 +4143,16 @@ function dtEnsureProjectRows(dateStr){
       DAILY_TASKS.push(entry);
       changed=true;
     } else if(!exists.assignedBy&&defAssignee){
-      // backfill empty assignedBy with project default
       exists.assignedBy=defAssignee;
       changed=true;
     }
   });
-  if(changed)saveDailyTasks();
+  // Debounce: batch all ensure calls into one save after 2s so startup doesn't
+  // show "Saving..." for every row created during initial renderDailyTasksPage().
+  if(changed){
+    clearTimeout(_dtEnsureSaveTimer);
+    _dtEnsureSaveTimer=setTimeout(()=>{ if(_serverDataLoaded)saveDailyTasks(); },2000);
+  }
 }
 
 // Auto-ensure all dates in the current month have rows for all projects
