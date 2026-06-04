@@ -2014,6 +2014,43 @@ app.post('/api/env-secrets', (req, res) => {
     }
 });
 
+// GET /api/admin/snapshots — list available deployment snapshots (super_admin only)
+app.get('/api/admin/snapshots', requireAdmin, async (req, res) => {
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        const snaps = await db.collection('deployment_snapshots')
+            .find({}, { projection: { _id: 1, ts: 1, keys: 1 } })
+            .sort({ ts: -1 }).limit(10).toArray();
+        res.json({ snapshots: snaps.map(s => ({ id: s._id, ts: s.ts, keys: s.keys })) });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/admin/snapshots/restore — restore all qa3_ keys from a snapshot (super_admin only)
+app.post('/api/admin/snapshots/restore', requireAdmin, async (req, res) => {
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        const { snapshotId } = req.body || {};
+        // Use latest if no id provided
+        const snap = snapshotId
+            ? await db.collection('deployment_snapshots').findOne({ _id: require('mongodb').ObjectId(snapshotId) })
+            : await db.collection('deployment_snapshots').findOne({}, { sort: { ts: -1 } });
+        if (!snap) return res.status(404).json({ error: 'No snapshot found' });
+        const data = snap.data || {};
+        const { writeKey } = require('./src/db');
+        let restored = 0;
+        for (const [key, value] of Object.entries(data)) {
+            if (!key.startsWith('qa3_') || !value) continue;
+            await writeKey(key, value);
+            _qaCache[key] = value;
+            restored++;
+        }
+        console.log(`[snapshot] ✅ Restored ${restored} keys from snapshot ${snap.ts}`);
+        res.json({ success: true, restored, snapshotTs: snap.ts });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /api/admin/set-slack-token — super_admin only, persists token to MongoDB (survives redeploys)
 app.post('/api/admin/set-slack-token', requireAdmin, async (req, res) => {
     const { token } = req.body || {};
@@ -6026,6 +6063,23 @@ async function migrateWfDocsToGitHub() {
             // Dedup all project data in MongoDB — removes any accumulated duplicates
             try { await deduplicateAllProjectData(); } catch (e) { console.error('[startup] dedup failed:', e.message); }
             try { await seedSuperAdmin(); } catch (e) { console.warn('[startup] seedSuperAdmin failed:', e.message); }
+            // ── Auto-snapshot: save a timestamped backup of all live data to MongoDB on every startup ──
+            // This means every deployment automatically has a pre-deploy snapshot to restore from.
+            try {
+                const { getDB } = require('./src/db');
+                const db2 = getDB();
+                if (db2 && Object.keys(_qaCache).length > 0) {
+                    const snap = { ts: new Date(), keys: Object.keys(_qaCache).length, data: _qaCache };
+                    await db2.collection('deployment_snapshots').insertOne(snap);
+                    // Keep only last 10 snapshots to avoid unbounded growth
+                    const all = await db2.collection('deployment_snapshots').find({}, { projection: { _id: 1, ts: 1 } }).sort({ ts: -1 }).toArray();
+                    if (all.length > 10) {
+                        const toDelete = all.slice(10).map(d => d._id);
+                        await db2.collection('deployment_snapshots').deleteMany({ _id: { $in: toDelete } });
+                    }
+                    console.log(`[startup] ✅ Deployment snapshot saved (${snap.keys} keys)`);
+                }
+            } catch (e) { console.warn('[startup] Deployment snapshot failed:', e.message); }
             // Load Slack token from MongoDB (survives Railway redeploys unlike .env on disk)
             try {
                 const { getDB } = require('./src/db');

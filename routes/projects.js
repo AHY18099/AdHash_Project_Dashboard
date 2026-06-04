@@ -74,6 +74,21 @@ router.post('/', requireAuth, ensureConnected, async (req, res) => {
             taskChecklist:   b.taskChecklist    || [],
         });
         const saved = await doc.save();
+        // Initialise qa3_ QA data entry so the project exists in both stores from day one.
+        // Without this, the first heartbeat save from an uninitialised STORE wipes credentials/envDetails.
+        try {
+            const { writeKey } = require('../src/db');
+            const projectId = saved.id || doc.id;
+            await writeKey('qa3_' + projectId, {
+                env: { environment: 'Production', website: '', dashboard: '', releaseDate: '', qaLead: '', appVersion: '', releaseVersion: '', custom: [] },
+                gates: ['All Critical Smoke scenarios must be Pass', 'No Fail or Blocked status in Production Checklist', 'US compliance, security, and data isolation checks reviewed', 'Monitoring, backup, rollback, and alerting enabled'],
+                smoke: [], prod: [], testdata: [], releaseNotes: [], reports: [], pending: [],
+                feedback: [], wfdocs: [], credentials: [], apitests: [], pendingtasks: [],
+                thirdparty: [], taskchecklist: [],
+                envDetails: { production: [], staging: [] },
+            });
+            console.log('[Projects] ✅ Initialised qa3_' + projectId + ' in QA data store');
+        } catch (e) { console.warn('[Projects] qa3_ init failed (non-fatal):', e.message); }
         return res.status(201).json({ success: true, project: saved.toObject() });
     } catch (err) {
         if (err.code === 11000) return res.status(409).json({ error: 'A project with this ID already exists' });
