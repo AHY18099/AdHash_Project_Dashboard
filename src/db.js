@@ -202,7 +202,7 @@ async function writeProject(projectId, proj) {
     // Only delete+replace when incoming array is non-empty (real save) OR when
     // the proj._replaceArrays flag explicitly lists the field (intentional clear).
     const replaceArrays = Array.isArray(proj._replaceArrays) ? new Set(proj._replaceArrays) : new Set();
-    const PROTECTED = new Set(['credentials', 'thirdparty', 'pendingtasks', 'apitests']);
+    const PROTECTED = new Set(['credentials', 'thirdparty', 'pendingtasks', 'apitests', 'reports']);
 
     for (const [field, col] of Object.entries(SECTION_MAP)) {
         const items = proj[field];
