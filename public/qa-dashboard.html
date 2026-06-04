@@ -7001,10 +7001,12 @@ async function _doServerPost(key,value,retriesLeft){
       if(mv!==undefined){
         _serverData[key]=mv;
         if(key==='qa3_daily_tasks'){
-          // Server confirmed save — clear pending flags for tasks in this response
-          if(Array.isArray(mv))mv.forEach(t=>{if(t.projectId&&t.date)_dtPendingSave.delete(t.projectId+'|'+t.date);});
-          _lastHbDtHash=JSON.stringify(mv); // set hash first
-          DAILY_TASKS=mv;
+          // Server confirmed save — only clear pending flags for the rows that were in
+          // the sent payload (not all rows), then merge server response respecting any
+          // newer local edits made while the save was in-flight.
+          if(Array.isArray(value))value.forEach(t=>{if(t.projectId&&t.date)_dtPendingSave.delete(t.projectId+'|'+t.date);});
+          _mergeSseDailyTasks(Array.isArray(mv)?mv:[]);
+          _lastHbDtHash=JSON.stringify(DAILY_TASKS); // hash after merge
         } else if(key==='qa3_team_tasks'){
           _lastHbTtHash=JSON.stringify(mv);
           TEAM_TASKS=mv;
@@ -7363,6 +7365,10 @@ let DAILY_TASKS=[];
 const _dtPendingSave=new Map(); // key: 'projectId|date' → timestamp of last local edit
 
 function saveDailyTasks(){
+  // Stamp every row with current timestamp so server can resolve concurrent-edit conflicts
+  // by preferring the row with the most recent _savedAt value.
+  const now=Date.now();
+  DAILY_TASKS.forEach(t=>{t._savedAt=now;});
   _serverData['qa3_daily_tasks']=DAILY_TASKS;
   serverPost('qa3_daily_tasks',DAILY_TASKS);
 }
@@ -7381,18 +7387,18 @@ function loadDailyTasks(){
 function _mergeSseDailyTasks(incomingArr){
   if(!Array.isArray(incomingArr))return;
   const now=Date.now();
-  const GRACE=10000; // 10s — if user edited within 10s, keep local version
+  const GRACE=60000; // 60s — keep local version for a full minute after any edit
   const localByKey=new Map();
   DAILY_TASKS.forEach(t=>{localByKey.set(t.projectId+'|'+t.date,t);});
   incomingArr.forEach(incoming=>{
     const k=incoming.projectId+'|'+incoming.date;
     const pendingTs=_dtPendingSave.get(k)||0;
-    const isLocallyPending=(now-pendingTs)<GRACE;
+    const isLocallyPending=pendingTs>0&&(now-pendingTs)<GRACE;
     if(!isLocallyPending){
       // No recent local edit — accept server version
       localByKey.set(k,incoming);
     }
-    // else: local edit is still "in-flight" — keep local version
+    // else: local edit still in grace window — keep local version
   });
   // Rebuild _serverData with merged result (so next loadDailyTasks uses it)
   const merged=Array.from(localByKey.values());

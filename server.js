@@ -5397,10 +5397,23 @@ function mergeDailyTasks(existing, incoming) {
     const byId = new Map();
     const byNk = new Map();
     const nk = r => (r.date||'') + '|' + (r.projectId||'');
-    (existing || []).forEach(r => { if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r); });
-    incoming.forEach(r => { if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r); });
-    // Build set of date|projectId keys already covered by id-keyed entries
-    // so no-id legacy entries don't create duplicates alongside them
+    // Helper: pick winner by _savedAt timestamp — newer edit wins
+    const winner = (a, b) => {
+        if (!a) return b;
+        if (!b) return a;
+        const ta = a._savedAt || 0;
+        const tb = b._savedAt || 0;
+        return tb > ta ? b : a;
+    };
+    (existing || []).forEach(r => {
+        if (r.id) byId.set(r.id, r);
+        else byNk.set(nk(r), r);
+    });
+    incoming.forEach(r => {
+        if (r.id) byId.set(r.id, winner(byId.get(r.id), r));
+        else byNk.set(nk(r), winner(byNk.get(nk(r)), r));
+    });
+    // Drop no-id entries whose date|projectId is already covered by an id-keyed entry
     const coveredById = new Set(Array.from(byId.values()).map(nk));
     const nkOnly = Array.from(byNk.entries())
         .filter(([k]) => !coveredById.has(k))
