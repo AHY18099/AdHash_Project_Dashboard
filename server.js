@@ -5545,6 +5545,9 @@ const PROJECT_ARRAY_KEYS = ['smoke', 'prod', 'feedback', 'thirdparty', 'taskchec
                             'pendingtasks', 'credentials', 'apitests', 'testdata',
                             'releaseNotes', 'reports', 'pending', 'wfdocs'];
 
+// Fields that must never be overwritten with an empty array — preserve existing data
+const NEVER_WIPE_EMPTY = new Set(['credentials', 'thirdparty', 'wfdocs', 'pendingtasks', 'apitests', 'reports']);
+
 function mergeProjectData(existing, incoming) {
     if (!existing || typeof existing !== 'object') return incoming;
     if (!incoming || typeof incoming !== 'object') return existing;
@@ -5555,18 +5558,24 @@ function mergeProjectData(existing, incoming) {
         // Never clobber existing data with null/undefined
         if (inVal === null || inVal === undefined) continue;
         if (PROJECT_ARRAY_KEYS.includes(key)) {
+            // Never overwrite existing non-empty data with an empty array for protected fields
+            if (NEVER_WIPE_EMPTY.has(key) && Array.isArray(inVal) && inVal.length === 0 &&
+                Array.isArray(merged[key]) && merged[key].length > 0) continue;
             if (key === 'smoke' || key === 'prod') {
                 merged[key] = mergeTestRows(existing[key], inVal);
             } else {
                 merged[key] = mergeById(existing[key], inVal);
             }
         } else if (key === 'envDetails' && inVal && typeof inVal === 'object') {
+            const existProd = (existing[key]||{}).production || [];
+            const existStag = (existing[key]||{}).staging    || [];
+            const inProd    = inVal.production || [];
+            const inStag    = inVal.staging    || [];
             merged[key] = {
-                production: mergeById((existing[key]||{}).production, inVal.production),
-                staging:    mergeById((existing[key]||{}).staging,    inVal.staging),
+                production: (inProd.length === 0 && existProd.length > 0) ? existProd : mergeById(existProd, inProd),
+                staging:    (inStag.length === 0 && existStag.length > 0) ? existStag : mergeById(existStag, inStag),
             };
         } else {
-            // Scalar/object fields — incoming wins only if it has a real value
             merged[key] = inVal;
         }
     }

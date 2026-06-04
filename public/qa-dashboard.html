@@ -7339,7 +7339,9 @@ let _serverDataLoaded=false; // guard: never save until server data has been fet
 async function loadFromServer(){
   try{
     const r=await fetch('/api/qa-data',{cache:'no-store',headers:{Authorization:'Bearer '+_getToken()}});
-    if(!r.ok)return;
+    // On auth failure (401/403) — do NOT proceed, saves must stay blocked
+    if(r.status===401||r.status===403){console.warn('[loadFromServer] auth failed ('+r.status+') — saves blocked');return;}
+    if(!r.ok){console.warn('[loadFromServer] server error ('+r.status+') — saves blocked');return;}
     _serverData=await r.json();
     _serverDataLoaded=true;
     // Strip any legacy base64 wfdoc blobs to keep memory clean
@@ -8050,13 +8052,15 @@ window.addEventListener('DOMContentLoaded',async()=>{
 
   initUsers();
   loadAllState();
-  // ── Set heartbeat hashes to CURRENT data immediately after load ──
-  // Without this, the first heartbeat sees all non-empty data as "changed"
-  // (hashes start as '' but data is now loaded) → saves everything on first tick.
-  _lastHbDtHash=JSON.stringify(DAILY_TASKS);
-  _lastHbTtHash=JSON.stringify(TEAM_TASKS);
-  _lastHbRlHash=JSON.stringify(RELEASES);
-  PROJECTS.forEach(p=>{_lastHbStoreHash[p.id]=JSON.stringify(STORE[p.id]);});
+  // ── Set heartbeat hashes AFTER load — must happen after _serverDataLoaded is true ──
+  // Only set hashes if server data actually loaded; if not, hashes stay empty so
+  // heartbeat sees no changes and skips saves (blocked by _serverDataLoaded guard anyway).
+  if(_serverDataLoaded){
+    _lastHbDtHash=JSON.stringify(DAILY_TASKS);
+    _lastHbTtHash=JSON.stringify(TEAM_TASKS);
+    _lastHbRlHash=JSON.stringify(RELEASES);
+    PROJECTS.forEach(p=>{_lastHbStoreHash[p.id]=JSON.stringify(STORE[p.id]);});
+  }
 
   // Determine session: JWT token first, then cookie fallback
   try{
