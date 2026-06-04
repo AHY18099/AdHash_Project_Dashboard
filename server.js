@@ -5478,6 +5478,39 @@ app.post('/api/qa-data-bulk', async (req, res) => {
     }
 });
 
+// ── Deleted-row registry ─────────────────────────────────────────────────────
+// When a row is explicitly deleted via _replaceArrays, its id is registered here
+// for 5 minutes. Any subsequent save that tries to bring the row back is blocked.
+// This prevents stale browser tabs from resurrecting deleted rows.
+const _deletedRowRegistry = new Map(); // key: 'qa3_pid:rowId' → expiry timestamp
+const DELETED_ROW_TTL = 5 * 60 * 1000; // 5 minutes
+
+function _registerDeletedRows(qaKey, prevArray, newArray) {
+    const prevIds = new Set((prevArray || []).filter(r => r && r.id).map(r => r.id));
+    const newIds  = new Set((newArray  || []).filter(r => r && r.id).map(r => r.id));
+    const now = Date.now();
+    // Clean expired entries
+    for (const [k, exp] of _deletedRowRegistry) { if (now > exp) _deletedRowRegistry.delete(k); }
+    // Register newly deleted ids
+    for (const id of prevIds) {
+        if (!newIds.has(id)) _deletedRowRegistry.set(qaKey + ':' + id, now + DELETED_ROW_TTL);
+    }
+}
+
+function _filterDeletedRows(qaKey, arr) {
+    if (!Array.isArray(arr)) return arr;
+    const now = Date.now();
+    return arr.filter(r => {
+        if (!r || !r.id) return true;
+        const exp = _deletedRowRegistry.get(qaKey + ':' + r.id);
+        if (exp && now < exp) {
+            console.log(`[delete-guard] blocked resurrection of ${r.id} in ${qaKey}`);
+            return false;
+        }
+        return true;
+    });
+}
+
 // Smart merge helpers — prevent multi-user overwrite on shared arrays
 // Each user's browser only has their slice of data; a full replace would clobber other users' rows.
 
@@ -5582,8 +5615,10 @@ function mergeById(existing, incoming) {
 // a _savedAt timestamp NEWER than the incoming batch — meaning another user
 // added them after this save was created. This prevents resurrection while
 // allowing concurrent adds from other users to survive.
-function mergeTestRows(existing, incoming) {
+function mergeTestRows(existing, incoming, qaKey) {
     if (!Array.isArray(incoming)) return existing || [];
+    // Filter incoming: block rows that were recently deleted (in registry)
+    if (qaKey) incoming = _filterDeletedRows(qaKey, incoming);
     if (!Array.isArray(existing) || existing.length === 0) return incoming;
     const nk = r => ((r&&r.module)||'') + '|' + ((r&&r.step)||'') + '|' + ((r&&r.item)||'');
     const winner = (a, b) => (!a) ? b : (!b) ? a : ((b._savedAt||0) >= (a._savedAt||0)) ? b : a;
@@ -5623,7 +5658,7 @@ const PROJECT_ARRAY_KEYS = ['smoke', 'prod', 'feedback', 'thirdparty', 'taskchec
 // Fields that must never be overwritten with an empty array — preserve existing data
 const NEVER_WIPE_EMPTY = new Set(['credentials', 'thirdparty', 'wfdocs', 'pendingtasks', 'apitests', 'reports']);
 
-function mergeProjectData(existing, incoming) {
+function mergeProjectData(existing, incoming, qaKey) {
     if (!existing || typeof existing !== 'object') return incoming;
     if (!incoming || typeof incoming !== 'object') return existing;
     // Start from existing so keys NOT present in incoming are preserved (not wiped)
@@ -5637,7 +5672,7 @@ function mergeProjectData(existing, incoming) {
             if (NEVER_WIPE_EMPTY.has(key) && Array.isArray(inVal) && inVal.length === 0 &&
                 Array.isArray(merged[key]) && merged[key].length > 0) continue;
             if (key === 'smoke' || key === 'prod') {
-                merged[key] = mergeTestRows(existing[key], inVal);
+                merged[key] = mergeTestRows(existing[key], inVal, qaKey);
             } else if (key === 'reports') {
                 // Reports: incoming is authoritative when non-empty (deletions must be respected).
                 // mergeById keeps deleted items alive — use incoming directly instead.
@@ -5713,11 +5748,9 @@ app.post('/api/qa-data/:key', async (req, res) => {
                 if (value._replaceArrays && Array.isArray(value._replaceArrays)) {
                     // Client explicitly deleted rows — replace those arrays directly, don't merge
                     const { _replaceArrays, ...cleanValue } = value;
-                    const merged = mergeProjectData(_qaCache[key], cleanValue);
+                    const merged = mergeProjectData(_qaCache[key], cleanValue, key);
                     for (const arrKey of _replaceArrays) {
                         if (arrKey === '_envDetails') {
-                            // Special: replace envDetails object entirely (not merge-by-id)
-                            // Accept even if production/staging arrays are empty (user cleared them)
                             if (cleanValue.envDetails && typeof cleanValue.envDetails === 'object') {
                                 merged.envDetails = {
                                     production: Array.isArray(cleanValue.envDetails.production) ? cleanValue.envDetails.production : [],
@@ -5725,6 +5758,8 @@ app.post('/api/qa-data/:key', async (req, res) => {
                                 };
                             }
                         } else if (Array.isArray(cleanValue[arrKey])) {
+                            // Register deleted row ids BEFORE replacing — blocks resurrection for 5min
+                            _registerDeletedRows(key, (_qaCache[key] || {})[arrKey], cleanValue[arrKey]);
                             merged[arrKey] = cleanValue[arrKey];
                         }
                     }
@@ -5732,7 +5767,7 @@ app.post('/api/qa-data/:key', async (req, res) => {
                 } else {
                     // Strip _replaceArrays if present (safety)
                     const { _replaceArrays: _ra, ...cleanVal } = (typeof value === 'object' && value !== null) ? value : {};
-                    _qaCache[key] = mergeProjectData(_qaCache[key], _ra ? cleanVal : value);
+                    _qaCache[key] = mergeProjectData(_qaCache[key], _ra ? cleanVal : value, key);
                 }
                 // ── DATA LOSS PREVENTION ──────────────────────────────────────────────────
                 // Preserve critical arrays if incoming is missing OR empty.
