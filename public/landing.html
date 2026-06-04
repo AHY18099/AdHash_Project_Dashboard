@@ -850,7 +850,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSyncTradePanel(
 // Keys stored in MongoDB (encrypted) — shared across all browsers/devices
 // localStorage used only as fast fallback while DB loads
 const stLS={get:k=>localStorage.getItem('stk_'+k)||'',set:(k,v)=>localStorage.setItem('stk_'+k,v)};
-function _stToken(){return localStorage.getItem('qa_jwt_token')||localStorage.getItem('qa_jwt_token')||localStorage.getItem('qa_token')||'';}
+function _stToken(){return localStorage.getItem('qa_jwt_token')||localStorage.getItem('qa_token')||'';}
 async function stLoadConfig(){
   const s=document.getElementById('st-cfgStatus');
   if(s){s.textContent='Loading config from DB…';s.className='stinfo';}
