@@ -3552,7 +3552,7 @@ async function apiRun(p,i){
     // Route through server-side proxy to avoid CORS restrictions
     const proxyResp=await fetch('/api/qa-proxy',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},
       body:JSON.stringify({url:api.url,method:api.method||'GET',headers:hdrs,body:hasBody?api.body:undefined})
     });
     const data=await proxyResp.json();
@@ -5925,7 +5925,7 @@ async function _tpRunApi(i){
   if(!a.url){if(badge){badge.style.display='inline';badge.textContent='⚠ No URL';badge.style.cssText='display:inline;background:rgba(217,119,6,.12);color:var(--blk);border:1px solid rgba(217,119,6,.3);border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600';}return;}
   if(badge){badge.style.cssText='display:inline;background:rgba(59,130,246,.1);color:var(--inp);border:1px solid rgba(59,130,246,.25);border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600';badge.textContent='⏳ Running…';}
   try{
-    const resp=await fetch('/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:a.url,method:a.method==='OTHER'?'GET':a.method})});
+    const resp=await fetch('/api/proxy',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},body:JSON.stringify({url:a.url,method:a.method==='OTHER'?'GET':a.method})});
     const data=await resp.json();
     const ok=data.status>=200&&data.status<300;
     const statusOk=data.status>0&&!data.error;
@@ -6026,6 +6026,7 @@ function tclInlineChange(p){
 function tclInlineSave(p,i,field,val){
   if(!STORE[p].taskchecklist[i])return;
   STORE[p].taskchecklist[i][field]=val;
+  STORE[p].taskchecklist[i]._savedAt=Date.now();
   _tclDirty[p]=true;
   const btn=document.getElementById('tcl-save-btn-'+p);
   if(btn){btn.disabled=false;btn.style.opacity='1';}
@@ -6647,7 +6648,7 @@ function openEditProject(pid){
     saveAllState();closeModal();renderProject(pid);toast('Project updated');
     // Sync website/dashboard URL to project-mapping.json and trigger git push
     fetch('/api/projects/'+encodeURIComponent(pid)+'/env',{
-      method:'POST',headers:{'Content-Type':'application/json'},
+      method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},
       body:JSON.stringify({website:proj.website,dashboard:proj.dashboard,color:proj.color,name:proj.name})
     }).catch(()=>{});
   });
@@ -7099,7 +7100,7 @@ async function _doServerPost(key,value,retriesLeft){
 // Download full data backup as JSON file
 async function downloadBackup(){
   try{
-    const r=await fetch('/api/backup',{cache:'no-store'});
+    const r=await fetch('/api/backup',{cache:'no-store',headers:{Authorization:'Bearer '+_getToken()}});
     if(!r.ok){toast('Backup failed: '+r.status,'err');return;}
     const blob=await r.blob();
     const url=URL.createObjectURL(blob);
@@ -7114,7 +7115,7 @@ async function downloadBackup(){
 
 // Fire-and-forget DELETE of a key from the server
 function serverDelete(key){
-  fetch('/api/qa-data/'+encodeURIComponent(key),{method:'DELETE'}).catch(()=>{});
+  fetch('/api/qa-data/'+encodeURIComponent(key),{method:'DELETE',headers:{Authorization:'Bearer '+_getToken()}}).catch(()=>{});
 }
 
 // Load all data from server into _serverData (called once on init, awaited)

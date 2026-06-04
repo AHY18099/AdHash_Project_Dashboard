@@ -25,3 +25,16 @@ package-lock.json
 *.log
 *.tmp
 *.temp
+
+# Live data backup snapshots — contain project data, never commit
+LIVE_BACKUP_*.json
+LIVE_CURRENT_*.json
+LIVE_EMERGENCY_*.json
+LIVE_FIXED.json
+LIVE_BACKUP_.json
+GIT_HEAD_DATA.json
+railway-live-data.json
+data/LIVE_BACKUP_*.json
+data/backup-*.json
+data/qa-shared-railway.json
+backups/

@@ -61,6 +61,14 @@ async function _ensureIndexes(db) {
             );
             // Fast lookup by projectId
             await db.collection(col).createIndex({ projectId: 1 }, { background: true });
+            // Compound (projectId, date) index for daily_tasks — used in merge queries
+            if (col === 'daily_tasks') {
+                await db.collection(col).createIndex({ projectId: 1, date: 1 }, { background: true, name: 'projectId_date' });
+            }
+            // _savedAt index for merge functions that filter by timestamp
+            if (['daily_tasks', 'team_tasks', 'smoke_tests', 'prod_checklist'].includes(col)) {
+                await db.collection(col).createIndex({ _savedAt: 1 }, { background: true, sparse: true, name: '_savedAt_1' });
+            }
         } catch (e) {
             console.warn('[mongodb] Index ensure failed for', col, ':', e.message);
         }
