@@ -5436,8 +5436,10 @@ app.delete('/api/qa-data/:key', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     const key = req.params.key;
     try {
-        delete _qaCache[key];
-        await deleteKey(key);
+        await _withWriteLock(async () => {
+            await deleteKey(key);   // persist to MongoDB FIRST
+            delete _qaCache[key];   // then update cache
+        });
         res.json({ status: 'deleted', key });
         broadcastSseEvent('qa-data-delete', { key });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -5480,26 +5482,27 @@ app.post('/api/qa-data-bulk', async (req, res) => {
 // Merge daily tasks: keyed by (date, projectId) — each row is unique per project per day
 function mergeDailyTasks(existing, incoming) {
     if (!Array.isArray(incoming)) return existing;
-    const byId = new Map();
-    const byNk = new Map();
     const nk = r => (r.date||'') + '|' + (r.projectId||'');
-    // Helper: pick winner by _savedAt timestamp — newer edit wins
     const winner = (a, b) => {
-        if (!a) return b;
-        if (!b) return a;
-        const ta = a._savedAt || 0;
-        const tb = b._savedAt || 0;
-        return tb > ta ? b : a;
+        if (!a) return b; if (!b) return a;
+        return ((b._savedAt||0) >= (a._savedAt||0)) ? b : a;
     };
+    // Use incoming's max timestamp as the "save time" for this batch
+    const incomingMaxTs = Math.max(0, ...incoming.map(r => r._savedAt || 0));
+    const byId  = new Map();
+    const byNk  = new Map();
+    // Seed from existing, but only keep rows newer than incoming's batch timestamp
+    // (rows with _savedAt > incomingMaxTs were edited by another user after this save)
     (existing || []).forEach(r => {
-        if (r.id) byId.set(r.id, r);
-        else byNk.set(nk(r), r);
+        if ((r._savedAt||0) > incomingMaxTs) {
+            if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r);
+        }
     });
+    // Overlay all incoming rows (winner by _savedAt on conflict)
     incoming.forEach(r => {
         if (r.id) byId.set(r.id, winner(byId.get(r.id), r));
         else byNk.set(nk(r), winner(byNk.get(nk(r)), r));
     });
-    // Drop no-id entries whose date|projectId is already covered by an id-keyed entry
     const coveredById = new Set(Array.from(byId.values()).map(nk));
     const nkOnly = Array.from(byNk.entries())
         .filter(([k]) => !coveredById.has(k))
@@ -5507,18 +5510,23 @@ function mergeDailyTasks(existing, incoming) {
     return [...Array.from(byId.values()), ...nkOnly];
 }
 
-// Merge team tasks: keyed by id. Newer _savedAt timestamp wins for same id.
+// Merge team tasks: keyed by id. Newer _savedAt wins. Rows deleted in incoming
+// (with older _savedAt than the batch) are not resurrected from existing.
 function mergeTeamTasks(existing, incoming) {
     if (!Array.isArray(incoming)) return existing;
-    const byId = new Map();
-    const byNk = new Map();
     const nk = r => (r.date||'') + '|' + (r.projectId||'');
     const winner = (a, b) => {
         if (!a) return b; if (!b) return a;
         return ((b._savedAt||0) >= (a._savedAt||0)) ? b : a;
     };
+    const incomingMaxTs = Math.max(0, ...incoming.map(r => r._savedAt || 0));
+    const byId  = new Map();
+    const byNk  = new Map();
+    // Only keep existing rows that are newer than this incoming batch (concurrent adds)
     (existing || []).forEach(r => {
-        if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r);
+        if ((r._savedAt||0) > incomingMaxTs) {
+            if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r);
+        }
     });
     incoming.forEach(r => {
         if (r.id) byId.set(r.id, winner(byId.get(r.id), r));

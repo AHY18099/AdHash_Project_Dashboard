@@ -4244,6 +4244,10 @@ function dtInlineChange(taskIdx,colKey,sel){
 
 function dtDeleteRow(taskIdx){
   if(!confirm('Delete this row?'))return;
+  const t=DAILY_TASKS[taskIdx];
+  // Mark ALL rows for this date as pending so saveDailyTasks stamps them with fresh _savedAt
+  // This ensures the server's mergeDailyTasks drops the deleted row (it won't be in incoming)
+  if(t){const k=t.projectId+'|'+t.date;_dtPendingSave.set(k,Date.now());}
   DAILY_TASKS.splice(taskIdx,1);
   saveDailyTasks();
   renderDailyTasksPage();
@@ -4449,6 +4453,8 @@ function dtOpenEdit(idx){
 
 function dtDelete(idx){
   if(!confirm('Delete this row?'))return;
+  const t=DAILY_TASKS[idx];
+  if(t){_dtPendingSave.set(t.projectId+'|'+t.date,Date.now());}
   DAILY_TASKS.splice(idx,1);
   saveDailyTasks();
   renderDailyTasksPage();
@@ -4823,6 +4829,7 @@ function ttToggleWeek(weekNum){
 function ttDeleteTask(idx){
   if(!confirm('Delete this task?'))return;
   TEAM_TASKS.splice(idx,1);
+  // saveTeamTasks stamps _savedAt on all rows — server drops deleted row (not in incoming)
   saveTeamTasks();
   renderTeamTasksPage();
   toast('Task deleted');
@@ -7422,28 +7429,31 @@ function loadDailyTasks(){
   filtered.forEach(t=>{const k=t.projectId+'|'+t.date;seen.set(k,t);});
   DAILY_TASKS=Array.from(seen.values());
 }
-// Merge incoming SSE daily tasks — preserve locally-modified tasks that haven't
-// been confirmed by server yet (within 10s grace window)
+// Merge incoming SSE daily tasks.
+// Server array is authoritative — deleted rows (not in incoming) are removed.
+// Exception: locally-pending rows (edited within GRACE window) override server version
+// for their specific key, but are NOT kept if server omitted them (deletion wins).
 function _mergeSseDailyTasks(incomingArr){
   if(!Array.isArray(incomingArr))return;
   const now=Date.now();
-  const GRACE=60000; // 60s — keep local version for a full minute after any edit
-  const localByKey=new Map();
-  DAILY_TASKS.forEach(t=>{localByKey.set(t.projectId+'|'+t.date,t);});
-  incomingArr.forEach(incoming=>{
-    const k=incoming.projectId+'|'+incoming.date;
+  const GRACE=60000;
+  // Build incoming map — this is the server's authoritative state
+  const incomingByKey=new Map();
+  incomingArr.forEach(t=>{incomingByKey.set(t.projectId+'|'+t.date,t);});
+  // Start from incoming (server authoritative), override with local pending edits
+  const result=new Map(incomingByKey);
+  DAILY_TASKS.forEach(t=>{
+    const k=t.projectId+'|'+t.date;
     const pendingTs=_dtPendingSave.get(k)||0;
     const isLocallyPending=pendingTs>0&&(now-pendingTs)<GRACE;
-    if(!isLocallyPending){
-      // No recent local edit — accept server version
-      localByKey.set(k,incoming);
+    // Only keep local version if: (a) still pending AND (b) server ALSO has this row
+    // If server dropped the row (deletion), don't resurrect it even if locally pending
+    if(isLocallyPending&&incomingByKey.has(k)){
+      result.set(k,t); // local edit wins for this key
     }
-    // else: local edit still in grace window — keep local version
   });
-  // Rebuild _serverData with merged result (so next loadDailyTasks uses it)
-  const merged=Array.from(localByKey.values());
+  const merged=Array.from(result.values());
   _serverData['qa3_daily_tasks']=merged;
-  // Reload DAILY_TASKS from merged data
   const realIds=new Set(PROJECTS.map(p=>p.id));
   const seen=new Map();
   merged.filter(t=>t.projectId&&(realIds.size===0||realIds.has(t.projectId))&&t.projectId!=='global')
