@@ -5577,31 +5577,38 @@ function mergeById(existing, incoming) {
     return [...Array.from(byId.values()), ...Array.from(byNk.values())];
 }
 
-// Merge smoke/prod rows by id. For same id, newer _savedAt wins (concurrent edit safety).
-// Rows in existing but NOT in incoming are preserved (another user's rows survive).
-// Row id changes: if incoming has a row whose id didn't exist in existing, it replaces
-// the row with matching module+step/item (natural key), preventing ghost rows.
+// Merge smoke/prod rows. Incoming is authoritative for what it contains.
+// Deleted rows (in existing but NOT in incoming) are only kept if they have
+// a _savedAt timestamp NEWER than the incoming batch — meaning another user
+// added them after this save was created. This prevents resurrection while
+// allowing concurrent adds from other users to survive.
 function mergeTestRows(existing, incoming) {
     if (!Array.isArray(incoming)) return existing || [];
     if (!Array.isArray(existing) || existing.length === 0) return incoming;
     const nk = r => ((r&&r.module)||'') + '|' + ((r&&r.step)||'') + '|' + ((r&&r.item)||'');
     const winner = (a, b) => (!a) ? b : (!b) ? a : ((b._savedAt||0) >= (a._savedAt||0)) ? b : a;
-    // Index existing by id and by natural key
-    const byId  = new Map(existing.filter(r=>r&&r.id).map(r=>[r.id, r]));
-    const byNk  = new Map(existing.filter(r=>r&&!r.id).map(r=>[nk(r), r]));
-    // Build a natural-key → existing-id map so id edits remove the old row
+    // The incoming batch's max timestamp — rows only added AFTER this are concurrent adds
+    const incomingMaxTs = Math.max(0, ...incoming.map(r => r._savedAt || 0));
     const nkToId = new Map(existing.filter(r=>r&&r.id).map(r=>[nk(r), r.id]));
+    // Start from incoming (authoritative)
+    const byId  = new Map();
+    const byNk  = new Map();
     incoming.forEach(r => {
         if (!r) return;
         const k = nk(r);
         if (r.id) {
-            // If this id is new but natural key matches an old id, remove the old row
             const oldId = nkToId.get(k);
-            if (oldId && oldId !== r.id) byId.delete(oldId);
+            if (oldId && oldId !== r.id) byId.delete(oldId); // remove ghost on id rename
             byId.set(r.id, winner(byId.get(r.id), r));
         } else {
             byNk.set(k, winner(byNk.get(k), r));
         }
+    });
+    // Only add existing rows that were created AFTER this batch (concurrent adds by other users)
+    existing.forEach(r => {
+        if (!r || (r._savedAt||0) <= incomingMaxTs) return; // older or same — skip (deleted)
+        if (r.id && !byId.has(r.id)) byId.set(r.id, r);
+        else if (!r.id) { const k = nk(r); if (!byNk.has(k)) byNk.set(k, r); }
     });
     return [...Array.from(byId.values()), ...Array.from(byNk.values())];
 }

@@ -3921,6 +3921,7 @@ function updateStats(p){
   }
 function updateStatus(p,sec,i,sel){
   STORE[p][sec][i].status=sel.value;
+  STORE[p][sec][i]._savedAt=Date.now();
   sel.className='ssel '+sel.value.replace(' ','-');
   sel.closest('tr').dataset.status=sel.value;
   updateStats(p);
@@ -6707,6 +6708,7 @@ function updateStats(p){
   }
 function updateStatus(p,sec,i,sel){
   STORE[p][sec][i].status=sel.value;
+  STORE[p][sec][i]._savedAt=Date.now();
   sel.className='ssel '+sel.value.replace(' ','-');
   sel.closest('tr').dataset.status=sel.value;
   updateStats(p);
@@ -6816,7 +6818,7 @@ function openEditRow(p,sec,i){
   openModal(`Edit ${isSm?'Smoke Test':'Production Item'}`,rowFormHtml(r,isSm),()=>{
     const d=getRowData(isSm,r);
     if(!d.module||!(d.step||d.item)){toast('Module and step/item are required','err');return;}
-    STORE[p][sec][i]={...r,...d};
+    STORE[p][sec][i]={...r,...d,_savedAt:Date.now()};
     closeModal();saveToLS(p);updateStats(p);renderProject(p);toast('Test case updated');
   },{saveLabel:'Update'});
 }
@@ -7013,7 +7015,10 @@ function serverPost(key,value){
   // Without this guard, empty-initialized STORE arrays wipe real MongoDB data.
   if(!_serverDataLoaded && key.startsWith('qa3_')){console.warn('[serverPost] blocked pre-load save for',key);return;}
   _serverData[key]=value; // update mirror immediately for instant UI reads
-  _doServerPost(key,value,3);
+  // Deep-snapshot the value NOW so _replaceArrays and array contents are captured
+  // before the caller deletes the flag or mutates the object (async fetch reads value later).
+  const snapshot=JSON.parse(JSON.stringify(value));
+  _doServerPost(key,snapshot,3);
 }
 async function _doServerPost(key,value,retriesLeft){
   _activeSaves++;
