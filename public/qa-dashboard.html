@@ -3297,7 +3297,9 @@ function renderApprovals(p){
 
 // ══ SAVED REPORTS ══
 function renderReports(p){
-  const reps=STORE[p].reports||[];
+  // Deduplicate by id then datetime before rendering — prevents display duplicates
+  const seen=new Set();
+  const reps=(STORE[p].reports||[]).filter(r=>{const k=r.id||r.datetime;if(seen.has(k))return false;seen.add(k);return true;});
   if(!reps.length)return`<div class="empty"><div class="ico">💾</div>No saved reports yet.<div style="margin-top:6px;font-size:12px">Use <b>Save Report</b> in Task Checklist or Smoke/Prod tests to create snapshots.</div></div>`;
   const proj=PROJECTS.find(x=>x.id===p);
 
@@ -6935,11 +6937,18 @@ function saveState(p){
     taskchecklist:JSON.parse(JSON.stringify(STORE[p].taskchecklist||[]))
   };
   STORE[p].reports.push(snap);
-  // Reset status + comment on every non-pending row — keep rows intact, never delete them
-  STORE[p].smoke.forEach(r=>{if(!r._pending){r.status='Not Started';r.comment='';}});
-  STORE[p].prod.forEach(r=>{if(!r._pending){r.status='Not Started';r.comment='';}});
-  saveToLS(p);renderProject(p);
-  toast(`✓ Report #${STORE[p].reports.length} saved — statuses reset, test cases preserved`);
+  // Reset ALL mutable fields on every non-pending row — status, comment, owner
+  STORE[p].smoke.forEach(r=>{if(!r._pending){r.status='Not Started';r.comment='';r.owner='';}});
+  STORE[p].prod.forEach(r=>{if(!r._pending){r.status='Not Started';r.comment='';r.owner='';}});
+  // Also reset task checklist status and bug counts
+  if(Array.isArray(STORE[p].taskchecklist)){
+    STORE[p].taskchecklist=STORE[p].taskchecklist.map(r=>({
+      ...r,status:'Pending',bugsCount:0,priorityHigh:0,priorityMedium:0,priorityLow:0,comments:'',testedBy:''
+    }));
+    STORE[p]._replaceArrays=['taskchecklist'];
+  }
+  saveToLS(p);delete STORE[p]._replaceArrays;renderProject(p);
+  toast(`✓ Report #${STORE[p].reports.length} saved — all statuses reset`);
 }
 // ── SERVER-FIRST STORAGE ──
 // _serverData mirrors MongoDB data loaded via /api/qa-data on startup.
@@ -6969,11 +6978,8 @@ function _retryAllFailed(){
   pending.forEach(p=>_doServerPost(p.key,p.value,3));
 }
 function _updateSaveStatusBadge(){
-  clearTimeout(_savingClearTimer);
   if(_activeSaves>0){
     _setSaveStatus('saving','⏳ Saving…');
-    // FIX D: force-clear after 5s so UI never stays stuck on "Saving..."
-    _savingClearTimer=setTimeout(()=>{_activeSaves=0;_setSaveStatus('idle','✓ Saved');},5000);
   } else if(Object.keys(_pendingRetries).length>0){
     _setSaveStatus('error','❌ Failed – Tap to retry');
   } else {
@@ -7218,6 +7224,8 @@ window.addEventListener('offline',()=>{
 
 // Merge an incoming SSE project snapshot into STORE[pid] without clobbering in-flight local edits.
 // Arrays are merged by id (incoming wins for matching id). Scalar fields replaced by incoming.
+// Fields where empty SSE array must never overwrite existing non-empty local data
+const _SSE_NEVER_WIPE=new Set(['credentials','thirdparty','wfdocs','pendingtasks','apitests','reports']);
 function _mergeSseProjectIntoStore(pid,incoming){
   const ex=STORE[pid];
   if(!ex||!incoming||typeof incoming!=='object')return;
@@ -7226,6 +7234,8 @@ function _mergeSseProjectIntoStore(pid,incoming){
     const inVal=incoming[key];
     if(inVal===null||inVal===undefined)continue;
     if(_PROJ_ARRAY_KEYS.includes(key)&&Array.isArray(inVal)){
+      // Never overwrite non-empty local data with empty SSE array for protected fields
+      if(_SSE_NEVER_WIPE.has(key)&&inVal.length===0&&(ex[key]||[]).length>0)continue;
       const m=new Map();
       (ex[key]||[]).forEach(r=>{if(r&&r.id)m.set(r.id,r);else if(r)m.set('nk:'+nk(r),r);});
       inVal.forEach(r=>{if(r&&r.id)m.set(r.id,r);else if(r)m.set('nk:'+nk(r),r);});
@@ -7234,6 +7244,8 @@ function _mergeSseProjectIntoStore(pid,incoming){
       ex.envDetails=ex.envDetails||{production:[],staging:[]};
       ['production','staging'].forEach(side=>{
         if(!Array.isArray(inVal[side]))return;
+        // Don't wipe existing envDetails with empty incoming
+        if(inVal[side].length===0&&(ex.envDetails[side]||[]).length>0)return;
         const m=new Map();
         (ex.envDetails[side]||[]).forEach(r=>{if(r&&r.id)m.set(r.id,r);});
         inVal[side].forEach(r=>{if(r&&r.id)m.set(r.id,r);});
@@ -7373,10 +7385,13 @@ let DAILY_TASKS=[];
 const _dtPendingSave=new Map(); // key: 'projectId|date' → timestamp of last local edit
 
 function saveDailyTasks(){
-  // Stamp every row with current timestamp so server can resolve concurrent-edit conflicts
-  // by preferring the row with the most recent _savedAt value.
+  // Only stamp rows that are locally pending (recently edited by this user).
+  // Stamping ALL rows overwrites other users' fresher _savedAt timestamps.
   const now=Date.now();
-  DAILY_TASKS.forEach(t=>{t._savedAt=now;});
+  DAILY_TASKS.forEach(t=>{
+    const k=t.projectId+'|'+t.date;
+    if(_dtPendingSave.has(k))t._savedAt=now;
+  });
   _serverData['qa3_daily_tasks']=DAILY_TASKS;
   serverPost('qa3_daily_tasks',DAILY_TASKS);
 }
@@ -7426,7 +7441,7 @@ async function syncWfDocsFromServer(){
   try{
     await Promise.all(PROJECTS.map(async proj=>{
       try{
-        const r=await fetch('/api/wfdocs/'+encodeURIComponent(proj.id),{cache:'no-store'});
+        const r=await fetch('/api/wfdocs/'+encodeURIComponent(proj.id),{cache:'no-store',headers:{Authorization:'Bearer '+_getToken()}});
         if(!r.ok)return;
         const serverFiles=await r.json();
         if(!Array.isArray(serverFiles))return;

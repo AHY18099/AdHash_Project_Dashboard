@@ -5477,19 +5477,23 @@ function mergeDailyTasks(existing, incoming) {
     return [...Array.from(byId.values()), ...nkOnly];
 }
 
-// Merge team tasks: keyed by id when present, otherwise by (date, projectId) for legacy items
+// Merge team tasks: keyed by id. Newer _savedAt timestamp wins for same id.
 function mergeTeamTasks(existing, incoming) {
     if (!Array.isArray(incoming)) return existing;
     const byId = new Map();
-    const byNk = new Map(); // natural key fallback for legacy items without id
+    const byNk = new Map();
     const nk = r => (r.date||'') + '|' + (r.projectId||'');
+    const winner = (a, b) => {
+        if (!a) return b; if (!b) return a;
+        return ((b._savedAt||0) >= (a._savedAt||0)) ? b : a;
+    };
     (existing || []).forEach(r => {
         if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r);
     });
     incoming.forEach(r => {
-        if (r.id) byId.set(r.id, r); else byNk.set(nk(r), r);
+        if (r.id) byId.set(r.id, winner(byId.get(r.id), r));
+        else byNk.set(nk(r), winner(byNk.get(nk(r)), r));
     });
-    // Drop no-id entries whose date|projectId is already covered by an id-keyed entry
     const coveredById = new Set(Array.from(byId.values()).map(nk));
     const nkOnly = Array.from(byNk.entries())
         .filter(([k]) => !coveredById.has(k))
@@ -5528,14 +5532,33 @@ function mergeById(existing, incoming) {
     return [...Array.from(byId.values()), ...Array.from(noIdMap.values())];
 }
 
-// Merge smoke/prod rows: incoming is authoritative — it is the full array from the client
-// and already reflects any edits (including id changes). We simply use incoming directly,
-// preserving order. The old merge-by-id approach caused edited IDs (e.g. PRD_40→PRD-40)
-// to survive as ghost rows alongside the updated ones.
+// Merge smoke/prod rows by id. For same id, newer _savedAt wins (concurrent edit safety).
+// Rows in existing but NOT in incoming are preserved (another user's rows survive).
+// Row id changes: if incoming has a row whose id didn't exist in existing, it replaces
+// the row with matching module+step/item (natural key), preventing ghost rows.
 function mergeTestRows(existing, incoming) {
     if (!Array.isArray(incoming)) return existing || [];
-    // Incoming is always the full array — trust it completely
-    return incoming;
+    if (!Array.isArray(existing) || existing.length === 0) return incoming;
+    const nk = r => ((r&&r.module)||'') + '|' + ((r&&r.step)||'') + '|' + ((r&&r.item)||'');
+    const winner = (a, b) => (!a) ? b : (!b) ? a : ((b._savedAt||0) >= (a._savedAt||0)) ? b : a;
+    // Index existing by id and by natural key
+    const byId  = new Map(existing.filter(r=>r&&r.id).map(r=>[r.id, r]));
+    const byNk  = new Map(existing.filter(r=>r&&!r.id).map(r=>[nk(r), r]));
+    // Build a natural-key → existing-id map so id edits remove the old row
+    const nkToId = new Map(existing.filter(r=>r&&r.id).map(r=>[nk(r), r.id]));
+    incoming.forEach(r => {
+        if (!r) return;
+        const k = nk(r);
+        if (r.id) {
+            // If this id is new but natural key matches an old id, remove the old row
+            const oldId = nkToId.get(k);
+            if (oldId && oldId !== r.id) byId.delete(oldId);
+            byId.set(r.id, winner(byId.get(r.id), r));
+        } else {
+            byNk.set(k, winner(byNk.get(k), r));
+        }
+    });
+    return [...Array.from(byId.values()), ...Array.from(byNk.values())];
 }
 
 // Deep merge a qa3_<projectId> project object.
