@@ -5534,32 +5534,37 @@ function mergeTeamTasks(existing, incoming) {
 // Merge releases: keyed by id
 function mergeReleases(existing, incoming) {
     if (!Array.isArray(incoming)) return existing;
-    // Incoming is authoritative — it reflects the user's current state after any deletes.
-    // Only ADD items from existing that are NOT in incoming (new items added by other users).
+    // Incoming is authoritative for items it contains.
+    // Existing items NOT in incoming are only kept if they were saved MORE RECENTLY than
+    // the incoming array's newest _savedAt — meaning another user added them after this save.
+    const incomingMaxTs = Math.max(0, ...incoming.map(r => r._savedAt || 0));
     const incomingIds = new Set(incoming.filter(r => r.id).map(r => r.id));
     const map = new Map();
     incoming.forEach(r => { if (r.id) map.set(r.id, r); });
-    // Add existing items that incoming doesn't know about (added by another user concurrently)
-    (existing || []).forEach(r => { if (r.id && !incomingIds.has(r.id)) map.set(r.id, r); });
+    // Only add existing items that were created AFTER the incoming save (concurrent adds)
+    (existing || []).forEach(r => {
+        if (r.id && !incomingIds.has(r.id) && (r._savedAt || 0) > incomingMaxTs) {
+            map.set(r.id, r);
+        }
+    });
     return Array.from(map.values());
 }
 
-// Generic array merge by id field — for any sub-array that uses an 'id' key.
-// For legacy items without an id, use a natural key (name+url or name alone) to deduplicate
-// so repeated heartbeat saves never produce duplicates even for old records.
+// Merge by id: incoming is authoritative — deleted items are NOT resurrected.
+// Items in incoming overwrite existing; items only in existing (not in incoming) are dropped.
+// Items only in incoming (not in existing) are added.
+// This ensures deletions persist correctly across concurrent saves.
 function mergeById(existing, incoming) {
     if (!Array.isArray(incoming)) return existing || [];
-    if (!Array.isArray(existing) || existing.length === 0) return incoming;
+    // Incoming is authoritative — only deduplicate within incoming itself
     const byId = new Map();
-    existing.forEach(r => { if (r && r.id) byId.set(r.id, r); });
-    incoming.forEach(r => { if (r && r.id) byId.set(r.id, r); });
-    // For items without id, deduplicate by natural key: name+url (or just name if no url)
-    const noIdMap = new Map();
     const natKey = r => ((r && r.name) || '') + '|' + ((r && r.url) || '') + '|' + ((r && r.environment) || '');
-    existing.filter(r => r && !r.id).forEach(r => noIdMap.set(natKey(r), r));
-    // Incoming wins for matching natural key
-    incoming.filter(r => r && !r.id).forEach(r => noIdMap.set(natKey(r), r));
-    return [...Array.from(byId.values()), ...Array.from(noIdMap.values())];
+    const byNk = new Map();
+    incoming.forEach(r => {
+        if (r && r.id) byId.set(r.id, r);
+        else if (r) byNk.set(natKey(r), r);
+    });
+    return [...Array.from(byId.values()), ...Array.from(byNk.values())];
 }
 
 // Merge smoke/prod rows by id. For same id, newer _savedAt wins (concurrent edit safety).
