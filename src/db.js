@@ -207,10 +207,23 @@ async function writeProject(projectId, proj) {
     // (b) _replaceArrays explicitly lists the field (intentional clear/replace)
     // This prevents empty STORE arrays from wiping MongoDB on heartbeat saves.
     for (const [field, col] of Object.entries(SECTION_MAP)) {
-        const items = proj[field];
+        let items = proj[field];
         if (!Array.isArray(items)) continue;
         // Skip empty arrays unless explicitly flagged for replace
         if (items.length === 0 && !replaceArrays.has(field)) continue;
+        // Deduplicate reports by datetime before writing — prevents old duplicates
+        // from being re-written by stale browser heartbeats that have the full set
+        if (field === 'reports' && items.length > 0) {
+            const seenDt = new Map();
+            items = items.filter(r => {
+                if (r && r.id && String(r.id).startsWith('rpt_')) {
+                    seenDt.set(r.id, true); return true; // new-format always unique
+                }
+                const k = (r && r.datetime) || (r && r.id) || JSON.stringify(r);
+                if (seenDt.has(k)) return false;
+                seenDt.set(k, true); return true;
+            });
+        }
         await getDB().collection(col).deleteMany({ projectId });
         if (items.length > 0) await _upsertMany(col, projectId, items);
     }

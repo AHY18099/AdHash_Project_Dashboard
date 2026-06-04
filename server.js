@@ -2072,8 +2072,10 @@ app.post('/api/admin/dedup-reports', requireAdmin, async (req, res) => {
             if (toDelete.length > 0) {
                 await db.collection('saved_reports').deleteMany({ _id: { $in: toDelete } });
                 // Rebuild _qaCache for this project
-                const { readKey, writeKey } = require('./src/db');
+                const { readKey } = require('./src/db');
                 _qaCache['qa3_' + pid] = await readKey('qa3_' + pid);
+                // Broadcast to ALL clients so browsers replace their stale STORE
+                broadcastSseEvent('qa-data-update', { key: 'qa3_' + pid, value: _qaCache['qa3_' + pid] });
             }
             results[pid] = { before: all.length, deleted: toDelete.length, after: all.length - toDelete.length };
         }
