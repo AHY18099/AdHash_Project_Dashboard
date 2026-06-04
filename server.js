@@ -2051,6 +2051,36 @@ app.post('/api/admin/snapshots/restore', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/admin/dedup-reports — super_admin only, deduplicates saved_reports by datetime per project
+app.post('/api/admin/dedup-reports', requireAdmin, async (req, res) => {
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        const projectIds = req.body.projectIds || (await db.collection('saved_reports').distinct('projectId'));
+        const results = {};
+        for (const pid of projectIds) {
+            const all = await db.collection('saved_reports').find({ projectId: pid }).sort({ createdAt: 1 }).toArray();
+            const seenDt = new Map();
+            const toDelete = [];
+            for (const doc of all) {
+                const key = doc.datetime || String(doc._id);
+                // Keep new-format rpt_ ids always (they are genuinely unique)
+                if (doc.id && String(doc.id).startsWith('rpt_')) { seenDt.set(doc.id, doc); continue; }
+                if (seenDt.has(key)) { toDelete.push(doc._id); }
+                else seenDt.set(key, doc);
+            }
+            if (toDelete.length > 0) {
+                await db.collection('saved_reports').deleteMany({ _id: { $in: toDelete } });
+                // Rebuild _qaCache for this project
+                const { readKey, writeKey } = require('./src/db');
+                _qaCache['qa3_' + pid] = await readKey('qa3_' + pid);
+            }
+            results[pid] = { before: all.length, deleted: toDelete.length, after: all.length - toDelete.length };
+        }
+        res.json({ success: true, results });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /api/admin/set-slack-token — super_admin only, persists token to MongoDB (survives redeploys)
 app.post('/api/admin/set-slack-token', requireAdmin, async (req, res) => {
     const { token } = req.body || {};
