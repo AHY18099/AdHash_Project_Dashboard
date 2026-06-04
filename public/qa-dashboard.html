@@ -4134,7 +4134,10 @@ function loadDayMeta(){DT_DAY_META=_serverData['qa3_day_meta']||DT_DAY_META;}
 // Ensure all projects have a row for the given date (auto-create if missing)
 let _dtEnsureSaveTimer=null;
 function dtEnsureProjectRows(dateStr){
-  let changed=false;
+  // Only create local UI rows — do NOT auto-save to server.
+  // Auto-saving empty rows wipes existing data: mergeDailyTasks sees new rows
+  // with _savedAt=now as newer than old saved rows and drops the real data.
+  // Rows are saved to DB only when user makes an actual edit (dtInlineChange/dtAssignedChange).
   PROJECTS.forEach(p=>{
     const exists=DAILY_TASKS.find(t=>t.date===dateStr&&t.projectId===p.id);
     const defAssignee=p.defaultAssignee||'';
@@ -4142,18 +4145,10 @@ function dtEnsureProjectRows(dateStr){
       const entry={id:'dt_'+Math.random().toString(36).slice(2,10),date:dateStr,projectId:p.id,assignedBy:defAssignee};
       DT_COLS.forEach(c=>{entry[c.key]='';});
       DAILY_TASKS.push(entry);
-      changed=true;
     } else if(!exists.assignedBy&&defAssignee){
       exists.assignedBy=defAssignee;
-      changed=true;
     }
   });
-  // Debounce: batch all ensure calls into one save after 2s so startup doesn't
-  // show "Saving..." for every row created during initial renderDailyTasksPage().
-  if(changed){
-    clearTimeout(_dtEnsureSaveTimer);
-    _dtEnsureSaveTimer=setTimeout(()=>{ if(_serverDataLoaded)saveDailyTasks(); },2000);
-  }
 }
 
 // Auto-ensure all dates in the current month have rows for all projects

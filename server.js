@@ -5479,22 +5479,56 @@ app.post('/api/qa-data-bulk', async (req, res) => {
 });
 
 // ── Deleted-row registry ─────────────────────────────────────────────────────
-// When a row is explicitly deleted via _replaceArrays, its id is registered here
-// for 5 minutes. Any subsequent save that tries to bring the row back is blocked.
-// This prevents stale browser tabs from resurrecting deleted rows.
-const _deletedRowRegistry = new Map(); // key: 'qa3_pid:rowId' → expiry timestamp
-const DELETED_ROW_TTL = 30 * 60 * 1000; // 30 minutes
+// When a row is explicitly deleted via _replaceArrays, its id (and all normalised
+// variants) are registered here for 2 hours. Any subsequent save that tries to
+// bring the row back is blocked. Persisted to MongoDB so it survives redeploys.
+const _deletedRowRegistry = new Map(); // key: 'qa3_pid:normId' → expiry timestamp
+const DELETED_ROW_TTL = 2 * 60 * 60 * 1000; // 2 hours
 
-function _registerDeletedRows(qaKey, prevArray, newArray) {
+// Normalise row id so PRD_40 and PRD-40 both resolve to the same key
+function _normaliseRowId(id) { return String(id).replace(/[-_]/g, '_').toUpperCase(); }
+
+async function _registerDeletedRows(qaKey, prevArray, newArray) {
     const prevIds = new Set((prevArray || []).filter(r => r && r.id).map(r => r.id));
-    const newIds  = new Set((newArray  || []).filter(r => r && r.id).map(r => r.id));
+    const newIds  = new Set((newArray  || []).filter(r => r && r.id).map(r => _normaliseRowId(r.id)));
     const now = Date.now();
+    const expiry = now + DELETED_ROW_TTL;
     // Clean expired entries
     for (const [k, exp] of _deletedRowRegistry) { if (now > exp) _deletedRowRegistry.delete(k); }
-    // Register newly deleted ids
+    const toStore = [];
     for (const id of prevIds) {
-        if (!newIds.has(id)) _deletedRowRegistry.set(qaKey + ':' + id, now + DELETED_ROW_TTL);
+        if (!newIds.has(_normaliseRowId(id))) {
+            const key = qaKey + ':' + _normaliseRowId(id);
+            _deletedRowRegistry.set(key, expiry);
+            toStore.push(key);
+        }
     }
+    // Persist to MongoDB so registry survives redeploys
+    if (toStore.length > 0) {
+        try {
+            const { getDB } = require('./src/db');
+            const db = getDB();
+            if (db) {
+                await db.collection('deleted_row_registry').insertMany(
+                    toStore.map(k => ({ key: k, expiry: new Date(expiry) })),
+                    { ordered: false }
+                );
+                // Clean expired entries from DB
+                await db.collection('deleted_row_registry').deleteMany({ expiry: { $lt: new Date() } });
+            }
+        } catch (_) {}
+    }
+}
+
+async function _loadDeletedRowRegistry() {
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        if (!db) return;
+        const docs = await db.collection('deleted_row_registry').find({ expiry: { $gt: new Date() } }).toArray();
+        docs.forEach(d => _deletedRowRegistry.set(d.key, new Date(d.expiry).getTime()));
+        if (docs.length > 0) console.log(`[delete-guard] loaded ${docs.length} registry entries from MongoDB`);
+    } catch (_) {}
 }
 
 function _filterDeletedRows(qaKey, arr) {
@@ -5502,7 +5536,8 @@ function _filterDeletedRows(qaKey, arr) {
     const now = Date.now();
     return arr.filter(r => {
         if (!r || !r.id) return true;
-        const exp = _deletedRowRegistry.get(qaKey + ':' + r.id);
+        const key = qaKey + ':' + _normaliseRowId(r.id);
+        const exp = _deletedRowRegistry.get(key);
         if (exp && now < exp) {
             console.log(`[delete-guard] blocked resurrection of ${r.id} in ${qaKey}`);
             return false;
@@ -5759,7 +5794,7 @@ app.post('/api/qa-data/:key', async (req, res) => {
                             }
                         } else if (Array.isArray(cleanValue[arrKey])) {
                             // Register deleted row ids BEFORE replacing — blocks resurrection for 5min
-                            _registerDeletedRows(key, (_qaCache[key] || {})[arrKey], cleanValue[arrKey]);
+                            await _registerDeletedRows(key, (_qaCache[key] || {})[arrKey], cleanValue[arrKey]);
                             merged[arrKey] = cleanValue[arrKey];
                         }
                     }
@@ -6188,6 +6223,8 @@ async function migrateWfDocsToGitHub() {
             // Dedup all project data in MongoDB — removes any accumulated duplicates
             try { await deduplicateAllProjectData(); } catch (e) { console.error('[startup] dedup failed:', e.message); }
             try { await seedSuperAdmin(); } catch (e) { console.warn('[startup] seedSuperAdmin failed:', e.message); }
+            // Load deleted-row registry from MongoDB — survives redeploys
+            try { await _loadDeletedRowRegistry(); } catch (e) { console.warn('[startup] registry load failed:', e.message); }
             // ── Auto-snapshot: save a timestamped backup of all live data to MongoDB on every startup ──
             // This means every deployment automatically has a pre-deploy snapshot to restore from.
             try {
