@@ -7414,6 +7414,17 @@ async function loadFromServer(){
     if(!r.ok){console.warn('[loadFromServer] server error ('+r.status+') — saves blocked');return;}
     _serverData=await r.json();
     _serverDataLoaded=true;
+    // Clear stale qa3_ keys from localStorage — they may have old data (duplicate reports,
+    // deleted rows) that migrateLocalStorageToServer would re-post back to the server.
+    // Server is always the source of truth after a successful load.
+    try{
+      const toRemove=[];
+      for(let i=0;i<localStorage.length;i++){
+        const k=localStorage.key(i);
+        if(k&&(k.startsWith('qa3_')||k==='qa3_daily_tasks'||k==='qa3_team_tasks'||k==='qa3_releases'))toRemove.push(k);
+      }
+      toRemove.forEach(k=>localStorage.removeItem(k));
+    }catch(_){}
     // Strip any legacy base64 wfdoc blobs to keep memory clean
     for(const k of Object.keys(_serverData)){
       if(k.startsWith('qa3_')&&_serverData[k]&&_serverData[k].wfdocs){
