@@ -4632,6 +4632,21 @@ app.get('/api/run-report-status', async (req, res) => {
 });
 
 // Serve latest run report HTML — from disk or MongoDB
+// Inject iframe-safe CSS into the email HTML so it renders correctly when embedded
+function _patchReportHtmlForIframe(html) {
+    const patch = `<style>
+        /* Force all text to be visible — email HTML div/td color must not be overridden by iframe UA stylesheet */
+        body { background-color:#000000 !important; color:#ffffff !important; }
+        * { box-sizing:border-box; }
+        div, span, td, th, p { color:inherit; }
+        table { border-collapse:collapse; }
+    </style>`;
+    // Insert patch right before </head>
+    return html.includes('</head>')
+        ? html.replace('</head>', patch + '</head>')
+        : patch + html;
+}
+
 app.get('/api/latest-run-report', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).send('Unauthorized');
     res.set('Cache-Control', 'no-store');
@@ -4642,7 +4657,10 @@ app.get('/api/latest-run-report', async (req, res) => {
     ];
     const found = candidates.find(f => fs.existsSync(f));
     if (found) {
-        return res.sendFile(found);
+        try {
+            const html = fs.readFileSync(found, 'utf8');
+            return res.set('Content-Type', 'text/html').send(_patchReportHtmlForIframe(html));
+        } catch (_) { /* fall through to MongoDB */ }
     }
     // Fall back to MongoDB
     try {
@@ -4651,7 +4669,7 @@ app.get('/api/latest-run-report', async (req, res) => {
         if (db) {
             const doc = await db.collection('run_reports').findOne({ key: 'latest' });
             if (doc && doc.html) {
-                return res.set('Content-Type', 'text/html').send(doc.html);
+                return res.set('Content-Type', 'text/html').send(_patchReportHtmlForIframe(doc.html));
             }
         }
     } catch (e) { console.error('[latest-run-report]', e.message); }
