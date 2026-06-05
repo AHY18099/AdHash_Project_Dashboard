@@ -3071,17 +3071,18 @@ function normalizeAppStoreValue(appStore) {
     const trimmed = appStore.trim();
     if (!trimmed) return null;
 
-    // Accept full App Store URL — extract the id part
+    // Accept full App Store URL — preserve the original URL, just extract the id
     if (/^https?:\/\//i.test(trimmed)) {
         try {
             const url = new URL(trimmed);
-            // URL like https://apps.apple.com/us/app/whatsapp-messenger/id310633997
-            const idMatch = url.pathname.match(/\/(id\d+)/);
+            const idMatch = url.pathname.match(/\/(id\d+)/i);
             const appId = idMatch ? idMatch[1] : '';
             if (!appId) return null;
             return {
                 appId,
-                expectedUrl: `https://apps.apple.com/app/${appId}`
+                // Preserve the full original URL — don't normalize to /app/idXXX
+                // which loses country code and app name path and may fail on Railway
+                expectedUrl: trimmed
             };
         } catch (error) {
             return null;
@@ -3973,6 +3974,15 @@ const GH_MAPPING_FILE = 'config/project-mapping.json';
 // In-memory cache of project-mapping — loaded from GitHub on startup, updated on every write.
 // This survives Railway redeploys because GitHub is the source of truth, not the Railway disk.
 let _projectMappingCache = null;
+
+// Called by routes/projects.js after a project is saved — updates the in-memory cache
+// so regenerateSpecFiles() immediately picks up the new apps/servers/apis without a redeploy.
+function _invalidateProjectMappingCache(updatedData) {
+    _projectMappingCache = updatedData || null;
+    // Also push to GitHub so the new config survives future redeploys
+    if (updatedData) _pushProjectMappingToGitHub(updatedData).catch(() => {});
+}
+module.exports._invalidateProjectMappingCache = _invalidateProjectMappingCache;
 
 // Load project-mapping.json from GitHub API — called once on startup and after every write.
 async function _loadProjectMappingFromGitHub() {

@@ -111,31 +111,37 @@ router.put('/:id', requireAuth, ensureConnected, async (req, res) => {
             { new: true, runValidators: false, lean: true }
         );
         if (!saved) return res.status(404).json({ error: 'Project not found' });
-        // Sync updated project config to project-mapping.json so test runner uses latest data
+        // Sync updated project config to project-mapping.json AND in-memory cache
+        // so test runner always uses the latest MongoDB data without a redeploy.
         try {
-            const fs = require('fs'), path = require('path');
             const mappingPath = path.join(__dirname, '..', 'config', 'project-mapping.json');
-            if (fs.existsSync(mappingPath)) {
-                const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
-                const projects = Array.isArray(mapping) ? mapping : (mapping.projects || []);
-                const idx = projects.findIndex(p => p.id === req.params.id);
-                if (idx >= 0) {
-                    // Update name, description, color, apps, servers, domains, sslCerts, apis
-                    const p = projects[idx];
-                    if (saved.name)        p.name        = saved.name;
-                    if (saved.description) p.description = saved.description;
-                    if (saved.color)       p.color       = saved.color;
-                    if (Array.isArray(saved.apps))     p.apps     = saved.apps;
-                    if (Array.isArray(saved.servers))  p.servers  = saved.servers;
-                    if (Array.isArray(saved.domains))  p.domains  = saved.domains;
-                    if (Array.isArray(saved.sslCerts)) p.sslCerts = saved.sslCerts;
-                    if (Array.isArray(saved.apis))     p.apis     = saved.apis;
-                    const updated = Array.isArray(mapping) ? projects : { ...mapping, projects };
-                    fs.writeFileSync(mappingPath, JSON.stringify(updated, null, 2) + '\n');
-                    console.log('[Projects] ✅ project-mapping.json updated for', req.params.id);
+            let mapping = { projects: [] };
+            try { mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8')); } catch (_) {}
+            const projects = Array.isArray(mapping) ? mapping : (mapping.projects || []);
+            const idx = projects.findIndex(p => p.id === req.params.id);
+            const p = idx >= 0 ? projects[idx] : { id: req.params.id };
+            if (idx < 0) projects.push(p);
+            if (saved.name)        p.name        = saved.name;
+            if (saved.description) p.description = saved.description;
+            if (saved.color)       p.color       = saved.color;
+            if (Array.isArray(saved.apps))     p.apps     = saved.apps;
+            if (Array.isArray(saved.servers))  p.servers  = saved.servers;
+            if (Array.isArray(saved.domains))  p.domains  = saved.domains;
+            if (Array.isArray(saved.sslCerts)) p.sslCerts = saved.sslCerts;
+            if (Array.isArray(saved.apis))     p.apis     = saved.apis;
+            const updated = Array.isArray(mapping) ? projects : { ...mapping, projects };
+            // Write to disk
+            try { fs.writeFileSync(mappingPath, JSON.stringify(updated, null, 2) + '\n'); } catch (_) {}
+            // Invalidate the server-level in-memory cache so next regenerateSpecFiles()
+            // re-reads from disk with the new data instead of using stale cached values.
+            try {
+                const serverModule = require('../server');
+                if (typeof serverModule._invalidateProjectMappingCache === 'function') {
+                    serverModule._invalidateProjectMappingCache(updated);
                 }
-            }
-        } catch (e) { console.warn('[Projects] project-mapping.json sync failed:', e.message); }
+            } catch (_) {}
+            console.log('[Projects] ✅ project-mapping synced for', req.params.id, '(apps:', (p.apps||[]).length, ')');
+        } catch (e) { console.warn('[Projects] project-mapping sync failed:', e.message); }
         return res.json({ success: true, project: saved });
     } catch (err) {
         console.error('[Projects] PUT /:id error:', err.message);
