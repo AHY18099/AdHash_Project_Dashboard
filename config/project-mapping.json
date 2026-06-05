@@ -1104,14 +1104,16 @@
       "apps": [],
       "servers": [
         {
-          "url": "https://zaptrade.ai",
           "name": "Website",
-          "type": "web"
+          "url": "https://zaptrade.ai",
+          "type": "web",
+          "expectedStatus": 200
         },
         {
-          "url": "https://algo.zaptrade.ai",
           "name": "Dashboard",
-          "type": "web"
+          "url": "https://algo.zaptrade.ai",
+          "type": "web",
+          "expectedStatus": 200
         }
       ],
       "domains": [
@@ -1124,16 +1126,16 @@
       ],
       "apis": [
         {
+          "name": "Website",
           "url": "https://zaptrade.ai",
-          "name": "Website Home",
-          "expectedStatus": 200,
-          "method": "GET"
+          "method": "GET",
+          "expectedStatus": 200
         },
         {
+          "name": "Dashboard",
           "url": "https://algo.zaptrade.ai",
-          "name": "Dashboard Home",
-          "expectedStatus": 200,
-          "method": "GET"
+          "method": "GET",
+          "expectedStatus": 200
         }
       ]
     }
