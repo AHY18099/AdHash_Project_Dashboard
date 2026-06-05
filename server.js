@@ -4634,19 +4634,18 @@ app.get('/api/run-report-status', async (req, res) => {
 // Serve latest run report HTML — from disk or MongoDB
 // Inject iframe-safe CSS into the email HTML so it renders correctly when embedded
 function _patchReportHtmlForIframe(html) {
-    // Fix 1: Ensure all inline color styles are preserved by resetting UA stylesheet overrides
-    // Fix 2: The email template uses bgcolor attribute + background-color inline — both needed
-    // Fix 3: div elements inside td must not lose their inline color from UA stylesheet
     const patch = `<style>
         html, body { background-color:#000000 !important; color:#ffffff !important; margin:0; padding:0; }
-        /* Prevent UA stylesheet from overriding inline color styles on div/span */
-        /* Use attribute selector to target divs with inline style containing color */
-        div[style*="color"] { color: unset; }
-        /* Force all text elements to show their inline styles, not UA defaults */
-        div, span, p, h1, h2, h3, h4, h5, h6 { -webkit-text-fill-color: unset; }
-        /* Ensure table cells with bgcolor show correctly */
+        /* Responsive: allow the 960px email table to scale on narrow screens */
+        table[style*="max-width:960px"], table[style*="max-width: 960px"] { width:100% !important; max-width:100% !important; }
+        /* Stack 50% summary cards on mobile */
+        @media screen and (max-width: 640px) {
+            td[width="50%"] { display:block !important; width:100% !important; box-sizing:border-box; }
+            td[style*="width:50%"] { display:block !important; width:100% !important; box-sizing:border-box; }
+        }
+        /* Fix color rendering in iframe — force inline styles to win over UA stylesheet */
         td[bgcolor], td[style*="background"] { color: #ffffff; }
-        /* Preserve explicitly set colors via !important specificity fix */
+        div, span, p { -webkit-text-fill-color: unset; }
         [style*="color:#ffffff"] { color: #ffffff !important; }
         [style*="color:#cbd5e1"] { color: #cbd5e1 !important; }
         [style*="color:#9ca3af"] { color: #9ca3af !important; }
@@ -4662,6 +4661,9 @@ function _patchReportHtmlForIframe(html) {
         [style*="color:#ffb020"] { color: #ffb020 !important; }
         [style*="color:#06b6d4"] { color: #06b6d4 !important; }
         [style*="color:#8b5cf6"] { color: #8b5cf6 !important; }
+        /* Padding/overflow fix for narrow screens */
+        body > table { min-width: unset !important; }
+        td[align="center"] { padding-left: 8px !important; padding-right: 8px !important; }
     </style>`;
     return html.includes('</head>')
         ? html.replace('</head>', patch + '</head>')
