@@ -1942,13 +1942,125 @@ app.post('/api/run-project/:projectId', (req, res) => {
         }); // end fetchSslCertData callback
     }
 
+    // ── Inline API runner — uses axios directly (no playwright needed) ──────────
+    // Runs BEFORE playwright suites so results are always available even if
+    // playwright binary is not executable (Railway permission issue).
+    async function runApiSuiteInline() {
+        if (!hasApis) return;
+        const axios = require('axios');
+        const apis = project.apis || [];
+        const result = makeEmptySuiteResult();
+        suiteResults['apis'] = result;
+        addLog(`[${project.name}] ▶ Running API suite inline (${apis.length} endpoints)…`, 'info');
+        for (const api of apis) {
+            try {
+                const method = (api.method || 'GET').toUpperCase();
+                const start = Date.now();
+                const resp = await axios({
+                    url: api.url, method,
+                    headers: api.headers || {},
+                    data: method !== 'GET' && method !== 'DELETE' ? (api.body || undefined) : undefined,
+                    timeout: 15000, validateStatus: () => true
+                });
+                const elapsed = Date.now() - start;
+                const code = resp.status;
+                const status = code >= 200 && code < 300 ? 'passed' : code >= 300 && code < 400 ? 'warning' : 'failed';
+                const responseBody = typeof resp.data === 'string' ? resp.data.slice(0, 500) : JSON.stringify(resp.data || '').slice(0, 500);
+                collectedApiDetails.push({ name: api.name, url: api.url, method, responseCode: code, status, requestBody: '', responseBody, elapsed });
+                result.tests.push({ _title: api.name, _status: status });
+                if (status === 'passed') result.passed++;
+                else if (status === 'warning') { result.warning = (result.warning||0)+1; }
+                else result.failed++;
+                result.total++;
+                addLog(`[${project.name}][API] ${api.name} → ${code} ${status} (${elapsed}ms)`, status === 'failed' ? 'error' : 'success');
+            } catch (e) {
+                collectedApiDetails.push({ name: api.name, url: api.url, method: api.method||'GET', responseCode: null, status: 'failed', requestBody: '', responseBody: e.message||'Error' });
+                result.tests.push({ _title: api.name, _status: 'failed' });
+                result.failed++; result.total++;
+                addLog(`[${project.name}][API] ${api.name} → ERROR: ${e.message}`, 'error');
+            }
+        }
+        projectRunState[projectId].passed  += result.passed;
+        projectRunState[projectId].failed  += result.failed;
+        addLog(`[${project.name}] API done — ✅${result.passed} ❌${result.failed}`, result.failed > 0 ? 'error' : 'success');
+    }
+
+    // ── Inline App checker — checks Play Store / App Store URL reachability ────
+    async function runAppSuiteInline() {
+        if (!hasApps) return;
+        const axios = require('axios');
+        const apps = project.apps || [];
+        const result = makeEmptySuiteResult();
+        suiteResults['apps'] = result;
+        addLog(`[${project.name}] ▶ Running App suite inline (${apps.length} apps)…`, 'info');
+        for (const app of apps) {
+            const checks = [];
+            if (app.playStore) {
+                const ps = app.playStore.startsWith('http') ? app.playStore : `https://play.google.com/store/apps/details?id=${app.playStore}`;
+                checks.push({ platform: 'Play Store', url: ps });
+            }
+            if (app.appStore) {
+                const as_ = app.appStore.startsWith('http') ? app.appStore : `https://apps.apple.com/app/${app.appStore}`;
+                checks.push({ platform: 'App Store', url: as_ });
+            }
+            for (const chk of checks) {
+                try {
+                    const resp = await axios.get(chk.url, { timeout: 15000, validateStatus: () => true, headers: { 'User-Agent': 'Mozilla/5.0' } });
+                    const status = resp.status >= 200 && resp.status < 400 ? 'passed' : 'failed';
+                    const nameToCheck = (app.name||project.name||'').toLowerCase().replace(/\s+/g,'');
+                    const title = (resp.data||'').toString().match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]||'';
+                    const titleOk = title.toLowerCase().replace(/\s+/g,'').includes(nameToCheck.slice(0,4));
+                    const finalStatus = status === 'passed' && titleOk ? 'passed' : status === 'passed' ? 'warning' : 'failed';
+                    collectedAppResults.push({ appName: app.name||project.name, platform: chk.platform, status: finalStatus, reason: title||`HTTP ${resp.status}` });
+                    result.tests.push({ _title: `${app.name||project.name} (${chk.platform})`, _status: finalStatus });
+                    if (finalStatus === 'passed') result.passed++;
+                    else if (finalStatus === 'warning') { result.warning = (result.warning||0)+1; }
+                    else result.failed++;
+                    result.total++;
+                    addLog(`[${project.name}][App] ${chk.platform} → ${resp.status} ${finalStatus}`, finalStatus === 'failed' ? 'error' : 'success');
+                } catch (e) {
+                    collectedAppResults.push({ appName: app.name||project.name, platform: chk.platform, status: 'failed', reason: e.message });
+                    result.tests.push({ _title: `${app.name||project.name} (${chk.platform})`, _status: 'failed' });
+                    result.failed++; result.total++;
+                    addLog(`[${project.name}][App] ${chk.platform} ERROR: ${e.message}`, 'error');
+                }
+            }
+        }
+        projectRunState[projectId].passed  += result.passed;
+        projectRunState[projectId].failed  += result.failed;
+        addLog(`[${project.name}] App done — ✅${result.passed} ❌${result.failed}`, result.failed > 0 ? 'error' : 'success');
+    }
+
+    // Remove API and App from playwright suites — now run inline
+    const playwrightSuites = suitesToRun.filter(s => s.category !== 'apis' && s.category !== 'apps');
+
     if (suitesToRun.length === 0) {
         projectRunState[projectId] = { running: false, passed: 0, failed: 0, warning: 0, skipped: 0 };
         addLog(`⚠️ [${project.name}] No testable suites configured`, 'warn');
         return;
     }
 
-    runSuite(0);
+    // Run inline suites first (no playwright), then playwright suites
+    Promise.all([runApiSuiteInline(), runAppSuiteInline()]).then(() => {
+        projectRunState[projectId].totalSuites = playwrightSuites.length + (hasApis?1:0) + (hasApps?1:0);
+        if (playwrightSuites.length > 0) {
+            // Re-index suitesToRun to only playwright suites
+            suitesToRun.length = 0;
+            playwrightSuites.forEach(s => suitesToRun.push(s));
+            runSuite(0);
+        } else {
+            onAllSuitesDone();
+        }
+    }).catch(e => {
+        addLog(`[${project.name}] Inline suite error: ${e.message}`, 'error');
+        if (playwrightSuites.length > 0) {
+            suitesToRun.length = 0;
+            playwrightSuites.forEach(s => suitesToRun.push(s));
+            runSuite(0);
+        } else {
+            onAllSuitesDone();
+        }
+    });
 });
 
 // Protected keys that must never be exposed or overwritten via the secrets UI
