@@ -2304,7 +2304,26 @@ app.post('/api/run-tests', (req, res) => {
                 } catch (regenErr) {
                     addLog('⚠️ Email preview generation error: ' + (regenErr && regenErr.message), 'warning');
                 }
-                // --- End email preview generation ---
+                // --- Persist HTML report to MongoDB so it survives Railway redeploys ---
+                try {
+                    const reportPath = path.join(__dirname, 'email-preview', 'AdHash-Projects-Dashboard.html');
+                    if (fs.existsSync(reportPath)) {
+                        const htmlContent = fs.readFileSync(reportPath, 'utf8');
+                        const { getDB } = require('./src/db');
+                        const db = getDB();
+                        if (db && htmlContent) {
+                            await db.collection('run_reports').updateOne(
+                                { key: 'latest' },
+                                { $set: { key: 'latest', html: htmlContent, generatedAt: new Date() } },
+                                { upsert: true }
+                            );
+                            addLog('💾 Run report saved to MongoDB (survives redeploys)', 'info');
+                        }
+                    }
+                } catch (dbErr) {
+                    console.warn('[run-report] MongoDB save failed:', dbErr.message);
+                }
+                // --- End MongoDB persist ---
 
                 // --- Send Zoho Mail if enabled ---
                 try {
@@ -4408,26 +4427,63 @@ app.post('/api/push-specs', (req, res) => {
 });
 
 // Run report availability check
-app.get('/api/run-report-status', (req, res) => {
+app.get('/api/run-report-status', async (req, res) => {
+    // Check disk first (fast), fall back to MongoDB (survives redeploys)
     const candidates = [
         path.join(__dirname, 'email-preview', 'AdHash-Projects-Dashboard.html'),
         path.join(__dirname, 'email-preview', 'index.html')
     ];
     const found = candidates.find(f => fs.existsSync(f));
-    if (!found) {
-        return res.json({ available: false });
+    if (found) {
+        try {
+            const stat = fs.statSync(found);
+            const state = readDashboardState();
+            return res.json({
+                available: true,
+                generatedAt: (state && state.generatedAt) || stat.mtime.toISOString(),
+                source: 'disk'
+            });
+        } catch (e) { /* fall through */ }
     }
+    // Not on disk — check MongoDB
     try {
-        const stat = fs.statSync(found);
-        const state = readDashboardState();
-        return res.json({
-            available: true,
-            generatedAt: (state && state.generatedAt) || stat.mtime.toISOString(),
-            path: path.basename(path.dirname(found)) + '/' + path.basename(found)
-        });
-    } catch (e) {
-        return res.json({ available: false });
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        if (db) {
+            const doc = await db.collection('run_reports').findOne({ key: 'latest' }, { projection: { html: 0 } });
+            if (doc) {
+                return res.json({ available: true, generatedAt: doc.generatedAt, source: 'mongodb' });
+            }
+        }
+    } catch (_) {}
+    return res.json({ available: false });
+});
+
+// Serve latest run report HTML — from disk or MongoDB
+app.get('/api/latest-run-report', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).send('Unauthorized');
+    res.set('Cache-Control', 'no-store');
+    // Try disk first
+    const candidates = [
+        path.join(__dirname, 'email-preview', 'AdHash-Projects-Dashboard.html'),
+        path.join(__dirname, 'email-preview', 'index.html')
+    ];
+    const found = candidates.find(f => fs.existsSync(f));
+    if (found) {
+        return res.sendFile(found);
     }
+    // Fall back to MongoDB
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        if (db) {
+            const doc = await db.collection('run_reports').findOne({ key: 'latest' });
+            if (doc && doc.html) {
+                return res.set('Content-Type', 'text/html').send(doc.html);
+            }
+        }
+    } catch (e) { console.error('[latest-run-report]', e.message); }
+    return res.status(404).send('No report available');
 });
 
 // Legacy dashboard route

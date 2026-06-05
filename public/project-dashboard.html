@@ -2855,10 +2855,10 @@
                     <span id="runReportTimestamp" style="font-weight:400;font-size:0.82rem;color:var(--text-secondary);margin-left:6px;"></span>
                 </div>
                 <div class="run-report-header-actions">
-                    <a class="run-report-download-btn" id="runReportDownloadBtn" href="/email-preview/AdHash-Projects-Dashboard.html" download="AdHash-Projects-Dashboard.html">
+                    <a class="run-report-download-btn" id="runReportDownloadBtn" href="/api/latest-run-report" download="AdHash-Projects-Dashboard.html">
                         ⬇ Download HTML
                     </a>
-                    <a class="run-report-open-btn" id="runReportOpenLink" href="/email-preview/AdHash-Projects-Dashboard.html" target="_blank">
+                    <a class="run-report-open-btn" id="runReportOpenLink" href="/api/latest-run-report" target="_blank">
                         ↗ Open in new tab
                     </a>
                     <button class="run-report-close-btn" onclick="closeRunReportPanel()">✕ Close</button>
@@ -5269,8 +5269,9 @@
         const panel = document.getElementById('runReportPanel');
         const iframe = document.getElementById('runReportIframe');
         if (!panel || !iframe) return;
-        // Add cache-busting param so iframe always reloads latest report
-        iframe.src = '/email-preview/AdHash-Projects-Dashboard.html?t=' + Date.now();
+        // Use /api/latest-run-report — served from disk or MongoDB (survives redeploys)
+        // Cache-busting param ensures browser always fetches fresh
+        iframe.src = '/api/latest-run-report?t=' + Date.now();
         panel.classList.add('visible');
         panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         runReportPanelOpen = true;
