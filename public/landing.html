@@ -697,7 +697,7 @@ async function acLoadReport(){
   box.style.display='block';
   box.innerHTML='<div style="color:#64748b;font-size:13px;padding:20px;text-align:center">⟳ Loading report...</div>';
   try{
-    const r=await fetch('/api/autochecker/report',{headers:{Authorization:'Bearer '+localStorage.getItem('qa_jwt_token')||localStorage.getItem('qa_token')||''}});
+    const r=await fetch('/api/autochecker/report',{cache:'no-store',headers:{Authorization:'Bearer '+localStorage.getItem('qa_jwt_token')||localStorage.getItem('qa_token')||''}});
     const resp=await r.json();
     if(!resp.data){box.innerHTML=`<div style="color:#ef4444;font-size:13px;padding:20px;text-align:center">No report available${resp.message?' — '+resp.message:''}</div>`;return;}
     const d=resp.data;
@@ -817,8 +817,8 @@ function acToggleRawHtml(btn){
   if(wrap.style.display==='none'){
     wrap.style.display='block';
     btn.textContent='▲ Hide Full HTML Report';
-    // Write HTML into iframe srcdoc for safe rendering
-    if(iframe&&window._acRawHtml&&!iframe.srcdoc){
+    // Always write latest HTML (reset srcdoc so stale run is never shown)
+    if(iframe&&window._acRawHtml){
       iframe.srcdoc=window._acRawHtml;
     }
   }else{

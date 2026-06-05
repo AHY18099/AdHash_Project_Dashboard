@@ -5195,6 +5195,8 @@ app.get('/api/autochecker/status', async (req, res) => {
 // GET /api/autochecker/report — download artifact zip, extract HTML, parse and return structured data
 app.get('/api/autochecker/report', async (req, res) => {
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
+    // Never cache — always fetch latest run from GitHub
+    res.set('Cache-Control', 'no-store');
     try {
         const token = process.env.GITHUB_TOKEN || '';
         const https = require('https');
