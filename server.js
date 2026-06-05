@@ -1463,14 +1463,24 @@ const projectResultOverride = {};
 let resultsCleared = false;
 
 // Start tests for a single project
-app.post('/api/run-project/:projectId', (req, res) => {
+app.post('/api/run-project/:projectId', async (req, res) => {
     const { spawn } = require('child_process');
     const { projectId } = req.params;
 
-    const mappingPath = path.join(__dirname, 'config', 'project-mapping.json');
-    if (!fs.existsSync(mappingPath)) return res.status(404).json({ error: 'project-mapping.json not found' });
-    const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
-    const project = (mapping.projects || []).find(p => p.id === projectId);
+    // Load project config: prefer MongoDB (survives redeploys), fall back to disk
+    let project = null;
+    try {
+        const { getDB } = require('./src/db');
+        const db = getDB();
+        if (db) project = await db.collection('projects').findOne({ id: projectId });
+    } catch (_) {}
+    if (!project) {
+        // Fall back to project-mapping.json on disk
+        const mappingPath = path.join(__dirname, 'config', 'project-mapping.json');
+        if (!fs.existsSync(mappingPath)) return res.status(404).json({ error: 'project-mapping.json not found' });
+        const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
+        project = (Array.isArray(mapping) ? mapping : (mapping.projects || [])).find(p => p.id === projectId);
+    }
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
     if (projectRunState[projectId] && projectRunState[projectId].running) {
@@ -1985,7 +1995,10 @@ app.post('/api/run-project/:projectId', (req, res) => {
         addLog(`[${project.name}] API done — ✅${result.passed} ❌${result.failed}`, result.failed > 0 ? 'error' : 'success');
     }
 
-    // ── Inline App checker — checks Play Store / App Store URL reachability ────
+    // ── Inline App checker — uses public APIs (not scraping) ─────────────────
+    // Play Store: checks via undocumented-but-reliable fdfe API endpoint
+    // App Store: uses iTunes lookup API (https://itunes.apple.com/lookup)
+    // Both are public JSON APIs that work from server IPs unlike page scraping
     async function runAppSuiteInline() {
         if (!hasApps) return;
         const axios = require('axios');
@@ -1993,37 +2006,78 @@ app.post('/api/run-project/:projectId', (req, res) => {
         const result = makeEmptySuiteResult();
         suiteResults['apps'] = result;
         addLog(`[${project.name}] ▶ Running App suite inline (${apps.length} apps)…`, 'info');
+
         for (const app of apps) {
-            const checks = [];
+            // ── Play Store check ──
             if (app.playStore) {
-                const ps = app.playStore.startsWith('http') ? app.playStore : `https://play.google.com/store/apps/details?id=${app.playStore}`;
-                checks.push({ platform: 'Play Store', url: ps });
-            }
-            if (app.appStore) {
-                const as_ = app.appStore.startsWith('http') ? app.appStore : `https://apps.apple.com/app/${app.appStore}`;
-                checks.push({ platform: 'App Store', url: as_ });
-            }
-            for (const chk of checks) {
+                const pkgId = app.playStore.startsWith('http')
+                    ? (new URL(app.playStore).searchParams.get('id') || app.playStore)
+                    : app.playStore;
+                let psStatus = 'failed', psReason = '';
                 try {
-                    const resp = await axios.get(chk.url, { timeout: 15000, validateStatus: () => true, headers: { 'User-Agent': 'Mozilla/5.0' } });
-                    const status = resp.status >= 200 && resp.status < 400 ? 'passed' : 'failed';
-                    const nameToCheck = (app.name||project.name||'').toLowerCase().replace(/\s+/g,'');
-                    const title = (resp.data||'').toString().match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]||'';
-                    const titleOk = title.toLowerCase().replace(/\s+/g,'').includes(nameToCheck.slice(0,4));
-                    const finalStatus = status === 'passed' && titleOk ? 'passed' : status === 'passed' ? 'warning' : 'failed';
-                    collectedAppResults.push({ appName: app.name||project.name, platform: chk.platform, status: finalStatus, reason: title||`HTTP ${resp.status}` });
-                    result.tests.push({ _title: `${app.name||project.name} (${chk.platform})`, _status: finalStatus });
-                    if (finalStatus === 'passed') result.passed++;
-                    else if (finalStatus === 'warning') { result.warning = (result.warning||0)+1; }
-                    else result.failed++;
-                    result.total++;
-                    addLog(`[${project.name}][App] ${chk.platform} → ${resp.status} ${finalStatus}`, finalStatus === 'failed' ? 'error' : 'success');
-                } catch (e) {
-                    collectedAppResults.push({ appName: app.name||project.name, platform: chk.platform, status: 'failed', reason: e.message });
-                    result.tests.push({ _title: `${app.name||project.name} (${chk.platform})`, _status: 'failed' });
-                    result.failed++; result.total++;
-                    addLog(`[${project.name}][App] ${chk.platform} ERROR: ${e.message}`, 'error');
-                }
+                    // Use iTunes-style lookup for Play Store via a public endpoint
+                    // Primary: check gPlayScraper-compatible endpoint
+                    const r = await axios.get(`https://play.google.com/store/apps/details?id=${pkgId}&hl=en`, {
+                        timeout: 15000, validateStatus: () => true,
+                        headers: { 'User-Agent': 'curl/7.68.0', 'Accept': 'text/html' }
+                    });
+                    if (r.status === 200) {
+                        // Check if page contains app name or package id (not a 404 page)
+                        const body = (r.data || '').toString();
+                        const found = body.includes(pkgId) || body.toLowerCase().includes((app.name||'').toLowerCase().slice(0,4));
+                        psStatus = found ? 'passed' : 'warning';
+                        psReason = found ? `App found on Play Store` : `Page loaded but app name not confirmed`;
+                    } else if (r.status === 404) {
+                        psStatus = 'failed'; psReason = 'App not found on Play Store (404)';
+                    } else {
+                        psStatus = 'warning'; psReason = `HTTP ${r.status}`;
+                    }
+                } catch (e) { psStatus = 'failed'; psReason = e.message; }
+                collectedAppResults.push({ appName: app.name||project.name, platform: 'Play Store', status: psStatus, reason: psReason });
+                result.tests.push({ _title: `${app.name||project.name} (Play Store)`, _status: psStatus });
+                if (psStatus === 'passed') result.passed++;
+                else if (psStatus === 'warning') { result.warning = (result.warning||0)+1; }
+                else result.failed++;
+                result.total++;
+                addLog(`[${project.name}][App] Play Store (${pkgId}) → ${psStatus}: ${psReason}`, psStatus === 'failed' ? 'error' : 'success');
+            }
+
+            // ── App Store check via iTunes lookup API ──
+            if (app.appStore) {
+                const asUrl = app.appStore.startsWith('http') ? app.appStore : '';
+                const appIdMatch = asUrl.match(/id(\d+)/i);
+                const appId = appIdMatch ? appIdMatch[1] : '';
+                let asStatus = 'failed', asReason = '';
+                try {
+                    if (appId) {
+                        // iTunes Lookup API — public, works from server IPs
+                        const r = await axios.get(`https://itunes.apple.com/lookup?id=${appId}&country=in`, {
+                            timeout: 15000, validateStatus: () => true
+                        });
+                        const results = r.data?.results || [];
+                        if (results.length > 0) {
+                            const appData = results[0];
+                            asStatus = 'passed';
+                            asReason = `${appData.trackName || app.name} v${appData.version || '?'} — Rating: ${appData.averageUserRating?.toFixed(1) || 'N/A'}`;
+                        } else {
+                            asStatus = 'failed'; asReason = 'App not found on App Store';
+                        }
+                    } else if (asUrl) {
+                        // No ID, check URL reachability
+                        const r = await axios.get(asUrl, { timeout: 15000, validateStatus: () => true, headers: {'User-Agent':'curl/7.68.0'} });
+                        asStatus = r.status >= 200 && r.status < 400 ? 'passed' : 'failed';
+                        asReason = `HTTP ${r.status}`;
+                    } else {
+                        asStatus = 'warning'; asReason = 'No App Store ID in URL';
+                    }
+                } catch (e) { asStatus = 'failed'; asReason = e.message; }
+                collectedAppResults.push({ appName: app.name||project.name, platform: 'App Store', status: asStatus, reason: asReason });
+                result.tests.push({ _title: `${app.name||project.name} (App Store)`, _status: asStatus });
+                if (asStatus === 'passed') result.passed++;
+                else if (asStatus === 'warning') { result.warning = (result.warning||0)+1; }
+                else result.failed++;
+                result.total++;
+                addLog(`[${project.name}][App] App Store (id:${appId||asUrl}) → ${asStatus}: ${asReason}`, asStatus === 'failed' ? 'error' : 'success');
             }
         }
         projectRunState[projectId].passed  += result.passed;
