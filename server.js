@@ -3979,7 +3979,12 @@ let _projectMappingCache = null;
 // so regenerateSpecFiles() immediately picks up the new apps/servers/apis without a redeploy.
 function _invalidateProjectMappingCache(updatedData) {
     _projectMappingCache = updatedData || null;
-    // Also push to GitHub so the new config survives future redeploys
+    // Regenerate spec files immediately so the 5 test repos pick up new
+    // servers/domains/apis/apps without requiring a separate redeploy.
+    if (updatedData) {
+        try { regenerateSpecFiles(); } catch (e) { console.warn('[spec-regen] failed:', e.message); }
+    }
+    // Push to GitHub so the new config survives future redeploys
     if (updatedData) _pushProjectMappingToGitHub(updatedData).catch(() => {});
 }
 module.exports._invalidateProjectMappingCache = _invalidateProjectMappingCache;
@@ -4142,6 +4147,8 @@ function autoPushSpecsToGitHub() {
 }
 
 // Regenerate spec files for all 5 test repositories from current project-mapping.json
+// If in-memory cache is populated it's used directly; otherwise reads from disk.
+// When called after Save Project, cache has already been updated with the new data.
 function regenerateSpecFiles() {
     const mapping = readProjectMapping();
     const projects = mapping.projects || [];
