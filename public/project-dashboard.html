@@ -5276,24 +5276,31 @@
         }
     }
 
-    function openRunReportPanel() {
+    async function openRunReportPanel() {
         const panel = document.getElementById('runReportPanel');
         const iframe = document.getElementById('runReportIframe');
         if (!panel || !iframe) return;
-        // Use /api/latest-run-report — served from disk or MongoDB (survives redeploys)
-        iframe.src = '/api/latest-run-report?t=' + Date.now();
-        // Auto-resize iframe height to fit content after it loads
-        iframe.onload = function() {
-            try {
-                const h = iframe.contentDocument?.documentElement?.scrollHeight ||
-                          iframe.contentWindow?.document?.documentElement?.scrollHeight || 0;
-                if (h > 200) iframe.style.height = Math.min(h + 32, 4000) + 'px';
-            } catch(_) { /* cross-origin fallback — keep CSS height */ }
-        };
         panel.classList.add('visible');
         panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         runReportPanelOpen = true;
         document.getElementById('viewReportBtn').textContent = '✕ Hide Report';
+        // Fetch HTML and inject via srcdoc so CSS patch is applied in same-origin context
+        // This avoids X-Frame-Options issues and ensures -webkit-text-fill-color patch works
+        try {
+            const res = await fetch('/api/latest-run-report?t=' + Date.now(), { headers: _authHeaders() });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const html = await res.text();
+            iframe.srcdoc = html;
+            iframe.onload = function() {
+                try {
+                    const h = iframe.contentDocument?.documentElement?.scrollHeight || 0;
+                    if (h > 200) iframe.style.height = Math.min(h + 32, 4000) + 'px';
+                } catch(_) {}
+            };
+        } catch(e) {
+            // Fallback to src if fetch fails
+            iframe.src = '/api/latest-run-report?t=' + Date.now();
+        }
     }
 
     function closeRunReportPanel() {

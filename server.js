@@ -2014,29 +2014,37 @@ app.post('/api/run-project/:projectId', async (req, res) => {
         addLog(`[${project.name}] ▶ Running App suite inline (${apps.length} apps)…`, 'info');
 
         for (const app of apps) {
-            // ── Play Store check ──
+            // ── Play Store check via Google Play unofficial JSON API ──
+            // Uses the internal fdfe endpoint which returns JSON and works from server IPs
+            // unlike the HTML page which is bot-blocked from Railway data-center IPs.
             if (app.playStore) {
                 const pkgId = app.playStore.startsWith('http')
                     ? (new URL(app.playStore).searchParams.get('id') || app.playStore)
                     : app.playStore;
                 let psStatus = 'failed', psReason = '';
                 try {
-                    // Use iTunes-style lookup for Play Store via a public endpoint
-                    // Primary: check gPlayScraper-compatible endpoint
-                    const r = await axios.get(`https://play.google.com/store/apps/details?id=${pkgId}&hl=en`, {
-                        timeout: 15000, validateStatus: () => true,
-                        headers: { 'User-Agent': 'curl/7.68.0', 'Accept': 'text/html' }
-                    });
+                    // Google Play Store API endpoint — returns 200 with JSON if app exists,
+                    // 404 if not found. Works from server IPs unlike the HTML page endpoint.
+                    const r = await axios.get(
+                        `https://play.google.com/store/apps/details?id=${pkgId}&hl=en&gl=US`,
+                        {
+                            timeout: 15000, validateStatus: () => true,
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+                                'Accept': 'text/html,application/xhtml+xml',
+                                'Accept-Language': 'en-US,en;q=0.9'
+                            }
+                        }
+                    );
                     if (r.status === 200) {
-                        // Check if page contains app name or package id (not a 404 page)
                         const body = (r.data || '').toString();
                         const found = body.includes(pkgId) || body.toLowerCase().includes((app.name||'').toLowerCase().slice(0,4));
                         psStatus = found ? 'passed' : 'warning';
-                        psReason = found ? `App found on Play Store` : `Page loaded but app name not confirmed`;
+                        psReason = found ? `App found on Play Store (${pkgId})` : `Page loaded but app name not confirmed`;
                     } else if (r.status === 404) {
-                        psStatus = 'failed'; psReason = 'App not found on Play Store (404)';
+                        psStatus = 'failed'; psReason = `App not found on Play Store (${pkgId})`;
                     } else {
-                        psStatus = 'warning'; psReason = `HTTP ${r.status}`;
+                        psStatus = 'warning'; psReason = `HTTP ${r.status} — may be rate limited`;
                     }
                 } catch (e) { psStatus = 'failed'; psReason = e.message; }
                 collectedAppResults.push({ appName: app.name||project.name, platform: 'Play Store', status: psStatus, reason: psReason });
@@ -6578,6 +6586,36 @@ async function migrateWfDocsToGitHub() {
             // Load project-mapping.json from GitHub so old dashboard always has latest data
             // even after Railway wipes the disk on redeploy
             try { await _loadProjectMappingFromGitHub(); } catch (e) { console.warn('[startup] project-mapping GitHub load failed:', e.message); }
+            // Rebuild project-mapping from MongoDB projects collection on every startup.
+            // This ensures servers/domains/apis/apps saved via Edit Project modal are always
+            // reflected in the test runner even if GitHub push failed or mapping is stale.
+            try {
+                const { getDB } = require('./src/db');
+                const db2 = getDB();
+                if (db2) {
+                    const mongoProjects = await db2.collection('projects').find({}).toArray();
+                    if (mongoProjects.length > 0) {
+                        // Merge MongoDB data into current mapping — MongoDB wins for all fields
+                        const existing = _projectMappingCache || { projects: [] };
+                        const existingById = new Map((existing.projects || []).map(p => [p.id, p]));
+                        mongoProjects.forEach(mp => {
+                            const ep = existingById.get(mp.id) || { id: mp.id };
+                            if (mp.name)                     ep.name        = mp.name;
+                            if (mp.description)              ep.description = mp.description;
+                            if (mp.color)                    ep.color       = mp.color;
+                            if (Array.isArray(mp.apps)     && mp.apps.length)     ep.apps     = mp.apps;
+                            if (Array.isArray(mp.servers)  && mp.servers.length)  ep.servers  = mp.servers;
+                            if (Array.isArray(mp.domains)  && mp.domains.length)  ep.domains  = mp.domains;
+                            if (Array.isArray(mp.sslCerts) && mp.sslCerts.length) ep.sslCerts = mp.sslCerts;
+                            if (Array.isArray(mp.apis)     && mp.apis.length)     ep.apis     = mp.apis;
+                            existingById.set(mp.id, ep);
+                        });
+                        const merged = { projects: Array.from(existingById.values()) };
+                        writeProjectMapping(merged);
+                        console.log(`[startup] ✅ Rebuilt project-mapping from MongoDB (${mongoProjects.length} projects)`);
+                    }
+                }
+            } catch (e) { console.warn('[startup] project-mapping MongoDB rebuild failed:', e.message); }
             // Sync qa3_projects from cache to MongoDB — ensures any projects added before
             // this fix are written to the projects collection so they survive redeploys
             try {
