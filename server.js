@@ -5239,12 +5239,14 @@ app.get('/api/autochecker/report', async (req, res) => {
             req3.end();
         });
 
-        // Parse zip in-memory — scan ALL local file headers (handles subdirectories + ZIP64 extras)
+        // Parse zip in-memory — handles subdirectories, ZIP64, and data descriptors
+        // (flags bit 3 set = compSize=0 in header; actual size follows the data)
         let htmlContent = '';
         let offset = 0;
         while (offset < zipBuf.length - 30) {
             const sig = zipBuf.readUInt32LE(offset);
             if (sig !== 0x04034b50) { offset++; continue; } // scan for next header
+            const flags       = zipBuf.readUInt16LE(offset + 6);
             const compression = zipBuf.readUInt16LE(offset + 8);
             let   compSize    = zipBuf.readUInt32LE(offset + 18);
             let   uncompSize  = zipBuf.readUInt32LE(offset + 22);
@@ -5266,6 +5268,20 @@ app.get('/api/autochecker/report', async (req, res) => {
                     }
                     extraOff += 4 + hdrSz;
                 }
+            }
+            // Data descriptor (flags bit 3): compSize=0 in header, real sizes after data.
+            // Find the actual compressed data by scanning for the data descriptor signature
+            // or the next local file header, and infer size from position.
+            if ((flags & 0x08) && compSize === 0 && (name.endsWith('.html') || name.endsWith('.htm'))) {
+                // Scan forward from dataOffset to find end of compressed data:
+                // look for data descriptor sig 0x08074b50 or next local file header 0x04034b50
+                let scanEnd = dataOffset;
+                while (scanEnd < zipBuf.length - 4) {
+                    const s = zipBuf.readUInt32LE(scanEnd);
+                    if (s === 0x08074b50 || s === 0x04034b50 || s === 0x02014b50) break;
+                    scanEnd++;
+                }
+                compSize = scanEnd - dataOffset;
             }
             if ((name.endsWith('.html') || name.endsWith('.htm')) && compSize > 0) {
                 const data = zipBuf.slice(dataOffset, dataOffset + compSize);
