@@ -6595,28 +6595,33 @@ async function migrateWfDocsToGitHub() {
                 if (db2) {
                     const mongoProjects = await db2.collection('projects').find({}).toArray();
                     if (mongoProjects.length > 0) {
-                        // Use MongoDB as the single source of truth for the mapping.
-                        // Build the mapping directly from MongoDB — do NOT merge with the
-                        // existing mapping to avoid legacy/duplicate IDs (e.g. zaptrade vs
-                        // zaptrade_mpv6v89b) creating ghost cards on the dashboard.
-                        const builtProjects = mongoProjects.map(mp => ({
-                            id:          mp.id || mp._id?.toString(),
-                            name:        mp.name        || '',
-                            description: mp.description || '',
-                            color:       mp.color       || '#3b82f6',
-                            apps:        mp.apps        || [],
-                            servers:     mp.servers     || [],
-                            domains:     mp.domains     || [],
-                            sslCerts:    mp.sslCerts    || [],
-                            apis:        mp.apis        || [],
-                        })).filter(p => p.id);
-                        const merged = { projects: builtProjects };
-                        // Update cache and disk ONLY — do NOT push to GitHub here.
-                        // Pushing to GitHub on startup causes an infinite redeploy loop
-                        // (Railway detects new commit → redeploys → startup → pushes → loop).
+                        // Merge MongoDB data into GitHub mapping — MongoDB wins ONLY for
+                        // non-empty arrays (servers/domains/apis/apps/sslCerts).
+                        // GitHub mapping is kept as base to preserve data for projects
+                        // whose Mongoose entry may have empty arrays (not yet edited via UI).
+                        // No GitHub push — just update cache and disk to avoid redeploy loop.
+                        const base = _projectMappingCache || { projects: [] };
+                        const byId = new Map((base.projects || []).map(p => [p.id, { ...p }]));
+                        mongoProjects.forEach(mp => {
+                            const id = mp.id || '';
+                            if (!id) return;
+                            const ep = byId.get(id) || { id };
+                            if (mp.name)        ep.name        = mp.name;
+                            if (mp.description) ep.description = mp.description;
+                            if (mp.color)       ep.color       = mp.color;
+                            // Only overwrite arrays if MongoDB has actual data (non-empty)
+                            if (Array.isArray(mp.servers)  && mp.servers.length)  ep.servers  = mp.servers;
+                            if (Array.isArray(mp.domains)  && mp.domains.length)  ep.domains  = mp.domains;
+                            if (Array.isArray(mp.sslCerts) && mp.sslCerts.length) ep.sslCerts = mp.sslCerts;
+                            if (Array.isArray(mp.apis)     && mp.apis.length)     ep.apis     = mp.apis;
+                            if (Array.isArray(mp.apps)     && mp.apps.length)     ep.apps     = mp.apps;
+                            byId.set(id, ep);
+                        });
+                        const merged = { projects: Array.from(byId.values()) };
+                        // Cache + disk ONLY — no GitHub push (would cause infinite redeploy loop)
                         _projectMappingCache = merged;
                         try { fs.writeFileSync(PROJECT_MAPPING_PATH, JSON.stringify(merged, null, 2), 'utf8'); } catch (_) {}
-                        console.log(`[startup] ✅ Rebuilt project-mapping from MongoDB (${builtProjects.length} projects)`);
+                        console.log(`[startup] ✅ Rebuilt project-mapping from MongoDB (${mongoProjects.length} projects)`);
                     }
                 }
             } catch (e) { console.warn('[startup] project-mapping MongoDB rebuild failed:', e.message); }
