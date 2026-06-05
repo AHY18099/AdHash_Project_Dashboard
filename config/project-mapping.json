@@ -1127,13 +1127,45 @@
     {
       "id": "zaptrade_mpv6v89b",
       "name": "ZapTrade",
-      "description": "",
+      "description": "ZapTrade platform",
       "color": "#f59e0b",
       "apps": [],
-      "servers": [],
-      "domains": [],
-      "sslCerts": [],
-      "apis": []
+      "servers": [
+        {
+          "name": "Website",
+          "url": "https://zaptrade.ai",
+          "type": "web",
+          "expectedStatus": 200
+        },
+        {
+          "name": "Dashboard",
+          "url": "https://algo.zaptrade.ai",
+          "type": "web",
+          "expectedStatus": 200
+        }
+      ],
+      "domains": [
+        "zaptrade.ai",
+        "algo.zaptrade.ai"
+      ],
+      "sslCerts": [
+        "zaptrade.ai",
+        "algo.zaptrade.ai"
+      ],
+      "apis": [
+        {
+          "name": "Website",
+          "url": "https://zaptrade.ai",
+          "method": "GET",
+          "expectedStatus": 200
+        },
+        {
+          "name": "Dashboard",
+          "url": "https://algo.zaptrade.ai",
+          "method": "GET",
+          "expectedStatus": 200
+        }
+      ]
     }
   ]
 }
