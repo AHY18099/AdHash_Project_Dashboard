@@ -6595,24 +6595,24 @@ async function migrateWfDocsToGitHub() {
                 if (db2) {
                     const mongoProjects = await db2.collection('projects').find({}).toArray();
                     if (mongoProjects.length > 0) {
-                        // Merge MongoDB data into current mapping — MongoDB wins for all fields
-                        const existing = _projectMappingCache || { projects: [] };
-                        const existingById = new Map((existing.projects || []).map(p => [p.id, p]));
-                        mongoProjects.forEach(mp => {
-                            const ep = existingById.get(mp.id) || { id: mp.id };
-                            if (mp.name)                     ep.name        = mp.name;
-                            if (mp.description)              ep.description = mp.description;
-                            if (mp.color)                    ep.color       = mp.color;
-                            if (Array.isArray(mp.apps)     && mp.apps.length)     ep.apps     = mp.apps;
-                            if (Array.isArray(mp.servers)  && mp.servers.length)  ep.servers  = mp.servers;
-                            if (Array.isArray(mp.domains)  && mp.domains.length)  ep.domains  = mp.domains;
-                            if (Array.isArray(mp.sslCerts) && mp.sslCerts.length) ep.sslCerts = mp.sslCerts;
-                            if (Array.isArray(mp.apis)     && mp.apis.length)     ep.apis     = mp.apis;
-                            existingById.set(mp.id, ep);
-                        });
-                        const merged = { projects: Array.from(existingById.values()) };
+                        // Use MongoDB as the single source of truth for the mapping.
+                        // Build the mapping directly from MongoDB — do NOT merge with the
+                        // existing mapping to avoid legacy/duplicate IDs (e.g. zaptrade vs
+                        // zaptrade_mpv6v89b) creating ghost cards on the dashboard.
+                        const builtProjects = mongoProjects.map(mp => ({
+                            id:          mp.id || mp._id?.toString(),
+                            name:        mp.name        || '',
+                            description: mp.description || '',
+                            color:       mp.color       || '#3b82f6',
+                            apps:        mp.apps        || [],
+                            servers:     mp.servers     || [],
+                            domains:     mp.domains     || [],
+                            sslCerts:    mp.sslCerts    || [],
+                            apis:        mp.apis        || [],
+                        })).filter(p => p.id);
+                        const merged = { projects: builtProjects };
                         writeProjectMapping(merged);
-                        console.log(`[startup] ✅ Rebuilt project-mapping from MongoDB (${mongoProjects.length} projects)`);
+                        console.log(`[startup] ✅ Rebuilt project-mapping from MongoDB (${builtProjects.length} projects)`);
                     }
                 }
             } catch (e) { console.warn('[startup] project-mapping MongoDB rebuild failed:', e.message); }
