@@ -4634,14 +4634,35 @@ app.get('/api/run-report-status', async (req, res) => {
 // Serve latest run report HTML — from disk or MongoDB
 // Inject iframe-safe CSS into the email HTML so it renders correctly when embedded
 function _patchReportHtmlForIframe(html) {
+    // Fix 1: Ensure all inline color styles are preserved by resetting UA stylesheet overrides
+    // Fix 2: The email template uses bgcolor attribute + background-color inline — both needed
+    // Fix 3: div elements inside td must not lose their inline color from UA stylesheet
     const patch = `<style>
-        /* Force all text to be visible — email HTML div/td color must not be overridden by iframe UA stylesheet */
-        body { background-color:#000000 !important; color:#ffffff !important; }
-        * { box-sizing:border-box; }
-        div, span, td, th, p { color:inherit; }
-        table { border-collapse:collapse; }
+        html, body { background-color:#000000 !important; color:#ffffff !important; margin:0; padding:0; }
+        /* Prevent UA stylesheet from overriding inline color styles on div/span */
+        /* Use attribute selector to target divs with inline style containing color */
+        div[style*="color"] { color: unset; }
+        /* Force all text elements to show their inline styles, not UA defaults */
+        div, span, p, h1, h2, h3, h4, h5, h6 { -webkit-text-fill-color: unset; }
+        /* Ensure table cells with bgcolor show correctly */
+        td[bgcolor], td[style*="background"] { color: #ffffff; }
+        /* Preserve explicitly set colors via !important specificity fix */
+        [style*="color:#ffffff"] { color: #ffffff !important; }
+        [style*="color:#cbd5e1"] { color: #cbd5e1 !important; }
+        [style*="color:#9ca3af"] { color: #9ca3af !important; }
+        [style*="color:#94a3b8"] { color: #94a3b8 !important; }
+        [style*="color:#10b981"] { color: #10b981 !important; }
+        [style*="color:#ef4444"] { color: #ef4444 !important; }
+        [style*="color:#f59e0b"] { color: #f59e0b !important; }
+        [style*="color:#3b82f6"] { color: #3b82f6 !important; }
+        [style*="color:#2563eb"] { color: #2563eb !important; }
+        [style*="color:#6366f1"] { color: #6366f1 !important; }
+        [style*="color:#22c55e"] { color: #22c55e !important; }
+        [style*="color:#ff4d4f"] { color: #ff4d4f !important; }
+        [style*="color:#ffb020"] { color: #ffb020 !important; }
+        [style*="color:#06b6d4"] { color: #06b6d4 !important; }
+        [style*="color:#8b5cf6"] { color: #8b5cf6 !important; }
     </style>`;
-    // Insert patch right before </head>
     return html.includes('</head>')
         ? html.replace('</head>', patch + '</head>')
         : patch + html;
