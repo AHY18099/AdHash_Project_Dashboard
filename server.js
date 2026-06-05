@@ -4634,36 +4634,68 @@ app.get('/api/run-report-status', async (req, res) => {
 // Serve latest run report HTML — from disk or MongoDB
 // Inject iframe-safe CSS into the email HTML so it renders correctly when embedded
 function _patchReportHtmlForIframe(html) {
+    // Strategy: rather than fighting the UA stylesheet with attribute selectors,
+    // we inject the colors directly as a data-uri stylesheet that has highest specificity.
+    // We also do a string-replace approach: inject a <style> that targets every
+    // color used in the template by its exact hex value, using both color and
+    // -webkit-text-fill-color (which overrides color in WebKit/Blink iframes).
     const patch = `<style>
-        html, body { background-color:#000000 !important; color:#ffffff !important; margin:0; padding:0; }
-        /* Responsive: allow the 960px email table to scale on narrow screens */
-        table[style*="max-width:960px"], table[style*="max-width: 960px"] { width:100% !important; max-width:100% !important; }
-        /* Stack 50% summary cards on mobile */
-        @media screen and (max-width: 640px) {
-            td[width="50%"] { display:block !important; width:100% !important; box-sizing:border-box; }
-            td[style*="width:50%"] { display:block !important; width:100% !important; box-sizing:border-box; }
+        /* Reset — no margin, black background, white text base */
+        html { overflow-x: hidden; }
+        html, body {
+            background-color: #000000 !important;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            margin: 0; padding: 0;
         }
-        /* Fix color rendering in iframe — force inline styles to win over UA stylesheet */
-        td[bgcolor], td[style*="background"] { color: #ffffff; }
-        div, span, p { -webkit-text-fill-color: unset; }
-        [style*="color:#ffffff"] { color: #ffffff !important; }
-        [style*="color:#cbd5e1"] { color: #cbd5e1 !important; }
-        [style*="color:#9ca3af"] { color: #9ca3af !important; }
-        [style*="color:#94a3b8"] { color: #94a3b8 !important; }
-        [style*="color:#10b981"] { color: #10b981 !important; }
-        [style*="color:#ef4444"] { color: #ef4444 !important; }
-        [style*="color:#f59e0b"] { color: #f59e0b !important; }
-        [style*="color:#3b82f6"] { color: #3b82f6 !important; }
-        [style*="color:#2563eb"] { color: #2563eb !important; }
-        [style*="color:#6366f1"] { color: #6366f1 !important; }
-        [style*="color:#22c55e"] { color: #22c55e !important; }
-        [style*="color:#ff4d4f"] { color: #ff4d4f !important; }
-        [style*="color:#ffb020"] { color: #ffb020 !important; }
-        [style*="color:#06b6d4"] { color: #06b6d4 !important; }
-        [style*="color:#8b5cf6"] { color: #8b5cf6 !important; }
-        /* Padding/overflow fix for narrow screens */
-        body > table { min-width: unset !important; }
-        td[align="center"] { padding-left: 8px !important; padding-right: 8px !important; }
+        /* Prevent horizontal scroll — the outer table must never exceed viewport */
+        body > table { width: 100% !important; min-width: 0 !important; }
+        table { max-width: 100%; word-break: break-word; }
+        /* The inner 960px container must scale to fit */
+        table[style*="max-width:960px"],
+        table[style*="max-width: 960px"] {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        /* All td cells default to white text so nothing is invisible */
+        td, th { color: #ffffff !important; -webkit-text-fill-color: #ffffff !important; }
+        /* All div/span/p inherit unless overridden by inline color below */
+        div, span, p {
+            color: inherit;
+            -webkit-text-fill-color: inherit;
+        }
+        /* Force every exact inline color used in the template.
+           Use both color and -webkit-text-fill-color to cover all browsers. */
+        [style*="color:#ffffff"]  { color: #ffffff  !important; -webkit-text-fill-color: #ffffff  !important; }
+        [style*="color:#cbd5e1"]  { color: #cbd5e1  !important; -webkit-text-fill-color: #cbd5e1  !important; }
+        [style*="color:#9ca3af"]  { color: #9ca3af  !important; -webkit-text-fill-color: #9ca3af  !important; }
+        [style*="color:#94a3b8"]  { color: #94a3b8  !important; -webkit-text-fill-color: #94a3b8  !important; }
+        [style*="color:#10b981"]  { color: #10b981  !important; -webkit-text-fill-color: #10b981  !important; }
+        [style*="color:#ef4444"]  { color: #ef4444  !important; -webkit-text-fill-color: #ef4444  !important; }
+        [style*="color:#f59e0b"]  { color: #f59e0b  !important; -webkit-text-fill-color: #f59e0b  !important; }
+        [style*="color:#3b82f6"]  { color: #3b82f6  !important; -webkit-text-fill-color: #3b82f6  !important; }
+        [style*="color:#2563eb"]  { color: #2563eb  !important; -webkit-text-fill-color: #2563eb  !important; }
+        [style*="color:#6366f1"]  { color: #6366f1  !important; -webkit-text-fill-color: #6366f1  !important; }
+        [style*="color:#22c55e"]  { color: #22c55e  !important; -webkit-text-fill-color: #22c55e  !important; }
+        [style*="color:#ff4d4f"]  { color: #ff4d4f  !important; -webkit-text-fill-color: #ff4d4f  !important; }
+        [style*="color:#ffb020"]  { color: #ffb020  !important; -webkit-text-fill-color: #ffb020  !important; }
+        [style*="color:#06b6d4"]  { color: #06b6d4  !important; -webkit-text-fill-color: #06b6d4  !important; }
+        [style*="color:#8b5cf6"]  { color: #8b5cf6  !important; -webkit-text-fill-color: #8b5cf6  !important; }
+        /* Additional colors from the project cards */
+        [style*="color:#ff6b6b"]  { color: #ff6b6b  !important; -webkit-text-fill-color: #ff6b6b  !important; }
+        [style*="color:#64748b"]  { color: #64748b  !important; -webkit-text-fill-color: #64748b  !important; }
+        [style*="color:#e2e8f0"]  { color: #e2e8f0  !important; -webkit-text-fill-color: #e2e8f0  !important; }
+        [style*="color:#f1f5f9"]  { color: #f1f5f9  !important; -webkit-text-fill-color: #f1f5f9  !important; }
+        [style*="color:#1e293b"]  { color: #1e293b  !important; -webkit-text-fill-color: #1e293b  !important; }
+        /* Summary cards: stay 2-col on desktop, stack on mobile */
+        @media screen and (max-width: 600px) {
+            td[width="50%"],
+            td[style*="width:50%"] {
+                display: block !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+        }
     </style>`;
     return html.includes('</head>')
         ? html.replace('</head>', patch + '</head>')
