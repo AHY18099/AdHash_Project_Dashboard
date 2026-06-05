@@ -6611,7 +6611,11 @@ async function migrateWfDocsToGitHub() {
                             apis:        mp.apis        || [],
                         })).filter(p => p.id);
                         const merged = { projects: builtProjects };
-                        writeProjectMapping(merged);
+                        // Update cache and disk ONLY — do NOT push to GitHub here.
+                        // Pushing to GitHub on startup causes an infinite redeploy loop
+                        // (Railway detects new commit → redeploys → startup → pushes → loop).
+                        _projectMappingCache = merged;
+                        try { fs.writeFileSync(PROJECT_MAPPING_PATH, JSON.stringify(merged, null, 2), 'utf8'); } catch (_) {}
                         console.log(`[startup] ✅ Rebuilt project-mapping from MongoDB (${builtProjects.length} projects)`);
                     }
                 }
