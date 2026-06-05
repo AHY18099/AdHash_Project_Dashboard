@@ -160,7 +160,13 @@ app.use(express.urlencoded({ limit: '100mb', extended: true }));
 // Security headers on every response
 app.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
-    res.set('X-Frame-Options', 'DENY');
+    // Allow SAMEORIGIN for report endpoints so they can be embedded in iframes
+    // on the same domain (project-dashboard uses an iframe to show the report).
+    // All other routes keep DENY.
+    const isSameOriginOk = req.path === '/api/latest-run-report' ||
+        req.path.startsWith('/email-preview/') ||
+        req.path.startsWith('/suite-reports/');
+    res.set('X-Frame-Options', isSameOriginOk ? 'SAMEORIGIN' : 'DENY');
     res.set('X-XSS-Protection', '1; mode=block');
     res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     if (IS_PROD) {
