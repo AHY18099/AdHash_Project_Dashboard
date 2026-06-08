@@ -226,8 +226,10 @@ function getSuiteExecutionConfig(definition: SuiteDefinition): SuiteExecutionCon
     return null;
   }
 
+  // App-status tests use HTTP checks (no browser) — run under the dedicated project
+  const projectFlag = definition.id === 'app' ? ' --project app-status' : '';
   return {
-    command: `${PLAYWRIGHT_BIN} test ${definition.specPath}`,
+    command: `${PLAYWRIGHT_BIN} test ${definition.specPath}${projectFlag}`,
     cwd: process.cwd(),
     fallbackTotal: countSuiteTests(definition)
   };

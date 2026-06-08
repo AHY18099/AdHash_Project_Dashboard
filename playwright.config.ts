@@ -27,6 +27,14 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      // Exclude app-status tests — they use HTTP checks and don't need a browser
+      testIgnore: ['**/app-status/**'],
+    },
+    {
+      // Browser-less project for app store HTTP checks
+      name: 'app-status',
+      testMatch: ['**/app-status/**'],
+      use: {},
     },
   ],
   outputDir: 'test-results/',
