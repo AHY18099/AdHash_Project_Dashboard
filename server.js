@@ -4676,9 +4676,11 @@ function _patchReportHtmlForIframe(html) {
         /* Prevent horizontal scroll — the outer table must never exceed viewport */
         body > table { width: 100% !important; min-width: 0 !important; }
         table { max-width: 100%; word-break: break-word; }
-        /* The inner 960px container must scale to fit */
+        /* The inner container must scale to fit on any screen */
         table[style*="max-width:960px"],
-        table[style*="max-width: 960px"] {
+        table[style*="max-width: 960px"],
+        table[style*="max-width:700px"],
+        table[style*="max-width: 700px"] {
             width: 100% !important;
             max-width: 100% !important;
         }

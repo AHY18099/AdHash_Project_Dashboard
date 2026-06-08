@@ -1631,12 +1631,24 @@ function getStatusEmoji(status: ItemStatus): string {
     return '✓';
 }
 
-function getProjectChipClasses(variant: string, tone: 'failed' | 'warning' | 'normal'): string {
-    return `project-chip-badge chip-${variant} ${tone === 'failed' ? 'chip-failed' : tone === 'warning' ? 'chip-warning' : 'chip-normal'}`;
+function getProjectChipInlineStyle(variant: string, tone: 'failed' | 'warning' | 'normal'): string {
+    const chipColors: Record<string, { bg: string; color: string; border: string }> = {
+        app:    { bg: '#f0f0f0', color: '#3b82f6', border: '#3b82f6' },
+        server: { bg: '#f0f0f0', color: '#06b6d4', border: '#06b6d4' },
+        ssl:    { bg: '#f0f0f0', color: '#8b5cf6', border: '#8b5cf6' },
+        domain: { bg: '#f0f0f0', color: '#10b981', border: '#10b981' },
+        api:    { bg: '#f0f0f0', color: '#f59e0b', border: '#f59e0b' }
+    };
+    const base = chipColors[variant] || chipColors['api'];
+    const bg    = tone === 'failed' ? '#2a0d0d' : tone === 'warning' ? '#3a2600' : base.bg;
+    const color = tone === 'failed' ? '#ff6b6b' : tone === 'warning' ? '#ffb020' : base.color;
+    const border = tone === 'failed' ? '#ff4d4f' : tone === 'warning' ? '#ffb020' : base.border;
+    const bw    = tone === 'normal' ? '2px' : '1px';
+    return `display:inline-block;margin-right:8px;margin-bottom:6px;padding:5px 12px;border-radius:18px;font-size:12px;line-height:14px;font-weight:700;font-family:Arial,'Segoe UI',sans-serif;white-space:nowrap;background-color:${bg};color:${color};border:${bw} solid ${border};`;
 }
 
 function renderProjectFailedCountBadge(failedCount: number): string {
-    return `<span class="project-failed-count">❗ ${escapeHtml(failedCount)}</span>`;
+    return `<span style="display:inline-block;margin-right:8px;padding:4px 10px;border-radius:12px;background-color:#3b0a0a;color:#ff4d4f;font-size:12px;font-weight:600;border:1px solid #ff4d4f;vertical-align:middle;font-family:Arial,'Segoe UI',sans-serif;">❗ ${escapeHtml(failedCount)}</span>`;
 }
 
 function renderProjectWarningCountBadge(warningCount: number): string {
@@ -1644,7 +1656,7 @@ function renderProjectWarningCountBadge(warningCount: number): string {
         return '';
     }
 
-    return `<span class="project-warning-count">⚠ ${escapeHtml(warningCount)}</span>`;
+    return `<span style="display:inline-block;margin-right:8px;padding:4px 10px;border-radius:12px;background-color:#3a2600;color:#ffb020;font-size:12px;font-weight:600;border:1px solid #ffb020;vertical-align:middle;font-family:Arial,'Segoe UI',sans-serif;">⚠ ${escapeHtml(warningCount)}</span>`;
 }
 
 function getProjectChipTone(failureCount: number, warningCount: number): 'failed' | 'warning' | 'normal' {
@@ -1658,7 +1670,7 @@ function getProjectChipTone(failureCount: number, warningCount: number): 'failed
 }
 
 function renderProjectSummaryChip(label: string, value: number, variant: string, tone: 'failed' | 'warning' | 'normal'): string {
-    return `<span class="${getProjectChipClasses(variant, tone)}">${escapeHtml(label)} ${value}</span>`;
+    return `<span style="${getProjectChipInlineStyle(variant, tone)}">${escapeHtml(label)} ${value}</span>`;
 }
 
 function renderCountChip(label: string, value: number, color: string): string {
@@ -1914,7 +1926,7 @@ function renderProjectStatusBadge(project: ProjectEmailCard): string {
 
 function renderProjectSummaryChips(project: ProjectEmailCard): string {
     return `
-        <span class="project-chip-row">
+        <span style="display:inline-block;">
             ${renderProjectSummaryChip('APP', project.results.apps.total, 'app', getProjectChipTone(project.categoryFailures.apps, project.categoryWarnings.apps))}
             ${renderProjectSummaryChip('SRV', project.results.servers.total, 'server', getProjectChipTone(project.categoryFailures.servers, project.categoryWarnings.servers))}
             ${renderProjectSummaryChip('SSL', project.results.ssl.total, 'ssl', getProjectChipTone(project.categoryFailures.ssl, project.categoryWarnings.ssl))}
@@ -2000,72 +2012,17 @@ function buildDashboardEmailHtml(model: DashboardEmailModel): string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${escapeHtml(model.headerTitle)}</title>
     <style>
-        .project-failed-count {
-            display: inline-block;
-            margin-right: 8px;
-            padding: 4px 10px;
-            border-radius: 12px;
-            background: #3b0a0a;
-            color: #ff4d4f;
-            font-size: 12px;
-            font-weight: 600;
-            border: 1px solid #ff4d4f;
-            vertical-align: middle;
-        }
-
-        .project-warning-count {
-            display: inline-block;
-            margin-right: 8px;
-            padding: 4px 10px;
-            border-radius: 12px;
-            background: #3a2600;
-            color: #ffb020;
-            font-size: 12px;
-            font-weight: 600;
-            border: 1px solid #ffb020;
-            vertical-align: middle;
-        }
-
-        .project-chip-row {
-            display: inline-block;
-        }
-
-        .project-chip-badge {
-            display: inline-block;
-            margin-right: 8px;
-            margin-bottom: 6px;
-            padding: 5px 12px;
-            border-radius: 18px;
-            font-size: 12px;
-            line-height: 14px;
-            font-weight: 700;
-            font-family: Arial, 'Segoe UI', sans-serif;
-            white-space: nowrap;
-            border: 2px solid transparent;
-        }
-
-        .chip-normal {
-            box-shadow: none;
-        }
-
-        .chip-app { background: #f0f0f0; color: #3b82f6; border-color: #3b82f6; }
-        .chip-server { background: #f0f0f0; color: #06b6d4; border-color: #06b6d4; }
-        .chip-ssl { background: #f0f0f0; color: #8b5cf6; border-color: #8b5cf6; }
-        .chip-domain { background: #f0f0f0; color: #10b981; border-color: #10b981; }
-        .chip-api { background: #f0f0f0; color: #f59e0b; border-color: #f59e0b; }
-
-        .chip-failed {
-            background: #2a0d0d !important;
-            color: #ff6b6b !important;
-            border: 1px solid #ff4d4f !important;
-            box-shadow: 0 0 6px rgba(255, 77, 79, 0.4);
-        }
-
-        .chip-warning {
-            background: #3a2600 !important;
-            color: #ffb020 !important;
-            border: 1px solid #ffb020 !important;
-            box-shadow: 0 0 6px rgba(255, 176, 32, 0.35);
+        /* Responsive: stack 2-col summary cards to 1-col on small screens */
+        @media screen and (max-width: 600px) {
+            td[width="50%"],
+            td[style*="width:50%"] {
+                display: block !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            table[style*="max-width:700px"] {
+                width: 100% !important;
+            }
         }
     </style>
 </head>
@@ -2073,7 +2030,7 @@ function buildDashboardEmailHtml(model: DashboardEmailModel): string {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background-color:#000000;margin:0;padding:0;border-collapse:collapse;">
         <tr>
             <td align="center" style="padding:24px 12px;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:960px;border-collapse:collapse;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:700px;border-collapse:collapse;">
                     <tr>
                         <td style="padding:0 0 24px 0;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0b1f38" style="background-color:#0b1f38;border:1px solid #2563eb;border-collapse:separate;border-radius:24px;">
@@ -2405,6 +2362,17 @@ function buildModuleReportPage(model: DashboardEmailModel, section: ModuleSectio
             .timestamp-line { flex-direction: column; gap: 4px; }
             .timestamp-prefix { flex-basis: auto; padding-top: 0; }
             .timestamp-value { font-size: 14px; }
+        }
+        @media (max-width: 480px) {
+            .page { padding: 14px 10px 28px; }
+            .hero { padding: 18px 14px; border-radius: 16px; }
+            .hero h1 { font-size: 22px; }
+            .summary { grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+            .timestamp-card { grid-column: span 2; }
+            .report-card { padding: 14px; }
+            .report-card-header h2 { font-size: 18px; }
+            .field-grid { grid-template-columns: 1fr; }
+            .field.wide { grid-column: 1; }
         }
     </style>
 </head>
