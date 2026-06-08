@@ -484,7 +484,7 @@ app.get('/api/users/names', async (req, res) => {
             return res.json(users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role || 'member' })));
         }
         const users = await db.collection('users')
-            .find({ isActive: true }, { projection: { id: 1, name: 1, email: 1, role: 1, _id: 0 } })
+            .find({ isActive: true }, { projection: { id: 1, name: 1, email: 1, role: 1, _id: 0 }, maxTimeMS: 5000 })
             .sort({ name: 1 }).toArray();
         res.json(users);
     } catch (e) { res.status(500).json({ error: e.message }); }

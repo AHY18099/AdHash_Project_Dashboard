@@ -2009,7 +2009,10 @@ function _setToken(t){if(t)localStorage.setItem('qa_jwt_token',t);else localStor
 let _teamMembersCache=[];
 async function _loadTeamMembersFromServer(){
   try{
-    const r=await fetch('/api/users/names',{headers:{Authorization:'Bearer '+_getToken()},cache:'no-store'});
+    const _ctrl=new AbortController();
+    const _tid=setTimeout(()=>_ctrl.abort(),5000);
+    const r=await fetch('/api/users/names',{headers:{Authorization:'Bearer '+_getToken()},cache:'no-store',signal:_ctrl.signal});
+    clearTimeout(_tid);
     if(r.ok){const data=await r.json();if(Array.isArray(data)&&data.length>0){_teamMembersCache=data;return;}}
   }catch(_){}
   // Fallback: use qa_users cache
