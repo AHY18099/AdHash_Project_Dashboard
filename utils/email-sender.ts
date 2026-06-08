@@ -1558,9 +1558,11 @@ function extractEmailProjectApiSummary(html: string, projectName: string): { fai
     }
 
     const cardSlice = html.slice(markerMatch.index, markerMatch.index + 6000);
-    const failedMatch = cardSlice.match(/project-failed-count">❗\s*(\d+)/i);
+    // Match inline-style badge (new) or legacy class-based badge (old)
+    const failedMatch = cardSlice.match(/❗\s*(\d+)/i);
     const statusMatch = cardSlice.match(/<td[^>]*>(PASSED|FAILED|WARNING)<\/td>/i);
-    const totalMatch = cardSlice.match(/project-chip-badge chip-api [^"]*">API\s*(\d+)/i);
+    // Match inline-style chip (new): ">API N<" or legacy class-based chip (old)
+    const totalMatch = cardSlice.match(/[>"]API\s+(\d+)[<"]/i) || cardSlice.match(/project-chip-badge chip-api [^"]*">API\s*(\d+)/i);
 
     if (!statusMatch || !totalMatch) {
         return null;
