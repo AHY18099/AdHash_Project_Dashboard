@@ -514,7 +514,7 @@
           "body": {
             "key": "Z6bJc+TJLSyk2k2zcjRDzB1b2SUMLqPMDJ7onRlphDDf9wwCF941EGsE928j/4PLQs6wcVXsDfQsyKWO6thxZvIflmVvWtgGAe2UT/c5on37m45Ge5BUDL3PnbKo774KRf4q1kM8GoJxF5nVeqF8C5pBVwwdKkFK5MyLPqTyzlCHof+IKxJOrMRFCe+HNPsuRdkf6rxr56sMhXrPQu8OP7VMlDa89QIrl5D4zYnb1msDUgfKvjl0gVX7AkZnUMZUE5FemJnx7sS1JggiuM5lEQVKivjgElAaiFlLhfSenmUlUdL037feg6oIRCwEhMxkYr3H9CXt7VRpwfB6TBElyvdftVi3cUyNV+l1l/uMzbM1/0gj2n0qntbeWti+vwhJwV7rHKJyxST7vDSkWC4rggTEabs9gkg7x3fMKGb58t1oO4MgCdku8Gou9TPEVyNbSZ7skRONiCE55ZUkwU/tYljSFvT/ljQF6cDLibuKHW6sk4j/ZtP0jN/MtHJUozkOLVEOzt+ZXjip++f7SRokIOHdmJ5jsU/FHgfVNy3h7LuBgdBMtiY8MqmRIxFyueoL9n1FyopW5yluQnUk6ok09Z8/4V5yVsfe7e6HszOYFgScgzmQcuDiegp4pSXDYx25EleDhYtW0SLi5fnXOKPrxo0qBmjlhhOY/XNPNEamlxM="
           },
-          "expectedStatus": 200
+          "expectedStatus": 201
         },
         {
           "name": "WavedIn SuperAdmin UI",
