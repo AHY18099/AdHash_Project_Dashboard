@@ -680,7 +680,7 @@
         {
           "name": "AutoChecker",
           "playStore": "com.autochecker",
-          "appStore": ""
+          "appStore": "thenilavan@adhashtech.com"
         }
       ],
       "servers": [
@@ -772,7 +772,7 @@
           "body": {
             "key": "o7obaAPl8Rin1yQil/fPLmfZDWV31ERB6O+us/ZdZlwAmt3brpIPLVi8W2ASbZ9dzes3tBTEjYwcayoLQ316BQ=="
           },
-          "expectedStatus": 200
+          "expectedStatus": 201
         }
       ]
     },
