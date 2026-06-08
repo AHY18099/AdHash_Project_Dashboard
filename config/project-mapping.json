@@ -680,7 +680,7 @@
         {
           "name": "AutoChecker",
           "playStore": "com.autochecker",
-          "appStore": ""
+          "appStore": null
         }
       ],
       "servers": [

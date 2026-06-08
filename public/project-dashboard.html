@@ -4737,8 +4737,8 @@
               <input class="pm-entry-input" placeholder="App name" data-key="name" value="${escapeHtml(name)}" />
             </div>
             <div class="pm-entry-row">
-              <input class="pm-entry-input" placeholder="Play Store — full URL or package ID (e.g. com.example.app)" data-key="playStore" value="${escapeHtml(ps)}" />
-              <input class="pm-entry-input" placeholder="App Store — full URL or ID (e.g. id123456)" data-key="appStore" value="${escapeHtml(as)}" />
+              <input class="pm-entry-input" type="url" placeholder="Play Store — full URL or package ID (e.g. com.example.app)" data-key="playStore" value="${escapeHtml(ps)}" autocomplete="off" autocorrect="off" spellcheck="false" />
+              <input class="pm-entry-input" type="url" placeholder="App Store — full URL only (e.g. https://apps.apple.com/app/id123456), leave blank if none" data-key="appStore" value="${escapeHtml(as)}" autocomplete="off" autocorrect="off" spellcheck="false" />
             </div>`;
         } else if (type === 'servers') {
             const name = (data && data.name) || '';
@@ -4837,8 +4837,8 @@
         list.querySelectorAll('.pm-entry').forEach(entry => {
             if (type === 'apps') {
                 const name = entry.querySelector('[data-key="name"]').value.trim();
-                const playStore = entry.querySelector('[data-key="playStore"]').value.trim();
-                const appStore = entry.querySelector('[data-key="appStore"]').value.trim();
+                const playStore = entry.querySelector('[data-key="playStore"]').value.trim() || null;
+                const appStore = entry.querySelector('[data-key="appStore"]').value.trim() || null;
                 if (name || playStore || appStore) entries.push({ name, playStore, appStore });
             } else if (type === 'servers') {
                 const name = entry.querySelector('[data-key="name"]').value.trim();
