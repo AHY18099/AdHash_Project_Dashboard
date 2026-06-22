@@ -4867,7 +4867,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
 
 // API proxy endpoint — forwards request to any URL and returns full response (follows redirects)
 app.post('/api/proxy', async (req, res) => {
-    const { url, method } = req.body || {};
+    const { url, method, headers: customHeaders, body: requestBody } = req.body || {};
     if (!url) return res.status(400).json({ error: 'url is required' });
     const m = (method || 'GET').toUpperCase();
     const allowedMethods = ['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS'];
@@ -4878,17 +4878,35 @@ app.post('/api/proxy', async (req, res) => {
     const { URL } = require('url');
     const startTs = Date.now();
 
+    // Build request body string for POST/PUT/PATCH
+    let bodyStr = null;
+    if (requestBody != null && ['POST','PUT','PATCH'].includes(m)) {
+        bodyStr = typeof requestBody === 'string' ? requestBody : JSON.stringify(requestBody);
+    }
+
     function doRequest(targetUrl, redirectsLeft, callback) {
         let parsed;
         try { parsed = new URL(targetUrl); } catch(e) { return callback({ status: 0, statusText: 'Invalid URL', headers: {}, body: '', timing: Date.now() - startTs, error: e.message }); }
         const isHttps = parsed.protocol === 'https:';
         const mod = isHttps ? https : http;
+        // Merge caller-supplied headers (sanitised — strip hop-by-hop)
+        const hopByHop = new Set(['host','connection','keep-alive','transfer-encoding','te','trailer','upgrade','proxy-authorization','proxy-authenticate']);
+        const mergedHeaders = { 'User-Agent': 'AdHash-Dashboard/1.0' };
+        if (customHeaders && typeof customHeaders === 'object') {
+            for (const [k, v] of Object.entries(customHeaders)) {
+                if (!hopByHop.has(k.toLowerCase())) mergedHeaders[k] = v;
+            }
+        }
+        if (bodyStr) {
+            mergedHeaders['Content-Type'] = mergedHeaders['Content-Type'] || mergedHeaders['content-type'] || 'application/json';
+            mergedHeaders['Content-Length'] = Buffer.byteLength(bodyStr);
+        }
         const options = {
             hostname: parsed.hostname,
             port: parsed.port || (isHttps ? 443 : 80),
             path: (parsed.pathname || '/') + (parsed.search || ''),
             method: m,
-            headers: { 'User-Agent': 'AdHash-Dashboard/1.0' },
+            headers: mergedHeaders,
             rejectUnauthorized: false,
             timeout: 10000
         };
@@ -4910,6 +4928,7 @@ app.post('/api/proxy', async (req, res) => {
         });
         proxyReq.on('timeout', () => { proxyReq.destroy(); callback({ status: 0, statusText: 'Timeout', headers: {}, body: '', timing: Date.now() - startTs, error: 'Request timed out' }); });
         proxyReq.on('error', (err) => callback({ status: 0, statusText: 'Error', headers: {}, body: '', timing: Date.now() - startTs, error: err.message }));
+        if (bodyStr) proxyReq.write(bodyStr);
         proxyReq.end();
     }
 

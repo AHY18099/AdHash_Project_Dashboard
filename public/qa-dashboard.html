@@ -5923,7 +5923,10 @@ async function _tpRunApi(i){
   if(!a.url){if(badge){badge.style.display='inline';badge.textContent='⚠ No URL';badge.style.cssText='display:inline;background:rgba(217,119,6,.12);color:var(--blk);border:1px solid rgba(217,119,6,.3);border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600';}return;}
   if(badge){badge.style.cssText='display:inline;background:rgba(59,130,246,.1);color:var(--inp);border:1px solid rgba(59,130,246,.25);border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600';badge.textContent='⏳ Running…';}
   try{
-    const resp=await fetch('/api/proxy',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},body:JSON.stringify({url:a.url,method:a.method==='OTHER'?'GET':a.method})});
+    const proxyPayload={url:a.url,method:a.method==='OTHER'?'GET':a.method};
+    if(a.headers&&Object.keys(a.headers).length)proxyPayload.headers=a.headers;
+    if(a.body!=null&&['POST','PUT','PATCH'].includes(a.method))proxyPayload.body=typeof a.body==='string'?a.body:JSON.stringify(a.body);
+    const resp=await fetch('/api/proxy',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},body:JSON.stringify(proxyPayload)});
     const data=await resp.json();
     const ok=data.status>=200&&data.status<300;
     const statusOk=data.status>0&&!data.error;
@@ -5950,17 +5953,49 @@ async function _tpRunAll(){
   await Promise.all(_tpApiRows.map((_,i)=>_tpRunApi(i)));
   if(btn){btn.disabled=false;btn.textContent='▶ Run All';}
 }
+function _tpMethodChange(){
+  const method=document.getElementById('tp-new-api-method')?.value||'GET';
+  const bodyRow=document.getElementById('tp-new-api-body-row');
+  const bodyNeeded=['POST','PUT','PATCH'].includes(method);
+  if(bodyRow)bodyRow.style.display=bodyNeeded?'':'none';
+}
 function _tpAddApiRow(){
   const name=document.getElementById('tp-new-api-name')?.value.trim();
   const method=document.getElementById('tp-new-api-method')?.value||'GET';
   const url=document.getElementById('tp-new-api-url')?.value.trim();
   const desc=document.getElementById('tp-new-api-desc')?.value.trim();
   if(!name){toast('API name is required','err');return;}
-  _tpApiRows.push({name,method,url:url||'',description:desc||'',status:'Active'});
+  // collect headers from key-value rows
+  const headers={};
+  document.querySelectorAll('.tp-hdr-row').forEach(row=>{
+    const k=row.querySelector('.tp-hdr-key')?.value.trim();
+    const v=row.querySelector('.tp-hdr-val')?.value.trim();
+    if(k&&v)headers[k]=v;
+  });
+  // collect body for POST/PUT/PATCH
+  let body=null;
+  if(['POST','PUT','PATCH'].includes(method)){
+    const bv=document.getElementById('tp-new-api-body')?.value.trim();
+    if(bv){try{body=JSON.parse(bv);}catch(_){body=bv;}}
+  }
+  _tpApiRows.push({name,method,url:url||'',description:desc||'',status:'Active',headers,body});
   document.getElementById('tp-new-api-name').value='';
   document.getElementById('tp-new-api-url').value='';
   document.getElementById('tp-new-api-desc').value='';
+  document.getElementById('tp-new-api-body')&&(document.getElementById('tp-new-api-body').value='');
+  // clear header rows
+  document.querySelectorAll('.tp-hdr-row').forEach(r=>r.remove());
   _tpApiRender();
+}
+function _tpAddHdrRow(){
+  const cont=document.getElementById('tp-hdr-rows');if(!cont)return;
+  const row=document.createElement('div');
+  row.className='tp-hdr-row';
+  row.style.cssText='display:flex;gap:6px;margin-bottom:4px;align-items:center';
+  row.innerHTML=`<input class="finp tp-hdr-key" placeholder="Header name (e.g. apy-token)" style="flex:1;padding:5px 8px;font-size:12px" autocomplete="off">
+    <input class="finp tp-hdr-val" placeholder="Value" style="flex:1;padding:5px 8px;font-size:12px" autocomplete="off">
+    <button type="button" onclick="this.closest('.tp-hdr-row').remove()" style="background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.25);border-radius:5px;padding:2px 7px;font-size:12px;color:var(--fail);cursor:pointer;flex-shrink:0">✕</button>`;
+  cont.appendChild(row);
 }
 function _tpApiSection(existingApis){
   _tpApiRows=existingApis?JSON.parse(JSON.stringify(existingApis)):[];
@@ -5970,19 +6005,33 @@ function _tpApiSection(existingApis){
       <button type="button" id="tp-run-all-btn" onclick="_tpRunAll()" style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;border-radius:7px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px">▶ Run All</button>
     </div>
     <div id="tp-api-list" style="margin-bottom:10px"></div>
-    <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-bottom:8px">Add API</div>
+    <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-bottom:10px">Add API</div>
       <div class="fg-row" style="margin-bottom:6px">
-        <div class="fg"><label>Name *</label><input class="finp" id="tp-new-api-name" placeholder="e.g. Get User"></div>
-        <div class="fg" style="max-width:120px"><label>Method</label><select class="finp" id="tp-new-api-method">${TP_API_METHODS.map(v=>`<option>${v}</option>`).join('')}</select></div>
+        <div class="fg"><label>Name *</label><input class="finp" id="tp-new-api-name" placeholder="e.g. Get Credits"></div>
+        <div class="fg" style="max-width:130px"><label>Method</label><select class="finp" id="tp-new-api-method" onchange="_tpMethodChange()">${TP_API_METHODS.map(v=>`<option>${v}</option>`).join('')}</select></div>
       </div>
       <div class="fg-row" style="margin-bottom:6px">
         <div class="fg"><label>Endpoint URL</label><input class="finp" id="tp-new-api-url" placeholder="https://api.example.com/endpoint"></div>
       </div>
-      <div class="fg-row" style="margin-bottom:8px">
+      <div class="fg-row" style="margin-bottom:6px">
         <div class="fg"><label>Description</label><input class="finp" id="tp-new-api-desc" placeholder="What this API does"></div>
       </div>
-      <button type="button" onclick="_tpAddApiRow()" style="background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;border:none;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">＋ Add API</button>
+      <!-- Auth / Headers -->
+      <div style="margin-bottom:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <label style="font-size:11px;font-weight:700;color:var(--txt)">Headers <span style="font-weight:400;color:var(--mut)">(auth tokens, content-type, etc.)</span></label>
+          <button type="button" onclick="_tpAddHdrRow()" style="font-size:11px;padding:2px 10px;border-radius:5px;border:1px solid var(--grad-a);color:var(--grad-a);background:transparent;cursor:pointer;font-weight:600">＋ Add Header</button>
+        </div>
+        <div id="tp-hdr-rows"></div>
+        <div style="font-size:10px;color:var(--mut);margin-top:2px">e.g. Key: <code>apy-token</code> &nbsp;Value: <code>APY0nO2p…</code></div>
+      </div>
+      <!-- Request Body (POST/PUT/PATCH only) -->
+      <div id="tp-new-api-body-row" style="display:none;margin-bottom:8px">
+        <label style="font-size:11px;font-weight:700;color:var(--txt)">Request Body <span style="font-weight:400;color:var(--mut)">(JSON)</span></label>
+        <textarea class="finp" id="tp-new-api-body" rows="4" placeholder='{\n  "key": "value"\n}' style="font-family:monospace;font-size:12px;margin-top:4px"></textarea>
+      </div>
+      <button type="button" onclick="_tpAddApiRow()" style="background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;border:none;border-radius:7px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer">＋ Add API</button>
     </div>
   </div>`;
 }
