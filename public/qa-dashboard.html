@@ -8382,50 +8382,67 @@ function _renderSwaggerExplorer(spec,container,p){
   }
   const total=Object.values(groups).reduce((s,a)=>s+a.length,0);
   const _swStatColors={get:'#60a5fa',post:'#34d399',put:'#fbbf24',patch:'#fb923c',delete:'#f87171',head:'#c4b5fd',options:'#94a3b8'};
-  const statsHtml=`<div style="text-align:center;min-width:36px"><div style="font-size:20px;font-weight:800;color:#fff">${total}</div><div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px">Endpoints</div></div><div style="text-align:center;min-width:36px"><div style="font-size:20px;font-weight:800;color:#fff">${Object.keys(groups).length}</div><div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px">Groups</div></div>`+
-    Object.entries(methodCounts).map(([m,c])=>`<div style="text-align:center;min-width:36px"><div style="font-size:20px;font-weight:800;color:${_swStatColors[m]||'#94a3b8'}">${c}</div><div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px">${m.toUpperCase()}</div></div>`).join('');
   const pillsHtml=`<button class="sw-fpill active" onclick="_swFilterMethod('all',this)">All <span class="sw-pcnt">${total}</span></button>`+
     Object.entries(methodCounts).map(([m,c])=>`<button class="sw-fpill sw-fpill-${m}" onclick="_swFilterMethod('${m}',this)">${m.toUpperCase()} <span class="sw-pcnt">${c}</span></button>`).join('');
-  const groupsHtml=Object.entries(groups).map(([tag,eps],gi)=>`
+  const groupsHtml=Object.entries(groups).map(([tag,eps],gi)=>{
+    const mb={};eps.forEach(e=>{mb[e.method]=(mb[e.method]||0)+1;});
+    const mbHtml=Object.entries(mb).map(([m,c])=>`<span style="font-size:9px;padding:2px 7px;border-radius:4px;background:${(_SW_MC[m]||_SW_MC.options).bg};color:${(_SW_MC[m]||_SW_MC.options).color};border:1px solid ${(_SW_MC[m]||_SW_MC.options).border};font-weight:700;font-family:monospace">${c} ${m.toUpperCase()}</span>`).join('');
+    return`
 <div class="sw-grp" data-group="${escH(tag)}">
-  <div class="sw-grp-hdr${gi===0?' open':''}" onclick="_swToggleGrp(this)">
-    <div class="sw-grp-left"><span class="sw-grp-chev">${gi===0?'▼':'▶'}</span><span class="sw-grp-name">${escH(tag)}</span></div>
-    <span class="sw-grp-badge">${eps.length} endpoint${eps.length!==1?'s':''}</span>
+  <div class="sw-grp-hdr${gi===0?' open':''}" onclick="_swToggleGrp(this)" style="padding:14px 18px">
+    <div class="sw-grp-left" style="display:flex;align-items:center;gap:10px">
+      <span class="sw-grp-chev" style="font-size:11px;color:#6366f1;font-weight:700">${gi===0?'▼':'▶'}</span>
+      <span style="font-size:14px;font-weight:700;color:var(--txt)">${escH(tag)}</span>
+      <span style="font-size:11px;color:var(--mut);background:var(--card2);padding:2px 8px;border-radius:50px;border:1px solid var(--border)">${eps.length} endpoint${eps.length!==1?'s':''}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">${mbHtml}</div>
   </div>
   <div class="sw-grp-body" style="${gi===0?'':'display:none'}">${eps.map(e=>_swEpRow(e.path,e.method,e.op,p)).join('')}</div>
-</div>`).join('');
+</div>`; }).join('');
   container.innerHTML=`
-<div style="background:#1b1b1b;border-radius:14px;padding:20px 24px;margin-bottom:18px;color:#fff;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
-  <div style="display:flex;align-items:flex-start;gap:14px">
-    <div style="background:#89bf04;color:#fff;font-weight:900;font-size:12px;padding:5px 10px;border-radius:6px;font-family:monospace;letter-spacing:-.5px;flex-shrink:0;margin-top:2px">swagger</div>
+<div style="background:#1b1b1b;border-radius:14px;padding:22px 26px;margin-bottom:18px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap">
+  <div style="display:flex;align-items:flex-start;gap:14px;flex:1;min-width:260px">
+    <div style="background:#89bf04;color:#fff;font-weight:900;font-size:12px;padding:5px 10px;border-radius:6px;font-family:monospace;flex-shrink:0;margin-top:3px">swagger</div>
     <div>
-      <div style="font-size:20px;font-weight:800;color:#fff;line-height:1.2">${escH(title)}</div>
-      ${desc?`<div style="font-size:12px;color:#999;margin-top:4px">${escH(desc.substring(0,120))}</div>`:''}
-      <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
-        ${ver?`<span style="background:#444;color:#ddd;font-size:10px;font-weight:700;padding:3px 9px;border-radius:4px;font-family:monospace">${escH(ver)}</span>`:''}
+      <div style="font-size:22px;font-weight:800;color:#fff;line-height:1.2">${escH(title)}</div>
+      ${desc?`<div style="font-size:12px;color:#aaa;margin-top:5px">${escH(desc.substring(0,140))}</div>`:''}
+      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap">
+        ${ver?`<span style="background:#333;color:#ddd;font-size:10px;font-weight:700;padding:3px 9px;border-radius:4px;font-family:monospace">${escH(ver)}</span>`:''}
         <span style="background:#89bf04;color:#fff;font-size:10px;font-weight:800;padding:3px 9px;border-radius:4px;font-family:monospace">OAS 3.0</span>
         <span style="font-size:11px;color:#666;font-family:monospace">${escH(_swBaseUrl)}</span>
       </div>
     </div>
   </div>
-  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0">
-    <div class="sw-stats-row" style="background:rgba(255,255,255,.05);border-radius:10px;padding:8px 14px">${statsHtml}</div>
-    <button onclick="_swToggleAuthPanel('${p}')" style="background:transparent;border:1.5px solid #89bf04;color:#89bf04;padding:8px 18px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap">🔓 Authorize</button>
-    <button id="sw-run-all-btn-${p}" onclick="_swRunAll('${p}')" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;color:#fff;padding:9px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;white-space:nowrap;box-shadow:0 3px 12px rgba(99,102,241,.4)">▶▶ Run All <span style="background:rgba(255,255,255,.2);padding:1px 8px;border-radius:50px;font-size:11px">${total}</span></button>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:14px;flex-shrink:0">
+    <div style="display:flex;gap:18px;align-items:flex-end;background:rgba(255,255,255,.05);border-radius:10px;padding:10px 18px">
+      <div style="text-align:center">
+        <div style="font-size:22px;font-weight:800;color:#fff;line-height:1">${total}</div>
+        <div style="font-size:9px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.6px;margin-top:3px">Endpoints</div>
+      </div>
+      <div style="width:1px;background:rgba(255,255,255,.1);align-self:stretch"></div>
+      <div style="text-align:center">
+        <div style="font-size:22px;font-weight:800;color:#fff;line-height:1">${Object.keys(groups).length}</div>
+        <div style="font-size:9px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.6px;margin-top:3px">Groups</div>
+      </div>
+      ${Object.entries(methodCounts).map(([m,c])=>`<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:${_swStatColors[m]||'#94a3b8'};line-height:1">${c}</div><div style="font-size:9px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.6px;margin-top:3px">${m.toUpperCase()}</div></div>`).join('')}
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button onclick="_swToggleAuthPanel('${p}')" style="background:transparent;border:1.5px solid #89bf04;color:#89bf04;padding:9px 20px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='rgba(137,191,4,.12)'" onmouseout="this.style.background='transparent'">🔓 Authorize</button>
+      <button id="sw-run-all-btn-${p}" onclick="_swRunAll('${p}')" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;color:#fff;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 4px 14px rgba(99,102,241,.45);display:flex;align-items:center;gap:8px">▶▶ Run All <span style="background:rgba(255,255,255,.22);padding:2px 9px;border-radius:50px;font-size:11px">${total}</span></button>
+    </div>
   </div>
 </div>
 <div id="sw-run-panel-${p}" style="display:none" class="sw-run-panel"></div>
 <div id="sw-auth-panel-${p}" style="display:none;margin-bottom:16px">
-  <div class="sw-toolbar">
-    <div class="sw-auth-bar2">
-      <span class="sw-auth-lbl">🔐 Auth</span>
-      <select id="sw-auth-type-${p}" class="sw-auth-sel"><option value="Bearer">Bearer</option><option value="Basic">Basic</option><option value="ApiKey">X-API-Key</option><option value="none">None</option></select>
-      <input type="text" id="sw-auth-token-${p}" class="sw-auth-inp" placeholder="Paste your Bearer token, API key…">
-    </div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-size:13px;font-weight:700;color:var(--txt);white-space:nowrap">🔓 Authorization</span>
+    <select id="sw-auth-type-${p}" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;background:var(--card2);color:var(--txt);font-size:12px;outline:none;cursor:pointer"><option value="Bearer">Bearer</option><option value="Basic">Basic</option><option value="ApiKey">X-API-Key</option><option value="none">None</option></select>
+    <input type="text" id="sw-auth-token-${p}" placeholder="Enter token or API key…" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;background:var(--card2);color:var(--txt);font-family:monospace;font-size:12px;outline:none">
+    <button onclick="_swToggleAuthPanel('${p}')" style="padding:8px 16px;background:var(--grad-a);color:#fff;border:none;border-radius:7px;cursor:pointer;font-weight:600;font-size:12px;white-space:nowrap">✓ Apply</button>
   </div>
 </div>
-<div class="sw-toolbar">
-  <input type="text" class="sw-search2" placeholder="🔍 Search endpoints, paths, methods…" oninput="_swFilter(this.value)" style="flex:1">
+<div style="margin-bottom:12px">
+  <input type="text" class="sw-search2" placeholder="🔍 Search endpoints, paths, methods…" oninput="_swFilter(this.value)" style="width:100%;box-sizing:border-box">
 </div>
 <div class="sw-method-filters">${pillsHtml}</div>
 <div class="sw-ep-list" id="sw-endpoints-${p}">${groupsHtml}</div>`;
@@ -8438,13 +8455,13 @@ function _swEpRow(path,method,op,p){
   const hasParams=(op.parameters?.length>0)||path.includes('{');
   const hasBody=!!op.requestBody||['post','put','patch'].includes(method);
   const pathHtml=escH(path).replace(/%7B([^%]+)%7D/g,'<span class="sw-path-param">{$1}</span>').replace(/\{([^}]+)\}/g,'<span class="sw-path-param">{$1}</span>');
-  return`<div class="sw-ep2${op.deprecated?' sw-depr':''}" data-path="${escH(path)}" data-method="${method}" data-summary="${escH((summary||'').toLowerCase())}">
+  return`<div class="sw-ep2${op.deprecated?' sw-depr':''}" data-path="${escH(path)}" data-method="${method}" data-summary="${escH((summary||'').toLowerCase())}" style="border-left:3px solid ${mc.border}">
   <div class="sw-ep-row2" onclick="_swToggleEp('${eid}')">
     <span class="sw-mbadge" style="background:${mc.bg};color:${mc.color};border:1.5px solid ${mc.border}">${method.toUpperCase()}</span>
-    <span class="sw-ep-path2">${pathHtml}</span>
+    <span class="sw-ep-path2" style="font-family:monospace;font-size:12px;color:var(--txt);flex-shrink:0;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pathHtml}</span>
     <span class="sw-ep-sum2">${op.deprecated?'<span class="sw-depr-badge">deprecated</span>':''}${escH(summary)}</span>
     <span class="sw-ep-tags2">${hasParams?'<span class="sw-has-tag2">params</span>':''}${hasBody?'<span class="sw-has-tag2 sw-has-body2">body</span>':''}</span>
-    <button class="sw-tryit" style="background:${mc.bg};color:${mc.color};border-color:${mc.border}" onclick="event.stopPropagation();_swRunQuick('${eid}','${escH(path)}','${method}','${p}')">▶ Try it</button>
+    <button class="sw-tryit" style="background:${mc.bg};color:${mc.color};border:1.5px solid ${mc.border};opacity:1;visibility:visible" onclick="event.stopPropagation();_swRunQuick('${eid}','${escH(path)}','${method}','${p}')">▶ Try it</button>
     <span class="sw-ep-chev2" id="${eid}-chev">▶</span>
   </div>
   <div id="${eid}" class="sw-panel2" style="display:none">
