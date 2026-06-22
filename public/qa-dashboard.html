@@ -7768,9 +7768,9 @@ tr:last-child td.rtd{border-bottom:none}
 .sw-panel2{padding:18px 20px;background:var(--card2);border-top:1px solid var(--border)}
 .sw-ep-desc2{font-size:12px;color:var(--mut);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;line-height:1.5}
 /* Sections */
-.sw-sec{margin-bottom:18px}
-.sw-sec-ttl{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
-.sw-sec-cnt{background:var(--grad-a);color:#fff;padding:1px 6px;border-radius:50px;font-size:9px}
+.sw-sec{margin-bottom:16px}
+.sw-sec-ttl{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--txt);margin:0 0 10px;padding-bottom:7px;border-bottom:1px solid var(--border)}
+.sw-sec-cnt{background:rgba(99,102,241,.12);color:var(--grad-a);padding:1px 7px;border-radius:50px;font-size:11px;font-weight:700}
 .sw-req-chip{background:rgba(239,68,68,.1);color:#b91c1c;font-size:9px;padding:1px 7px;border-radius:50px;border:1px solid rgba(239,68,68,.25)}
 /* Params */
 .sw-params-grid{display:flex;flex-direction:column;gap:8px}
@@ -7796,13 +7796,13 @@ body.dark .sw-pin-path{color:#fbbf24}body.dark .sw-pin-query{color:#93c5fd}body.
 .sw-body-action:hover{background:var(--bg)}
 .sw-body-ed2{width:100%;min-height:110px;resize:vertical;padding:10px 13px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);font-size:12px;font-family:var(--font-mono);color:var(--txt);outline:none;transition:border-color .15s;line-height:1.6;tab-size:2}
 .sw-body-ed2:focus{border-color:var(--grad-a);background:var(--card2);box-shadow:0 0 0 3px rgba(99,102,241,.08)}
-/* Execute bar */
-.sw-exec-bar{display:flex;align-items:center;gap:9px;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-radius:9px;margin-bottom:12px;flex-wrap:wrap}
-.sw-url-prev{flex:1;font-family:var(--font-mono);font-size:11px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.sw-exec-btn{padding:8px 20px;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,.12)}
-.sw-exec-btn:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.18)}
-.sw-clr-btn{padding:7px 14px;font-size:12px;border:1px solid var(--border);border-radius:8px;background:var(--card2);color:var(--txt2);cursor:pointer;flex-shrink:0}
-.sw-clr-btn:hover{background:var(--bg)}
+/* Execute bar — layout handled inline in _swEpRow */
+.sw-exec-bar{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.sw-url-prev{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:9px 14px;font-family:monospace;font-size:12px;color:var(--mut);word-break:break-all;line-height:1.4}
+.sw-exec-btn{background:var(--grad-a);color:#fff;border:none;border-radius:4px;padding:8px 22px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:opacity .15s}
+.sw-exec-btn:hover{opacity:.85}
+.sw-clr-btn{background:transparent;color:var(--mut);border:1px solid var(--border);border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
+.sw-clr-btn:hover{background:var(--card)}
 /* Response card */
 .sw-resp-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:14px}
 .sw-rstat{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)}
@@ -8460,16 +8460,18 @@ function _swEpRow(path,method,op,p){
     <span style="font-family:monospace;font-size:13px;font-weight:600;color:${mc.solid};padding:0 12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pathHtml}</span>
     <span style="font-size:12px;color:#3b4151;flex:2;padding:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.85">${op.deprecated?'<s>'+escH(summary)+'</s>':escH(summary)}</span>
     ${lockIcon}
-    <span style="font-size:10px;color:${mc.solid};opacity:.7;padding:0 14px;flex-shrink:0" id="${eid}-chev">▼</span>
+    <span style="font-size:10px;color:${mc.solid};opacity:.7;padding:0 14px;flex-shrink:0;transition:transform .2s" id="${eid}-chev">▶</span>
   </div>
-  <div id="${eid}" class="sw-panel2" style="display:none;border-top:1px solid ${mc.border};background:var(--card2,#f8f8f8);border-radius:0 0 6px 6px">
-    ${op.description?`<div class="sw-ep-desc2" style="padding:10px 16px 0;font-size:12px;color:var(--mut)">${escH(op.description)}</div>`:''}
+  <div id="${eid}" class="sw-panel2" style="display:none;border-top:2px solid ${mc.solid};background:var(--card2,#f8f9fa);border-radius:0 0 6px 6px;padding:16px 20px 20px">
+    ${op.description?`<div style="font-size:12px;color:var(--mut);margin-bottom:12px;line-height:1.5">${escH(op.description)}</div>`:''}
     ${_swParams2(op,path,eid)}
     ${_swBody2(op,eid)}
-    <div class="sw-exec-bar">
-      <span class="sw-url-prev" id="${eid}-urlprev">${escH(_swBaseUrl)}${escH(path)}</span>
-      <button class="sw-exec-btn" style="background:${mc.solid}" onclick="_swRun('${eid}','${escH(path)}','${method}','${p}')">▶ Execute</button>
-      <button class="sw-clr-btn" onclick="_swClearResp('${eid}')">✕ Clear</button>
+    <div style="margin-top:14px">
+      <div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:6px;padding:9px 14px;font-family:monospace;font-size:12px;color:var(--mut);margin-bottom:10px;word-break:break-all;line-height:1.4" id="${eid}-urlprev">${escH(_swBaseUrl)}${escH(path)}</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button style="background:${mc.solid};color:#fff;border:none;border-radius:4px;padding:8px 22px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'" onclick="_swRun('${eid}','${escH(path)}','${method}','${p}')">▶ Execute</button>
+        <button style="background:transparent;color:var(--mut);border:1px solid var(--border);border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--card)'" onmouseout="this.style.background='transparent'" onclick="_swClearResp('${eid}')">✕ Clear</button>
+      </div>
     </div>
     <div id="${eid}-resp" style="display:none"></div>
   </div>
