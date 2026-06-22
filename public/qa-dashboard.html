@@ -4497,12 +4497,19 @@ let _ttProjFilter='all';
 let _ttTodayStr=(()=>{const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`})();
 
 function saveTeamTasks(){
+  // Safety: never overwrite server data with an empty array if the server has tasks
+  const serverHasTasks=(_serverData['qa3_team_tasks']||[]).length>0;
+  if(TEAM_TASKS.length===0&&serverHasTasks){console.warn('[saveTeamTasks] blocked empty-array overwrite — server has tasks');return;}
   const now=Date.now();
   TEAM_TASKS.forEach(t=>{t._savedAt=now;});
   _serverData['qa3_team_tasks']=TEAM_TASKS;
   serverPost('qa3_team_tasks',TEAM_TASKS);
 }
-function loadTeamTasks(){TEAM_TASKS=_serverData['qa3_team_tasks']||TEAM_TASKS;}
+function loadTeamTasks(){
+  const sv=_serverData['qa3_team_tasks'];
+  // Only replace local if server has actual data, or local is empty
+  if(sv&&(sv.length>0||TEAM_TASKS.length===0))TEAM_TASKS=sv;
+}
 
 function showTeamTasks(){
   curView='teamtasks';
