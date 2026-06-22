@@ -8465,13 +8465,15 @@ function _swEpRow(path,method,op,p){
     ${lockIcon}
     <span style="font-size:10px;color:${mc.solid};opacity:.7;padding:0 14px;flex-shrink:0" id="${eid}-chev">▶</span>
   </div>
-  <div id="${eid}" class="sw-panel2" style="display:none;border-top:2px solid ${mc.solid};background:${mc.bg};border-radius:0 0 6px 6px;padding:0">
+  <div id="${eid}" class="sw-panel2" style="display:none;border-top:2px solid ${mc.solid};background:#ebf7f0;border-radius:0 0 6px 6px;padding:0">
 
     <!-- Parameters section -->
-    <div style="padding:16px 20px 0">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid ${mc.solid}">
-        <span style="font-size:15px;font-weight:700;color:var(--txt)">Parameters</span>
-        <button id="${eid}-tryit" style="padding:5px 16px;font-size:12px;font-weight:700;border:1.5px solid ${mc.solid};border-radius:4px;background:transparent;color:${mc.solid};cursor:pointer;transition:all .15s" onmouseover="this.style.background='${mc.solid}';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='${mc.solid}'" onclick="event.stopPropagation();_swToggleTryIt('${eid}','${mc.solid}')">Try it out</button>
+    <div style="padding:14px 20px 0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid ${mc.solid}">
+        <span style="font-size:14px;font-weight:700;color:#3b4151">Parameters</span>
+        <div style="display:flex;gap:6px">
+          <button id="${eid}-tryit" style="padding:4px 12px;font-size:12px;font-weight:600;border:1px solid ${mc.solid};border-radius:3px;background:transparent;color:${mc.solid};cursor:pointer" onclick="event.stopPropagation();_swToggleTryIt('${eid}','${mc.solid}')">Try it out</button>
+        </div>
       </div>
       ${_swParams2(op,path,eid)}
     </div>
@@ -8480,18 +8482,18 @@ function _swEpRow(path,method,op,p){
     ${_swBody2(op,eid,mc.solid)}
 
     <!-- Execute bar (hidden until Try it out) -->
-    <div id="${eid}-execbar" style="display:none;padding:0 20px 16px">
-      <div style="display:flex;width:100%;border:1px solid ${mc.solid};border-radius:4px;overflow:hidden;margin-bottom:14px">
-        <button style="flex:1;background:${mc.solid};color:#fff;border:none;padding:10px 0;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'" onclick="_swRun('${eid}','${escH(path)}','${method}','${p}')">Execute</button>
-        <button style="flex:1;background:#fff;color:var(--txt);border:none;border-left:1px solid ${mc.solid};padding:10px 0;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background='#fff'" onclick="_swClearResp('${eid}')">Clear</button>
+    <div id="${eid}-execbar" style="display:none;padding:10px 20px 14px;background:rgba(0,0,0,.03);border-top:1px solid rgba(0,0,0,.1)">
+      <div style="display:flex;width:100%;overflow:hidden;margin-bottom:0">
+        <button style="flex:1;background:#4990e2;color:#fff;border:1px solid #4990e2;border-radius:4px 0 0 4px;padding:9px 0;font-size:14px;font-weight:700;cursor:pointer;transition:opacity .15s;letter-spacing:.3px" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'" onclick="_swRun('${eid}','${escH(path)}','${method}','${p}')">Execute</button>
+        <button style="flex:1;background:#fff;color:#3b4151;border:1px solid #aaa;border-left:none;border-radius:0 4px 4px 0;padding:9px 0;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='#fff'" onclick="_swClearResp('${eid}')">Clear</button>
       </div>
       <div id="${eid}-urlprev" style="display:none"></div>
     </div>
-    <div id="${eid}-resp" style="display:none;padding:0 20px 16px"></div>
+    <div id="${eid}-resp" style="display:none;padding:0 20px 16px;background:#ebf7f0"></div>
 
     <!-- Responses table -->
-    ${respTableHtml?`<div style="padding:0 20px 20px;border-top:1px solid ${mc.border};margin-top:4px">
-      <div style="font-size:15px;font-weight:700;color:var(--txt);padding:14px 0 10px;border-bottom:2px solid ${mc.solid};margin-bottom:0">Responses</div>
+    ${respTableHtml?`<div style="padding:0 20px 20px">
+      <div style="font-size:14px;font-weight:700;color:${mc.solid};padding:14px 0 8px;border-bottom:1px solid rgba(0,0,0,.1);margin-bottom:0">Responses</div>
       ${respTableHtml}
     </div>`:''}
 
@@ -8511,40 +8513,90 @@ function _swBody2(op,eid,solidColor){
   if(!op.requestBody)return'';
   const ct=op.requestBody.content||{},jc=ct['application/json'];
   const ctTypes=Object.keys(ct).length?Object.keys(ct):['application/json'];
-  const solid=solidColor||'var(--grad-a)';
-  let ex='{\n  \n}';
+  const solid=solidColor||'#49cc90';
+  let ex='{\n}';
   if(jc?.example)ex=JSON.stringify(jc.example,null,2);
   else if(jc?.schema)ex=_swExampleFromSchema(jc.schema);
-  return`<div style="padding:0 20px 0;border-top:1px solid rgba(0,0,0,.06);margin-top:0">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 10px;border-bottom:2px solid ${solid}">
+  const schemaHtml=jc?.schema?_swSchemaView(jc.schema):'<span style="color:var(--mut);font-size:12px">No schema available</span>';
+  return`<div style="padding:0 20px 0;border-top:1px solid rgba(0,0,0,.08);margin-top:2px">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0 8px">
     <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:15px;font-weight:700;color:var(--txt)">Request body</span>
-      ${op.requestBody.required?`<span style="font-size:11px;color:#e53e3e;font-weight:600;font-style:italic">required</span>`:''}
+      <span style="font-size:14px;font-weight:700;color:#3b4151">Request body</span>
+      ${op.requestBody.required?`<span style="font-size:11px;color:#e53e3e;font-style:italic">required</span>`:''}
     </div>
-    <select style="padding:5px 10px;border:1px solid var(--border);border-radius:4px;font-size:12px;background:var(--card);color:var(--txt);cursor:pointer;outline:none">${ctTypes.map(t=>`<option value="${escH(t)}">${escH(t)}</option>`).join('')}</select>
+    <select id="${eid}-ct" style="padding:4px 28px 4px 8px;border:1px solid #d3d3d3;border-radius:4px;font-size:12px;background:#fff;color:#3b4151;cursor:pointer;outline:none;appearance:auto">${ctTypes.map(t=>`<option value="${escH(t)}">${escH(t)}</option>`).join('')}</select>
   </div>
-  <div style="margin:10px 0 6px;display:flex;gap:14px;align-items:center">
-    <span style="font-size:12px;font-weight:600;color:${solid};border-bottom:2px solid ${solid};padding-bottom:3px;cursor:pointer">Edit Value</span>
-    <span style="font-size:12px;color:var(--mut);cursor:pointer;padding-bottom:3px">Schema</span>
+  <div style="display:flex;gap:0;align-items:center;margin-bottom:8px;border-bottom:1px solid rgba(0,0,0,.1)">
+    <span id="${eid}-tab-edit" style="font-size:12px;font-weight:600;color:${solid};border-bottom:2px solid ${solid};padding:4px 10px 4px 0;cursor:pointer;margin-right:12px" onclick="_swBodyTab('${eid}','edit','${solid}')">Edit Value</span>
+    <span id="${eid}-tab-schema" style="font-size:12px;color:#999;padding:4px 0;cursor:pointer;border-bottom:2px solid transparent" onclick="_swBodyTab('${eid}','schema','${solid}')">Schema</span>
   </div>
-  <textarea id="${eid}-body" class="sw-body-ed2" rows="6" disabled style="background:var(--card,#fff);color:var(--txt);border:1px solid var(--border);resize:vertical">${escH(ex)}</textarea>
+  <div id="${eid}-body-edit">
+    <textarea id="${eid}-body" class="sw-body-ed2" rows="6" disabled data-orig="${escH(ex)}" style="background:#fff;color:#3b4151;border:1px solid #d3d3d3;border-radius:4px;font-family:monospace;font-size:13px;width:100%;box-sizing:border-box;padding:10px;resize:vertical">${escH(ex)}</textarea>
+  </div>
+  <div id="${eid}-body-schema" style="display:none;background:#fff;border:1px solid #d3d3d3;border-radius:4px;padding:12px;font-size:12px;font-family:monospace;line-height:1.8">${schemaHtml}</div>
   <div style="margin-top:6px;margin-bottom:12px;display:flex;justify-content:flex-end;gap:6px">
-    <button class="sw-body-action" onclick="try{document.getElementById('${eid}-body').value=JSON.stringify(JSON.parse(document.getElementById('${eid}-body').value),null,2)}catch(_){toast('Invalid JSON','err')}">⇄ Format</button>
+    <button class="sw-body-action" onclick="try{const el=document.getElementById('${eid}-body');el.value=JSON.stringify(JSON.parse(el.value),null,2)}catch(_){toast('Invalid JSON','err')}">⇄ Format</button>
     <button class="sw-body-action" onclick="document.getElementById('${eid}-body').value=''">✕ Clear</button>
   </div>
 </div>`;
 }
 
-function _swExampleFromSchema(s){
-  if(!s)return'{}';const ex={};
-  if(s.properties)for(const[k,p]of Object.entries(s.properties)){
-    if(p.type==='string')ex[k]=p.example||'';
-    else if(p.type==='number'||p.type==='integer')ex[k]=p.example||0;
-    else if(p.type==='boolean')ex[k]=false;
-    else if(p.type==='array')ex[k]=[];
-    else ex[k]=null;
+function _swExampleFromSchema(s,depth){
+  depth=depth||0;if(depth>4)return'"..."';
+  if(!s)return'{}';
+  if(s.example!==undefined)return JSON.stringify(s.example,null,2);
+  if(s.type==='string')return JSON.stringify(s.enum?s.enum[0]:(s.format==='date-time'?'2024-01-01T00:00:00Z':s.format==='date'?'2024-01-01':s.format==='email'?'user@example.com':'string'));
+  if(s.type==='number'||s.type==='integer')return String(s.example||0);
+  if(s.type==='boolean')return'false';
+  if(s.type==='array'){const items=s.items?_swExampleFromSchema(s.items,depth+1):'""';return'['+items+']';}
+  if(s.type==='object'||s.properties){
+    const ex={};
+    const props=s.properties||{};
+    for(const[k,p]of Object.entries(props)){
+      try{ex[k]=JSON.parse(_swExampleFromSchema(p,depth+1));}catch(_){ex[k]='string';}
+    }
+    return JSON.stringify(ex,null,2);
   }
-  return JSON.stringify(ex,null,2);
+  if(s.$ref){const name=(s.$ref||'').split('/').pop();return`"<${name}>"`;}
+  if(s.allOf||s.oneOf||s.anyOf){const sub=(s.allOf||s.oneOf||s.anyOf)[0];return sub?_swExampleFromSchema(sub,depth+1):'{}';}
+  return'{}';
+}
+
+function _swSchemaView(s,indent){
+  indent=indent||0;
+  if(!s)return'<span style="color:#999">{}</span>';
+  const pad='&nbsp;'.repeat(indent*4);
+  if(s.$ref){const name=(s.$ref||'').split('/').pop();return pad+'<span style="color:#6b6b6b">'+escH(name)+'</span>';}
+  if(s.type==='object'||s.properties){
+    const props=s.properties||{};
+    const req=new Set(s.required||[]);
+    const lines=Object.entries(props).map(([k,p])=>{
+      const typeStr=p.$ref?(p.$ref.split('/').pop()):(p.type||(p.allOf?'allOf':p.oneOf?'oneOf':'object'));
+      const reqMark=req.has(k)?'<span style="color:#e53e3e">*</span>':'';
+      const desc=p.description?` <span style="color:#999;font-size:11px">// ${escH(p.description.substring(0,60))}</span>`:'';
+      return pad+'&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#555">'+escH(k)+'</span>'+reqMark+': <span style="color:#6b6b6b">'+escH(typeStr)+'</span>'+desc;
+    });
+    return pad+'{\n'+lines.join('\n')+'\n'+pad+'}';
+  }
+  if(s.type==='array'){return pad+'[<br>'+_swSchemaView(s.items,indent+1)+'<br>'+pad+']';}
+  return pad+'<span style="color:#6b6b6b">'+escH(s.type||'object')+'</span>';
+}
+
+function _swBodyTab(eid,tab,solid){
+  const editDiv=document.getElementById(eid+'-body-edit');
+  const schemaDiv=document.getElementById(eid+'-body-schema');
+  const tabEdit=document.getElementById(eid+'-tab-edit');
+  const tabSchema=document.getElementById(eid+'-tab-schema');
+  if(!editDiv||!schemaDiv)return;
+  if(tab==='edit'){
+    editDiv.style.display='';schemaDiv.style.display='none';
+    if(tabEdit){tabEdit.style.color=solid;tabEdit.style.borderBottom='2px solid '+solid;}
+    if(tabSchema){tabSchema.style.color='#999';tabSchema.style.borderBottom='2px solid transparent';}
+  } else {
+    editDiv.style.display='none';schemaDiv.style.display='';
+    if(tabSchema){tabSchema.style.color=solid;tabSchema.style.borderBottom='2px solid '+solid;}
+    if(tabEdit){tabEdit.style.color='#999';tabEdit.style.borderBottom='2px solid transparent';}
+  }
 }
 
 function _swRespTable(op){
@@ -8585,21 +8637,35 @@ function _swToggleTryIt(eid,solidColor){
   if(!execBar)return;
   const isOpen=execBar.style.display!=='none';
   execBar.style.display=isOpen?'none':'block';
-  // Toggle inputs enabled/disabled
   inputs.forEach(i=>i.disabled=isOpen);
   if(bodyEl)bodyEl.disabled=isOpen;
   if(btn){
-    btn.textContent=isOpen?'Try it out':'Cancel';
-    btn.style.background=isOpen?'transparent':solidColor;
-    btn.style.color=isOpen?solidColor:'#fff';
-  }
-  // Reset hover handlers
-  if(btn&&isOpen){
-    btn.onmouseover=()=>{btn.style.background=solidColor;btn.style.color='#fff';};
-    btn.onmouseout=()=>{btn.style.background='transparent';btn.style.color=solidColor;};
-  } else if(btn){
-    btn.onmouseover=()=>{btn.style.background='transparent';btn.style.color=solidColor;};
-    btn.onmouseout=()=>{btn.style.background=solidColor;btn.style.color='#fff';};
+    if(isOpen){
+      // switching back to "Try it out"
+      btn.textContent='Try it out';
+      btn.style.cssText='padding:4px 12px;font-size:12px;font-weight:600;border:1px solid '+solidColor+';border-radius:3px;background:transparent;color:'+solidColor+';cursor:pointer';
+      // remove Reset button if it exists
+      const resetBtn=document.getElementById(eid+'-resetbtn');
+      if(resetBtn)resetBtn.remove();
+    } else {
+      // switching to "Cancel"
+      btn.textContent='Cancel';
+      btn.style.cssText='padding:4px 12px;font-size:12px;font-weight:600;border:1px solid #f93e3e;border-radius:3px;background:transparent;color:#f93e3e;cursor:pointer';
+      // add Reset button next to Cancel
+      if(!document.getElementById(eid+'-resetbtn')){
+        const resetBtn=document.createElement('button');
+        resetBtn.id=eid+'-resetbtn';
+        resetBtn.textContent='Reset';
+        resetBtn.style.cssText='padding:4px 12px;font-size:12px;font-weight:600;border:1px solid #aaa;border-radius:3px;background:transparent;color:#555;cursor:pointer';
+        resetBtn.onclick=(e)=>{
+          e.stopPropagation();
+          inputs.forEach(i=>{i.value='';});
+          if(bodyEl){const orig=bodyEl.dataset.orig||'';bodyEl.value=orig;}
+          _swClearResp(eid);
+        };
+        btn.parentNode.insertBefore(resetBtn,btn.nextSibling);
+      }
+    }
   }
 }
 
