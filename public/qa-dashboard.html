@@ -7659,6 +7659,44 @@ tr:last-child td.rtd{border-bottom:none}
 /* ── SWAGGER EXPLORER — PREMIUM ───────────────────────────────────────────── */
 .sw-wrap{padding:20px 24px}
 .sw-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;gap:12px;flex-wrap:wrap}
+/* Swagger UI-style dark header */
+.sw-ui-header{background:#1b1b1b;border-radius:14px;padding:20px 24px;margin-bottom:18px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.sw-ui-brand{display:flex;align-items:center;gap:14px}
+.sw-ui-logo{background:#89bf04;color:#fff;font-weight:900;font-size:13px;padding:5px 10px;border-radius:6px;font-family:var(--font-mono);letter-spacing:-.5px;flex-shrink:0}
+.sw-ui-title-block{}
+.sw-ui-title{font-size:20px;font-weight:800;color:#fff;line-height:1.2}
+.sw-ui-desc{font-size:12px;color:#999;margin-top:3px}
+.sw-ui-badges{display:flex;align-items:center;gap:7px;margin-top:6px;flex-wrap:wrap}
+.sw-ui-badge-ver{background:#444;color:#ddd;font-size:10px;font-weight:700;padding:2px 9px;border-radius:4px;font-family:var(--font-mono)}
+.sw-ui-badge-oas{background:#89bf04;color:#fff;font-size:10px;font-weight:800;padding:2px 9px;border-radius:4px;font-family:var(--font-mono)}
+.sw-ui-server{font-size:11px;color:#777;font-family:var(--font-mono);margin-top:4px}
+.sw-ui-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.sw-ui-auth-btn{background:transparent;border:1.5px solid #89bf04;color:#89bf04;padding:8px 18px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .15s}
+.sw-ui-auth-btn:hover{background:rgba(137,191,4,.12)}
+.sw-ui-run-all-btn{background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;color:#fff;padding:9px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;transition:all .2s;box-shadow:0 3px 12px rgba(99,102,241,.35)}
+.sw-ui-run-all-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(99,102,241,.45)}
+.sw-ui-run-all-btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+/* Run-all results panel */
+.sw-run-panel{background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:18px;overflow:hidden}
+.sw-run-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:var(--card2);flex-wrap:wrap;gap:10px}
+.sw-run-title{font-size:14px;font-weight:800;color:var(--txt);display:flex;align-items:center;gap:8px}
+.sw-run-stats{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.sw-run-stat{text-align:center}
+.sw-run-stat-n{font-size:18px;font-weight:800}
+.sw-run-stat-l{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+.sw-run-progress{height:4px;background:var(--border);margin:0}
+.sw-run-progress-bar{height:4px;background:linear-gradient(90deg,#6366f1,#8b5cf6);transition:width .3s}
+.sw-run-body{max-height:380px;overflow-y:auto}
+.sw-run-row{display:flex;align-items:center;gap:10px;padding:8px 18px;border-bottom:1px solid var(--border);font-size:12px}
+.sw-run-row:last-child{border-bottom:none}
+.sw-run-row-status{width:20px;flex-shrink:0;text-align:center;font-size:14px}
+.sw-run-row-method{min-width:60px;flex-shrink:0}
+.sw-run-row-path{font-family:var(--font-mono);font-size:11px;color:var(--txt);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sw-run-row-code{font-size:11px;font-weight:700;font-family:var(--font-mono);min-width:36px;flex-shrink:0}
+.sw-run-row-time{font-size:10px;color:var(--mut);min-width:48px;text-align:right;flex-shrink:0}
+.sw-run-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sw-run-close-btn{padding:5px 13px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:var(--card2);color:var(--txt2);cursor:pointer}
+.sw-run-export-btn{padding:5px 13px;font-size:11px;border-radius:6px;border:1px solid var(--grad-a);color:var(--grad-a);background:transparent;cursor:pointer;font-weight:600}
 /* URL tab strip */
 .sw-url-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
 .sw-url-tab{padding:6px 14px;border-radius:50px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:6px;transition:all .15s;color:var(--txt2)}
@@ -8299,11 +8337,6 @@ function _renderSwaggerShell(p,configs,el){
 </div>
 ${configs.length===0?`<div class="sw-empty"><div class="sw-empty-icon">⚡</div><div style="font-weight:600;color:var(--txt2);margin-bottom:6px">No Swagger URLs added yet</div><div style="color:var(--mut);font-size:12px;margin-bottom:14px">Add a Swagger/OpenAPI URL to explore your APIs</div><button class="btn btn-primary" onclick="openSwaggerAddModal('${p}')">＋ Add Swagger URL</button></div>`:`
 <div class="sw-url-tabs">${urlTabsHtml}</div>
-<div id="sw-auth-bar-${p}" class="sw-auth-bar">
-  <span style="font-size:11px;font-weight:700;color:var(--mut);white-space:nowrap">🔐 Auth:</span>
-  <input type="text" id="sw-auth-token-${p}" placeholder="Bearer token or API key…" style="flex:1;min-width:140px;background:transparent;border:none;outline:none;font-family:var(--font-mono);font-size:12px;color:var(--txt)">
-  <select id="sw-auth-type-${p}" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:12px;color:var(--txt);cursor:pointer;outline:none"><option value="Bearer">Bearer</option><option value="Basic">Basic</option><option value="ApiKey">X-API-Key</option><option value="none">None</option></select>
-</div>
 <div id="sw-explorer-${p}"><div class="sw-empty" style="padding:28px"><div class="sw-empty-icon" style="font-size:28px">⏳</div><div style="color:var(--mut);font-size:12px">Loading spec…</div></div></div>`}`;
 }
 
@@ -8361,24 +8394,37 @@ function _renderSwaggerExplorer(spec,container,p){
   <div class="sw-grp-body" style="${gi===0?'':'display:none'}">${eps.map(e=>_swEpRow(e.path,e.method,e.op,p)).join('')}</div>
 </div>`).join('');
   container.innerHTML=`
-<div class="sw-info-card">
-  <div class="sw-info-left">
-    <div class="sw-api-icon">⚡</div>
-    <div>
-      <div class="sw-api-title">${escH(title)}${ver?`<span class="sw-version">v${escH(ver)}</span>`:''}</div>
-      ${desc?`<div class="sw-api-desc">${escH(desc.substring(0,160))}</div>`:''}
-      <div class="sw-base-url">🔗 ${escH(_swBaseUrl)}</div>
+<div class="sw-ui-header">
+  <div class="sw-ui-brand">
+    <div class="sw-ui-logo">swagger</div>
+    <div class="sw-ui-title-block">
+      <div class="sw-ui-title">${escH(title)}</div>
+      ${desc?`<div class="sw-ui-desc">${escH(desc.substring(0,120))}</div>`:''}
+      <div class="sw-ui-badges">
+        ${ver?`<span class="sw-ui-badge-ver">${escH(ver)}</span>`:''}
+        <span class="sw-ui-badge-oas">OAS 3.0</span>
+        <span class="sw-ui-server">${escH(_swBaseUrl)}</span>
+      </div>
     </div>
   </div>
-  <div class="sw-stats-row">${statsHtml}</div>
+  <div class="sw-ui-actions">
+    <div class="sw-stats-row">${statsHtml}</div>
+    <button class="sw-ui-auth-btn" onclick="_swToggleAuthPanel('${p}')">🔓 Authorize</button>
+    <button class="sw-ui-run-all-btn" id="sw-run-all-btn-${p}" onclick="_swRunAll('${p}')">▶▶ Run All <span style="background:rgba(255,255,255,.2);padding:1px 7px;border-radius:50px;font-size:11px">${total}</span></button>
+  </div>
+</div>
+<div id="sw-run-panel-${p}" style="display:none" class="sw-run-panel"></div>
+<div id="sw-auth-panel-${p}" style="display:none;margin-bottom:16px">
+  <div class="sw-toolbar">
+    <div class="sw-auth-bar2">
+      <span class="sw-auth-lbl">🔐 Auth</span>
+      <select id="sw-auth-type-${p}" class="sw-auth-sel"><option value="Bearer">Bearer</option><option value="Basic">Basic</option><option value="ApiKey">X-API-Key</option><option value="none">None</option></select>
+      <input type="text" id="sw-auth-token-${p}" class="sw-auth-inp" placeholder="Paste your Bearer token, API key…">
+    </div>
+  </div>
 </div>
 <div class="sw-toolbar">
-  <div class="sw-auth-bar2">
-    <span class="sw-auth-lbl">🔐 Auth</span>
-    <select id="sw-auth-type-${p}" class="sw-auth-sel"><option value="Bearer">Bearer</option><option value="Basic">Basic</option><option value="ApiKey">X-API-Key</option><option value="none">None</option></select>
-    <input type="text" id="sw-auth-token-${p}" class="sw-auth-inp" placeholder="Paste your token here…">
-  </div>
-  <input type="text" class="sw-search2" placeholder="🔍 Search endpoints, paths, methods…" oninput="_swFilter(this.value)">
+  <input type="text" class="sw-search2" placeholder="🔍 Search endpoints, paths, methods…" oninput="_swFilter(this.value)" style="flex:1">
 </div>
 <div class="sw-method-filters">${pillsHtml}</div>
 <div class="sw-ep-list" id="sw-endpoints-${p}">${groupsHtml}</div>`;
@@ -8559,6 +8605,111 @@ function _swRTab(btn,showId,hideId){
 }
 
 function _swClearResp(eid){const el=document.getElementById(eid+'-resp');if(el){el.innerHTML='';el.style.display='none';}}
+
+function _swToggleAuthPanel(p){
+  const panel=document.getElementById('sw-auth-panel-'+p);
+  if(panel)panel.style.display=panel.style.display==='none'?'block':'none';
+}
+
+// ── Run All APIs ──
+async function _swRunAll(p){
+  if(!_swSpec){toast('No spec loaded','err');return;}
+  const btn=document.getElementById('sw-run-all-btn-'+p);
+  const panel=document.getElementById('sw-run-panel-'+p);
+  if(!panel)return;
+
+  // collect all endpoints
+  const eps=[];
+  for(const[path,methods]of Object.entries(_swSpec.paths||{})){
+    for(const[method,op]of Object.entries(methods)){
+      if(!['get','post','put','patch','delete','head','options'].includes(method))continue;
+      eps.push({path,method,op});
+    }
+  }
+  if(!eps.length){toast('No endpoints found','err');return;}
+
+  const authTok=document.getElementById('sw-auth-token-'+p)?.value?.trim()||'';
+  const authType=document.getElementById('sw-auth-type-'+p)?.value||'Bearer';
+
+  // show panel
+  panel.style.display='block';
+  if(btn){btn.disabled=true;btn.textContent='⏳ Running…';}
+
+  let pass=0,fail=0,err=0,done=0;
+  const total=eps.length;
+  const rows=[];
+
+  // render initial panel
+  const renderPanel=()=>{
+    const pct=total?Math.round(done/total*100):0;
+    panel.innerHTML=`
+<div class="sw-run-header">
+  <div class="sw-run-title">▶▶ Run All Results <span style="color:var(--mut);font-size:12px;font-weight:400">${done}/${total} completed</span></div>
+  <div class="sw-run-stats">
+    <div class="sw-run-stat"><div class="sw-run-stat-n" style="color:var(--pass)">${pass}</div><div class="sw-run-stat-l">Pass (2xx)</div></div>
+    <div class="sw-run-stat"><div class="sw-run-stat-n" style="color:var(--fail)">${fail}</div><div class="sw-run-stat-l">Fail (4xx/5xx)</div></div>
+    <div class="sw-run-stat"><div class="sw-run-stat-n" style="color:var(--mut)">${err}</div><div class="sw-run-stat-l">Error</div></div>
+  </div>
+</div>
+<div class="sw-run-progress"><div class="sw-run-progress-bar" style="width:${pct}%"></div></div>
+<div class="sw-run-body">${rows.map(r=>`<div class="sw-run-row">
+  <span class="sw-run-row-status">${r.icon}</span>
+  <span class="sw-run-row-method"><span class="sw-mbadge" style="background:${(_SW_MC[r.method]||_SW_MC.options).bg};color:${(_SW_MC[r.method]||_SW_MC.options).color};border:1.5px solid ${(_SW_MC[r.method]||_SW_MC.options).border};font-size:9px;padding:2px 7px">${r.method.toUpperCase()}</span></span>
+  <span class="sw-run-row-path" title="${escH(r.path)}">${escH(r.path)}</span>
+  <span class="sw-run-row-code" style="color:${r.codeColor}">${r.code}</span>
+  <span class="sw-run-row-time">${r.time}ms</span>
+</div>`).join('')}${done<total?`<div style="padding:12px 18px;font-size:12px;color:var(--mut)">⏳ Running ${total-done} more…</div>`:''}</div>
+${done===total?`<div class="sw-run-footer">
+  <span style="font-size:12px;font-weight:700;color:var(--txt)">✅ Completed: ${pass} passed, ${fail} failed, ${err} errors</span>
+  <button class="sw-run-export-btn" onclick="_swExportRunResults('${p}')">📥 Export CSV</button>
+  <button class="sw-run-close-btn" onclick="document.getElementById('sw-run-panel-${p}').style.display='none'">✕ Close</button>
+</div>`:''}`;
+  };
+
+  // run concurrently in batches of 8
+  const BATCH=8;
+  const runOne=async(ep)=>{
+    const hd={};
+    if(authTok&&authType!=='none')hd[authType==='ApiKey'?'X-API-Key':'Authorization']=(authType==='ApiKey'?'':authType+' ')+authTok;
+    const t0=Date.now();
+    try{
+      const r=await fetch('/api/swagger-execute',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},body:JSON.stringify({method:ep.method,url:_swBaseUrl+ep.path,headers:hd,body:null,params:{}})});
+      const data=await r.json();
+      const code=data.status||0;
+      const time=data.duration||(Date.now()-t0);
+      const ok=code>=200&&code<300;
+      const isErr=code>=400;
+      if(ok)pass++;else if(isErr)fail++;else err++;
+      rows.push({path:ep.path,method:ep.method,code,time,icon:ok?'✅':isErr?'❌':'⚠️',codeColor:ok?'var(--pass)':isErr?'var(--fail)':'var(--blk)'});
+    }catch(e){
+      err++;
+      rows.push({path:ep.path,method:ep.method,code:'ERR',time:Date.now()-t0,icon:'🔴',codeColor:'var(--mut)'});
+    }
+    done++;
+    renderPanel();
+  };
+
+  // process in batches
+  for(let i=0;i<eps.length;i+=BATCH){
+    await Promise.all(eps.slice(i,i+BATCH).map(runOne));
+  }
+
+  if(btn){btn.disabled=false;btn.innerHTML=`▶▶ Run All <span style="background:rgba(255,255,255,.2);padding:1px 7px;border-radius:50px;font-size:11px">${total}</span>`;}
+
+  // store results for export
+  window._swLastRunResults=rows;
+}
+
+function _swExportRunResults(p){
+  const rows=window._swLastRunResults||[];
+  if(!rows.length){toast('No results to export','err');return;}
+  const csv=['Method,Path,Status,Duration(ms)'].concat(rows.map(r=>`${r.method.toUpperCase()},${r.path},${r.code},${r.time}`)).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`swagger-run-${p}-${Date.now()}.csv`;a.click();
+  URL.revokeObjectURL(url);
+  toast('CSV exported ✓');
+}
 
 // ── Add Swagger URL modal ──
 function openSwaggerAddModal(p){
