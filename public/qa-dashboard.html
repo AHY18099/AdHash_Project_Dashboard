@@ -7382,7 +7382,7 @@ function _applySseUpdate(key,value){
       // Update hash so heartbeat doesn't re-save the old stale state
       _lastHbStoreHash[pid]=JSON.stringify(STORE[pid]);
     }
-    if(curView==='project'&&curProj===pid&&!userTyping){
+    if(curView==='project'&&curProj===pid&&!userTyping&&(curTab[pid]||'')!=='swagger'){
       renderProject(pid);
       // Flash highlight on all visible rows to indicate live update
       setTimeout(()=>{
