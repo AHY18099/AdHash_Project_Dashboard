@@ -8292,13 +8292,13 @@ function _autoSaveHeartbeat(){
 // ══ SWAGGER API EXPLORER — PREMIUM ═════════════════════════════════════════
 
 const _SW_MC={
-  get:    {bg:'rgba(59,130,246,.12)',color:'#1d4ed8',border:'rgba(59,130,246,.3)',glow:'rgba(29,78,216,.2)'},
-  post:   {bg:'rgba(16,185,129,.12)',color:'#065f46',border:'rgba(16,185,129,.3)',glow:'rgba(21,128,61,.2)'},
-  put:    {bg:'rgba(245,158,11,.12)',color:'#92400e',border:'rgba(245,158,11,.3)',glow:'rgba(133,77,14,.2)'},
-  patch:  {bg:'rgba(249,115,22,.12)',color:'#c2410c',border:'rgba(249,115,22,.3)',glow:'rgba(194,65,12,.2)'},
-  delete: {bg:'rgba(239,68,68,.12)', color:'#b91c1c',border:'rgba(239,68,68,.3)',glow:'rgba(185,28,28,.2)'},
-  head:   {bg:'rgba(139,92,246,.1)', color:'#6d28d9',border:'rgba(139,92,246,.3)',glow:'rgba(109,40,217,.2)'},
-  options:{bg:'rgba(100,116,139,.1)',color:'#475569',border:'rgba(100,116,139,.3)',glow:'transparent'},
+  get:    {bg:'rgba(97,175,254,.1)', color:'#61affe',solid:'#61affe',border:'rgba(97,175,254,.4)', glow:'rgba(97,175,254,.2)'},
+  post:   {bg:'rgba(73,204,144,.1)', color:'#49cc90',solid:'#49cc90',border:'rgba(73,204,144,.4)', glow:'rgba(73,204,144,.2)'},
+  put:    {bg:'rgba(252,161,48,.1)', color:'#fca130',solid:'#fca130',border:'rgba(252,161,48,.4)', glow:'rgba(252,161,48,.2)'},
+  patch:  {bg:'rgba(80,227,194,.1)', color:'#50e3c2',solid:'#50e3c2',border:'rgba(80,227,194,.4)', glow:'rgba(80,227,194,.2)'},
+  delete: {bg:'rgba(249,62,62,.1)',  color:'#f93e3e',solid:'#f93e3e',border:'rgba(249,62,62,.4)',  glow:'rgba(249,62,62,.2)'},
+  head:   {bg:'rgba(144,18,254,.1)', color:'#9012fe',solid:'#9012fe',border:'rgba(144,18,254,.4)', glow:'rgba(144,18,254,.2)'},
+  options:{bg:'rgba(13,90,167,.1)',  color:'#0d5aa7',solid:'#0d5aa7',border:'rgba(13,90,167,.4)',  glow:'transparent'},
 };
 let _swSpec=null,_swBaseUrl='',_swProjId='';
 let _swLoading=false; // prevent concurrent spec loads
@@ -8386,18 +8386,18 @@ function _renderSwaggerExplorer(spec,container,p){
     Object.entries(methodCounts).map(([m,c])=>`<button class="sw-fpill sw-fpill-${m}" onclick="_swFilterMethod('${m}',this)">${m.toUpperCase()} <span class="sw-pcnt">${c}</span></button>`).join('');
   const groupsHtml=Object.entries(groups).map(([tag,eps],gi)=>{
     const mb={};eps.forEach(e=>{mb[e.method]=(mb[e.method]||0)+1;});
-    const mbHtml=Object.entries(mb).map(([m,c])=>`<span style="font-size:9px;padding:2px 7px;border-radius:4px;background:${(_SW_MC[m]||_SW_MC.options).bg};color:${(_SW_MC[m]||_SW_MC.options).color};border:1px solid ${(_SW_MC[m]||_SW_MC.options).border};font-weight:700;font-family:monospace">${c} ${m.toUpperCase()}</span>`).join('');
+    const mbHtml=Object.entries(mb).map(([m,c])=>{const mc2=_SW_MC[m]||_SW_MC.options;return`<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:3px 9px;border-radius:4px;background:${mc2.solid};color:#fff;font-weight:700;font-family:monospace;letter-spacing:.3px">${c} ${m.toUpperCase()}</span>`;}).join('');
     return`
-<div class="sw-grp" data-group="${escH(tag)}">
-  <div class="sw-grp-hdr${gi===0?' open':''}" onclick="_swToggleGrp(this)" style="padding:14px 18px">
+<div class="sw-grp" data-group="${escH(tag)}" style="background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+  <div class="sw-grp-hdr${gi===0?' open':''}" onclick="_swToggleGrp(this)" style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;cursor:pointer;user-select:none;background:var(--card);transition:background .15s">
     <div class="sw-grp-left" style="display:flex;align-items:center;gap:10px">
-      <span class="sw-grp-chev" style="font-size:11px;color:#6366f1;font-weight:700">${gi===0?'▼':'▶'}</span>
+      <span class="sw-grp-chev" style="font-size:11px;color:var(--mut);font-weight:700;transition:transform .2s">${gi===0?'▼':'▶'}</span>
       <span style="font-size:14px;font-weight:700;color:var(--txt)">${escH(tag)}</span>
       <span style="font-size:11px;color:var(--mut);background:var(--card2);padding:2px 8px;border-radius:50px;border:1px solid var(--border)">${eps.length} endpoint${eps.length!==1?'s':''}</span>
     </div>
     <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">${mbHtml}</div>
   </div>
-  <div class="sw-grp-body" style="${gi===0?'':'display:none'}">${eps.map(e=>_swEpRow(e.path,e.method,e.op,p)).join('')}</div>
+  <div class="sw-grp-body" style="${gi===0?'':'display:none'};padding:8px 12px 12px">${eps.map(e=>_swEpRow(e.path,e.method,e.op,p)).join('')}</div>
 </div>`; }).join('');
   container.innerHTML=`
 <div style="background:#1b1b1b;border-radius:14px;padding:22px 26px;margin-bottom:18px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap">
@@ -8452,25 +8452,23 @@ function _swEpRow(path,method,op,p){
   const mc=_SW_MC[method]||_SW_MC.options;
   const eid='sw2_'+method+'_'+path.replace(/[^a-z0-9]/gi,'_');
   const summary=op.summary||op.operationId||path;
-  const hasParams=(op.parameters?.length>0)||path.includes('{');
-  const hasBody=!!op.requestBody||['post','put','patch'].includes(method);
-  const pathHtml=escH(path).replace(/%7B([^%]+)%7D/g,'<span class="sw-path-param">{$1}</span>').replace(/\{([^}]+)\}/g,'<span class="sw-path-param">{$1}</span>');
-  return`<div class="sw-ep2${op.deprecated?' sw-depr':''}" data-path="${escH(path)}" data-method="${method}" data-summary="${escH((summary||'').toLowerCase())}" style="border-left:3px solid ${mc.border}">
-  <div class="sw-ep-row2" onclick="_swToggleEp('${eid}')">
-    <span class="sw-mbadge" style="background:${mc.bg};color:${mc.color};border:1.5px solid ${mc.border}">${method.toUpperCase()}</span>
-    <span class="sw-ep-path2" style="font-family:monospace;font-size:12px;color:var(--txt);flex-shrink:0;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pathHtml}</span>
-    <span class="sw-ep-sum2">${op.deprecated?'<span class="sw-depr-badge">deprecated</span>':''}${escH(summary)}</span>
-    <span class="sw-ep-tags2">${hasParams?'<span class="sw-has-tag2">params</span>':''}${hasBody?'<span class="sw-has-tag2 sw-has-body2">body</span>':''}</span>
-    <button class="sw-tryit" style="background:${mc.bg};color:${mc.color};border:1.5px solid ${mc.border};opacity:1;visibility:visible" onclick="event.stopPropagation();_swRunQuick('${eid}','${escH(path)}','${method}','${p}')">▶ Try it</button>
-    <span class="sw-ep-chev2" id="${eid}-chev">▶</span>
+  const pathHtml=escH(path).replace(/\{([^}]+)\}/g,'<span style="color:inherit;opacity:.85">{$1}</span>');
+  const lockIcon=op.security&&op.security.length?'<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 20 20" fill="#fff" style="opacity:.85;flex-shrink:0"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>':'';
+  return`<div class="sw-ep2${op.deprecated?' sw-depr':''}" data-path="${escH(path)}" data-method="${method}" data-summary="${escH((summary||'').toLowerCase())}" style="margin-bottom:2px;border-radius:6px;overflow:hidden;border:1px solid ${mc.border}">
+  <div onclick="_swToggleEp('${eid}')" style="display:flex;align-items:center;gap:0;cursor:pointer;background:${mc.bg};transition:filter .15s;padding:0;min-height:44px">
+    <span style="display:inline-flex;align-items:center;justify-content:center;background:${mc.solid};color:#fff;font-family:monospace;font-size:11px;font-weight:700;letter-spacing:.5px;min-width:72px;width:72px;padding:12px 0;align-self:stretch;flex-shrink:0;text-shadow:0 1px 2px rgba(0,0,0,.25)">${method.toUpperCase()}</span>
+    <span style="font-family:monospace;font-size:13px;font-weight:600;color:${mc.solid};padding:0 12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pathHtml}</span>
+    <span style="font-size:12px;color:#3b4151;flex:2;padding:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.85">${op.deprecated?'<s>'+escH(summary)+'</s>':escH(summary)}</span>
+    ${lockIcon}
+    <span style="font-size:10px;color:${mc.solid};opacity:.7;padding:0 14px;flex-shrink:0" id="${eid}-chev">▼</span>
   </div>
-  <div id="${eid}" class="sw-panel2" style="display:none">
-    ${op.description?`<div class="sw-ep-desc2">${escH(op.description)}</div>`:''}
+  <div id="${eid}" class="sw-panel2" style="display:none;border-top:1px solid ${mc.border};background:var(--card2,#f8f8f8);border-radius:0 0 6px 6px">
+    ${op.description?`<div class="sw-ep-desc2" style="padding:10px 16px 0;font-size:12px;color:var(--mut)">${escH(op.description)}</div>`:''}
     ${_swParams2(op,path,eid)}
     ${_swBody2(op,eid)}
     <div class="sw-exec-bar">
       <span class="sw-url-prev" id="${eid}-urlprev">${escH(_swBaseUrl)}${escH(path)}</span>
-      <button class="sw-exec-btn" style="background:${mc.color}" onclick="_swRun('${eid}','${escH(path)}','${method}','${p}')">▶ Execute</button>
+      <button class="sw-exec-btn" style="background:${mc.solid}" onclick="_swRun('${eid}','${escH(path)}','${method}','${p}')">▶ Execute</button>
       <button class="sw-clr-btn" onclick="_swClearResp('${eid}')">✕ Clear</button>
     </div>
     <div id="${eid}-resp" style="display:none"></div>
