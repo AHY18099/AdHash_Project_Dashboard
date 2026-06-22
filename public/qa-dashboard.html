@@ -6538,23 +6538,72 @@ function tpOpenEdit(p,i){
   setTimeout(()=>_tpApiRender(),80);
 }
 function tpDelete(p,i){if(!isAdmin()){toast('Only admin can delete third party accounts','err');return;}if(!confirm('Delete this account?'))return;STORE[p].thirdparty.splice(i,1);STORE[p]._replaceArrays=['thirdparty'];saveToLS(p);delete STORE[p]._replaceArrays;renderProject(p);toast('Account deleted');}
+function _tpApiModalHtml(api){
+  // Shared HTML for Add/Edit API modal — headers + body
+  const method=api?.method||'GET';
+  const bodyNeeded=['POST','PUT','PATCH'].includes(method);
+  const hdrs=api?.headers&&typeof api.headers==='object'?Object.entries(api.headers):[];
+  const hdrRows=hdrs.map(([k,v])=>`<div class="tpa-hdr-row" style="display:flex;gap:6px;margin-bottom:4px;align-items:center"><input class="finp tpa-hdr-key" value="${escH(k)}" placeholder="Header name" style="flex:1;padding:5px 8px;font-size:12px" autocomplete="off"><input class="finp tpa-hdr-val" value="${escH(v)}" placeholder="Value" style="flex:1;padding:5px 8px;font-size:12px" autocomplete="off"><button type="button" onclick="this.closest('.tpa-hdr-row').remove()" style="background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.25);border-radius:5px;padding:2px 7px;font-size:12px;color:var(--fail);cursor:pointer;flex-shrink:0">✕</button></div>`).join('');
+  const bodyVal=api?.body?typeof api.body==='string'?api.body:JSON.stringify(api.body,null,2):'';
+  return`<div class="fg-row" style="margin-bottom:6px">
+      <div class="fg"><label>API Name *</label><input class="finp" id="tpa-name" value="${escH(api?.name||'')}" placeholder="e.g. Get Credits"></div>
+      <div class="fg" style="max-width:130px"><label>Method</label><select class="finp" id="tpa-method" onchange="_tpaMethodChange()">${TP_API_METHODS.map(v=>`<option${v===method?' selected':''}>${v}</option>`).join('')}</select></div>
+    </div>
+    <div class="fg-row" style="margin-bottom:6px">
+      <div class="fg"><label>Endpoint URL</label><input class="finp" id="tpa-url" value="${escH(api?.url||'')}" placeholder="https://api.example.com/endpoint"></div>
+      <div class="fg" style="max-width:130px"><label>Status</label><select class="finp" id="tpa-status">${TP_API_STATUSES.map(v=>`<option${v===(api?.status||'Active')?' selected':''}>${v}</option>`).join('')}</select></div>
+    </div>
+    <div class="fg" style="margin-bottom:6px"><label>Description</label><textarea class="finp" id="tpa-desc" rows="2" placeholder="What this API does…">${escH(api?.description||'')}</textarea></div>
+    <div style="margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <label style="font-size:11px;font-weight:700;color:var(--txt)">Headers <span style="font-weight:400;color:var(--mut)">(auth tokens, content-type, etc.)</span></label>
+        <button type="button" onclick="_tpaAddHdrRow()" style="font-size:11px;padding:2px 10px;border-radius:5px;border:1px solid var(--grad-a);color:var(--grad-a);background:transparent;cursor:pointer;font-weight:600">＋ Add Header</button>
+      </div>
+      <div id="tpa-hdr-rows">${hdrRows}</div>
+      <div style="font-size:10px;color:var(--mut);margin-top:2px">e.g. Key: <code>apy-token</code> &nbsp;Value: your API key</div>
+    </div>
+    <div id="tpa-body-row" style="${bodyNeeded?'':'display:none'}margin-bottom:6px">
+      <label style="font-size:11px;font-weight:700;color:var(--txt)">Request Body <span style="font-weight:400;color:var(--mut)">(JSON)</span></label>
+      <textarea class="finp" id="tpa-body" rows="4" placeholder='{\n  "key": "value"\n}' style="font-family:monospace;font-size:12px;margin-top:4px">${escH(bodyVal)}</textarea>
+    </div>`;
+}
+function _tpaMethodChange(){
+  const m=document.getElementById('tpa-method')?.value||'GET';
+  const row=document.getElementById('tpa-body-row');
+  if(row)row.style.display=['POST','PUT','PATCH'].includes(m)?'':'none';
+}
+function _tpaAddHdrRow(){
+  const cont=document.getElementById('tpa-hdr-rows');if(!cont)return;
+  const row=document.createElement('div');row.className='tpa-hdr-row';
+  row.style.cssText='display:flex;gap:6px;margin-bottom:4px;align-items:center';
+  row.innerHTML=`<input class="finp tpa-hdr-key" placeholder="Header name (e.g. apy-token)" style="flex:1;padding:5px 8px;font-size:12px" autocomplete="off"><input class="finp tpa-hdr-val" placeholder="Value" style="flex:1;padding:5px 8px;font-size:12px" autocomplete="off"><button type="button" onclick="this.closest('.tpa-hdr-row').remove()" style="background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.25);border-radius:5px;padding:2px 7px;font-size:12px;color:var(--fail);cursor:pointer;flex-shrink:0">✕</button>`;
+  cont.appendChild(row);
+}
+function _tpaReadApiFields(existingApi){
+  const name=document.getElementById('tpa-name')?.value.trim();
+  const method=document.getElementById('tpa-method')?.value||'GET';
+  const url=document.getElementById('tpa-url')?.value.trim()||'';
+  const status=document.getElementById('tpa-status')?.value||'Active';
+  const description=document.getElementById('tpa-desc')?.value.trim()||'';
+  const headers={};
+  document.querySelectorAll('.tpa-hdr-row').forEach(row=>{
+    const k=row.querySelector('.tpa-hdr-key')?.value.trim();
+    const v=row.querySelector('.tpa-hdr-val')?.value.trim();
+    if(k&&v)headers[k]=v;
+  });
+  let body=null;
+  if(['POST','PUT','PATCH'].includes(method)){
+    const bv=document.getElementById('tpa-body')?.value.trim();
+    if(bv){try{body=JSON.parse(bv);}catch(_){body=bv;}}
+  }
+  return{id:existingApi?.id||('tpa_'+Math.random().toString(36).slice(2,10)),name,method,url,status,description,headers,body};
+}
 function tpOpenAddApi(p,acctIdx){
   if(!isAdmin()){toast('Only admin can add APIs','err');return;}
-  // quick-add from the tab view (outside modal)
-  const body=`
-    <div class="fg-row">
-      <div class="fg"><label>API Name *</label><input class="finp" id="tpa-name" placeholder="e.g. Send Payment"></div>
-      <div class="fg"><label>Method</label><select class="finp" id="tpa-method">${TP_API_METHODS.map(v=>`<option>${v}</option>`).join('')}</select></div>
-    </div>
-    <div class="fg-row">
-      <div class="fg"><label>Endpoint URL</label><input class="finp" id="tpa-url" placeholder="https://api.example.com/endpoint"></div>
-      <div class="fg"><label>Status</label><select class="finp" id="tpa-status">${TP_API_STATUSES.map(v=>`<option>${v}</option>`).join('')}</select></div>
-    </div>
-    <div class="fg"><label>Description</label><textarea class="finp" id="tpa-desc" rows="2" placeholder="What this API does…"></textarea></div>`;
-  openModal('Add API',body,()=>{
+  openModal('Add API',_tpApiModalHtml(null),()=>{
     const name=document.getElementById('tpa-name')?.value.trim();
     if(!name){toast('API name is required','err');return;}
-    const api={id:'tpa_'+Math.random().toString(36).slice(2,10),name,method:document.getElementById('tpa-method')?.value||'GET',url:document.getElementById('tpa-url')?.value.trim()||'',status:document.getElementById('tpa-status')?.value||'Active',description:document.getElementById('tpa-desc')?.value.trim()||''};
+    const api=_tpaReadApiFields(null);
     if(!STORE[p].thirdparty[acctIdx].apis)STORE[p].thirdparty[acctIdx].apis=[];
     STORE[p].thirdparty[acctIdx].apis.push(api);saveToLS(p);closeModal();renderProject(p);toast('API added');
   },{saveLabel:'Add API'});
@@ -6564,21 +6613,11 @@ function tpEditApi(p,acctIdx,apiIdx){
   if(!isAdmin()){toast('Only admin can edit APIs','err');return;}
   const api=STORE[p].thirdparty[acctIdx]?.apis?.[apiIdx];
   if(!api)return;
-  const body=`
-    <div class="fg-row">
-      <div class="fg"><label>API Name *</label><input class="finp" id="tpa-name" value="${escH(api.name||'')}"></div>
-      <div class="fg"><label>Method</label><select class="finp" id="tpa-method">${TP_API_METHODS.map(v=>`<option${v===api.method?' selected':''}>${v}</option>`).join('')}</select></div>
-    </div>
-    <div class="fg-row">
-      <div class="fg"><label>Endpoint URL</label><input class="finp" id="tpa-url" value="${escH(api.url||'')}"></div>
-      <div class="fg"><label>Status</label><select class="finp" id="tpa-status">${TP_API_STATUSES.map(v=>`<option${v===api.status?' selected':''}>${v}</option>`).join('')}</select></div>
-    </div>
-    <div class="fg"><label>Description</label><textarea class="finp" id="tpa-desc" rows="2">${escH(api.description||'')}</textarea></div>`;
-  openModal('Edit API',body,()=>{
+  openModal('Edit API',_tpApiModalHtml(api),()=>{
     const name=document.getElementById('tpa-name')?.value.trim();
     if(!name){toast('API name is required','err');return;}
-    STORE[p].thirdparty[acctIdx].apis[apiIdx]={...api,name,method:document.getElementById('tpa-method')?.value||'GET',url:document.getElementById('tpa-url')?.value.trim()||'',status:document.getElementById('tpa-status')?.value||'Active',description:document.getElementById('tpa-desc')?.value.trim()||''};
-    saveToLS(p);closeModal();renderProject(p);toast('API updated');
+    STORE[p].thirdparty[acctIdx].apis[apiIdx]=_tpaReadApiFields(api);
+    STORE[p]._replaceArrays=['thirdparty'];saveToLS(p);delete STORE[p]._replaceArrays;closeModal();renderProject(p);toast('API updated');
   },{saveLabel:'Update API'});
 }
 // Format API response for display
@@ -6614,7 +6653,10 @@ async function tpRunApiFromTab(p,acctIdx,apiIdx,btnEl){
   const respPanel=document.getElementById(`tp-resp-${acctIdx}-${apiIdx}`);
   if(badge){badge.style.display='inline';badge.textContent='⏳ Running…';badge.style.cssText='font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;border:1px solid;color:var(--inp);background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3)';}
   try{
-    const resp=await fetch('/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:api.url,method:api.method==='OTHER'?'GET':api.method})});
+    const tabPayload={url:api.url,method:api.method==='OTHER'?'GET':api.method};
+    if(api.headers&&Object.keys(api.headers).length)tabPayload.headers=api.headers;
+    if(api.body!=null&&['POST','PUT','PATCH'].includes(api.method))tabPayload.body=typeof api.body==='string'?api.body:JSON.stringify(api.body);
+    const resp=await fetch('/api/proxy',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},body:JSON.stringify(tabPayload)});
     const data=await resp.json();
     const ok=data.status>=200&&data.status<300;
     const statusOk=data.status>0&&!data.error;
