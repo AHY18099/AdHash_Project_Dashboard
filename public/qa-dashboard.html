@@ -7789,6 +7789,8 @@ body.dark .sw-pin-path{color:#fbbf24}body.dark .sw-pin-query{color:#93c5fd}body.
 .sw-pdesc{font-size:11px;color:var(--mut);margin-bottom:6px;line-height:1.4}
 .sw-pinput{width:100%;padding:6px 11px;border:1px solid var(--border);border-radius:7px;background:var(--card2);font-size:12px;font-family:var(--font-mono);color:var(--txt);outline:none;transition:border-color .15s}
 .sw-pinput:focus{border-color:var(--grad-a);box-shadow:0 0 0 2px rgba(99,102,241,.1)}
+.sw-pinput:disabled{opacity:.55;cursor:not-allowed;background:var(--bg)}
+.sw-body-ed2:disabled{opacity:.55;cursor:not-allowed}
 /* Body editor */
 .sw-body-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;flex-wrap:wrap;gap:6px}
 .sw-body-actions{display:flex;gap:6px}
@@ -8454,26 +8456,45 @@ function _swEpRow(path,method,op,p){
   const summary=op.summary||op.operationId||path;
   const pathHtml=escH(path).replace(/\{([^}]+)\}/g,'<span style="color:inherit;opacity:.85">{$1}</span>');
   const lockIcon=op.security&&op.security.length?'<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 20 20" fill="#fff" style="opacity:.85;flex-shrink:0"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>':'';
+  const respTableHtml=_swRespTable(op);
   return`<div class="sw-ep2${op.deprecated?' sw-depr':''}" data-path="${escH(path)}" data-method="${method}" data-summary="${escH((summary||'').toLowerCase())}" style="margin-bottom:2px;border-radius:6px;overflow:hidden;border:1px solid ${mc.border}">
   <div onclick="_swToggleEp('${eid}')" style="display:flex;align-items:center;gap:0;cursor:pointer;background:${mc.bg};transition:filter .15s;padding:0;min-height:44px">
     <span style="display:inline-flex;align-items:center;justify-content:center;background:${mc.solid};color:#fff;font-family:monospace;font-size:11px;font-weight:700;letter-spacing:.5px;min-width:72px;width:72px;padding:12px 0;align-self:stretch;flex-shrink:0;text-shadow:0 1px 2px rgba(0,0,0,.25)">${method.toUpperCase()}</span>
     <span style="font-family:monospace;font-size:13px;font-weight:600;color:${mc.solid};padding:0 12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pathHtml}</span>
     <span style="font-size:12px;color:#3b4151;flex:2;padding:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.85">${op.deprecated?'<s>'+escH(summary)+'</s>':escH(summary)}</span>
     ${lockIcon}
-    <span style="font-size:10px;color:${mc.solid};opacity:.7;padding:0 14px;flex-shrink:0;transition:transform .2s" id="${eid}-chev">▶</span>
+    <span style="font-size:10px;color:${mc.solid};opacity:.7;padding:0 14px;flex-shrink:0" id="${eid}-chev">▶</span>
   </div>
-  <div id="${eid}" class="sw-panel2" style="display:none;border-top:2px solid ${mc.solid};background:var(--card2,#f8f9fa);border-radius:0 0 6px 6px;padding:16px 20px 20px">
-    ${op.description?`<div style="font-size:12px;color:var(--mut);margin-bottom:12px;line-height:1.5">${escH(op.description)}</div>`:''}
-    ${_swParams2(op,path,eid)}
-    ${_swBody2(op,eid)}
-    <div style="margin-top:14px">
-      <div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:6px;padding:9px 14px;font-family:monospace;font-size:12px;color:var(--mut);margin-bottom:10px;word-break:break-all;line-height:1.4" id="${eid}-urlprev">${escH(_swBaseUrl)}${escH(path)}</div>
+  <div id="${eid}" class="sw-panel2" style="display:none;border-top:2px solid ${mc.solid};background:${mc.bg};border-radius:0 0 6px 6px;padding:0">
+
+    <!-- Parameters section -->
+    <div style="padding:16px 20px 0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid ${mc.solid}">
+        <span style="font-size:15px;font-weight:700;color:var(--txt)">Parameters</span>
+        <button id="${eid}-tryit" style="padding:5px 16px;font-size:12px;font-weight:700;border:1.5px solid ${mc.solid};border-radius:4px;background:transparent;color:${mc.solid};cursor:pointer;transition:all .15s" onmouseover="this.style.background='${mc.solid}';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='${mc.solid}'" onclick="event.stopPropagation();_swToggleTryIt('${eid}','${mc.solid}')">Try it out</button>
+      </div>
+      ${_swParams2(op,path,eid)}
+    </div>
+
+    <!-- Request body section -->
+    ${_swBody2(op,eid,mc.solid)}
+
+    <!-- Execute bar (hidden until Try it out) -->
+    <div id="${eid}-execbar" style="display:none;padding:12px 20px 16px;border-top:1px solid ${mc.border};background:rgba(0,0,0,.025)">
+      <div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:6px;padding:8px 13px;font-family:monospace;font-size:12px;color:var(--mut);margin-bottom:10px;word-break:break-all;line-height:1.4" id="${eid}-urlprev">${escH(_swBaseUrl)}${escH(path)}</div>
       <div style="display:flex;align-items:center;gap:8px">
-        <button style="background:${mc.solid};color:#fff;border:none;border-radius:4px;padding:8px 22px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'" onclick="_swRun('${eid}','${escH(path)}','${method}','${p}')">▶ Execute</button>
-        <button style="background:transparent;color:var(--mut);border:1px solid var(--border);border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--card)'" onmouseout="this.style.background='transparent'" onclick="_swClearResp('${eid}')">✕ Clear</button>
+        <button style="background:${mc.solid};color:#fff;border:none;border-radius:4px;padding:8px 24px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:opacity .15s" onmouseover="this.style.opacity='.82'" onmouseout="this.style.opacity='1'" onclick="_swRun('${eid}','${escH(path)}','${method}','${p}')">▶ Execute</button>
+        <button style="background:transparent;color:var(--mut);border:1px solid var(--border);border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer" onclick="_swClearResp('${eid}')">✕ Clear</button>
       </div>
     </div>
-    <div id="${eid}-resp" style="display:none"></div>
+    <div id="${eid}-resp" style="display:none;padding:0 20px 16px"></div>
+
+    <!-- Responses table -->
+    ${respTableHtml?`<div style="padding:0 20px 20px;border-top:1px solid ${mc.border};margin-top:4px">
+      <div style="font-size:15px;font-weight:700;color:var(--txt);padding:14px 0 10px;border-bottom:2px solid ${mc.solid};margin-bottom:0">Responses</div>
+      ${respTableHtml}
+    </div>`:''}
+
   </div>
 </div>`;
 }
@@ -8481,18 +8502,39 @@ function _swEpRow(path,method,op,p){
 function _swParams2(op,path,eid){
   const params=[...(op.parameters||[])];
   (path.match(/\{([^}]+)\}/g)||[]).map(x=>x.slice(1,-1)).forEach(n=>{if(!params.find(px=>px.name===n))params.unshift({name:n,in:'path',required:true,schema:{type:'string'}});});
-  if(!params.length)return'';
+  if(!params.length)return`<div style="font-size:13px;color:var(--mut);padding:6px 0 14px">No parameters</div>`;
   const inCls={path:'sw-pin-path',query:'sw-pin-query',header:'sw-pin-header',cookie:'sw-pin-cookie'};
-  return`<div class="sw-sec"><div class="sw-sec-ttl">📋 Parameters <span class="sw-sec-cnt">${params.length}</span></div><div class="sw-params-grid">${params.map(px=>`<div class="sw-prow${px.required?' sw-preq':''}"><div class="sw-pmeta"><span class="sw-pname">${escH(px.name)}${px.required?'<span class="sw-req-dot">*</span>':''}</span><span class="sw-pin ${inCls[px.in]||'sw-pin-query'}">${(px.in||'query').toUpperCase()}</span><span class="sw-ptype">${px.schema?.type||px.type||'string'}</span></div>${px.description?`<div class="sw-pdesc">${escH(px.description.substring(0,100))}</div>`:''}<input type="text" id="${eid}-p-${escH(px.name)}" data-param-name="${escH(px.name)}" data-param-in="${px.in||'query'}" placeholder="${escH(px.example||px.schema?.example||(px.required?'Required':'Optional'))}" class="sw-pinput" oninput="_swUpdateUrlPrev('${eid}','${escH(path)}')"></div>`).join('')}</div></div>`;
+  return`<div class="sw-sec" style="margin-bottom:0;padding-bottom:14px"><div class="sw-params-grid">${params.map(px=>`<div class="sw-prow${px.required?' sw-preq':''}"><div class="sw-pmeta"><span class="sw-pname">${escH(px.name)}${px.required?'<span class="sw-req-dot">*</span>':''}</span><span class="sw-pin ${inCls[px.in]||'sw-pin-query'}">${(px.in||'query').toUpperCase()}</span><span class="sw-ptype">${px.schema?.type||px.type||'string'}</span></div>${px.description?`<div class="sw-pdesc">${escH(px.description.substring(0,100))}</div>`:''}<input type="text" id="${eid}-p-${escH(px.name)}" data-param-name="${escH(px.name)}" data-param-in="${px.in||'query'}" placeholder="${escH(px.example||px.schema?.example||(px.required?'Required':'Optional'))}" class="sw-pinput" disabled oninput="_swUpdateUrlPrev('${eid}','${escH(path)}')"></div>`).join('')}</div></div>`;
 }
 
-function _swBody2(op,eid){
+function _swBody2(op,eid,solidColor){
   if(!op.requestBody)return'';
   const ct=op.requestBody.content||{},jc=ct['application/json'];
+  const ctTypes=Object.keys(ct).length?Object.keys(ct):['application/json'];
+  const solid=solidColor||'var(--grad-a)';
   let ex='{\n  \n}';
   if(jc?.example)ex=JSON.stringify(jc.example,null,2);
   else if(jc?.schema)ex=_swExampleFromSchema(jc.schema);
-  return`<div class="sw-sec"><div class="sw-sec-ttl">📦 Request Body ${op.requestBody.required?'<span class="sw-req-chip">required</span>':''}</div><div class="sw-body-bar"><div></div><div class="sw-body-actions"><button class="sw-body-action" onclick="try{document.getElementById('${eid}-body').value=JSON.stringify(JSON.parse(document.getElementById('${eid}-body').value),null,2)}catch(_){toast('Invalid JSON','err')}">⇄ Format</button><button class="sw-body-action" onclick="document.getElementById('${eid}-body').value=''"">✕ Clear</button></div></div><textarea id="${eid}-body" class="sw-body-ed2" rows="6">${escH(ex)}</textarea></div>`;
+  return`<div style="padding:0 20px 0;border-top:1px solid rgba(0,0,0,.06);margin-top:0">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 10px;border-bottom:2px solid ${solid}">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:15px;font-weight:700;color:var(--txt)">Request body</span>
+      ${op.requestBody.required?`<span style="font-size:11px;color:#e53e3e;font-weight:600;font-style:italic">required</span>`:''}
+    </div>
+    <select style="padding:5px 10px;border:1px solid var(--border);border-radius:4px;font-size:12px;background:var(--card);color:var(--txt);cursor:pointer;outline:none">${ctTypes.map(t=>`<option value="${escH(t)}">${escH(t)}</option>`).join('')}</select>
+  </div>
+  <div style="margin:10px 0 4px;display:flex;gap:12px;align-items:center">
+    <span style="font-size:12px;font-weight:600;color:var(--txt);border-bottom:2px solid ${solid};padding-bottom:3px;cursor:pointer">Example Value</span>
+    <span style="font-size:12px;color:var(--mut);cursor:pointer">Schema</span>
+  </div>
+  <div style="position:relative">
+    <textarea id="${eid}-body" class="sw-body-ed2" rows="5" disabled style="background:#1a1a2e;color:#a8ff78;font-family:monospace;border-color:rgba(0,0,0,.2)">${escH(ex)}</textarea>
+    <div style="position:absolute;top:8px;right:8px;display:flex;gap:4px">
+      <button class="sw-body-action" onclick="try{document.getElementById('${eid}-body').value=JSON.stringify(JSON.parse(document.getElementById('${eid}-body').value),null,2)}catch(_){toast('Invalid JSON','err')}">⇄ Format</button>
+      <button class="sw-body-action" onclick="document.getElementById('${eid}-body').value=''">✕ Clear</button>
+    </div>
+  </div>
+</div>`;
 }
 
 function _swExampleFromSchema(s){
@@ -8505,6 +8547,62 @@ function _swExampleFromSchema(s){
     else ex[k]=null;
   }
   return JSON.stringify(ex,null,2);
+}
+
+function _swRespTable(op){
+  const resp=op.responses;
+  if(!resp||!Object.keys(resp).length)return'';
+  const codeColor=c=>{
+    const n=parseInt(c);
+    if(n>=200&&n<300)return'#49cc90';
+    if(n>=400&&n<500)return'#f93e3e';
+    if(n>=500)return'#9012fe';
+    return'#61affe';
+  };
+  const rows=Object.entries(resp).map(([code,r])=>{
+    const desc=r.description||'';
+    const hasSchema=r.content&&r.content['application/json']?.schema;
+    return`<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:10px 14px;font-family:monospace;font-size:14px;font-weight:700;color:${codeColor(code)};white-space:nowrap;vertical-align:top">${escH(code)}</td>
+      <td style="padding:10px 14px;font-size:13px;color:var(--txt);vertical-align:top">${escH(desc)}${hasSchema?`<div style="margin-top:6px;font-size:11px;color:var(--mut);font-family:monospace">application/json</div>`:''}
+      </td>
+      <td style="padding:10px 14px;font-size:12px;color:var(--mut);text-align:right;white-space:nowrap;vertical-align:top">No links</td>
+    </tr>`;
+  }).join('');
+  return`<table style="width:100%;border-collapse:collapse;margin-top:0">
+    <thead><tr style="border-bottom:1px solid var(--border)">
+      <th style="padding:8px 14px;font-size:12px;font-weight:700;color:var(--txt);text-align:left">Code</th>
+      <th style="padding:8px 14px;font-size:12px;font-weight:700;color:var(--txt);text-align:left">Description</th>
+      <th style="padding:8px 14px;font-size:12px;font-weight:700;color:var(--txt);text-align:right">Links</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function _swToggleTryIt(eid,solidColor){
+  const execBar=document.getElementById(eid+'-execbar');
+  const btn=document.getElementById(eid+'-tryit');
+  const inputs=document.querySelectorAll('#'+eid+' .sw-pinput');
+  const bodyEl=document.getElementById(eid+'-body');
+  if(!execBar)return;
+  const isOpen=execBar.style.display!=='none';
+  execBar.style.display=isOpen?'none':'block';
+  // Toggle inputs enabled/disabled
+  inputs.forEach(i=>i.disabled=isOpen);
+  if(bodyEl)bodyEl.disabled=isOpen;
+  if(btn){
+    btn.textContent=isOpen?'Try it out':'Cancel';
+    btn.style.background=isOpen?'transparent':solidColor;
+    btn.style.color=isOpen?solidColor:'#fff';
+  }
+  // Reset hover handlers
+  if(btn&&isOpen){
+    btn.onmouseover=()=>{btn.style.background=solidColor;btn.style.color='#fff';};
+    btn.onmouseout=()=>{btn.style.background='transparent';btn.style.color=solidColor;};
+  } else if(btn){
+    btn.onmouseover=()=>{btn.style.background='transparent';btn.style.color=solidColor;};
+    btn.onmouseout=()=>{btn.style.background=solidColor;btn.style.color='#fff';};
+  }
 }
 
 function _swToggleGrp(hdr){
