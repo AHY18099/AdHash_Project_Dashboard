@@ -8533,7 +8533,7 @@ function _swBody2(op,eid,solidColor){
   <div id="${eid}-body-edit">
     <textarea id="${eid}-body" class="sw-body-ed2" rows="6" disabled data-orig="${escH(ex)}" style="background:#fff;color:#3b4151;border:1px solid #d3d3d3;border-radius:4px;font-family:monospace;font-size:13px;width:100%;box-sizing:border-box;padding:10px;resize:vertical">${escH(ex)}</textarea>
   </div>
-  <div id="${eid}-body-schema" style="display:none;background:#fff;border:1px solid #d3d3d3;border-radius:4px;padding:12px;font-size:12px;font-family:monospace;line-height:1.8">${schemaHtml}</div>
+  <div id="${eid}-body-schema" style="display:none;background:#fff;border:1px solid #d3d3d3;border-radius:4px;padding:12px;font-size:12px;font-family:monospace;line-height:1.8;white-space:pre;overflow-x:auto">${schemaHtml}</div>
   <div style="margin-top:6px;margin-bottom:12px;display:flex;justify-content:flex-end;gap:6px">
     <button class="sw-body-action" onclick="try{const el=document.getElementById('${eid}-body');el.value=JSON.stringify(JSON.parse(el.value),null,2)}catch(_){toast('Invalid JSON','err')}">⇄ Format</button>
     <button class="sw-body-action" onclick="document.getElementById('${eid}-body').value=''">✕ Clear</button>
@@ -8541,45 +8541,96 @@ function _swBody2(op,eid,solidColor){
 </div>`;
 }
 
-function _swExampleFromSchema(s,depth){
-  depth=depth||0;if(depth>4)return'"..."';
+function _swResolveRef(ref,seen){
+  if(!ref||!_swSpec)return null;
+  // '#/components/schemas/Foo' → _swSpec.components.schemas.Foo
+  const parts=ref.replace(/^#\//,'').split('/');
+  let node=_swSpec;
+  for(const p of parts){node=node?.[p];if(!node)return null;}
+  // guard against circular refs
+  if(seen&&seen.has(ref))return{type:'object',properties:{}};
+  return node;
+}
+
+function _swExampleFromSchema(s,depth,seen){
+  depth=depth||0;seen=seen||new Set();
+  if(depth>5)return'"..."';
   if(!s)return'{}';
+  // resolve $ref first
+  if(s.$ref){
+    if(seen.has(s.$ref))return'"..."';
+    const resolved=_swResolveRef(s.$ref,seen);
+    if(!resolved)return'"..."';
+    const newSeen=new Set(seen);newSeen.add(s.$ref);
+    return _swExampleFromSchema(resolved,depth+1,newSeen);
+  }
+  if(s.allOf||s.oneOf||s.anyOf){
+    const merged={type:'object',properties:{}};
+    (s.allOf||s.oneOf||s.anyOf).forEach(sub=>{
+      try{
+        const r=sub.$ref?_swResolveRef(sub.$ref,seen):sub;
+        if(r?.properties)Object.assign(merged.properties,r.properties);
+        if(r?.type&&r.type!=='object')return _swExampleFromSchema(r,depth+1,seen);
+      }catch(_){}
+    });
+    if(Object.keys(merged.properties).length)return _swExampleFromSchema(merged,depth+1,seen);
+    const first=(s.allOf||s.oneOf||s.anyOf)[0];
+    return first?_swExampleFromSchema(first,depth+1,seen):'{}';
+  }
   if(s.example!==undefined)return JSON.stringify(s.example,null,2);
-  if(s.type==='string')return JSON.stringify(s.enum?s.enum[0]:(s.format==='date-time'?'2024-01-01T00:00:00Z':s.format==='date'?'2024-01-01':s.format==='email'?'user@example.com':'string'));
-  if(s.type==='number'||s.type==='integer')return String(s.example||0);
+  if(s.type==='string')return JSON.stringify(s.enum?s.enum[0]:(s.format==='date-time'?'2024-01-01T00:00:00Z':s.format==='date'?'2024-01-01':s.format==='email'?'user@example.com':s.format==='uuid'?'00000000-0000-0000-0000-000000000000':'string'));
+  if(s.type==='number'||s.type==='integer')return String(s.example!==undefined?s.example:0);
   if(s.type==='boolean')return'false';
-  if(s.type==='array'){const items=s.items?_swExampleFromSchema(s.items,depth+1):'""';return'['+items+']';}
+  if(s.type==='array'){
+    const items=s.items?_swExampleFromSchema(s.items,depth+1,seen):'""';
+    return'[\n  '+items+'\n]';
+  }
   if(s.type==='object'||s.properties){
     const ex={};
     const props=s.properties||{};
-    for(const[k,p]of Object.entries(props)){
-      try{ex[k]=JSON.parse(_swExampleFromSchema(p,depth+1));}catch(_){ex[k]='string';}
+    for(const[k,v]of Object.entries(props)){
+      try{ex[k]=JSON.parse(_swExampleFromSchema(v,depth+1,seen));}catch(_){ex[k]='string';}
     }
     return JSON.stringify(ex,null,2);
   }
-  if(s.$ref){const name=(s.$ref||'').split('/').pop();return`"<${name}>"`;}
-  if(s.allOf||s.oneOf||s.anyOf){const sub=(s.allOf||s.oneOf||s.anyOf)[0];return sub?_swExampleFromSchema(sub,depth+1):'{}';}
   return'{}';
 }
 
-function _swSchemaView(s,indent){
-  indent=indent||0;
+function _swSchemaView(s,indent,seen){
+  indent=indent||0;seen=seen||new Set();
+  if(indent>5)return'<span style="color:#999">...</span>';
   if(!s)return'<span style="color:#999">{}</span>';
-  const pad='&nbsp;'.repeat(indent*4);
-  if(s.$ref){const name=(s.$ref||'').split('/').pop();return pad+'<span style="color:#6b6b6b">'+escH(name)+'</span>';}
+  const pad='  '.repeat(indent);
+  if(s.$ref){
+    if(seen.has(s.$ref))return pad+'<span style="color:#999">'+escH(s.$ref.split('/').pop())+'</span>';
+    const resolved=_swResolveRef(s.$ref,seen);
+    if(!resolved)return pad+'<span style="color:#6b6b6b">'+escH(s.$ref.split('/').pop())+'</span>';
+    const newSeen=new Set(seen);newSeen.add(s.$ref);
+    return _swSchemaView(resolved,indent,newSeen);
+  }
+  if(s.allOf||s.oneOf||s.anyOf){
+    const first=(s.allOf||s.oneOf||s.anyOf)[0];
+    return first?_swSchemaView(first,indent,seen):'<span style="color:#999">{}</span>';
+  }
   if(s.type==='object'||s.properties){
     const props=s.properties||{};
     const req=new Set(s.required||[]);
-    const lines=Object.entries(props).map(([k,p])=>{
-      const typeStr=p.$ref?(p.$ref.split('/').pop()):(p.type||(p.allOf?'allOf':p.oneOf?'oneOf':'object'));
-      const reqMark=req.has(k)?'<span style="color:#e53e3e">*</span>':'';
-      const desc=p.description?` <span style="color:#999;font-size:11px">// ${escH(p.description.substring(0,60))}</span>`:'';
-      return pad+'&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#555">'+escH(k)+'</span>'+reqMark+': <span style="color:#6b6b6b">'+escH(typeStr)+'</span>'+desc;
+    if(!Object.keys(props).length)return pad+'<span style="color:#999">{}</span>';
+    const lines=Object.entries(props).map(([k,v])=>{
+      const vResolved=v.$ref?(_swResolveRef(v.$ref,seen)||v):v;
+      const typeStr=v.$ref?v.$ref.split('/').pop():(vResolved.type||(vResolved.properties?'object':vResolved.type==='array'?'array':'any'));
+      const reqMark=req.has(k)?'<span style="color:#e53e3e;font-weight:700"> *</span>':'';
+      const enumStr=vResolved.enum?` = ${vResolved.enum.map(e=>JSON.stringify(e)).join(' | ')}`:'';
+      const desc=vResolved.description?` <span style="color:#aaa;font-size:11px">// ${escH(vResolved.description.substring(0,70))}</span>`:'';
+      return`${pad}  <span style="color:#555;font-weight:600">${escH(k)}</span>${reqMark}: <span style="color:#6b6b6b">${escH(typeStr)}</span><span style="color:#888">${escH(enumStr)}</span>${desc}`;
     });
-    return pad+'{\n'+lines.join('\n')+'\n'+pad+'}';
+    return`${pad}{\n${lines.join('\n')}\n${pad}}`;
   }
-  if(s.type==='array'){return pad+'[<br>'+_swSchemaView(s.items,indent+1)+'<br>'+pad+']';}
-  return pad+'<span style="color:#6b6b6b">'+escH(s.type||'object')+'</span>';
+  if(s.type==='array'){
+    return`${pad}Array [<br>${_swSchemaView(s.items||{},indent+1,seen)}<br>${pad}]`;
+  }
+  const typeStr=s.enum?escH(s.type||'string')+' ('+s.enum.map(e=>JSON.stringify(e)).join(' | ')+')':escH(s.type||'any');
+  return`${pad}<span style="color:#6b6b6b">${typeStr}</span>`;
 }
 
 function _swBodyTab(eid,tab,solid){
