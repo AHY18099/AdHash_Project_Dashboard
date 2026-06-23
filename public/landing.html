@@ -458,6 +458,36 @@ body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(24
 .qacl-item input[type=checkbox]{width:16px;height:16px;border-radius:4px;accent-color:#6366f1;cursor:pointer;flex-shrink:0;margin-top:1px}
 .qacl-item-lbl{font-size:13px;color:var(--txt);line-height:1.5;flex:1}
 .qacl-item.checked .qacl-item-lbl{text-decoration:line-through;color:var(--mut)}
+/* Evidence drawer */
+.qacl-ev-toggle{margin-left:auto;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(99,102,241,.09);border:1px solid rgba(99,102,241,.2);color:#6366f1;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s}
+.qacl-ev-toggle:hover{background:rgba(99,102,241,.18)}
+.qacl-ev-toggle.has-data{background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981}
+.qacl-ev-drawer{display:none;background:var(--card2);border:1px solid var(--border);border-radius:0 0 10px 10px;margin-top:-4px;padding:14px 16px 16px;border-top:2px solid rgba(99,102,241,.2)}
+.qacl-ev-drawer.open{display:block}
+.qacl-ev-row{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.qacl-ev-row:last-child{margin-bottom:0}
+.qacl-ev-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+.qacl-ev-label .req{color:#ef4444;margin-left:2px}
+.qacl-ev-input{width:100%;padding:7px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);color:var(--txt);font-size:12px;font-family:inherit;resize:vertical;transition:border-color .15s}
+.qacl-ev-input:focus{outline:none;border-color:#6366f1}
+.qacl-ev-radios{display:flex;gap:8px;flex-wrap:wrap}
+.qacl-ev-radio-opt{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:7px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-size:12px;font-weight:600;transition:all .15s}
+.qacl-ev-radio-opt:hover{border-color:#6366f1;background:rgba(99,102,241,.06)}
+.qacl-ev-radio-opt.selected-pass{border-color:rgba(16,185,129,.5);background:rgba(16,185,129,.1);color:#10b981}
+.qacl-ev-radio-opt.selected-fail{border-color:rgba(239,68,68,.5);background:rgba(239,68,68,.1);color:#ef4444}
+.qacl-ev-radio-opt.selected-na{border-color:rgba(100,116,139,.4);background:rgba(100,116,139,.08);color:var(--mut)}
+.qacl-ev-radio-opt.selected-medium{border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.1);color:#f59e0b}
+.qacl-ev-radio-opt.selected{border-color:rgba(99,102,241,.5);background:rgba(99,102,241,.1);color:#6366f1}
+.qacl-ev-tags{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.qacl-ev-tag{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);color:#6366f1;font-size:11px;font-weight:600}
+.qacl-ev-tag button{background:none;border:none;color:#6366f1;cursor:pointer;font-size:12px;line-height:1;padding:0}
+.qacl-ev-footer{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);gap:8px;flex-wrap:wrap}
+.qacl-ev-stamp{font-size:10px;color:var(--mut);font-style:italic}
+.qacl-ev-save-btn{padding:5px 14px;border-radius:7px;border:1.5px solid rgba(16,185,129,.4);background:rgba(16,185,129,.08);color:#10b981;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.qacl-ev-save-btn:hover{background:rgba(16,185,129,.18)}
+/* full-width evidence rows */
+.qacl-ev-row.full{grid-column:1/-1}
+@media(max-width:600px){.qacl-ev-drawer>div[style*="grid"]{grid-template-columns:1fr!important}}
 
 /* Summary cards */
 .qacl-metric-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px}
@@ -743,7 +773,496 @@ const QACL_STAGES=[
   ]}
 ];
 
-let _qaclData={};    // { [projId]: { [releaseId]: { s1:[true,false,...], s2:[], ... } } }
+// ─── EVIDENCE SCHEMA ────────────────────────────────────────────────────────
+// Each entry: { label, type, required?, options?, placeholder?, hint? }
+// types: textarea | text | url | radio | select | tags | bugfields | grid
+const QACL_EVIDENCE={
+  s1:{
+    0:[{label:'Business Requirement Document',type:'url',placeholder:'Link to BRD / Confluence / Notion page',hint:'Paste the URL of the requirement doc'},
+       {label:'Requirement Summary',type:'textarea',required:true,placeholder:'Summarise the business requirement in 2–3 sentences…'},
+       {label:'Stakeholder / Requester',type:'text',placeholder:'e.g. Product Owner: Ravi K.'},
+       {label:'Clarity Status',type:'radio',required:true,options:['Clear','Partially Clear','Needs Clarification']}],
+    1:[{label:'Acceptance Criteria Doc / Link',type:'url',placeholder:'Link to AC in Jira / Confluence'},
+       {label:'Acceptance Criteria (list each)',type:'textarea',required:true,placeholder:'AC1: …\nAC2: …\nAC3: …'},
+       {label:'Agreed by',type:'text',placeholder:'Product Owner / BA name'}],
+    2:[{label:'User Flow Diagram / Link',type:'url',placeholder:'Figma / Miro / Confluence flow link'},
+       {label:'User Flow Steps',type:'textarea',required:true,placeholder:'Step 1: User lands on …\nStep 2: User clicks …'},
+       {label:'Flow Confirmed by',type:'text',placeholder:'Developer / PO name'}],
+    3:[{label:'Roles & Permissions Matrix',type:'textarea',required:true,placeholder:'Admin: can do X, Y, Z\nEditor: can do X\nViewer: read-only'},
+       {label:'Reference Doc',type:'url',placeholder:'Link to roles doc if available'}],
+    4:[{label:'APIs Impacted',type:'textarea',required:true,placeholder:'GET /api/orders\nPOST /api/invoices — new endpoint'},
+       {label:'Database Tables / Collections',type:'textarea',placeholder:'orders, invoices (added field: discount_amount)'},
+       {label:'DB Change Script / Migration Link',type:'url',placeholder:'Link to migration or Confluence'}],
+    5:[{label:'Affected Modules',type:'tags',required:true,placeholder:'Add module and press Enter'},
+       {label:'Impact Assessment Notes',type:'textarea',placeholder:'Describe how each module is affected…'}],
+    6:[{label:'Positive Scenarios (list)',type:'textarea',required:true,placeholder:'1. Valid user creates order with correct data\n2. …'},
+       {label:'Scenario Count',type:'text',placeholder:'e.g. 8 positive scenarios'}],
+    7:[{label:'Negative Scenarios (list)',type:'textarea',required:true,placeholder:'1. Submit empty form — expect validation error\n2. Invalid email format — expect …'},
+       {label:'Scenario Count',type:'text',placeholder:'e.g. 6 negative scenarios'}],
+    8:[{label:'Edge Cases (list)',type:'textarea',required:true,placeholder:'1. Max character limit in name field\n2. Concurrent submission by two users\n3. …'},
+       {label:'Edge Case Count',type:'text',placeholder:'e.g. 5 edge cases'}],
+    9:[{label:'Performance Risks',type:'textarea',placeholder:'e.g. Bulk export with 10k records — potential timeout'},
+       {label:'Security Risks',type:'textarea',placeholder:'e.g. File upload — validate MIME type, size limit'},
+       {label:'Risk Level',type:'radio',required:true,options:['Low','Medium','High','Critical']}],
+    10:[{label:'Test Data Requirements',type:'textarea',required:true,placeholder:'Valid user accounts (roles: admin, editor, viewer)\nSample orders in each status…'},
+        {label:'Test Data Source',type:'radio',options:['Manual Creation','Seed Script','Production Snapshot','Staging Default']}],
+    11:[{label:'Automation Feasibility',type:'radio',required:true,options:['Fully Automatable','Partially Automatable','Manual Only']},
+        {label:'Automation Notes',type:'textarea',placeholder:'Which flows can be automated? Which require manual judgment?'},
+        {label:'Estimated Automation Coverage',type:'text',placeholder:'e.g. 70% — login, CRUD flows'}]
+  },
+  s2:{
+    0:[{label:'Critical Flows List',type:'textarea',required:true,placeholder:'1. Login / Auth\n2. Payment checkout\n3. Role-based data access'},
+       {label:'Reference',type:'url',placeholder:'Link to test plan or risk register'}],
+    1:[{label:'High-Risk Features',type:'textarea',required:true,placeholder:'1. Create invoice (data integrity)\n2. Delete user (irreversible)\n3. Export report (data accuracy)'}],
+    2:[{label:'Medium-Risk Areas',type:'textarea',required:true,placeholder:'1. Search results paging\n2. Date range filter\n3. Report generation'}],
+    3:[{label:'Low-Risk Areas',type:'textarea',required:true,placeholder:'1. Help text copy\n2. Button colours\n3. Tooltip wording'}],
+    4:[{label:'P0 Blocker Definition',type:'textarea',required:true,placeholder:'App crashes on login\nPayment flow broken\nData not saving'},
+       {label:'Example Scenarios',type:'textarea',placeholder:'List 2–3 example P0 scenarios for this release'}],
+    5:[{label:'P1 Major Issue Definition',type:'textarea',required:true,placeholder:'Export produces wrong data\nAdmin cannot see dashboard stats'},
+       {label:'Example Scenarios',type:'textarea',placeholder:'List 2–3 example P1 scenarios'}],
+    6:[{label:'P2 Partial Issue Definition',type:'textarea',required:true,placeholder:'Filter shows extra results (workaround: manual filter)\nSort order incorrect on edge case'},
+       {label:'Workaround Available?',type:'radio',options:['Yes','No','Partial']}],
+    7:[{label:'P3 Minor Issue Definition',type:'textarea',required:true,placeholder:'Button label spelling\nIcon alignment off by 2px'}],
+    8:[{label:'Risk Level per Feature (table)',type:'textarea',required:true,placeholder:'Feature | Risk | Reason\nLogin | P0 | Auth critical\nExport | P1 | Data integrity\nSearch | P2 | UX only'},
+       {label:'Risk Register Link',type:'url',placeholder:'Jira / Confluence risk register link'}],
+    9:[{label:'Test Priority Order',type:'textarea',required:true,placeholder:'1. Login & Auth (P0)\n2. Create / Edit / Delete (P1)\n3. Export & Reports (P1)\n4. Search & Filter (P2)\n5. UI / Text (P3)'},
+       {label:'Confirmed by',type:'text',placeholder:'QA Lead / Test Manager'}]
+  },
+  s3:{
+    0:[{label:'Test Cases Doc / Link',type:'url',placeholder:'TestRail / Confluence / Sheet link'},
+       {label:'Main Flow Test Cases (count)',type:'text',required:true,placeholder:'e.g. 12 test cases covering main flow'},
+       {label:'Notes',type:'textarea',placeholder:'Any gaps or pending cases…'}],
+    1:[{label:'Positive Test Case Count',type:'text',required:true,placeholder:'e.g. 15'},
+       {label:'Sample Cases',type:'textarea',placeholder:'TC-001: Valid form submission → success toast…'}],
+    2:[{label:'Negative Test Case Count',type:'text',required:true,placeholder:'e.g. 10'},
+       {label:'Sample Cases',type:'textarea',placeholder:'TC-021: Empty required field → validation error…'}],
+    3:[{label:'Boundary Cases',type:'textarea',required:true,placeholder:'Min: 1 char → accept\nMax: 255 chars → accept\n256 chars → reject'}],
+    4:[{label:'Empty State Cases',type:'textarea',required:true,placeholder:'Empty list → show "No data" placeholder\nEmpty form submit → show required field errors'}],
+    5:[{label:'Invalid Data Cases',type:'textarea',required:true,placeholder:'Invalid email format → error\nNegative quantity → error\nFuture date where not allowed → error'}],
+    6:[{label:'Permission Test Cases',type:'textarea',required:true,placeholder:'Admin: full access ✓\nEditor: no delete ✓\nViewer: read-only ✓\nUnauth: redirect to login ✓'}],
+    7:[{label:'Mobile / Responsive Cases',type:'textarea',required:true,placeholder:'iPhone 14 Pro 390px — form usable\nTablet 768px — layout ok\nLandscape mode tested'}],
+    8:[{label:'Browsers to Test',type:'tags',required:true,placeholder:'Add browser and press Enter'},
+       {label:'Browser Cases',type:'textarea',placeholder:'Chrome 124: pass\nFirefox 125: pass\nSafari 17: pending'}],
+    9:[{label:'Error Messages to Validate',type:'textarea',required:true,placeholder:'Required field: "This field is required"\nInvalid email: "Please enter a valid email address"'}],
+    10:[{label:'Network Failure Scenarios',type:'textarea',required:true,placeholder:'Offline during submit → show retry banner\nSlow 3G → loading spinner visible\nRequest timeout → user-friendly error'}],
+    11:[{label:'Affected Features (regression)',type:'tags',required:true,placeholder:'Add affected feature and press Enter'},
+        {label:'Regression Cases',type:'textarea',placeholder:'Feature A — 5 cases\nFeature B — 3 cases'}],
+    12:[{label:'Smoke Test Cases (list IDs)',type:'text',required:true,placeholder:'TC-001, TC-002, TC-005, TC-010'},
+        {label:'Smoke Suite Link',type:'url',placeholder:'Automation repo / TestRail smoke suite link'}],
+    13:[{label:'Regression Test Cases (list IDs)',type:'text',required:true,placeholder:'TC-020 – TC-050'},
+        {label:'Regression Suite Link',type:'url',placeholder:'Automation regression suite link'}],
+    14:[{label:'Test Data Details',type:'textarea',required:true,placeholder:'User accounts: admin@test.com / editor@test.com\nSample orders: IDs 1001–1010\nPayment card: 4242 4242 4242 4242'},
+        {label:'Data Source',type:'radio',options:['Manual','Seed Script','Staging']}],
+    15:[{label:'Reusable Methods / Helpers',type:'textarea',placeholder:'loginAs(role), createOrder(data), assertToast(msg)'},
+        {label:'Automation Repo Link',type:'url',placeholder:'GitHub repo or folder link'}],
+    16:[{label:'API Tests Required',type:'textarea',placeholder:'POST /api/orders — 3 cases\nGET /api/orders/:id — 2 cases'},
+        {label:'API Test Tool',type:'radio',options:['Postman','Newman','Supertest','Other']}],
+    17:[{label:'Updated Scripts',type:'textarea',placeholder:'Updated login.spec.js — added new role\nUpdated order.spec.js — added discount field'},
+        {label:'PR / Commit Link',type:'url',placeholder:'GitHub PR or commit link'}]
+  },
+  s4:{
+    0:[{label:'PR / Code Review Link',type:'url',required:true,placeholder:'GitHub PR link'},
+       {label:'Reviewed by',type:'text',required:true,placeholder:'Reviewer name'},
+       {label:'Review Notes',type:'textarea',placeholder:'Key comments or changes requested…'}],
+    1:[{label:'Unit Test Coverage %',type:'text',required:true,placeholder:'e.g. 78%'},
+       {label:'Unit Test Report Link',type:'url',placeholder:'Coverage report link'}],
+    2:[{label:'Demo / Loom Link',type:'url',placeholder:'Demo video or screenshot link'},
+       {label:'Dev Notes',type:'textarea',required:true,placeholder:'What was built, key decisions, known limitations…'}],
+    3:[{label:'Positive Flow Verification',type:'radio',required:true,options:['Verified','Partially Verified','Not Verified']},
+       {label:'Verified by (Dev)',type:'text',placeholder:'Developer name'}],
+    4:[{label:'Negative Flow Verification',type:'radio',required:true,options:['Verified','Partially Verified','Not Verified']},
+       {label:'Notes',type:'textarea',placeholder:'Which negative cases were tested by dev?'}],
+    5:[{label:'API Response Sample',type:'textarea',placeholder:'Paste sample API response or Postman collection link…'},
+       {label:'Postman Collection Link',type:'url',placeholder:'Postman / Swagger link'}],
+    6:[{label:'DB Changes Description',type:'textarea',required:true,placeholder:'Added column: discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0\nIndex added on: orders.created_at'},
+       {label:'Migration Script Link',type:'url',placeholder:'Migration file link'}],
+    7:[{label:'Impacted Functionality Checked',type:'tags',required:true,placeholder:'Add checked module and press Enter'},
+       {label:'Dev Test Notes',type:'textarea',placeholder:'Module A: confirmed no regression\nModule B: minor display fix needed'}],
+    8:[{label:'Console Errors Present?',type:'radio',required:true,options:['None — Clean','Fixed Before Handoff','Known / Acceptable']},
+       {label:'Details',type:'textarea',placeholder:'List any known console warnings and reason for acceptance…'}],
+    9:[{label:'Build Status',type:'radio',required:true,options:['Stable','Unstable — Hotfix Pending','Failed']},
+       {label:'Build Number / Version',type:'text',required:true,placeholder:'e.g. v2.4.1-build-44'},
+       {label:'Build Link / CI Log',type:'url',placeholder:'GitHub Actions / Railway / Jenkins link'}],
+    10:[{label:'Known Limitations',type:'textarea',required:true,placeholder:'1. Bulk export > 5000 rows may timeout (fix in next sprint)\n2. Mobile layout on 320px not optimised yet'},
+        {label:'Limitation Impact',type:'radio',options:['None — Low risk','Acceptable for this release','Must be fixed before release']}],
+    11:[{label:'Feature Name',type:'text',required:true,placeholder:'e.g. Invoice Discount Module'},
+        {label:'Build Number',type:'text',required:true,placeholder:'e.g. v2.4.1'},
+        {label:'Release Date (planned)',type:'text',placeholder:'e.g. 2026-06-30'}],
+    12:[{label:'Changed Modules',type:'tags',required:true,placeholder:'Add module and press Enter'}],
+    13:[{label:'New APIs (list)',type:'textarea',required:true,placeholder:'POST /api/discounts — creates discount rule\nGET /api/discounts/:id — fetch single rule'},
+        {label:'API Docs Link',type:'url',placeholder:'Swagger / Postman collection link'}],
+    14:[{label:'DB Change Summary',type:'textarea',required:true,placeholder:'Table: discounts\nNew columns: code, value, type, expires_at\nIndex: code (unique)'},
+        {label:'ERD / Schema Link',type:'url',placeholder:'DB schema or migration link'}],
+    15:[{label:'Test Credentials',type:'textarea',required:true,placeholder:'admin@test.com / Test@123\neditor@test.com / Test@123\nTest card: 4242 4242 4242 4242 exp 12/26 cvv 123'},
+        {label:'Test Data Description',type:'textarea',placeholder:'10 sample orders in status: draft, pending, paid, cancelled'}],
+    16:[{label:'Regression Impact Areas',type:'tags',required:true,placeholder:'Add impacted area and press Enter'},
+        {label:'Estimated Regression Risk',type:'radio',required:true,options:['Low','Medium','High']}]
+  },
+  s5:{
+    0:[{label:'Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'Screenshot / Log Link',type:'url',placeholder:'Screenshot or CI log link'},
+       {label:'Notes',type:'textarea',placeholder:'Any warnings on open…'}],
+    1:[{label:'Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'Test Credentials Used',type:'text',placeholder:'e.g. admin@test.com'},
+       {label:'Notes',type:'textarea',placeholder:'Any 2FA, captcha or redirect issue…'}],
+    2:[{label:'Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'Load Time (approx)',type:'text',placeholder:'e.g. ~1.2 sec'},
+       {label:'Screenshot',type:'url',placeholder:'Screenshot link'}],
+    3:[{label:'Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'Menus Tested',type:'tags',placeholder:'Add menu name and press Enter'},
+       {label:'Notes',type:'textarea',placeholder:'Any menu that failed to open or navigate…'}],
+    4:[{label:'Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'APIs Tested',type:'textarea',placeholder:'GET /api/dashboard — 200 OK\nGET /api/projects — 200 OK'},
+       {label:'Network Screenshot',type:'url',placeholder:'DevTools network tab screenshot'}],
+    5:[{label:'Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'Create Flow Tested',type:'text',placeholder:'e.g. Create Invoice flow'},
+       {label:'Notes',type:'textarea',placeholder:'Steps executed, result observed…'}],
+    6:[{label:'Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'Search / Filter Used',type:'text',placeholder:'e.g. Invoice search by customer name'},
+       {label:'Notes',type:'textarea',placeholder:'Result as expected?'}],
+    7:[{label:'Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'Edit Flow Tested',type:'text',placeholder:'e.g. Edit Invoice → save changes'},
+       {label:'Notes',type:'textarea',placeholder:'Steps and result…'}],
+    8:[{label:'Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'Notes',type:'textarea',placeholder:'Any session cleanup issues after logout?'}],
+    9:[{label:'Overall Smoke Result',type:'radio',required:true,options:['PASS — QA Testing Begins','FAIL — Build Rejected']},
+       {label:'Test Date',type:'text',placeholder:'e.g. 2026-06-23'},
+       {label:'Tester',type:'text',required:true,placeholder:'Tester name'},
+       {label:'Build Number',type:'text',required:true,placeholder:'e.g. v2.4.1-build-44'}],
+    10:[{label:'Rejection Reason',type:'textarea',placeholder:'Required only if build was rejected — describe failure…'},
+        {label:'Returned to Dev',type:'radio',options:['Yes','N/A']},
+        {label:'Dev Notified',type:'text',placeholder:'Dev name / Slack notification time'}]
+  },
+  s6:{
+    0:[{label:'Priority 1 Test Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+       {label:'Main Business Flow Tested',type:'textarea',required:true,placeholder:'Describe the main flow tested step by step…'},
+       {label:'Evidence Link',type:'url',placeholder:'Screenshot / video / TestRail link'}],
+    1:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+       {label:'Data Created (sample)',type:'text',placeholder:'e.g. Invoice #1042, Order #2201'},
+       {label:'Screenshot',type:'url',placeholder:'Screenshot of created data'}],
+    2:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+       {label:'Data Modified (sample)',type:'text',placeholder:'e.g. Invoice #1042 status changed to Paid'},
+       {label:'Screenshot',type:'url',placeholder:'Screenshot of modification'}],
+    3:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+       {label:'Deletion Tested',type:'text',placeholder:'e.g. Deleted test Order #2201'},
+       {label:'Undo / Confirm Dialog',type:'radio',options:['Present','Not Present','N/A']},
+       {label:'Screenshot',type:'url',placeholder:'Screenshot of delete confirmation'}],
+    4:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+       {label:'Calculations Verified',type:'textarea',required:true,placeholder:'Invoice total: base 100 + 18% GST = 118 ✓\nDiscount 10% on 118 = 106.2 ✓'},
+       {label:'Screenshot',type:'url',placeholder:'Screenshot of calculation result'}],
+    5:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+       {label:'Workflow Steps Tested',type:'textarea',required:true,placeholder:'Draft → Pending → Approved → Paid — all transitions verified'},
+       {label:'Screenshot',type:'url',placeholder:'Screenshot / video link'}],
+    6:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+       {label:'Discrepancies Found',type:'textarea',placeholder:'e.g. UI shows 10 items but API returns 11 — BUG #42'},
+       {label:'Screenshot',type:'url',placeholder:'Screenshot of UI vs API comparison'}],
+    7:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+       {label:'DB Verification Method',type:'radio',options:['Direct DB Query','Admin Panel','API Response']},
+       {label:'Sample Verification',type:'textarea',placeholder:'db.orders.findOne({_id:"..."}) → matches API response ✓'}],
+    8:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+       {label:'Export File Checked',type:'text',placeholder:'e.g. invoices_export_2026-06.xlsx'},
+       {label:'Verification Notes',type:'textarea',placeholder:'Row count matches UI: 47 rows ✓\nCalculations correct ✓\nFormatting correct ✓'}],
+    9:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+       {label:'Dashboard Stats Verified',type:'textarea',required:true,placeholder:'Total revenue: UI $12,450 = DB SUM(amount) $12,450 ✓'},
+       {label:'Screenshot',type:'url',placeholder:'Screenshot of dashboard with DB verification'}],
+    10:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+        {label:'Invalid Inputs Tested',type:'textarea',required:true,placeholder:'SQL injection attempt → sanitised ✓\nXSS script tag → escaped ✓\nOverlong string → truncated / rejected ✓'}],
+    11:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+        {label:'Empty Input Cases',type:'textarea',required:true,placeholder:'Submit empty form → required field errors shown ✓\nEmpty search → all results shown ✓'}],
+    12:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+        {label:'Duplicate Actions Tested',type:'textarea',required:true,placeholder:'Double-click submit → only 1 order created ✓\nDuplicate email registration → error message ✓'}],
+    13:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+        {label:'Roles Tested',type:'tags',required:true,placeholder:'Add role and press Enter'},
+        {label:'Restriction Verified',type:'textarea',placeholder:'Viewer cannot access /admin → redirected ✓\nEditor cannot delete → button hidden ✓'}],
+    14:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+        {label:'Integration Tested',type:'text',placeholder:'e.g. Stripe payment — test card 4242 4242 4242 4242'},
+        {label:'Notes',type:'textarea',placeholder:'Email delivery confirmed ✓\nPayment recorded in Stripe dashboard ✓'}],
+    15:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+        {label:'API Tested',type:'text',placeholder:'e.g. ApyHub credits monitor — GET /apyhub/credits'},
+        {label:'Response Code',type:'text',placeholder:'e.g. 200 OK'},
+        {label:'Notes',type:'textarea',placeholder:'Response time: 240ms ✓\nData format correct ✓'}],
+    16:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+        {label:'Storage Service',type:'text',placeholder:'e.g. AWS S3 / Cloudinary / Railway Volume'},
+        {label:'Upload Test',type:'text',placeholder:'e.g. 2.4MB PDF uploaded — URL returned correctly'},
+        {label:'Download Test',type:'text',placeholder:'e.g. File downloaded — byte size matches ✓'}],
+    17:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+        {label:'Notifications Tested',type:'textarea',placeholder:'Email notification: received within 30s ✓\nIn-app notification: shown correctly ✓\nPush: delivered on mobile ✓'}],
+    18:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+        {label:'Responsive Breakpoints',type:'tags',placeholder:'Add breakpoint and press Enter'},
+        {label:'Layout Issues',type:'textarea',placeholder:'None found OR describe issues…'}],
+    19:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+        {label:'Loading States Observed',type:'textarea',placeholder:'Button disabled during submit ✓\nSkeleton loader on list ✓\nSpinner on API call ✓'}],
+    20:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+        {label:'Devices Tested',type:'tags',placeholder:'Add device and press Enter'},
+        {label:'Notes',type:'textarea',placeholder:'iPhone 14 390px — usable ✓\nSamsung S22 — usable ✓'}],
+    21:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','Partial','Skip']},
+        {label:'Browsers Tested',type:'tags',placeholder:'Add browser version and press Enter'},
+        {label:'Issues Found',type:'textarea',placeholder:'None OR describe browser-specific issues…'}]
+  },
+  s7:{
+    0:[{label:'Positive Scenario Coverage',type:'text',required:true,placeholder:'e.g. 15/15 scenarios passed'},
+       {label:'Notes',type:'textarea',placeholder:'Any edge scenarios still pending…'}],
+    1:[{label:'Negative Scenario Coverage',type:'text',required:true,placeholder:'e.g. 10/10 scenarios passed'}],
+    2:[{label:'Boundary Cases Results',type:'textarea',required:true,placeholder:'Min boundary: pass\nMax boundary: pass\nOver max: rejected correctly ✓'}],
+    3:[{label:'Business Rules Verified',type:'textarea',required:true,placeholder:'Rule 1: Invoice total = sum(lines) + tax ✓\nRule 2: Discount cannot exceed 50% ✓'}],
+    4:[{label:'Admin Role — Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
+       {label:'Admin Scenarios Tested',type:'textarea',placeholder:'Create, edit, delete, export, manage users — all tested'}],
+    5:[{label:'Standard User — Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
+       {label:'Standard User Scenarios',type:'textarea',placeholder:'Create, edit own records — tested\nCannot access admin panel — verified'}],
+    6:[{label:'Restricted User — Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
+       {label:'Restrictions Verified',type:'textarea',placeholder:'Read-only access confirmed\nDelete button hidden ✓\nExport disabled ✓'}],
+    7:[{label:'Unauthenticated User — Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
+       {label:'Verification',type:'textarea',placeholder:'Direct URL access → redirected to /login ✓\nAPI without token → 401 Unauthorised ✓'}],
+    8:[{label:'Valid Data Test Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
+       {label:'Data Sets Used',type:'textarea',placeholder:'Valid email, valid phone, valid date ranges…'}],
+    9:[{label:'Invalid Data Test Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
+       {label:'Invalid Data Tested',type:'textarea',placeholder:'XSS: <script>alert(1)</script> → sanitised ✓\nSQL: \' OR 1=1 -- → rejected ✓'}],
+    10:[{label:'Empty & Duplicate Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
+        {label:'Cases Tested',type:'textarea',placeholder:'Empty required fields → validation ✓\nDuplicate email → unique constraint error ✓'}],
+    11:[{label:'Special Characters Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
+        {label:'Characters Tested',type:'textarea',placeholder:'Arabic text ✓, Chinese characters ✓, Emojis ✓, Long string (500 chars) ✓'}],
+    12:[{label:'Chrome Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
+        {label:'Chrome Version',type:'text',placeholder:'e.g. Chrome 124.0'}],
+    13:[{label:'Edge Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
+        {label:'Edge Version',type:'text',placeholder:'e.g. Edge 124.0'}],
+    14:[{label:'Desktop Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
+        {label:'Resolution Tested',type:'text',placeholder:'e.g. 1920×1080, 1440×900'}],
+    15:[{label:'Mobile Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
+        {label:'Devices Tested',type:'tags',placeholder:'Add device and press Enter'}],
+    16:[{label:'Real Device Validation',type:'radio',required:true,options:['Done','Not Done','N/A']},
+        {label:'Devices Used',type:'text',placeholder:'e.g. iPhone 14 Pro, Samsung Galaxy S22'}],
+    17:[{label:'API Integration Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
+        {label:'APIs Tested',type:'textarea',placeholder:'All endpoints listed in Stage 1 — verified ✓'}],
+    18:[{label:'DB Verification Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
+        {label:'Verification Method',type:'radio',options:['Direct Query','Admin Panel','API Response']},
+        {label:'Sample Query Result',type:'textarea',placeholder:'Paste sample query and result…'}],
+    19:[{label:'File Upload/Download Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+        {label:'Max File Size Tested',type:'text',placeholder:'e.g. 10MB PDF — uploaded in 2.1s'}],
+    20:[{label:'Performance Result',type:'radio',required:true,options:['Pass','Acceptable','Fail','N/A']},
+        {label:'Key Metrics',type:'textarea',placeholder:'Dashboard load: 1.2s ✓\nList with 1000 rows: 2.1s ✓\nExport 5000 rows: 8.3s (acceptable)'}],
+    21:[{label:'Security Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+        {label:'Security Checks',type:'textarea',placeholder:'XSS: protected ✓\nCSRF: token present ✓\nSensitive data in logs: none ✓\nHTTPS only: yes ✓'}],
+    22:[{label:'Session Management Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+        {label:'Cases Tested',type:'textarea',placeholder:'Session expiry → redirect to login ✓\nInvalid token → 401 ✓\nLogout clears token ✓'}]
+  },
+  s8:{
+    0:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+       {label:'Observed Behaviour',type:'textarea',placeholder:'Double-click on submit → only 1 record created ✓ OR describe bug found'}],
+    1:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+       {label:'Observed Behaviour',type:'textarea',placeholder:'Refresh mid-submit → form re-submits correctly OR data lost — BUG #xx'}],
+    2:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+       {label:'Observed Behaviour',type:'textarea',placeholder:'Back → previous state retained ✓\nForward → correct page ✓'}],
+    3:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+       {label:'Observed Behaviour',type:'textarea',placeholder:'Two tabs: changes in tab 1 reflected in tab 2 (or not — as designed) ✓'}],
+    4:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+       {label:'Expiry Behaviour',type:'textarea',placeholder:'After 30min idle → session expired message shown ✓\nRedirected to login ✓'}],
+    5:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+       {label:'Slow Network Tool Used',type:'radio',options:['Chrome DevTools','Charles Proxy','Real Network','Other']},
+       {label:'Observed Behaviour',type:'textarea',placeholder:'Submit on slow 3G → loading spinner shown, no duplicate ✓'}],
+    6:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+       {label:'Observed Behaviour',type:'textarea',placeholder:'Disconnect during upload → error shown, data not corrupted ✓'}],
+    7:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+       {label:'Repeated Login Behaviour',type:'textarea',placeholder:'10 successive logins — no memory leak, no session issue ✓'}],
+    8:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+       {label:'Max Chars Tested',type:'text',placeholder:'e.g. 5000 characters in description field'},
+       {label:'Observed Behaviour',type:'textarea',placeholder:'Text wraps correctly ✓ / Truncated at 255 with message ✓'}],
+    9:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+       {label:'Special Chars Tested',type:'text',placeholder:'e.g. <script>, \'OR 1=1--, Arabic, Emoji'},
+       {label:'Observed Behaviour',type:'textarea',placeholder:'Sanitised / escaped correctly ✓'}],
+    10:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+        {label:'File Size Tested',type:'text',placeholder:'e.g. 50MB file upload attempt'},
+        {label:'Observed Behaviour',type:'textarea',placeholder:'Rejected with "File too large" message ✓ OR timeout occurred — BUG'}],
+    11:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+        {label:'Invalid Formats Tested',type:'tags',placeholder:'Add format and press Enter'},
+        {label:'Observed Behaviour',type:'textarea',placeholder:'exe file → rejected ✓\nphp file → rejected ✓\nAll non-allowed types → error message ✓'}],
+    12:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+        {label:'Navigation Tested',type:'textarea',placeholder:'Click browser close during form → unsaved changes warning ✓\nNavigate away mid-upload → handled gracefully ✓'}],
+    13:[{label:'Result',type:'radio',required:true,options:['Pass','Fail','N/A']},
+        {label:'Concurrent Users',type:'text',placeholder:'e.g. 2 users editing same record simultaneously'},
+        {label:'Observed Behaviour',type:'textarea',placeholder:'Last write wins — noted ✓ OR optimistic lock error shown ✓'}]
+  },
+  s9:{
+    0:[{label:'Bug Title',type:'text',required:true,placeholder:'Short descriptive title of the bug'},
+       {label:'Bug Tracker Link',type:'url',placeholder:'Jira / Linear / GitHub Issue link'}],
+    1:[{label:'Environment',type:'radio',required:true,options:['Production','Staging','Dev','Local']},
+       {label:'Build / Version Number',type:'text',required:true,placeholder:'e.g. v2.4.1-build-44'}],
+    2:[{label:'Steps to Reproduce',type:'textarea',required:true,placeholder:'1. Login as admin\n2. Navigate to Invoices\n3. Click Export\n4. Select date range: last 30 days\n5. Click Download\n→ Result: 404 error'},
+       {label:'Reproducibility',type:'radio',options:['Always','Sometimes (Flaky)','Once only']}],
+    3:[{label:'Expected Result',type:'textarea',required:true,placeholder:'Export file (invoices_export.xlsx) should download successfully'},
+       {label:'Actual Result',type:'textarea',required:true,placeholder:'404 Not Found error — no file downloaded'}],
+    4:[{label:'Severity',type:'radio',required:true,options:['P0 — Critical','P1 — Major','P2 — Partial','P3 — Minor']},
+       {label:'Priority',type:'radio',required:true,options:['Urgent (same day)','High (this sprint)','Medium (next sprint)','Low (backlog)']}],
+    5:[{label:'Screenshot / Video Link',type:'url',required:true,placeholder:'Screenshot or Loom video link'},
+       {label:'Steps Screenshot',type:'url',placeholder:'Additional screenshot (optional)'}],
+    6:[{label:'Console Error Text',type:'textarea',placeholder:'Paste the full console error here…'},
+       {label:'Console Screenshot',type:'url',placeholder:'Console screenshot link'}],
+    7:[{label:'API / Network Error',type:'textarea',placeholder:'Status: 404\nEndpoint: GET /api/export?range=30d\nResponse: {"error":"route not found"}'},
+       {label:'Network Screenshot',type:'url',placeholder:'DevTools network tab screenshot'}],
+    8:[{label:'Retest Result',type:'radio',required:true,options:['Pass — Fixed','Fail — Still Present','Partial Fix']},
+       {label:'Retest Date',type:'text',required:true,placeholder:'e.g. 2026-06-24'},
+       {label:'Retested by',type:'text',required:true,placeholder:'Tester name'},
+       {label:'Retest Notes',type:'textarea',placeholder:'Fix verified on staging — awaiting production deploy'}],
+    9:[{label:'Related Screen Retest',type:'radio',required:true,options:['Pass','Fail','Not Tested']},
+       {label:'Screens Retested',type:'tags',placeholder:'Add screen name and press Enter'}],
+    10:[{label:'Related API Retest',type:'radio',required:true,options:['Pass','Fail','N/A']},
+        {label:'APIs Retested',type:'textarea',placeholder:'GET /api/export — 200 OK ✓\nGET /api/export?range=90d — 200 OK ✓'}],
+    11:[{label:'Related Role Retest',type:'radio',required:true,options:['Pass','Fail','N/A']},
+        {label:'Roles Retested',type:'tags',placeholder:'Add role and press Enter'}],
+    12:[{label:'Calculation Retest',type:'radio',required:true,options:['Pass','Fail','N/A']},
+        {label:'Calculations Verified',type:'textarea',placeholder:'Invoice total recalculated correctly after discount fix ✓'}],
+    13:[{label:'Workflow Retest',type:'radio',required:true,options:['Pass','Fail','N/A']},
+        {label:'Workflows Tested',type:'textarea',placeholder:'Draft → Pending → Approved → still works ✓'}],
+    14:[{label:'Mobile / Browser Retest',type:'radio',required:true,options:['Pass','Fail','N/A']},
+        {label:'Platforms Retested',type:'tags',placeholder:'Add platform and press Enter'}],
+    15:[{label:'Automation Case Added?',type:'radio',required:true,options:['Yes — Added','No — Too Complex','Deferred','N/A']},
+        {label:'Automation Test Reference',type:'text',placeholder:'e.g. test/export.spec.js — TC-047'},
+        {label:'PR / Commit Link',type:'url',placeholder:'GitHub PR link for automation case'}]
+  },
+  s10:{
+    0:[{label:'Script Reference',type:'text',required:true,placeholder:'e.g. test/auth/login.spec.js'},
+       {label:'Coverage',type:'text',placeholder:'e.g. Valid login, invalid password, 2FA, session'},
+       {label:'Last Run Status',type:'radio',required:true,options:['Pass','Fail','Not Yet Run']}],
+    1:[{label:'Script Reference',type:'text',required:true,placeholder:'e.g. test/dashboard/load.spec.js'},
+       {label:'Coverage',type:'text',placeholder:'e.g. Dashboard renders, all widgets load, no console errors'},
+       {label:'Last Run Status',type:'radio',required:true,options:['Pass','Fail','Not Yet Run']}],
+    2:[{label:'Script Reference',type:'text',required:true,placeholder:'e.g. test/navigation/menu.spec.js'},
+       {label:'Coverage',type:'text',placeholder:'e.g. All nav links, breadcrumbs, back navigation'},
+       {label:'Last Run Status',type:'radio',required:true,options:['Pass','Fail','Not Yet Run']}],
+    3:[{label:'Script Reference',type:'text',required:true,placeholder:'e.g. test/invoices/crud.spec.js'},
+       {label:'Coverage',type:'text',placeholder:'e.g. Create, edit, delete — all CRUD operations'},
+       {label:'Last Run Status',type:'radio',required:true,options:['Pass','Fail','Not Yet Run']}],
+    4:[{label:'Script Reference',type:'text',required:true,placeholder:'e.g. test/invoices/search.spec.js'},
+       {label:'Coverage',type:'text',placeholder:'e.g. Search by name, filter by date, clear filter'},
+       {label:'Last Run Status',type:'radio',required:true,options:['Pass','Fail','Not Yet Run']}],
+    5:[{label:'Script Reference',type:'text',required:true,placeholder:'e.g. test/auth/permissions.spec.js'},
+       {label:'Roles Covered',type:'tags',placeholder:'Add role and press Enter'},
+       {label:'Last Run Status',type:'radio',required:true,options:['Pass','Fail','Not Yet Run']}],
+    6:[{label:'Script Reference',type:'text',required:true,placeholder:'e.g. test/payment/checkout.spec.js'},
+       {label:'Test Mode Cards Used',type:'text',placeholder:'e.g. Stripe test card 4242 4242 4242 4242'},
+       {label:'Last Run Status',type:'radio',required:true,options:['Pass','Fail','N/A']}],
+    7:[{label:'Script Reference',type:'text',required:true,placeholder:'e.g. test/invoices/export.spec.js'},
+       {label:'File Types Tested',type:'tags',placeholder:'Add file type and press Enter'},
+       {label:'Last Run Status',type:'radio',required:true,options:['Pass','Fail','N/A']}],
+    8:[{label:'API Test Suite',type:'text',required:true,placeholder:'e.g. test/api/invoices.api.spec.js'},
+       {label:'Endpoints Covered',type:'textarea',placeholder:'GET /api/invoices — 200, 401, 404\nPOST /api/invoices — 201, 400, 422'},
+       {label:'Last Run Status',type:'radio',required:true,options:['Pass','Fail','Not Yet Run']}],
+    9:[{label:'Bug Scenario Reference',type:'text',required:true,placeholder:'e.g. BUG-42 → test/regression/export-404.spec.js'},
+       {label:'Last Run Status',type:'radio',required:true,options:['Pass','Fail','Not Yet Run']}],
+    10:[{label:'Repeated Scenarios',type:'textarea',placeholder:'e.g. Pagination — TC-055, TC-056, TC-057 added after repeated P2 bugs'},
+        {label:'Last Run Status',type:'radio',required:true,options:['Pass','Fail','Not Yet Run']}],
+    11:[{label:'Smoke Suite CI Config',type:'url',placeholder:'GitHub Actions / CI config link'},
+        {label:'Trigger',type:'text',placeholder:'e.g. On every push to main branch'},
+        {label:'Status',type:'radio',required:true,options:['Configured & Running','Configured — Not Running','Not Configured']}],
+    12:[{label:'Critical Regression CI Config',type:'url',placeholder:'CI workflow config link'},
+        {label:'Trigger',type:'text',placeholder:'e.g. On every PR to main'},
+        {label:'Status',type:'radio',required:true,options:['Configured & Running','Configured — Not Running','Not Configured']}],
+    13:[{label:'API Suite CI Config',type:'url',placeholder:'CI workflow config link'},
+        {label:'Trigger',type:'text',placeholder:'e.g. On every PR to main'},
+        {label:'Status',type:'radio',required:true,options:['Configured & Running','Configured — Not Running','Not Configured']}],
+    14:[{label:'Nightly Full Regression',type:'url',placeholder:'CI nightly schedule config link'},
+        {label:'Schedule',type:'text',placeholder:'e.g. Every night at 02:00 UTC'},
+        {label:'Status',type:'radio',required:true,options:['Configured & Running','Configured — Not Running','Not Configured']}],
+    15:[{label:'Cross-Browser Suite',type:'url',placeholder:'CI cross-browser config link'},
+        {label:'Browsers in Suite',type:'tags',placeholder:'Add browser and press Enter'},
+        {label:'Status',type:'radio',required:true,options:['Configured & Running','Configured — Not Running','Not Configured']}],
+    16:[{label:'Production Sanity Config',type:'url',placeholder:'CI post-deploy sanity config link'},
+        {label:'Trigger',type:'text',placeholder:'e.g. After Railway deploy completes'},
+        {label:'Status',type:'radio',required:true,options:['Configured & Running','Configured — Not Running','Not Configured']}]
+  },
+  s11:{
+    0:[{label:'Deployment Status',type:'radio',required:true,options:['Successful','Failed','In Progress']},
+       {label:'Deploy Log / Link',type:'url',placeholder:'Railway / CI deploy log link'},
+       {label:'Deployed By',type:'text',placeholder:'Dev / CI bot name'},
+       {label:'Deploy Time',type:'text',placeholder:'e.g. 2026-06-23 14:35 UTC'}],
+    1:[{label:'Smoke Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'Smoke Report Link',type:'url',placeholder:'CI smoke test report link'},
+       {label:'Run Time',type:'text',placeholder:'e.g. 2m 14s'}],
+    2:[{label:'Environment Status',type:'radio',required:true,options:['Stable','Degraded','Down']},
+       {label:'Environment URL',type:'url',placeholder:'Staging / production environment URL'},
+       {label:'Monitoring Link',type:'url',placeholder:'UptimeRobot / Datadog / Railway metrics link'}],
+    3:[{label:'AC Verification Status',type:'radio',required:true,options:['All Pass','Partial Pass','Fail']},
+       {label:'AC Report / Link',type:'url',placeholder:'TestRail / Confluence AC sign-off link'},
+       {label:'Approved by',type:'text',required:true,placeholder:'Product Owner / BA name'}],
+    4:[{label:'Functional Testing Status',type:'radio',required:true,options:['Complete','In Progress','Not Started']},
+       {label:'Test Report Link',type:'url',placeholder:'Test summary report link'},
+       {label:'Total Cases',type:'text',placeholder:'e.g. 87 pass, 3 fail, 2 blocked'}],
+    5:[{label:'API & Data Validation Status',type:'radio',required:true,options:['Complete','Partial','Not Done']},
+       {label:'API Test Report',type:'url',placeholder:'Postman / Newman run report link'}],
+    6:[{label:'Roles Validated',type:'tags',required:true,placeholder:'Add role and press Enter'},
+       {label:'Validation Result',type:'radio',required:true,options:['All Pass','Partial','Fail']}],
+    7:[{label:'Critical Regression Status',type:'radio',required:true,options:['Pass','Fail','Partial']},
+       {label:'Regression Report Link',type:'url',placeholder:'CI regression run report link'},
+       {label:'Failed Cases',type:'text',placeholder:'e.g. 0 failures OR list case IDs'}],
+    8:[{label:'Affected Modules Status',type:'radio',required:true,options:['All Pass','Some Fail','Not Tested']},
+       {label:'Modules Verified',type:'tags',placeholder:'Add verified module and press Enter'},
+       {label:'Failures',type:'textarea',placeholder:'None OR describe failures found'}],
+    9:[{label:'Automation Failures Analysed?',type:'radio',required:true,options:['Yes — All Accounted For','Yes — Some Unexplained','No — Failures Present']},
+       {label:'Failure Analysis Notes',type:'textarea',placeholder:'Flaky test: TC-023 — timing issue, not a product bug\nTC-045 — environment timeout, rerun passed'}],
+    10:[{label:'Fixed Bugs Retest Status',type:'radio',required:true,options:['All Retested & Pass','Some Pending','Not Done']},
+        {label:'Bug List',type:'textarea',placeholder:'BUG-38 — retested ✓\nBUG-42 — retested ✓\nBUG-45 — pending retest'}],
+    11:[{label:'Performance Result',type:'radio',required:true,options:['Pass','Acceptable','Fail','N/A']},
+        {label:'Performance Report',type:'url',placeholder:'Lighthouse / k6 / JMeter report link'},
+        {label:'Key Metrics',type:'textarea',placeholder:'LCP: 1.8s ✓\nFID: 45ms ✓\nCLS: 0.05 ✓'}],
+    12:[{label:'Security Result',type:'radio',required:true,options:['Pass','Issues Found','N/A']},
+        {label:'Security Scan Report',type:'url',placeholder:'OWASP ZAP / security audit report link'},
+        {label:'Issues Found',type:'textarea',placeholder:'None OR describe issues and mitigations'}],
+    13:[{label:'Browser Compatibility Result',type:'radio',required:true,options:['Pass','Issues Found','N/A']},
+        {label:'Browsers Tested',type:'tags',placeholder:'Add browser and press Enter'},
+        {label:'Issues',type:'textarea',placeholder:'None OR describe browser-specific issues'}],
+    14:[{label:'Mobile Responsiveness Result',type:'radio',required:true,options:['Pass','Issues Found','N/A']},
+        {label:'Devices Tested',type:'tags',placeholder:'Add device and press Enter'},
+        {label:'Issues',type:'textarea',placeholder:'None OR describe layout issues found'}],
+    15:[{label:'Open Critical Bugs',type:'radio',required:true,options:['None — GO','Present — NO-GO']},
+        {label:'Bug List (if any)',type:'textarea',placeholder:'BUG-50 — critical export crash — OPEN'}],
+    16:[{label:'High Bugs Blocking Main Flow',type:'radio',required:true,options:['None','Present — with workaround','Present — blocking']},
+        {label:'Bug List (if any)',type:'textarea',placeholder:'BUG-48 — P1 filter issue — workaround: use search'}],
+    17:[{label:'Known Risks',type:'textarea',required:true,placeholder:'Risk 1: Bulk export > 5000 rows may be slow on low-end devices\nRisk 2: Safari 16 layout issue on order detail page (fix in next sprint)'},
+        {label:'Risk Register Link',type:'url',placeholder:'Risk register / Confluence link'}],
+    18:[{label:'Product Owner Decision',type:'radio',required:true,options:['Risks Accepted — GO','Risks Not Accepted — NO-GO','Pending Decision']},
+        {label:'PO Sign-off Date',type:'text',placeholder:'e.g. 2026-06-23'},
+        {label:'PO Name',type:'text',required:true,placeholder:'Product Owner name'}],
+    19:[{label:'Rollback Plan',type:'textarea',required:true,placeholder:'1. Revert Railway deploy to previous image\n2. Run DB migration rollback script: rollback-v2.4.sql\n3. Notify users via status page\n4. Estimated rollback time: <10 min'},
+        {label:'Rollback Script / Doc Link',type:'url',placeholder:'Rollback runbook link'}],
+    20:[{label:'Monitoring Tool',type:'text',placeholder:'e.g. Railway Metrics + UptimeRobot + custom /api/health'},
+        {label:'Monitoring Dashboard Link',type:'url',placeholder:'Dashboard / alert config link'},
+        {label:'Alert Owners',type:'text',required:true,placeholder:'e.g. On-call: Ravi K. (Slack: @ravi)'},
+        {label:'Monitoring Ready?',type:'radio',required:true,options:['Yes — Live','Partially Configured','Not Ready']}]
+  },
+  s12:{
+    0:[{label:'Production URL',type:'url',required:true,placeholder:'https://yourdomain.com'},
+       {label:'Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'Response Time',type:'text',placeholder:'e.g. ~800ms first load'}],
+    1:[{label:'Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'Test Account Used',type:'text',placeholder:'e.g. sanity@yourdomain.com (not real user)'},
+       {label:'Notes',type:'textarea',placeholder:'2FA, SSO, redirect — all working?'}],
+    2:[{label:'Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'Load Time',type:'text',placeholder:'e.g. 1.4s'},
+       {label:'Screenshot',type:'url',placeholder:'Screenshot link'}],
+    3:[{label:'Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'Navigation Items Checked',type:'tags',placeholder:'Add nav item and press Enter'}],
+    4:[{label:'Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'Critical APIs Checked',type:'textarea',placeholder:'GET /api/projects — 200 ✓\nGET /api/dashboard — 200 ✓'},
+       {label:'Monitoring Link',type:'url',placeholder:'APM / logs link'}],
+    5:[{label:'Result',type:'radio',required:true,options:['Pass','Fail']},
+       {label:'Business Flow Tested',type:'textarea',required:true,placeholder:'Describe the one safe smoke flow executed in production…'},
+       {label:'Test Account',type:'text',placeholder:'Dedicated sanity test account used (not real user data)'}],
+    6:[{label:'Error Log Review',type:'radio',required:true,options:['Clean — No New Errors','Minor Warnings','Critical Errors Found']},
+       {label:'Log Platform',type:'text',placeholder:'e.g. Railway logs / Datadog / Sentry'},
+       {label:'Log Link',type:'url',placeholder:'Log dashboard link'},
+       {label:'Issues Found',type:'textarea',placeholder:'None OR describe unexpected errors…'}],
+    7:[{label:'Performance Status',type:'radio',required:true,options:['Normal','Degraded','Alert Triggered']},
+       {label:'Key Metrics',type:'textarea',placeholder:'Response time: <200ms avg ✓\nMemory: 340MB (normal) ✓\nCPU: 12% (normal) ✓'},
+       {label:'Monitoring Dashboard',type:'url',placeholder:'Dashboard link'}],
+    8:[{label:'Integrations Monitored',type:'tags',required:true,placeholder:'Add integration and press Enter'},
+       {label:'Status',type:'radio',required:true,options:['All Operational','Some Issues','Critical Failure']},
+       {label:'Notes',type:'textarea',placeholder:'Stripe webhooks: firing ✓\nSendGrid: delivery ok ✓\nApyHub: responding ✓'}],
+    9:[{label:'Failure Rate',type:'radio',required:true,options:['Normal / No Increase','Slight Increase','Significant Increase']},
+       {label:'Monitoring Period',type:'text',placeholder:'e.g. First 30 min post-deploy'},
+       {label:'Notes',type:'textarea',placeholder:'Error rate: 0.02% (normal baseline: 0.02%) ✓\nNo new error types observed ✓'}]
+  }
+};
+
+let _qaclData={};    // { [projId]: { [releaseId]: { s1:[true,false,...], _ev:{s1:{0:{...}}} } } }
 let _qaclProjs=[];   // [{id,name,color}]
 let _qaclCurProj=null;
 let _qaclCurRel=null;
@@ -953,6 +1472,113 @@ function qaclShowStage(id){
   document.getElementById('qacl-stage-content')?.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
+// ── Evidence helpers ──────────────────────────────────────────────────────
+function _qaclEv(stageId,idx){
+  const d=_qaclRelData();if(!d)return null;
+  if(!d._ev)d._ev={};
+  if(!d._ev[stageId])d._ev[stageId]={};
+  if(!d._ev[stageId][idx])d._ev[stageId][idx]={};
+  return d._ev[stageId][idx];
+}
+function _qaclEvHasData(stageId,idx){
+  const d=_qaclRelData();if(!d||!d._ev||!d._ev[stageId]||!d._ev[stageId][idx])return false;
+  const ev=d._ev[stageId][idx];
+  return Object.keys(ev).some(k=>k!=='_verifiedBy'&&k!=='_verifiedAt'&&ev[k]!==''&&ev[k]!==null&&ev[k]!==undefined&&!(Array.isArray(ev[k])&&ev[k].length===0));
+}
+function _qaclEvComplete(stageId,idx){
+  const schema=(QACL_EVIDENCE[stageId]||[])[idx];if(!schema)return false;
+  const ev=_qaclEv(stageId,idx);if(!ev)return false;
+  return schema.every(f=>{if(!f.required)return true;const v=ev[f.label];return v!==''&&v!=null&&!(Array.isArray(v)&&v.length===0);});
+}
+
+function _qaclEvFieldHtml(stageId,idx,field,val){
+  const fid=`ev-${stageId}-${idx}-${field.label.replace(/\W+/g,'-')}`;
+  const labelHtml=`<div class="qacl-ev-label">${field.label}${field.required?'<span class="req">*</span>':''}</div>`;
+  if(field.type==='textarea'){
+    return`<div class="qacl-ev-row full">${labelHtml}<textarea class="qacl-ev-input" id="${fid}" rows="3" placeholder="${field.placeholder||''}" onchange="qaclEvChange('${stageId}',${idx},'${field.label.replace(/'/g,"\\'")}',this.value)">${val||''}</textarea>${field.hint?`<div style="font-size:10px;color:var(--mut);margin-top:2px">${field.hint}</div>`:''}</div>`;
+  }
+  if(field.type==='text'||field.type==='url'){
+    const ic=field.type==='url'?'🔗 ':'';
+    return`<div class="qacl-ev-row">${labelHtml}<input type="text" class="qacl-ev-input" id="${fid}" placeholder="${ic}${field.placeholder||''}" value="${val||''}" onchange="qaclEvChange('${stageId}',${idx},'${field.label.replace(/'/g,"\\'")}',this.value)"></div>`;
+  }
+  if(field.type==='radio'){
+    const opts=(field.options||[]).map(o=>{
+      const sel=val===o;
+      const cls=sel?(o.toLowerCase().includes('pass')||o.toLowerCase().includes('go ')||o.toLowerCase().includes('stable')||o.toLowerCase().includes('yes')||o.toLowerCase().includes('successful')||o.toLowerCase().includes('complete')||o.toLowerCase().includes('done')?'selected-pass':'selected'):(o.toLowerCase().includes('fail')||o.toLowerCase().includes('no-go')||o.toLowerCase().includes('reject')||o.toLowerCase().includes('not ')?'selected-fail':(o.toLowerCase().includes('partial')||o.toLowerCase().includes('risk')||o.toLowerCase().includes('n/a')||o.toLowerCase().includes('acceptable')?'selected-na':''));
+      return`<div class="qacl-ev-radio-opt ${sel?cls:''}" onclick="qaclEvChange('${stageId}',${idx},'${field.label.replace(/'/g,"\\'")}','${o.replace(/'/g,"\\'")}');qaclEvRefreshRadios('${fid}','${o.replace(/'/g,"\\'")}',this)">${o}</div>`;
+    }).join('');
+    return`<div class="qacl-ev-row full">${labelHtml}<div class="qacl-ev-radios" id="${fid}">${opts}</div></div>`;
+  }
+  if(field.type==='select'){
+    const opts=(field.options||[]).map(o=>`<option value="${o}"${val===o?' selected':''}>${o}</option>`).join('');
+    return`<div class="qacl-ev-row">${labelHtml}<select class="qacl-ev-input" id="${fid}" onchange="qaclEvChange('${stageId}',${idx},'${field.label.replace(/'/g,"\\'")}',this.value)"><option value="">— Select —</option>${opts}</select></div>`;
+  }
+  if(field.type==='tags'){
+    const tags=(Array.isArray(val)?val:[]).map(t=>`<span class="qacl-ev-tag">${t}<button onclick="qaclEvRemoveTag('${stageId}',${idx},'${field.label.replace(/'/g,"\\'")}','${t.replace(/'/g,"\\'")}')">×</button></span>`).join('');
+    return`<div class="qacl-ev-row full">${labelHtml}<div class="qacl-ev-tags" id="${fid}-tags">${tags}<input type="text" class="qacl-ev-input" id="${fid}" placeholder="${field.placeholder||'Add and press Enter'}" style="width:auto;flex:1;min-width:120px" onkeydown="if(event.key==='Enter'){event.preventDefault();qaclEvAddTag('${stageId}',${idx},'${field.label.replace(/'/g,"\\'")}','${fid}')}"></div></div>`;
+  }
+  return'';
+}
+
+function qaclEvRefreshRadios(containerId,selectedVal,clickedEl){
+  const container=document.getElementById(containerId);if(!container)return;
+  container.querySelectorAll('.qacl-ev-radio-opt').forEach(el=>{
+    const v=el.textContent.trim();
+    const isSelected=v===selectedVal;
+    el.className='qacl-ev-radio-opt'+(isSelected?' '+(v.toLowerCase().includes('fail')||v.toLowerCase().includes('no-go')||v.toLowerCase().includes('reject')||v.toLowerCase().includes('not ')?'selected-fail':(v.toLowerCase().includes('partial')||v.toLowerCase().includes('risk')||v.toLowerCase().includes('n/a')||v.toLowerCase().includes('acceptable')?'selected-na':'selected-pass')):'');
+  });
+}
+function qaclEvChange(stageId,idx,label,value){
+  const ev=_qaclEv(stageId,idx);if(!ev)return;
+  ev[label]=value;
+  _qaclEvAutoCheck(stageId,idx);
+  qaclEvUpdateToggleBtn(stageId,idx);
+  qaclSave();
+}
+function qaclEvAddTag(stageId,idx,label,inputId){
+  const inp=document.getElementById(inputId);if(!inp)return;
+  const v=inp.value.trim();if(!v)return;
+  const ev=_qaclEv(stageId,idx);if(!ev)return;
+  if(!Array.isArray(ev[label]))ev[label]=[];
+  if(!ev[label].includes(v)){ev[label].push(v);}
+  inp.value='';
+  // re-render tag list
+  const tagsEl=document.getElementById(inputId+'-tags');
+  if(tagsEl){
+    const tags=ev[label].map(t=>`<span class="qacl-ev-tag">${t}<button onclick="qaclEvRemoveTag('${stageId}',${idx},'${label.replace(/'/g,"\\'")}','${t.replace(/'/g,"\\'")}')">×</button></span>`).join('');
+    tagsEl.innerHTML=tags;tagsEl.appendChild(inp);
+  }
+  _qaclEvAutoCheck(stageId,idx);
+  qaclEvUpdateToggleBtn(stageId,idx);
+  qaclSave();
+}
+function qaclEvRemoveTag(stageId,idx,label,tag){
+  const ev=_qaclEv(stageId,idx);if(!ev||!Array.isArray(ev[label]))return;
+  ev[label]=ev[label].filter(t=>t!==tag);
+  qaclRenderStage();
+  qaclSave();
+}
+function _qaclEvAutoCheck(stageId,idx){
+  if(!_qaclEvComplete(stageId,idx))return;
+  const d=_qaclRelData();if(!d)return;
+  if(!d[stageId])d[stageId]=new Array((QACL_STAGES.find(s=>s.id===stageId)||{items:[]}).items.length).fill(false);
+  if(!d[stageId][idx]){
+    d[stageId][idx]=true;
+    const el=document.getElementById('qacl-item-'+stageId+'-'+idx);
+    if(el){el.classList.add('checked');const cb=el.querySelector('input[type=checkbox]');if(cb)cb.checked=true;}
+    const ev=_qaclEv(stageId,idx);
+    if(ev&&!ev._verifiedAt){ev._verifiedAt=new Date().toLocaleString();ev._verifiedBy='Auto — evidence complete';}
+    qaclUpdateNav();
+  }
+}
+function qaclEvUpdateToggleBtn(stageId,idx){
+  const btn=document.querySelector(`#qacl-ev-toggle-${stageId}-${idx}`);
+  if(!btn)return;
+  const hasData=_qaclEvHasData(stageId,idx);
+  btn.classList.toggle('has-data',hasData);
+  btn.textContent=hasData?'📎 Evidence ▾':'+ Evidence';
+}
+
 function qaclRenderStage(){
   const stage=QACL_STAGES.find(s=>s.id===_qaclCurStage);
   if(!stage){document.getElementById('qacl-stage-content').innerHTML='';return;}
@@ -962,6 +1588,45 @@ function qaclRenderStage(){
   const pct=hasRelease?_qaclStagePct(stage.id):0;
   const fillCls=pct===100?'done':'';
   const el=document.getElementById('qacl-stage-content');
+
+  const itemsHtml=stage.items.map((item,i)=>{
+    const grp=item.startsWith('—');
+    const lbl=grp?item.replace(/^— /,''):item;
+    const checked=hasRelease&&checks[i];
+    const schema=(QACL_EVIDENCE[stage.id]||[])[i]||[];
+    const hasEvData=hasRelease&&_qaclEvHasData(stage.id,i);
+    const ev=hasRelease?(_qaclEv(stage.id,i)||{}):{};
+    const stamp=ev._verifiedAt?`<span class="qacl-ev-stamp">✓ ${ev._verifiedBy||'Verified'} · ${ev._verifiedAt}</span>`:'';
+
+    // Build evidence fields HTML
+    const fieldsHtml=schema.map(f=>{
+      const val=ev[f.label]!==undefined?ev[f.label]:'';
+      return _qaclEvFieldHtml(stage.id,i,f,val);
+    }).join('');
+
+    const drawerHtml=hasRelease&&schema.length?`
+      <div class="qacl-ev-drawer" id="qacl-ev-drawer-${stage.id}-${i}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px">
+          ${fieldsHtml}
+        </div>
+        <div class="qacl-ev-footer">
+          ${stamp}
+          <button class="qacl-ev-save-btn" onclick="qaclEvManualSave('${stage.id}',${i})">✓ Mark Evidence Complete</button>
+        </div>
+      </div>`:'';
+
+    return`<div id="qacl-row-${stage.id}-${i}" style="${grp?'padding-left:20px':''}">
+      <div style="display:flex;align-items:flex-start;gap:0">
+        <label class="qacl-item${checked?' checked':''}" id="qacl-item-${stage.id}-${i}" style="${!hasRelease?'opacity:.6;pointer-events:none;flex:1':'flex:1'}${grp?';padding-left:4px':''}">
+          <input type="checkbox" ${checked?'checked':''} ${!hasRelease?'disabled':''} onchange="qaclCheck('${stage.id}',${i},this.checked)">
+          <span class="qacl-item-lbl">${grp?`<span style="color:var(--mut);font-size:11px;margin-right:4px">↳</span>`:''}<span>${lbl}</span></span>
+        </label>
+        ${hasRelease&&schema.length?`<button class="qacl-ev-toggle${hasEvData?' has-data':''}" id="qacl-ev-toggle-${stage.id}-${i}" onclick="qaclToggleEvidence('${stage.id}',${i})">${hasEvData?'📎 Evidence ▾':'+ Evidence'}</button>`:''}
+      </div>
+      ${drawerHtml}
+    </div>`;
+  }).join('');
+
   el.innerHTML=`
     <div class="qacl-stage">
       <div class="qacl-stage-hdr">
@@ -974,25 +1639,51 @@ function qaclRenderStage(){
         </div>`:''}
       </div>
       ${!hasRelease?`<div style="background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#6366f1;font-weight:600">⚡ Select a project and create a release to start tracking this stage</div>`:''}
-      <div class="qacl-stage-body">
-        ${stage.items.map((item,i)=>{
-          const grp=item.startsWith('—');
-          const lbl=grp?item.replace(/^— /,''):item;
-          return`<label class="qacl-item${(hasRelease&&checks[i])?' checked':''}" id="qacl-item-${stage.id}-${i}" style="${!hasRelease?'opacity:.6;pointer-events:none':''}${grp?';padding-left:24px':''}">
-            <input type="checkbox" ${(hasRelease&&checks[i])?'checked':''} ${!hasRelease?'disabled':''} onchange="qaclCheck('${stage.id}',${i},this.checked)">
-            <span class="qacl-item-lbl">${grp?`<span style="color:var(--mut);font-size:11px;margin-right:4px">↳</span>`:''}<span>${lbl}</span></span>
-          </label>`;
-        }).join('')}
-      </div>
+      <div class="qacl-stage-body">${itemsHtml}</div>
     </div>
     ${hasRelease?`<div style="display:flex;gap:8px;margin-top:8px">
       <button onclick="qaclMarkAll('${stage.id}',true)" style="flex:1;padding:9px;border-radius:8px;border:1.5px solid rgba(16,185,129,.4);background:rgba(16,185,129,.08);color:#10b981;font-size:12px;font-weight:700;cursor:pointer">✓ Mark All Done</button>
       <button onclick="qaclMarkAll('${stage.id}',false)" style="flex:1;padding:9px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);color:var(--mut);font-size:12px;font-weight:700;cursor:pointer">↺ Reset Stage</button>
     </div>`:''}`;
+
   // Update active state in nav
   document.querySelectorAll('.qacl-stage-nav-item').forEach(b=>{
     b.classList.toggle('active',b.dataset.stageId===stage.id);
   });
+}
+
+function qaclToggleEvidence(stageId,idx){
+  const drawer=document.getElementById('qacl-ev-drawer-'+stageId+'-'+idx);
+  if(!drawer)return;
+  const isOpen=drawer.classList.toggle('open');
+  const btn=document.getElementById('qacl-ev-toggle-'+stageId+'-'+idx);
+  if(btn)btn.textContent=isOpen?((_qaclEvHasData(stageId,idx)?'📎 Evidence ▴':'+ Evidence ▴')):((_qaclEvHasData(stageId,idx)?'📎 Evidence ▾':'+ Evidence'));
+  if(isOpen)drawer.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function qaclEvManualSave(stageId,idx){
+  const ev=_qaclEv(stageId,idx);if(!ev)return;
+  if(!ev._verifiedAt){ev._verifiedAt=new Date().toLocaleString();ev._verifiedBy='Manual sign-off';}
+  // Check required fields
+  const schema=(QACL_EVIDENCE[stageId]||[])[idx]||[];
+  const missing=schema.filter(f=>f.required&&(ev[f.label]===''||ev[f.label]==null||(Array.isArray(ev[f.label])&&ev[f.label].length===0)));
+  if(missing.length){
+    const d=document.getElementById('qacl-ev-drawer-'+stageId+'-'+idx);
+    if(d){d.style.border='2px solid rgba(245,158,11,.5)';setTimeout(()=>{d.style.border='';},2000);}
+  }
+  // Auto-check the item
+  const relData=_qaclRelData();if(!relData)return;
+  const stage=QACL_STAGES.find(s=>s.id===stageId);
+  if(!relData[stageId])relData[stageId]=new Array(stage.items.length).fill(false);
+  relData[stageId][idx]=true;
+  const itemEl=document.getElementById('qacl-item-'+stageId+'-'+idx);
+  if(itemEl){itemEl.classList.add('checked');const cb=itemEl.querySelector('input[type=checkbox]');if(cb)cb.checked=true;}
+  qaclEvUpdateToggleBtn(stageId,idx);
+  // Update stamp in drawer
+  const drawer=document.getElementById('qacl-ev-drawer-'+stageId+'-'+idx);
+  if(drawer){const footer=drawer.querySelector('.qacl-ev-footer');if(footer){const oldStamp=footer.querySelector('.qacl-ev-stamp');if(oldStamp)oldStamp.remove();const span=document.createElement('span');span.className='qacl-ev-stamp';span.textContent=`✓ Manual sign-off · ${ev._verifiedAt}`;footer.prepend(span);}}
+  qaclUpdateNav();
+  qaclSave();
 }
 
 function qaclCheck(stageId,idx,val){
@@ -1000,6 +1691,8 @@ function qaclCheck(stageId,idx,val){
   const stage=QACL_STAGES.find(s=>s.id===stageId);
   if(!d[stageId])d[stageId]=new Array(stage.items.length).fill(false);
   d[stageId][idx]=val;
+  // Stamp evidence on manual check
+  if(val){const ev=_qaclEv(stageId,idx);if(ev&&!ev._verifiedAt){ev._verifiedAt=new Date().toLocaleString();ev._verifiedBy='Manual check';}}
   // Update item UI
   const itemEl=document.getElementById('qacl-item-'+stageId+'-'+idx);
   if(itemEl)itemEl.classList.toggle('checked',val);
