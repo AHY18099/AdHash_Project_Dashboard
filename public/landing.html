@@ -1016,7 +1016,7 @@ const QACL_EVIDENCE={
     8:[{label:'Valid Data Test Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
        {label:'Data Sets Used',type:'textarea',placeholder:'Valid email, valid phone, valid date ranges…'}],
     9:[{label:'Invalid Data Test Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
-       {label:'Invalid Data Tested',type:'textarea',placeholder:'XSS: <script>alert(1)</script> → sanitised ✓\nSQL: \' OR 1=1 -- → rejected ✓'}],
+       {label:'Invalid Data Tested',type:'textarea',placeholder:'XSS: <script>alert(1)<\/script> → sanitised ✓\nSQL: \' OR 1=1 -- → rejected ✓'}],
     10:[{label:'Empty & Duplicate Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
         {label:'Cases Tested',type:'textarea',placeholder:'Empty required fields → validation ✓\nDuplicate email → unique constraint error ✓'}],
     11:[{label:'Special Characters Result',type:'radio',required:true,options:['Pass','Fail','Partial']},
