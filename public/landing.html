@@ -373,10 +373,674 @@ body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(24
     </div>
   </div>
 
+  <!-- 5th card — Testing Checklist (spans full width) -->
+  <div class="dash-card" onclick="openQAChecklist()" style="cursor:pointer;grid-column:1/-1;border-color:rgba(99,102,241,.3);background:linear-gradient(135deg,rgba(99,102,241,.04) 0%,rgba(168,85,247,.04) 100%)">
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+      <div class="card-icon" style="background:rgba(99,102,241,.12);border:1.5px solid rgba(99,102,241,.25);flex-shrink:0">✅</div>
+      <div class="card-body" style="flex:1;min-width:220px">
+        <div class="card-label" style="color:#6366f1">QA Process Framework</div>
+        <div class="card-title">Testing Checklist &amp; Release Quality Gates</div>
+        <div class="card-desc">End-to-end QA workflow — track all 12 testing stages per project &amp; release, GO/NO-GO decisions, bug severity, automation coverage, and management metrics.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
+        <div class="card-tags">
+          <span class="tag" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">12 Stages</span>
+          <span class="tag" style="background:rgba(168,85,247,.1);border-color:rgba(168,85,247,.3);color:#a855f7">GO/NO-GO</span>
+          <span class="tag" style="background:rgba(236,72,153,.1);border-color:rgba(236,72,153,.3);color:#ec4899">All Projects</span>
+          <span class="tag" style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#3b82f6">Per Release</span>
+        </div>
+        <div class="arrow-btn" style="align-self:flex-end">→</div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- FOOTER -->
 <div class="footer">AdHash Technology · Authorized Personnel Only</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- TESTING CHECKLIST OVERLAY + PANEL                                    -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<style>
+#qacl-overlay{display:none;position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
+#qacl-panel{
+  position:fixed;inset:0;z-index:9101;
+  background:var(--bg);overflow:hidden;
+  display:flex;flex-direction:column;
+  transform:translateY(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);
+}
+#qacl-panel.open{transform:translateY(0)}
+#qacl-hdr{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:14px 22px;border-bottom:1px solid var(--border);
+  background:var(--card);position:sticky;top:0;z-index:10;flex-shrink:0;
+}
+#qacl-hdr h2{font-size:16px;font-weight:800;color:var(--txt);margin:0}
+#qacl-close-btn{margin-left:auto;background:none;border:1px solid var(--border);color:var(--mut);border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;font-weight:600;white-space:nowrap}
+#qacl-close-btn:hover{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.3);color:#ef4444}
+#qacl-body{flex:1;overflow-y:auto;padding:20px 22px 40px}
+
+/* sidebar + content layout */
+.qacl-layout{display:flex;gap:18px;min-height:100%}
+.qacl-sidebar{width:240px;flex-shrink:0}
+.qacl-main{flex:1;min-width:0}
+
+/* Project/Release selector bar */
+.qacl-selbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+.qacl-sel{padding:7px 12px;border-radius:9px;border:1.5px solid var(--border);background:var(--card);color:var(--txt);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;min-width:160px}
+.qacl-sel:focus{outline:none;border-color:#6366f1}
+.qacl-add-release{padding:7px 14px;border-radius:9px;border:1.5px solid rgba(99,102,241,.4);background:rgba(99,102,241,.08);color:#6366f1;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.qacl-add-release:hover{background:rgba(99,102,241,.15)}
+
+/* Stage nav */
+.qacl-stage-nav{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 6px;display:flex;flex-direction:column;gap:2px}
+.qacl-stage-nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--mut);transition:all .15s;border:none;background:none;text-align:left;width:100%}
+.qacl-stage-nav-item:hover{background:rgba(99,102,241,.07);color:var(--txt)}
+.qacl-stage-nav-item.active{background:rgba(99,102,241,.12);color:#6366f1;border-left:none}
+.qacl-stage-pct{margin-left:auto;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;background:rgba(99,102,241,.12);color:#6366f1}
+.qacl-stage-pct.done{background:rgba(16,185,129,.12);color:#10b981}
+.qacl-stage-pct.zero{background:rgba(100,116,139,.1);color:var(--mut)}
+
+/* Stage card */
+.qacl-stage{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:16px}
+.qacl-stage-hdr{display:flex;align-items:center;gap:10px;margin-bottom:14px;cursor:pointer;user-select:none}
+.qacl-stage-hdr h3{font-size:15px;font-weight:800;color:var(--txt);margin:0;flex:1}
+.qacl-stage-prog{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;color:var(--mut)}
+.qacl-stage-bar{height:4px;border-radius:2px;background:var(--border);flex:1;max-width:80px;overflow:hidden}
+.qacl-stage-bar-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,#6366f1,#a855f7);transition:width .3s}
+.qacl-stage-bar-fill.done{background:linear-gradient(90deg,#10b981,#059669)}
+.qacl-stage-body{display:flex;flex-direction:column;gap:6px}
+
+/* Checklist item */
+.qacl-item{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .1s;border:none;background:none;text-align:left;width:100%}
+.qacl-item:hover{background:var(--card2)}
+.qacl-item input[type=checkbox]{width:16px;height:16px;border-radius:4px;accent-color:#6366f1;cursor:pointer;flex-shrink:0;margin-top:1px}
+.qacl-item-lbl{font-size:13px;color:var(--txt);line-height:1.5;flex:1}
+.qacl-item.checked .qacl-item-lbl{text-decoration:line-through;color:var(--mut)}
+
+/* Summary cards */
+.qacl-metric-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.qacl-metric{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;text-align:center}
+.qacl-metric-val{font-size:26px;font-weight:800;line-height:1.1}
+.qacl-metric-lbl{font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+
+/* GO/NO-GO */
+.qacl-gonogo{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.qacl-gonogo-card{flex:1;min-width:160px;border-radius:14px;padding:16px 18px;border:2px solid;text-align:center}
+.qacl-gonogo-card.go{background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.4);color:#10b981}
+.qacl-gonogo-card.risk{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.4);color:#f59e0b}
+.qacl-gonogo-card.nogo{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.4);color:#ef4444}
+.qacl-gonogo-card .gng-label{font-size:18px;font-weight:800}
+.qacl-gonogo-card .gng-desc{font-size:11px;margin-top:4px;opacity:.8}
+
+/* Section subhead */
+.qacl-subhdr{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--mut);margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+
+/* Responsive */
+@media(max-width:700px){
+  .qacl-layout{flex-direction:column}
+  .qacl-sidebar{width:100%}
+  .qacl-stage-nav{flex-direction:row;flex-wrap:wrap;gap:4px}
+  .qacl-stage-nav-item{flex:none;font-size:11px;padding:5px 8px}
+}
+</style>
+<div id="qacl-overlay" onclick="closeQAChecklist()"></div>
+<div id="qacl-panel">
+  <div id="qacl-hdr">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:20px">✅</span>
+      <h2>Testing Checklist &amp; Release Quality Gates</h2>
+    </div>
+    <div id="qacl-gonogo-badge" style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:800;background:rgba(100,116,139,.1);color:var(--mut);border:1.5px solid var(--border)">— Select Project</div>
+    <button id="qacl-close-btn" onclick="closeQAChecklist()">✕ Close</button>
+  </div>
+  <div id="qacl-body">
+    <div id="qacl-loading" style="text-align:center;padding:60px;color:var(--mut);font-size:14px">Loading projects…</div>
+    <div id="qacl-content" style="display:none">
+      <!-- selector bar -->
+      <div class="qacl-selbar">
+        <select class="qacl-sel" id="qacl-proj-sel" onchange="qaclSelectProject()"></select>
+        <select class="qacl-sel" id="qacl-rel-sel" onchange="qaclSelectRelease()" style="min-width:200px"></select>
+        <button class="qacl-add-release" onclick="qaclAddRelease()">＋ New Release</button>
+        <button class="qacl-add-release" onclick="qaclDeleteRelease()" style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.3);color:#ef4444">✕ Delete</button>
+      </div>
+      <!-- metric summary -->
+      <div class="qacl-metric-grid" id="qacl-metrics"></div>
+      <!-- GO/NO-GO -->
+      <div id="qacl-gng-row" class="qacl-gonogo"></div>
+      <!-- main layout -->
+      <div class="qacl-layout">
+        <div class="qacl-sidebar">
+          <div class="qacl-subhdr">Stages</div>
+          <div class="qacl-stage-nav" id="qacl-stage-nav"></div>
+        </div>
+        <div class="qacl-main" id="qacl-stage-content"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+// TESTING CHECKLIST
+// ════════════════════════════════════════════════════════
+const QACL_STAGES=[
+  {id:'s1',icon:'📋',title:'Stage 1 — Requirement & Risk Review',items:[
+    'Business requirement is clearly explained',
+    'Acceptance criteria are documented',
+    'Expected user flow is confirmed',
+    'User roles and permissions are identified',
+    'API and database impact is identified',
+    'Existing affected modules are listed',
+    'Positive scenarios are identified',
+    'Negative scenarios are identified',
+    'Edge cases are identified',
+    'Performance and security risks are reviewed',
+    'Test data requirements are confirmed',
+    'Automation feasibility is reviewed'
+  ]},
+  {id:'s2',icon:'⚡',title:'Stage 2 — Risk-Based Test Planning',items:[
+    'Critical flows identified (Login, payment, permissions)',
+    'High-risk features identified (Create, edit, delete, export)',
+    'Medium-risk areas identified (Search, filter, reports)',
+    'Low-risk areas identified (Text, colours, minor UI)',
+    'P0 blockers defined (App or critical flow blocked)',
+    'P1 major issues defined (Major functionality affected)',
+    'P2 partial issues defined (Partial issue with workaround)',
+    'P3 minor issues defined (Minor UI or text)',
+    'Risk level documented per feature',
+    'Test priority order confirmed'
+  ]},
+  {id:'s3',icon:'📝',title:'Stage 3 — Test Preparation',items:[
+    'Main user flow test cases prepared',
+    'Positive test cases written',
+    'Negative test cases written',
+    'Boundary value cases prepared',
+    'Empty data cases prepared',
+    'Invalid data cases prepared',
+    'User permission cases prepared',
+    'Mobile and responsive cases prepared',
+    'Browser compatibility cases prepared',
+    'Error message validation prepared',
+    'Network failure scenarios prepared',
+    'Existing feature impact cases prepared',
+    'Smoke test cases identified for automation',
+    'Regression test cases identified for automation',
+    'Test data prepared',
+    'Reusable automation methods reviewed',
+    'Required API tests reviewed',
+    'Existing automation scripts updated for impacted modules'
+  ]},
+  {id:'s4',icon:'👨‍💻',title:'Stage 4 — Developer Quality Gate',items:[
+    'Code is reviewed',
+    'Unit tests are completed',
+    'Main functionality is working',
+    'Positive flow is verified by developer',
+    'Basic negative flow is verified by developer',
+    'API response is validated by developer',
+    'Database changes are verified',
+    'Existing impacted functionality is checked',
+    'No console error exists',
+    'Build is stable',
+    'Known limitations are documented',
+    'Feature name and build number provided',
+    'Changed modules list provided',
+    'New APIs documented',
+    'Database changes documented',
+    'Test credentials and test data provided',
+    'Regression impact areas identified'
+  ]},
+  {id:'s5',icon:'🔥',title:'Stage 5 — Automated Smoke Testing',items:[
+    'Application opens successfully',
+    'Login works',
+    'Dashboard loads',
+    'Main menus open',
+    'Critical APIs respond',
+    'Main create flow works',
+    'Search or filter works',
+    'Main edit flow works',
+    'Logout works',
+    'Smoke result: PASS → QA testing begins',
+    'Smoke result: FAIL → Build rejected, returned to Dev'
+  ]},
+  {id:'s6',icon:'🧪',title:'Stage 6 — Manual Functional Testing',items:[
+    '— Priority 1: Main business flow tested',
+    '— Priority 1: Data creation tested',
+    '— Priority 1: Data modification tested',
+    '— Priority 1: Data deletion tested',
+    '— Priority 1: Business calculations verified',
+    '— Priority 1: Workflow transitions tested',
+    '— Priority 2: UI data matches API data',
+    '— Priority 2: API data matches database',
+    '— Priority 2: Exported data verified',
+    '— Priority 2: Dashboard calculations verified',
+    '— Priority 3: Invalid input tested',
+    '— Priority 3: Empty input tested',
+    '— Priority 3: Duplicate actions tested',
+    '— Priority 3: Permission restrictions verified',
+    '— Priority 4: Email/SMS/Payment integration tested',
+    '— Priority 4: Third-party API tested',
+    '— Priority 4: File storage tested',
+    '— Priority 4: Notifications tested',
+    '— Priority 5: Layout and alignment verified',
+    '— Priority 5: Loading indicators checked',
+    '— Priority 5: Responsive design tested',
+    '— Priority 5: Browser compatibility tested'
+  ]},
+  {id:'s7',icon:'🌐',title:'Stage 7 — Complete Coverage',items:[
+    'Positive scenarios covered',
+    'Negative scenarios covered',
+    'Boundary values tested',
+    'Business rules verified',
+    'Admin role tested',
+    'Standard user role tested',
+    'Restricted user role tested',
+    'Unauthenticated user tested',
+    'Valid data tested',
+    'Invalid data tested',
+    'Empty and duplicate data tested',
+    'Special characters and long text tested',
+    'Chrome tested',
+    'Edge tested',
+    'Desktop tested',
+    'Mobile tested',
+    'Real device validation done',
+    'API integration tested',
+    'Database verified',
+    'File upload/download tested',
+    'Performance checked',
+    'Security checked',
+    'Session management checked'
+  ]},
+  {id:'s8',icon:'🔍',title:'Stage 8 — Exploratory Testing',items:[
+    'Double-click actions tested',
+    'Refresh during submission tested',
+    'Browser back and forward tested',
+    'Multiple tabs tested',
+    'Session expiry tested',
+    'Slow network tested',
+    'Internet disconnect tested',
+    'Repeated login tested',
+    'Long text entered',
+    'Special characters entered',
+    'Very large files uploaded',
+    'Invalid file formats uploaded',
+    'Unexpected navigation tested',
+    'Concurrent user activity tested'
+  ]},
+  {id:'s9',icon:'🐛',title:'Stage 9 — Bug Fix & Retesting',items:[
+    'Bug title documented',
+    'Environment and build number recorded',
+    'Steps to reproduce documented',
+    'Expected vs actual result documented',
+    'Severity and priority assigned',
+    'Screenshot or video attached',
+    'Console error captured',
+    'API/network error captured',
+    'Original issue retested after fix',
+    'Related screen retested',
+    'Related API retested',
+    'Related user role retested',
+    'Related calculation retested',
+    'Existing workflow retested',
+    'Mobile/browser impact checked',
+    'Automation regression added for fixed bug'
+  ]},
+  {id:'s10',icon:'🤖',title:'Stage 10 — Automation Regression',items:[
+    'Login automated',
+    'Dashboard load automated',
+    'Critical navigation automated',
+    'Create, edit and delete automated',
+    'Search and filter automated',
+    'Role permissions automated',
+    'Payment test-mode flows automated',
+    'Export and download automated',
+    'API validation automated',
+    'Critical production bug scenarios automated',
+    'Repeated regression scenarios automated',
+    'Smoke suite runs on every deployment',
+    'Critical regression runs on every build',
+    'API suite runs on every build',
+    'Full regression runs nightly',
+    'Cross-browser suite runs before release',
+    'Production sanity runs after deployment'
+  ]},
+  {id:'s11',icon:'🚦',title:'Stage 11 — Release Quality Gates',items:[
+    '— Gate 1: Deployment successful',
+    '— Gate 1: Automated smoke passed',
+    '— Gate 1: Environment is stable',
+    '— Gate 2: Acceptance criteria passed',
+    '— Gate 2: Functional testing completed',
+    '— Gate 2: API and data validation completed',
+    '— Gate 2: User roles validated',
+    '— Gate 3: Critical regression passed',
+    '— Gate 3: Affected modules passed',
+    '— Gate 3: Automation failures analysed',
+    '— Gate 3: Fixed bugs retested',
+    '— Gate 4: Performance passed (if applicable)',
+    '— Gate 4: Security passed (if applicable)',
+    '— Gate 4: Browser compatibility passed',
+    '— Gate 4: Mobile responsiveness passed',
+    '— Gate 5: No critical bug open',
+    '— Gate 5: No high bug blocking main flow',
+    '— Gate 5: Known risks documented',
+    '— Gate 5: Product owner accepts remaining risks',
+    '— Gate 5: Rollback plan ready',
+    '— Gate 5: Production monitoring ready'
+  ]},
+  {id:'s12',icon:'🚀',title:'Stage 12 — Production Sanity & Monitoring',items:[
+    'Application opens in production',
+    'Login works in production',
+    'Dashboard loads in production',
+    'Main navigation works',
+    'Critical API works',
+    'One safe business flow verified',
+    'Error logs reviewed',
+    'Performance monitored',
+    'Email/SMS/payment integrations monitored',
+    'No unexpected failure increase observed'
+  ]}
+];
+
+let _qaclData={};    // { [projId]: { [releaseId]: { s1:[true,false,...], s2:[], ... } } }
+let _qaclProjs=[];   // [{id,name,color}]
+let _qaclCurProj=null;
+let _qaclCurRel=null;
+let _qaclCurStage='s1';
+let _qaclToken='';
+
+function _qaclTok(){return localStorage.getItem('qa_jwt_token')||localStorage.getItem('qa_token')||'';}
+
+async function openQAChecklist(){
+  document.getElementById('qacl-overlay').style.display='block';
+  requestAnimationFrame(()=>document.getElementById('qacl-panel').classList.add('open'));
+  document.body.style.overflow='hidden';
+  _qaclToken=_qaclTok();
+  await qaclLoad();
+}
+function closeQAChecklist(){
+  document.getElementById('qacl-panel').classList.remove('open');
+  setTimeout(()=>{document.getElementById('qacl-overlay').style.display='none';},350);
+  document.body.style.overflow='';
+}
+
+async function qaclLoad(){
+  document.getElementById('qacl-loading').style.display='block';
+  document.getElementById('qacl-content').style.display='none';
+  try{
+    // Load projects
+    const pr=await fetch('/api/projects',{headers:{Authorization:'Bearer '+_qaclTok()}});
+    _qaclProjs=pr.ok?await pr.json():[];
+    // Load checklist data
+    const dr=await fetch('/api/qa-data/qa3_checklist_data',{headers:{Authorization:'Bearer '+_qaclTok()}});
+    if(dr.ok){const d=await dr.json();_qaclData=d.value||{};}
+    else{_qaclData={};}
+    // Populate project dropdown
+    const psel=document.getElementById('qacl-proj-sel');
+    psel.innerHTML='<option value="">— Select Project —</option>'+_qaclProjs.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+    document.getElementById('qacl-loading').style.display='none';
+    document.getElementById('qacl-content').style.display='block';
+    if(_qaclProjs.length){psel.value=_qaclProjs[0].id;qaclSelectProject();}
+  }catch(e){
+    document.getElementById('qacl-loading').innerHTML='<div style="color:#ef4444;padding:60px;text-align:center">Failed to load: '+e.message+'</div>';
+  }
+}
+
+function qaclSelectProject(){
+  _qaclCurProj=document.getElementById('qacl-proj-sel').value;
+  if(!_qaclCurProj)return;
+  if(!_qaclData[_qaclCurProj])_qaclData[_qaclCurProj]={};
+  // populate releases
+  const rels=Object.keys(_qaclData[_qaclCurProj]).sort().reverse();
+  const rsel=document.getElementById('qacl-rel-sel');
+  rsel.innerHTML='<option value="">— Select Release —</option>'+rels.map(r=>`<option value="${r}">${r}</option>`).join('');
+  if(rels.length){rsel.value=rels[0];_qaclCurRel=rels[0];}
+  else{_qaclCurRel=null;}
+  qaclRender();
+}
+
+function qaclSelectRelease(){
+  _qaclCurRel=document.getElementById('qacl-rel-sel').value||null;
+  qaclRender();
+}
+
+function qaclAddRelease(){
+  const name=prompt('Release name (e.g. v2.5.0 or Sprint 12):');
+  if(!name||!name.trim())return;
+  const rid=name.trim();
+  if(!_qaclData[_qaclCurProj])_qaclData[_qaclCurProj]={};
+  if(_qaclData[_qaclCurProj][rid]){alert('Release "'+rid+'" already exists.');return;}
+  _qaclData[_qaclCurProj][rid]={};
+  _qaclCurRel=rid;
+  // rebuild dropdown
+  const rels=Object.keys(_qaclData[_qaclCurProj]).sort().reverse();
+  const rsel=document.getElementById('qacl-rel-sel');
+  rsel.innerHTML='<option value="">— Select Release —</option>'+rels.map(r=>`<option value="${r}">${r}</option>`).join('');
+  rsel.value=rid;
+  qaclSave();
+  qaclRender();
+}
+
+function qaclDeleteRelease(){
+  if(!_qaclCurRel||!_qaclCurProj)return;
+  if(!confirm('Delete release "'+_qaclCurRel+'"? All checklist progress will be lost.'))return;
+  delete _qaclData[_qaclCurProj][_qaclCurRel];
+  _qaclCurRel=null;
+  qaclSelectProject();
+  qaclSave();
+}
+
+function _qaclRelData(){
+  if(!_qaclCurProj||!_qaclCurRel)return null;
+  if(!_qaclData[_qaclCurProj])_qaclData[_qaclCurProj]={};
+  if(!_qaclData[_qaclCurProj][_qaclCurRel])_qaclData[_qaclCurProj][_qaclCurRel]={};
+  return _qaclData[_qaclCurProj][_qaclCurRel];
+}
+
+function _qaclStagePct(stageId){
+  const d=_qaclRelData();if(!d)return 0;
+  const items=QACL_STAGES.find(s=>s.id===stageId)?.items||[];
+  if(!items.length)return 0;
+  const checked=(d[stageId]||[]).filter(Boolean).length;
+  return Math.round(checked/items.length*100);
+}
+
+function _qaclTotalPct(){
+  const d=_qaclRelData();if(!d)return 0;
+  let total=0,checked=0;
+  QACL_STAGES.forEach(s=>{
+    total+=s.items.length;
+    checked+=(d[s.id]||[]).filter(Boolean).length;
+  });
+  return total?Math.round(checked/total*100):0;
+}
+
+function _qaclGoNoGo(){
+  const d=_qaclRelData();if(!d)return 'select';
+  const pct11=_qaclStagePct('s11');
+  const items11=QACL_STAGES.find(s=>s.id==='s11').items;
+  const s11=d['s11']||[];
+  // Critical gates: Gate5 starts at index 15 (No critical bug open)
+  const gate5Start=15;
+  const gate5All=items11.slice(gate5Start).every((_,i)=>s11[gate5Start+i]);
+  const total=_qaclTotalPct();
+  if(total===0)return 'none';
+  if(gate5All&&total>=80)return 'go';
+  if(total>=50&&pct11>=50)return 'risk';
+  return 'nogo';
+}
+
+function qaclRender(){
+  if(!_qaclCurProj||!_qaclCurRel){
+    // show empty state
+    document.getElementById('qacl-metrics').innerHTML='<div style="color:var(--mut);font-size:13px;padding:10px">Select a project and release to view checklist.</div>';
+    document.getElementById('qacl-gng-row').innerHTML='';
+    document.getElementById('qacl-stage-nav').innerHTML='';
+    document.getElementById('qacl-stage-content').innerHTML='';
+    document.getElementById('qacl-gonogo-badge').textContent='— Select Release';
+    document.getElementById('qacl-gonogo-badge').style.cssText='padding:5px 14px;border-radius:20px;font-size:12px;font-weight:800;background:rgba(100,116,139,.1);color:var(--mut);border:1.5px solid var(--border)';
+    return;
+  }
+  const d=_qaclRelData();
+  const total=_qaclTotalPct();
+  const gng=_qaclGoNoGo();
+
+  // Badge in header
+  const badge=document.getElementById('qacl-gonogo-badge');
+  const gngMap={go:{txt:'✅ GO',bg:'rgba(16,185,129,.12)',color:'#10b981',border:'rgba(16,185,129,.4)'},risk:{txt:'⚠ GO WITH RISK',bg:'rgba(245,158,11,.12)',color:'#f59e0b',border:'rgba(245,158,11,.4)'},nogo:{txt:'🚫 NO-GO',bg:'rgba(239,68,68,.12)',color:'#ef4444',border:'rgba(239,68,68,.4)'},none:{txt:'— In Progress',bg:'rgba(100,116,139,.1)',color:'var(--mut)',border:'var(--border)'}};
+  const gm=gngMap[gng]||gngMap.none;
+  badge.textContent=gm.txt;
+  badge.style.cssText=`padding:5px 14px;border-radius:20px;font-size:12px;font-weight:800;background:${gm.bg};color:${gm.color};border:1.5px solid ${gm.border}`;
+
+  // Metrics
+  let totalItems=0,totalChecked=0;
+  QACL_STAGES.forEach(s=>{totalItems+=s.items.length;totalChecked+=(d[s.id]||[]).filter(Boolean).length;});
+  const stagesStarted=QACL_STAGES.filter(s=>(d[s.id]||[]).some(Boolean)).length;
+  const stagesDone=QACL_STAGES.filter(s=>_qaclStagePct(s.id)===100).length;
+  document.getElementById('qacl-metrics').innerHTML=`
+    <div class="qacl-metric"><div class="qacl-metric-val" style="color:#6366f1">${total}%</div><div class="qacl-metric-lbl">Overall Progress</div></div>
+    <div class="qacl-metric"><div class="qacl-metric-val" style="color:#10b981">${totalChecked}</div><div class="qacl-metric-lbl">Items Checked</div></div>
+    <div class="qacl-metric"><div class="qacl-metric-val" style="color:var(--mut)">${totalItems-totalChecked}</div><div class="qacl-metric-lbl">Remaining</div></div>
+    <div class="qacl-metric"><div class="qacl-metric-val" style="color:#a855f7">${stagesDone}/${QACL_STAGES.length}</div><div class="qacl-metric-lbl">Stages Complete</div></div>`;
+
+  // GO/NO-GO row
+  document.getElementById('qacl-gng-row').innerHTML=`
+    <div class="qacl-gonogo-card go"><div class="gng-label">✅ GO</div><div class="gng-desc">All critical flows pass · No critical defect · Smoke & regression pass · Rollback ready</div></div>
+    <div class="qacl-gonogo-card risk"><div class="gng-label">⚠ GO WITH RISK</div><div class="gng-desc">Only medium/low defects · Workaround available · Risk accepted & documented</div></div>
+    <div class="qacl-gonogo-card nogo"><div class="gng-label">🚫 NO-GO</div><div class="gng-desc">Critical flow fails · Data loss risk · Critical bug open · Build unstable · No rollback plan</div></div>`;
+
+  // Stage nav
+  document.getElementById('qacl-stage-nav').innerHTML=QACL_STAGES.map(s=>{
+    const pct=_qaclStagePct(s.id);
+    const cls=pct===100?'done':(pct===0?'zero':'');
+    return`<button class="qacl-stage-nav-item${_qaclCurStage===s.id?' active':''}" onclick="qaclShowStage('${s.id}')">${s.icon} ${s.title.split('—')[0].trim()}<span class="qacl-stage-pct ${cls}">${pct}%</span></button>`;
+  }).join('');
+
+  // Stage content
+  qaclRenderStage();
+}
+
+function qaclShowStage(id){
+  _qaclCurStage=id;
+  // update nav active state
+  document.querySelectorAll('.qacl-stage-nav-item').forEach(b=>{
+    b.classList.toggle('active',b.getAttribute('onclick').includes("'"+id+"'"));
+  });
+  qaclRenderStage();
+  document.querySelector('.qacl-main')?.scrollTo({top:0,behavior:'smooth'});
+}
+
+function qaclRenderStage(){
+  const stage=QACL_STAGES.find(s=>s.id===_qaclCurStage);
+  if(!stage)return;
+  const d=_qaclRelData()||{};
+  const checks=d[stage.id]||new Array(stage.items.length).fill(false);
+  const pct=_qaclStagePct(stage.id);
+  const fillCls=pct===100?'done':'';
+  const el=document.getElementById('qacl-stage-content');
+  el.innerHTML=`
+    <div class="qacl-stage">
+      <div class="qacl-stage-hdr" onclick="qaclToggleAll('${stage.id}')">
+        <span style="font-size:22px">${stage.icon}</span>
+        <h3>${stage.title}</h3>
+        <div class="qacl-stage-prog">
+          <span>${checks.filter(Boolean).length}/${stage.items.length}</span>
+          <div class="qacl-stage-bar"><div class="qacl-stage-bar-fill ${fillCls}" style="width:${pct}%"></div></div>
+          <span style="color:${pct===100?'#10b981':'#6366f1'}">${pct}%</span>
+        </div>
+      </div>
+      <div class="qacl-stage-body" id="qacl-items-${stage.id}">
+        ${stage.items.map((item,i)=>`
+          <label class="qacl-item${checks[i]?' checked':''}" id="qacl-item-${stage.id}-${i}">
+            <input type="checkbox" ${checks[i]?'checked':''} onchange="qaclCheck('${stage.id}',${i},this.checked)">
+            <span class="qacl-item-lbl">${item}</span>
+          </label>`).join('')}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="qaclMarkAll('${stage.id}',true)" style="flex:1;padding:9px;border-radius:8px;border:1.5px solid rgba(16,185,129,.4);background:rgba(16,185,129,.08);color:#10b981;font-size:12px;font-weight:700;cursor:pointer">✓ Mark All Done</button>
+      <button onclick="qaclMarkAll('${stage.id}',false)" style="flex:1;padding:9px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);color:var(--mut);font-size:12px;font-weight:700;cursor:pointer">↺ Reset Stage</button>
+    </div>`;
+}
+
+function qaclCheck(stageId,idx,val){
+  const d=_qaclRelData();if(!d)return;
+  const stage=QACL_STAGES.find(s=>s.id===stageId);
+  if(!d[stageId])d[stageId]=new Array(stage.items.length).fill(false);
+  d[stageId][idx]=val;
+  // Update item UI
+  const itemEl=document.getElementById('qacl-item-'+stageId+'-'+idx);
+  if(itemEl)itemEl.classList.toggle('checked',val);
+  // Update progress bar
+  const pct=_qaclStagePct(stageId);
+  const bar=document.querySelector(`#qacl-stage-content .qacl-stage-bar-fill`);
+  if(bar){bar.style.width=pct+'%';bar.classList.toggle('done',pct===100);}
+  const progEl=document.querySelector(`#qacl-stage-content .qacl-stage-prog`);
+  if(progEl){
+    const spans=progEl.querySelectorAll('span');
+    if(spans[0])spans[0].textContent=d[stageId].filter(Boolean).length+'/'+stage.items.length;
+    if(spans[1])spans[1].textContent=pct+'%';
+  }
+  // Update nav + metrics + badge
+  qaclUpdateNav();
+  qaclSave();
+}
+
+function qaclMarkAll(stageId,val){
+  const d=_qaclRelData();if(!d)return;
+  const stage=QACL_STAGES.find(s=>s.id===stageId);
+  d[stageId]=new Array(stage.items.length).fill(val);
+  qaclRenderStage();
+  qaclUpdateNav();
+  qaclSave();
+}
+
+function qaclUpdateNav(){
+  // refresh stage nav percentages and metrics
+  const total=_qaclTotalPct();
+  const gng=_qaclGoNoGo();
+  // Update nav items
+  QACL_STAGES.forEach(s=>{
+    const pct=_qaclStagePct(s.id);
+    const btn=document.querySelector(`.qacl-stage-nav-item[onclick*="'${s.id}'"] .qacl-stage-pct`);
+    if(btn){btn.textContent=pct+'%';btn.className='qacl-stage-pct '+(pct===100?'done':(pct===0?'zero':''));}
+  });
+  // Update metrics
+  const d=_qaclRelData()||{};
+  let totalItems=0,totalChecked=0;
+  QACL_STAGES.forEach(s=>{totalItems+=s.items.length;totalChecked+=(d[s.id]||[]).filter(Boolean).length;});
+  const stagesDone=QACL_STAGES.filter(s=>_qaclStagePct(s.id)===100).length;
+  const m=document.getElementById('qacl-metrics');
+  if(m){
+    const vals=m.querySelectorAll('.qacl-metric-val');
+    if(vals[0])vals[0].textContent=total+'%';
+    if(vals[1])vals[1].textContent=totalChecked;
+    if(vals[2])vals[2].textContent=totalItems-totalChecked;
+    if(vals[3])vals[3].textContent=stagesDone+'/'+QACL_STAGES.length;
+  }
+  // Update GO/NO-GO badge
+  const gngMap={go:{txt:'✅ GO',bg:'rgba(16,185,129,.12)',color:'#10b981',border:'rgba(16,185,129,.4)'},risk:{txt:'⚠ GO WITH RISK',bg:'rgba(245,158,11,.12)',color:'#f59e0b',border:'rgba(245,158,11,.4)'},nogo:{txt:'🚫 NO-GO',bg:'rgba(239,68,68,.12)',color:'#ef4444',border:'rgba(239,68,68,.4)'},none:{txt:'— In Progress',bg:'rgba(100,116,139,.1)',color:'var(--mut)',border:'var(--border)'}};
+  const gm=gngMap[gng]||gngMap.none;
+  const badge=document.getElementById('qacl-gonogo-badge');
+  badge.textContent=gm.txt;
+  badge.style.cssText=`padding:5px 14px;border-radius:20px;font-size:12px;font-weight:800;background:${gm.bg};color:${gm.color};border:1.5px solid ${gm.border}`;
+}
+
+let _qaclSaveTimer=null;
+function qaclSave(){
+  clearTimeout(_qaclSaveTimer);
+  _qaclSaveTimer=setTimeout(async()=>{
+    try{
+      await fetch('/api/qa-data/qa3_checklist_data',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+_qaclTok()},
+        body:JSON.stringify({value:_qaclData})
+      });
+    }catch(e){console.warn('[qacl] save failed',e);}
+  },600);
+}
+</script>
 
 <!-- AUTOCHECKER OVERLAY + PANEL -->
 <style>
