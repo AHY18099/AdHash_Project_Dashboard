@@ -1,0 +1,2262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fast-Track QA Workflow — AdHash</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial Black%2CArial%2Csans-serif' font-weight='900' font-size='11' fill='white'%3EFT%3C/text%3E%3C/svg%3E">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  --bg:#f0f4f8;--card:#fff;--card2:#f8fafc;--border:rgba(148,163,184,0.2);
+  --txt:#1e293b;--txt2:#334155;--mut:#64748b;--accent:#3b82f6;--a2:#8b5cf6;
+  --pass:#10b981;--warn:#f59e0b;--danger:#ef4444;
+  --shadow:0 4px 20px rgba(100,116,139,.12);
+  font-family:'Inter','Segoe UI',-apple-system,sans-serif;
+  background:var(--bg);color:var(--txt);min-height:100vh;
+}
+body.dark{
+  --bg:#000;--card:#111;--card2:#161616;--border:rgba(255,255,255,.1);
+  --txt:#fff;--txt2:#e2e8f0;--mut:#9ca3af;--accent:#00d4ff;--a2:#00ffc6;
+  --pass:#00ff88;--warn:#fbbf24;--danger:#f87171;
+  --shadow:0 4px 20px rgba(0,0,0,.4);
+}
+
+/* ── LAYOUT ── */
+#ft-app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+#ft-topbar{
+  display:flex;align-items:center;gap:12px;padding:0 20px;height:54px;
+  background:var(--card);border-bottom:1px solid var(--border);
+  flex-shrink:0;z-index:100;
+}
+#ft-topbar .logo{font-size:15px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap}
+#ft-topbar .page-title{font-size:13px;font-weight:700;color:var(--mut);white-space:nowrap}
+#ft-topbar .spacer{flex:1}
+.ft-topbtn{padding:5px 11px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--mut);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
+.ft-topbtn:hover{background:var(--card2);color:var(--txt)}
+.ft-topbtn.accent{border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.08);color:var(--accent)}
+
+#ft-body{display:flex;flex:1;overflow:hidden}
+
+/* ── SIDEBAR ── */
+#ft-sidebar{
+  width:200px;flex-shrink:0;background:var(--card);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;
+}
+.ft-nav-item{
+  display:flex;align-items:center;gap:10px;padding:10px 16px;
+  font-size:13px;font-weight:600;color:var(--mut);cursor:pointer;
+  border-left:3px solid transparent;transition:all .15s;white-space:nowrap;
+}
+.ft-nav-item:hover{background:var(--card2);color:var(--txt)}
+.ft-nav-item.active{background:rgba(59,130,246,.06);color:var(--accent);border-left-color:var(--accent)}
+.ft-nav-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+
+/* ── MAIN ── */
+#ft-main{flex:1;overflow-y:auto;padding:20px}
+
+/* ── CARDS ── */
+.ft-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px}
+.ft-card-title{font-size:14px;font-weight:800;color:var(--txt);margin-bottom:12px}
+.ft-section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.ft-section-hdr h2{font-size:16px;font-weight:800;color:var(--txt)}
+
+/* ── SUMMARY CARDS ── */
+.ft-metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:20px}
+.ft-metric{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
+.ft-metric-val{font-size:26px;font-weight:800;line-height:1}
+.ft-metric-lbl{font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-top:4px}
+.ft-metric.blue .ft-metric-val{color:var(--accent)}
+.ft-metric.green .ft-metric-val{color:var(--pass)}
+.ft-metric.amber .ft-metric-val{color:var(--warn)}
+.ft-metric.red .ft-metric-val{color:var(--danger)}
+
+/* ── BADGES ── */
+.ftbadge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap}
+.ftbadge.green{background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.3)}
+.ftbadge.blue{background:rgba(59,130,246,.12);color:#3b82f6;border:1px solid rgba(59,130,246,.3)}
+.ftbadge.amber{background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.3)}
+.ftbadge.red{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
+.ftbadge.purple{background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)}
+.ftbadge.grey{background:rgba(100,116,139,.12);color:#64748b;border:1px solid rgba(100,116,139,.3)}
+.ftbadge.go{background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.4)}
+.ftbadge.go-risk{background:rgba(245,158,11,.15);color:#d97706;border:1px solid rgba(245,158,11,.4)}
+.ftbadge.nogo{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.4)}
+
+/* ── BUTTONS ── */
+.ftbtn{padding:7px 14px;border-radius:8px;border:1.5px solid var(--border);background:none;color:var(--mut);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
+.ftbtn:hover{background:var(--card2);color:var(--txt)}
+.ftbtn.primary{border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.1);color:var(--accent)}
+.ftbtn.primary:hover{background:rgba(59,130,246,.18)}
+.ftbtn.success{border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.1);color:#10b981}
+.ftbtn.danger{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.06);color:#ef4444}
+.ftbtn.sm{padding:4px 10px;font-size:11px}
+
+/* ── TABLE ── */
+.ft-tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border)}
+.ft-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.ft-tbl th{padding:9px 12px;text-align:left;background:var(--card2);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);border-bottom:1px solid var(--border);white-space:nowrap}
+.ft-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--txt);vertical-align:middle}
+.ft-tbl tr:last-child td{border-bottom:none}
+.ft-tbl tr:hover td{background:rgba(59,130,246,.02)}
+
+/* ── FORM ── */
+.ft-form-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:12px}
+.ft-form-group{display:flex;flex-direction:column;gap:4px}
+.ft-form-group label{font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.3px}
+.ft-form-group input,.ft-form-group select,.ft-form-group textarea{
+  padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);
+  background:var(--card2);color:var(--txt);font-size:13px;font-family:inherit;
+  transition:border-color .15s;
+}
+.ft-form-group input:focus,.ft-form-group select:focus,.ft-form-group textarea:focus{outline:none;border-color:var(--accent)}
+.ft-form-group textarea{resize:vertical;min-height:70px}
+
+/* ── MODAL ── */
+.ft-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;backdrop-filter:blur(4px)}
+.ft-modal-overlay.open{display:flex;align-items:center;justify-content:center;padding:20px}
+.ft-modal{background:var(--card);border-radius:14px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.ft-modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);z-index:1}
+.ft-modal-hdr h3{font-size:15px;font-weight:800;color:var(--txt)}
+.ft-modal-body{padding:20px}
+.ft-modal-footer{display:flex;gap:8px;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--border)}
+
+/* ── KANBAN ── */
+.ft-kanban{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;min-height:200px}
+.ft-kanban-col{flex-shrink:0;width:200px}
+.ft-kanban-col-hdr{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);padding:6px 10px;background:var(--card2);border-radius:8px 8px 0 0;border:1px solid var(--border);border-bottom:none}
+.ft-kanban-col-body{background:var(--card2);border:1px solid var(--border);border-radius:0 0 8px 8px;padding:6px;min-height:100px;display:flex;flex-direction:column;gap:6px}
+.ft-kanban-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;cursor:pointer;transition:all .15s}
+.ft-kanban-card:hover{border-color:var(--accent);box-shadow:var(--shadow)}
+.ft-kanban-card-title{font-size:12px;font-weight:700;color:var(--txt);margin-bottom:4px}
+.ft-kanban-card-sub{font-size:11px;color:var(--mut)}
+
+/* ── PROGRESS ── */
+.ft-progress{height:6px;background:var(--border);border-radius:3px;overflow:hidden;width:100%}
+.ft-progress-fill{height:100%;border-radius:3px;background:var(--accent);transition:width .3s}
+.ft-progress-fill.green{background:var(--pass)}
+.ft-progress-fill.amber{background:var(--warn)}
+.ft-progress-fill.red{background:var(--danger)}
+
+/* ── WORKFLOW STEPPER ── */
+.ft-stepper{display:flex;gap:0;overflow-x:auto;padding-bottom:8px;margin-bottom:20px;position:relative}
+.ft-step{display:flex;flex-direction:column;align-items:center;flex:1;min-width:80px;cursor:pointer;position:relative}
+.ft-step::after{content:'';position:absolute;top:16px;left:50%;width:100%;height:2px;background:var(--border);z-index:0}
+.ft-step:last-child::after{display:none}
+.ft-step-circle{width:32px;height:32px;border-radius:50%;border:2px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;z-index:1;position:relative;transition:all .2s}
+.ft-step.done .ft-step-circle{background:var(--pass);border-color:var(--pass);color:#fff}
+.ft-step.active .ft-step-circle{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 0 4px rgba(59,130,246,.15)}
+.ft-step.blocked .ft-step-circle{background:var(--danger);border-color:var(--danger);color:#fff}
+.ft-step-label{font-size:9px;font-weight:700;color:var(--mut);text-align:center;margin-top:6px;text-transform:uppercase;letter-spacing:.3px;max-width:72px;line-height:1.3}
+.ft-step.active .ft-step-label{color:var(--accent)}
+.ft-step.done .ft-step-label{color:var(--pass)}
+
+/* ── TABS ── */
+.ft-tabs{display:flex;gap:4px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:16px;flex-wrap:wrap;position:sticky;top:-20px;z-index:10}
+.ft-tab{padding:6px 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;color:var(--mut);border:none;background:none;font-family:inherit;white-space:nowrap;transition:all .15s}
+.ft-tab.active{background:var(--card);color:var(--txt);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.ft-tab:hover:not(.active){color:var(--txt);background:rgba(59,130,246,.05)}
+
+/* ── TOAST ── */
+#ft-toast-wrap{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:99999;pointer-events:none}
+.ft-toast{padding:10px 16px;border-radius:10px;font-size:13px;font-weight:600;color:#fff;box-shadow:0 4px 20px rgba(0,0,0,.25);opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
+.ft-toast.show{opacity:1;transform:translateY(0)}
+.ft-toast.success{background:#10b981}
+.ft-toast.error{background:#ef4444}
+.ft-toast.warning{background:#f59e0b}
+.ft-toast.info{background:#3b82f6}
+
+/* ── CHECKLIST ── */
+.ft-check-row{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)}
+.ft-check-row:last-child{border-bottom:none}
+.ft-check-num{font-size:11px;font-weight:800;color:var(--mut);width:22px;flex-shrink:0;padding-top:2px}
+.ft-check-label{flex:1;font-size:13px;color:var(--txt);padding-top:1px}
+.ft-radio-grp{display:flex;gap:4px;flex-shrink:0}
+.ft-radio-btn{padding:3px 9px;border-radius:6px;border:1.5px solid var(--border);font-size:11px;font-weight:700;cursor:pointer;transition:all .12s;background:none;color:var(--mut);font-family:inherit}
+.ft-radio-btn.selected-pass{background:rgba(16,185,129,.15);border-color:#10b981;color:#10b981}
+.ft-radio-btn.selected-fail{background:rgba(239,68,68,.12);border-color:#ef4444;color:#ef4444}
+.ft-radio-btn.selected-na{background:rgba(100,116,139,.1);border-color:#64748b;color:#64748b}
+.ft-radio-btn.selected-yes{background:rgba(16,185,129,.15);border-color:#10b981;color:#10b981}
+.ft-radio-btn.selected-no{background:rgba(239,68,68,.12);border-color:#ef4444;color:#ef4444}
+
+/* ── HEALTH BANNER ── */
+.ft-health{border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.ft-health.healthy{background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.3);color:#10b981}
+.ft-health.attention{background:rgba(245,158,11,.1);border:1.5px solid rgba(245,158,11,.3);color:#d97706}
+.ft-health.at-risk{background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);color:#ef4444}
+.ft-health.blocked{background:rgba(239,68,68,.15);border:2px solid rgba(239,68,68,.5);color:#ef4444}
+
+/* ── EMPTY STATE ── */
+.ft-empty{text-align:center;padding:40px 20px;color:var(--mut)}
+.ft-empty-icon{font-size:36px;margin-bottom:10px}
+.ft-empty-text{font-size:14px;font-weight:600;margin-bottom:6px;color:var(--txt)}
+.ft-empty-sub{font-size:12px}
+
+/* ── MOBILE ── */
+@media(max-width:768px){
+  #ft-sidebar{display:none}
+  #ft-sidebar.mobile-open{display:flex;position:fixed;top:54px;left:0;bottom:0;z-index:500;width:220px;box-shadow:4px 0 20px rgba(0,0,0,.2)}
+  #ft-main{padding:12px}
+  .ft-stepper{gap:0}
+  .ft-step{min-width:60px}
+}
+</style>
+</head>
+<body>
+<div id="ft-app">
+
+<!-- TOPBAR -->
+<div id="ft-topbar">
+  <div class="logo">AdHash</div>
+  <div class="page-title">/ Fast-Track QA</div>
+  <div class="spacer"></div>
+  <button class="ft-topbtn" onclick="window.location.href='/landing'">← Dashboard</button>
+  <button class="ft-topbtn" id="ft-dark-btn" onclick="ftToggleDark()">🌙</button>
+  <span id="ft-user-name" style="font-size:12px;font-weight:700;color:var(--mut);padding:0 8px"></span>
+</div>
+
+<!-- BODY -->
+<div id="ft-body">
+  <!-- SIDEBAR -->
+  <div id="ft-sidebar">
+    <div style="padding:12px 8px 4px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);padding-left:16px">Navigation</div>
+    <div class="ft-nav-item active" data-view="dashboard" onclick="ftNav('dashboard')"><span class="ft-nav-icon">📊</span>Dashboard</div>
+    <div class="ft-nav-item" data-view="projects" onclick="ftNav('projects')"><span class="ft-nav-icon">📁</span>Projects</div>
+    <div class="ft-nav-item" data-view="releases" onclick="ftNav('releases')"><span class="ft-nav-icon">🚀</span>Releases</div>
+    <div class="ft-nav-item" data-view="assignments" onclick="ftNav('assignments')"><span class="ft-nav-icon">📋</span>My Assignments</div>
+    <div class="ft-nav-item" data-view="workload" onclick="ftNav('workload')"><span class="ft-nav-icon">👥</span>Team Workload</div>
+    <div class="ft-nav-item" data-view="management" onclick="ftNav('management')"><span class="ft-nav-icon">👔</span>Management</div>
+    <div class="ft-nav-item" data-view="reports" onclick="ftNav('reports')"><span class="ft-nav-icon">📊</span>Reports</div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="ft-main">
+    <div id="ft-view-dashboard"></div>
+    <div id="ft-view-projects" style="display:none"></div>
+    <div id="ft-view-releases" style="display:none"></div>
+    <div id="ft-view-release-detail" style="display:none"></div>
+    <div id="ft-view-assignments" style="display:none"></div>
+    <div id="ft-view-workload" style="display:none"></div>
+    <div id="ft-view-management" style="display:none"></div>
+    <div id="ft-view-reports" style="display:none"></div>
+  </div>
+</div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div id="ft-toast-wrap"></div>
+
+<!-- MODALS -->
+<div id="ft-modal-overlay" class="ft-modal-overlay" onclick="if(event.target===this)ftCloseModal()">
+  <div class="ft-modal" id="ft-modal">
+    <div class="ft-modal-hdr">
+      <h3 id="ft-modal-title">Modal</h3>
+      <button class="ftbtn sm" onclick="ftCloseModal()">✕</button>
+    </div>
+    <div class="ft-modal-body" id="ft-modal-body"></div>
+    <div class="ft-modal-footer" id="ft-modal-footer"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── AUTH ──
+const _ftTok = () => localStorage.getItem('qa_jwt_token') || localStorage.getItem('qa_token') || '';
+const _ftHdr = () => ({'Content-Type':'application/json','Authorization':'Bearer '+_ftTok()});
+
+(function checkAuth(){
+  if(!_ftTok()){window.location.href='/';return;}
+  try{
+    const payload=JSON.parse(atob(_ftTok().split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    document.getElementById('ft-user-name').textContent=payload.name||payload.email||'';
+    window._ftCurrentUser = payload.name || payload.email || '';
+    window._ftCurrentRole = payload.role || '';
+  }catch(e){}
+})();
+
+// ── DARK MODE ──
+(function initDark(){
+  if(localStorage.getItem('ftDarkMode')==='1') document.body.classList.add('dark');
+})();
+function ftToggleDark(){
+  document.body.classList.toggle('dark');
+  localStorage.setItem('ftDarkMode', document.body.classList.contains('dark')?'1':'0');
+  document.getElementById('ft-dark-btn').textContent = document.body.classList.contains('dark')?'☀️':'🌙';
+}
+
+// ── TOAST ──
+function ftToast(msg, type='success'){
+  const wrap=document.getElementById('ft-toast-wrap');
+  const t=document.createElement('div');
+  t.className='ft-toast '+type;
+  t.textContent=msg;
+  wrap.appendChild(t);
+  setTimeout(()=>t.classList.add('show'),10);
+  setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),300);},3000);
+}
+
+// ── MODAL ──
+function ftOpenModal(title, bodyHtml, footerHtml){
+  document.getElementById('ft-modal-title').textContent=title;
+  document.getElementById('ft-modal-body').innerHTML=bodyHtml;
+  document.getElementById('ft-modal-footer').innerHTML=footerHtml||'';
+  document.getElementById('ft-modal-overlay').classList.add('open');
+}
+function ftCloseModal(){
+  document.getElementById('ft-modal-overlay').classList.remove('open');
+}
+
+// ── UTILITIES ──
+function ftUuid(){return 'xxxx-xxxx-xxxx'.replace(/x/g,()=>(Math.random()*16|0).toString(16));}
+function ftEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function ftFmt(dt){if(!dt)return '—';try{return new Date(dt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});}catch{return dt;}}
+
+// ── API ──
+async function ftApiGet(key){
+  try{
+    const r=await fetch('/api/qa-data/'+key,{headers:_ftHdr()});
+    if(r.status===404)return null;
+    const d=await r.json();
+    return d.value||null;
+  }catch(e){return null;}
+}
+async function ftApiSet(key,val){
+  await fetch('/api/qa-data/'+key,{method:'POST',headers:_ftHdr(),body:JSON.stringify({value:val})});
+}
+
+// ── STATE ──
+let _ftProjects=[];
+let _ftReleases=[];
+let _ftCurrentView='dashboard';
+let _ftSelectedProject=null;
+let _ftSelectedRelease=null;
+let _ftRelTab='overview';
+
+// ── DATA LOAD ──
+async function ftLoadData(){
+  const [pd,rd]=await Promise.all([ftApiGet('fast_track_projects'),ftApiGet('fast_track_releases')]);
+  _ftProjects=pd?.projects||[];
+  _ftReleases=rd?.releases||[];
+  if(_ftProjects.length===0&&_ftReleases.length===0) ftSeedDemo();
+}
+async function ftSaveProjects(){await ftApiSet('fast_track_projects',{projects:_ftProjects});}
+async function ftSaveReleases(){await ftApiSet('fast_track_releases',{releases:_ftReleases});}
+
+// ── NAV ──
+const FT_VIEWS=['dashboard','projects','releases','release-detail','assignments','workload','management','reports'];
+function ftNav(view, skipSidebar){
+  _ftCurrentView=view;
+  FT_VIEWS.forEach(v=>{
+    const el=document.getElementById('ft-view-'+v);
+    if(el) el.style.display=v===view?'':'none';
+  });
+  if(!skipSidebar){
+    document.querySelectorAll('.ft-nav-item').forEach(n=>n.classList.remove('active'));
+    const ni=document.querySelector('.ft-nav-item[data-view="'+view+'"]');
+    if(ni) ni.classList.add('active');
+  }
+  ftRenderView(view);
+}
+function ftRenderView(view){
+  if(view==='dashboard') ftRenderDashboard();
+  else if(view==='projects') ftRenderProjects();
+  else if(view==='releases') ftRenderReleases();
+  else if(view==='release-detail') ftRenderReleaseDetail();
+  else if(view==='assignments') ftRenderAssignments();
+  else if(view==='workload') ftRenderWorkload();
+  else if(view==='management') ftRenderManagement();
+  else if(view==='reports') ftRenderReports();
+}
+
+// ── HELPERS ──
+function ftGetRelHealth(rel){
+  const bugs=rel.bugs||[];
+  const critOpen=bugs.filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  const s4=rel.stages?.s4||{};
+  if(critOpen>0||s4.status==='Blocked') return {cls:'blocked',label:'🚫 Blocked',reason:critOpen>0?critOpen+' critical bug(s) open':'Smoke test blocked'};
+  const highOpen=bugs.filter(b=>b.severity==='High'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  const reg=rel.stages?.s8||{};
+  if(highOpen>=3||(reg.pct>0&&reg.pct<80)) return {cls:'at-risk',label:'⚠ At Risk',reason:'High bugs or regression coverage low'};
+  const pct=ftRelProgress(rel);
+  if(pct<30&&rel.status!=='Draft') return {cls:'attention',label:'⚡ Attention',reason:'Testing progress low'};
+  return {cls:'healthy',label:'✅ Healthy',reason:'No blockers found'};
+}
+const STAGE_WEIGHTS={s1:5,s2:5,s3:10,s4:15,s5:20,s6:15,s7:10,s8:15,s9:5};
+function ftRelProgress(rel){
+  if(!rel.stages) return 0;
+  let total=0;
+  Object.entries(STAGE_WEIGHTS).forEach(([k,w])=>{
+    const pct=(rel.stages[k]?.pct)||0;
+    total+=pct*(w/100);
+  });
+  return Math.round(total);
+}
+function ftDecisionBadge(d){
+  if(d==='GO') return '<span class="ftbadge go">GO</span>';
+  if(d==='GO WITH RISK') return '<span class="ftbadge go-risk">GO WITH RISK</span>';
+  if(d==='NO-GO') return '<span class="ftbadge nogo">NO-GO</span>';
+  return '<span class="ftbadge grey">Pending</span>';
+}
+function ftStatusBadge(s){
+  const m={'Active':'blue','In Testing':'blue','QA Ready':'green','Ready for Release':'green','Released':'green','Completed':'green','Blocked':'red','Cancelled':'grey','Draft':'grey','Waiting for Fix':'amber','Retesting':'amber','On Hold':'amber'};
+  const c=m[s]||'grey';
+  return `<span class="ftbadge ${c}">${ftEsc(s)}</span>`;
+}
+function ftRiskBadge(r){
+  const m={'Critical':'red','High':'amber','Normal':'blue','Low':'green'};
+  return `<span class="ftbadge ${m[r]||'grey'}">${ftEsc(r||'—')}</span>`;
+}
+function ftProjById(id){return _ftProjects.find(p=>p.id===id)||null;}
+function ftRelById(id){return _ftReleases.find(r=>r.id===id)||null;}
+function ftRelsByProj(pid){return _ftReleases.filter(r=>r.projectId===pid);}
+function ftProgressColor(pct){return pct>=80?'green':pct>=50?'':'amber';}
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════
+// DASHBOARD VIEW
+// ══════════════════════════════════════════════════════
+const KANBAN_COLS=[
+  {id:'change',label:'Change Received'},
+  {id:'qa-ready',label:'QA Ready'},
+  {id:'smoke',label:'Smoke Testing'},
+  {id:'manual',label:'Manual/API'},
+  {id:'fix',label:'Waiting for Fix'},
+  {id:'regression',label:'Regression'},
+  {id:'ready',label:'Ready for Release'},
+  {id:'blocked',label:'Blocked'},
+  {id:'released',label:'Released'}
+];
+function ftRelKanbanCol(rel){
+  const s=rel.status||'Draft';
+  if(s==='Draft'||s==='Change Received') return 'change';
+  if(s==='QA Ready') return 'qa-ready';
+  if(s==='In Testing'){
+    const cs=rel.currentStage||1;
+    if(cs<=3) return 'qa-ready';
+    if(cs===4) return 'smoke';
+    if(cs<=6) return 'manual';
+    if(cs===8) return 'regression';
+    return 'manual';
+  }
+  if(s==='Waiting for Fix') return 'fix';
+  if(s==='Retesting') return 'manual';
+  if(s==='Ready for Release') return 'ready';
+  if(s==='Blocked') return 'blocked';
+  if(s==='Released'||s==='Completed') return 'released';
+  if(s==='Cancelled') return 'blocked';
+  return 'change';
+}
+function ftRenderDashboard(){
+  const el=document.getElementById('ft-view-dashboard');
+  const activeRels=_ftReleases.filter(r=>r.status!=='Cancelled'&&r.status!=='Completed');
+  const critOpen=_ftReleases.flatMap(r=>r.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  const highOpen=_ftReleases.flatMap(r=>r.bugs||[]).filter(b=>b.severity==='High'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  const ready=_ftReleases.filter(r=>r.status==='Ready for Release').length;
+  const blocked=_ftReleases.filter(r=>r.status==='Blocked').length;
+  const activePr=_ftProjects.filter(p=>p.status==='Active').length;
+
+  // Build kanban
+  const cols={};
+  KANBAN_COLS.forEach(c=>cols[c.id]=[]);
+  _ftReleases.forEach(rel=>{
+    if(rel.status==='Cancelled') return;
+    const col=ftRelKanbanCol(rel);
+    const proj=ftProjById(rel.projectId);
+    const health=ftGetRelHealth(rel);
+    const pct=ftRelProgress(rel);
+    cols[col].push({rel,proj,health,pct});
+  });
+
+  let kanbanHtml='<div class="ft-kanban">';
+  KANBAN_COLS.forEach(c=>{
+    const items=cols[c.id];
+    let cards=items.length===0?'<div style="font-size:11px;color:var(--mut);text-align:center;padding:12px">Empty</div>':'';
+    items.forEach(({rel,proj,health,pct})=>{
+      const critB=(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+      const highB=(rel.bugs||[]).filter(b=>b.severity==='High'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+      cards+=`<div class="ft-kanban-card" onclick="ftOpenRelease('${rel.id}')">
+        <div class="ft-kanban-card-title">${ftEsc(rel.name)}</div>
+        <div class="ft-kanban-card-sub" style="margin-bottom:6px">${ftEsc(proj?.name||'—')} · v${ftEsc(rel.version||'?')}</div>
+        ${ftRiskBadge(rel.riskLevel)}
+        <div class="ft-progress" style="margin:6px 0"><div class="ft-progress-fill ${ftProgressColor(pct)}" style="width:${pct}%"></div></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+          ${critB>0?`<span class="ftbadge red" style="font-size:10px">🐛${critB} Crit</span>`:''}
+          ${highB>0?`<span class="ftbadge amber" style="font-size:10px">⚠${highB} High</span>`:''}
+          ${rel.plannedDate?`<span style="font-size:10px;color:var(--mut)">${ftFmt(rel.plannedDate)}</span>`:''}
+        </div>
+        <div style="margin-top:6px">${ftDecisionBadge(rel.decision||'Pending')}</div>
+      </div>`;
+    });
+    kanbanHtml+=`<div class="ft-kanban-col">
+      <div class="ft-kanban-col-hdr">${c.label} <span style="float:right;background:var(--border);border-radius:8px;padding:1px 7px">${items.length}</span></div>
+      <div class="ft-kanban-col-body">${cards}</div>
+    </div>`;
+  });
+  kanbanHtml+='</div>';
+
+  el.innerHTML=`
+  <div class="ft-section-hdr">
+    <h2>📊 QA Dashboard</h2>
+    <button class="ftbtn primary" onclick="ftNav('releases')">+ New Release</button>
+  </div>
+  <div class="ft-metrics">
+    <div class="ft-metric blue"><div class="ft-metric-val">${activePr}</div><div class="ft-metric-lbl">Active Projects</div></div>
+    <div class="ft-metric blue"><div class="ft-metric-val">${activeRels.length}</div><div class="ft-metric-lbl">Releases in QA</div></div>
+    <div class="ft-metric green"><div class="ft-metric-val">${ready}</div><div class="ft-metric-lbl">Ready to Release</div></div>
+    <div class="ft-metric red"><div class="ft-metric-val">${blocked}</div><div class="ft-metric-lbl">Blocked</div></div>
+    <div class="ft-metric red"><div class="ft-metric-val">${critOpen}</div><div class="ft-metric-lbl">Open Critical Bugs</div></div>
+    <div class="ft-metric amber"><div class="ft-metric-val">${highOpen}</div><div class="ft-metric-lbl">Open High Bugs</div></div>
+  </div>
+  <div class="ft-card">
+    <div class="ft-card-title">Release Kanban Board</div>
+    ${kanbanHtml}
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════
+// PROJECTS VIEW
+// ══════════════════════════════════════════════════════
+function ftRenderProjects(){
+  const el=document.getElementById('ft-view-projects');
+  let cards='';
+  if(_ftProjects.length===0){
+    cards=`<div class="ft-empty"><div class="ft-empty-icon">📁</div><div class="ft-empty-text">No projects yet</div><div class="ft-empty-sub">Create your first project to get started.</div></div>`;
+  } else {
+    cards='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">';
+    _ftProjects.forEach(p=>{
+      const rels=ftRelsByProj(p.id);
+      const activeRels=rels.filter(r=>r.status!=='Completed'&&r.status!=='Cancelled').length;
+      cards+=`<div class="ft-card" style="cursor:pointer" onclick="ftSelectProject('${p.id}')">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px">
+          <div>
+            <div style="font-size:15px;font-weight:800;color:var(--txt)">${ftEsc(p.name)}</div>
+            <div style="font-size:12px;color:var(--mut)">${ftEsc(p.client||'—')}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+            ${ftStatusBadge(p.status||'Active')}
+            ${ftRiskBadge(p.priority)}
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--mut);margin-bottom:10px">${ftEsc(p.description||'').slice(0,100)}</div>
+        <div style="display:flex;gap:16px;font-size:11px;color:var(--mut);margin-bottom:12px">
+          <span>🚀 ${activeRels} active releases</span>
+          <span>👤 ${ftEsc(p.qaLead||'—')}</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="ftbtn sm primary" onclick="event.stopPropagation();ftSelectProject('${p.id}')">View Releases</button>
+          <button class="ftbtn sm" onclick="event.stopPropagation();ftOpenEditProject('${p.id}')">Edit</button>
+          <button class="ftbtn sm danger" onclick="event.stopPropagation();ftArchiveProject('${p.id}')">Archive</button>
+        </div>
+      </div>`;
+    });
+    cards+='</div>';
+  }
+  el.innerHTML=`
+  <div class="ft-section-hdr">
+    <h2>📁 Projects</h2>
+    <button class="ftbtn primary" onclick="ftOpenNewProject()">+ New Project</button>
+  </div>
+  ${cards}`;
+}
+
+function ftOpenNewProject(){
+  ftOpenModal('New Project', ftProjectFormHtml(null), `<button class="ftbtn" onclick="ftCloseModal()">Cancel</button><button class="ftbtn primary" onclick="ftSaveProject()">Save Project</button>`);
+}
+function ftOpenEditProject(id){
+  const p=ftProjById(id);if(!p)return;
+  ftOpenModal('Edit Project', ftProjectFormHtml(p), `<button class="ftbtn" onclick="ftCloseModal()">Cancel</button><button class="ftbtn primary" onclick="ftSaveProject('${id}')">Save</button>`);
+}
+function ftProjectFormHtml(p){
+  const v=k=>ftEsc(p?.[k]||'');
+  return `<div class="ft-form-row">
+    <div class="ft-form-group"><label>Project Name *</label><input id="fp-name" value="${v('name')}"></div>
+    <div class="ft-form-group"><label>Client</label><input id="fp-client" value="${v('client')}"></div>
+  </div>
+  <div class="ft-form-group" style="margin-bottom:12px"><label>Description</label><textarea id="fp-desc">${v('description')}</textarea></div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Priority</label><select id="fp-priority">${['Critical','High','Normal'].map(x=>`<option ${(p?.priority||'Normal')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="ft-form-group"><label>Status</label><select id="fp-status">${['Active','On Hold','Completed','Archived'].map(x=>`<option ${(p?.status||'Active')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Project Manager</label><input id="fp-pm" value="${v('projectManager')}"></div>
+    <div class="ft-form-group"><label>QA Lead</label><input id="fp-qalead" value="${v('qaLead')}"></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Manual QA Owner</label><input id="fp-manual" value="${v('manualQaOwner')}"></div>
+    <div class="ft-form-group"><label>Automation QA Owner</label><input id="fp-auto" value="${v('automationQaOwner')}"></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>API Owner</label><input id="fp-api" value="${v('apiOwner')}"></div>
+    <div class="ft-form-group"><label>Dev Owner</label><input id="fp-dev" value="${v('devOwner')}"></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>QA Env URL</label><input id="fp-qaenv" value="${v('qaEnvUrl')}"></div>
+    <div class="ft-form-group"><label>Production URL</label><input id="fp-prod" value="${v('productionUrl')}"></div>
+  </div>`;
+}
+function ftSaveProject(existingId){
+  const name=document.getElementById('fp-name').value.trim();
+  if(!name){ftToast('Project name is required','error');return;}
+  if(existingId){
+    const p=ftProjById(existingId);
+    if(!p) return;
+    p.name=name;p.client=document.getElementById('fp-client').value;
+    p.description=document.getElementById('fp-desc').value;
+    p.priority=document.getElementById('fp-priority').value;
+    p.status=document.getElementById('fp-status').value;
+    p.projectManager=document.getElementById('fp-pm').value;
+    p.qaLead=document.getElementById('fp-qalead').value;
+    p.manualQaOwner=document.getElementById('fp-manual').value;
+    p.automationQaOwner=document.getElementById('fp-auto').value;
+    p.apiOwner=document.getElementById('fp-api').value;
+    p.devOwner=document.getElementById('fp-dev').value;
+    p.qaEnvUrl=document.getElementById('fp-qaenv').value;
+    p.productionUrl=document.getElementById('fp-prod').value;
+    p.updatedAt=new Date().toISOString();
+  } else {
+    _ftProjects.push({
+      id:ftUuid(),name,
+      client:document.getElementById('fp-client').value,
+      description:document.getElementById('fp-desc').value,
+      priority:document.getElementById('fp-priority').value||'Normal',
+      status:document.getElementById('fp-status').value||'Active',
+      projectManager:document.getElementById('fp-pm').value,
+      qaLead:document.getElementById('fp-qalead').value,
+      manualQaOwner:document.getElementById('fp-manual').value,
+      automationQaOwner:document.getElementById('fp-auto').value,
+      apiOwner:document.getElementById('fp-api').value,
+      devOwner:document.getElementById('fp-dev').value,
+      qaEnvUrl:document.getElementById('fp-qaenv').value,
+      productionUrl:document.getElementById('fp-prod').value,
+      createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()
+    });
+  }
+  ftSaveProjects();
+  ftCloseModal();
+  ftToast(existingId?'Project updated':'Project created');
+  ftRenderProjects();
+}
+function ftArchiveProject(id){
+  if(!confirm('Archive this project?')) return;
+  const p=ftProjById(id);if(!p)return;
+  p.status='Archived';p.updatedAt=new Date().toISOString();
+  ftSaveProjects();ftToast('Project archived','warning');ftRenderProjects();
+}
+function ftSelectProject(pid){
+  _ftSelectedProject=pid;
+  ftNav('releases');
+}
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════
+// RELEASES VIEW
+// ══════════════════════════════════════════════════════
+function ftRenderReleases(){
+  const el=document.getElementById('ft-view-releases');
+  const proj=_ftSelectedProject?ftProjById(_ftSelectedProject):null;
+  const rels=_ftSelectedProject?ftRelsByProj(_ftSelectedProject):_ftReleases;
+
+  let projSelector='<select onchange="ftChangeProject(this.value)" style="padding:6px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--card2);color:var(--txt);font-size:13px;font-weight:600;min-width:180px">';
+  projSelector+='<option value="">— All Projects —</option>';
+  _ftProjects.forEach(p=>{
+    projSelector+=`<option value="${p.id}" ${_ftSelectedProject===p.id?'selected':''}>${ftEsc(p.name)}</option>`;
+  });
+  projSelector+='</select>';
+
+  let rows='';
+  if(rels.length===0){
+    rows=`<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--mut)">No releases found. Create one to get started.</td></tr>`;
+  } else {
+    rels.forEach(rel=>{
+      const p=ftProjById(rel.projectId);
+      const pct=ftRelProgress(rel);
+      const health=ftGetRelHealth(rel);
+      rows+=`<tr>
+        <td><div style="font-weight:700">${ftEsc(rel.name)}</div><div style="font-size:11px;color:var(--mut)">${ftEsc(p?.name||'—')}</div></td>
+        <td>${ftEsc(rel.version||'—')}</td>
+        <td>${ftRiskBadge(rel.riskLevel)}</td>
+        <td>${ftStatusBadge(rel.status||'Draft')}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="ft-progress" style="width:80px"><div class="ft-progress-fill ${ftProgressColor(pct)}" style="width:${pct}%"></div></div>
+            <span style="font-size:11px;color:var(--mut)">${pct}%</span>
+          </div>
+        </td>
+        <td>${ftDecisionBadge(rel.decision||'Pending')}</td>
+        <td>${rel.plannedDate?ftFmt(rel.plannedDate):'—'}</td>
+        <td>
+          <button class="ftbtn sm primary" onclick="ftOpenRelease('${rel.id}')">Open</button>
+          <button class="ftbtn sm danger" onclick="ftDeleteRelease('${rel.id}')">Delete</button>
+        </td>
+      </tr>`;
+    });
+  }
+
+  el.innerHTML=`
+  <div class="ft-section-hdr">
+    <h2>🚀 Releases</h2>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      ${projSelector}
+      <button class="ftbtn primary" onclick="ftOpenNewRelease()">+ New Release</button>
+    </div>
+  </div>
+  <div class="ft-tbl-wrap">
+    <table class="ft-tbl">
+      <thead><tr>
+        <th>Release</th><th>Version</th><th>Risk</th><th>Status</th>
+        <th>Progress</th><th>Decision</th><th>Planned Date</th><th>Actions</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+function ftChangeProject(pid){_ftSelectedProject=pid||null;ftRenderReleases();}
+
+function ftOpenNewRelease(){
+  if(_ftProjects.length===0){ftToast('Create a project first','warning');return;}
+  ftOpenModal('New Release', ftReleaseFormHtml(null), `<button class="ftbtn" onclick="ftCloseModal()">Cancel</button><button class="ftbtn primary" onclick="ftSaveRelease()">Create Release</button>`);
+}
+function ftOpenEditRelease(id){
+  const rel=ftRelById(id);if(!rel)return;
+  ftOpenModal('Edit Release', ftReleaseFormHtml(rel), `<button class="ftbtn" onclick="ftCloseModal()">Cancel</button><button class="ftbtn primary" onclick="ftSaveRelease('${id}')">Save</button>`);
+}
+function ftReleaseFormHtml(rel){
+  const v=k=>ftEsc(rel?.[k]||'');
+  let projOpts=_ftProjects.map(p=>`<option value="${p.id}" ${rel?.projectId===p.id?'selected':''}>${ftEsc(p.name)}</option>`).join('');
+  return `<div class="ft-form-row">
+    <div class="ft-form-group"><label>Project *</label><select id="fr-proj">${projOpts}</select></div>
+    <div class="ft-form-group"><label>Release Name *</label><input id="fr-name" value="${v('name')}" placeholder="e.g. Sprint 12 Release"></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Version *</label><input id="fr-version" value="${v('version')}" placeholder="e.g. 2.1.0"></div>
+    <div class="ft-form-group"><label>Build Number</label><input id="fr-build" value="${v('buildNumber')}"></div>
+  </div>
+  <div class="ft-form-group" style="margin-bottom:12px"><label>Summary</label><textarea id="fr-summary">${v('summary')}</textarea></div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Risk Level</label><select id="fr-risk">${['Critical','High','Normal','Low'].map(x=>`<option ${(rel?.riskLevel||'Normal')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="ft-form-group"><label>Status</label><select id="fr-status">${['Draft','QA Ready','In Testing','Waiting for Fix','Retesting','Ready for Release','Blocked','Released','Completed','Cancelled'].map(x=>`<option ${(rel?.status||'Draft')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Release Owner</label><input id="fr-owner" value="${v('releaseOwner')}"></div>
+    <div class="ft-form-group"><label>QA Lead</label><input id="fr-qalead" value="${v('qaLead')}"></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Planned Date</label><input type="date" id="fr-planned" value="${v('plannedDate')}"></div>
+    <div class="ft-form-group"><label>QA Env URL</label><input id="fr-qaenv" value="${v('qaEnvUrl')}"></div>
+  </div>
+  <div class="ft-form-group" style="margin-bottom:12px"><label>Known Risks</label><textarea id="fr-risks" style="min-height:50px">${v('knownRisks')}</textarea></div>
+  <div class="ft-form-group"><label>Client Notes</label><textarea id="fr-cnotes" style="min-height:50px">${v('clientNotes')}</textarea></div>`;
+}
+function ftSaveRelease(existingId){
+  const name=document.getElementById('fr-name').value.trim();
+  const version=document.getElementById('fr-version').value.trim();
+  const projectId=document.getElementById('fr-proj').value;
+  if(!name||!version){ftToast('Name and version required','error');return;}
+  const data={
+    projectId,name,version,
+    buildNumber:document.getElementById('fr-build').value,
+    summary:document.getElementById('fr-summary').value,
+    riskLevel:document.getElementById('fr-risk').value,
+    status:document.getElementById('fr-status').value,
+    releaseOwner:document.getElementById('fr-owner').value,
+    qaLead:document.getElementById('fr-qalead').value,
+    plannedDate:document.getElementById('fr-planned').value,
+    qaEnvUrl:document.getElementById('fr-qaenv').value,
+    knownRisks:document.getElementById('fr-risks').value,
+    clientNotes:document.getElementById('fr-cnotes').value,
+    updatedAt:new Date().toISOString()
+  };
+  if(existingId){
+    const rel=ftRelById(existingId);if(!rel)return;
+    Object.assign(rel,data);
+  } else {
+    const newRel={
+      id:ftUuid(),...data,
+      currentStage:1,decision:'Pending',
+      stages:{s1:{status:'Not Started',pct:0},s2:{status:'Not Started',pct:0},s3:{status:'Not Started',pct:0},
+              s4:{status:'Not Started',pct:0},s5:{status:'Not Started',pct:0},s6:{status:'Not Started',pct:0},
+              s7:{status:'Not Started',pct:0},s8:{status:'Not Started',pct:0},s9:{status:'Not Started',pct:0},s10:{status:'Not Started',pct:0}},
+      bugs:[],teamAssignments:[],history:[],regressionPack:ftDefaultRegression(),
+      createdAt:new Date().toISOString()
+    };
+    _ftReleases.push(newRel);
+  }
+  ftSaveReleases();ftCloseModal();ftToast(existingId?'Release updated':'Release created');ftRenderReleases();
+}
+function ftDeleteRelease(id){
+  if(!confirm('Delete this release? This cannot be undone.')) return;
+  _ftReleases=_ftReleases.filter(r=>r.id!==id);
+  ftSaveReleases();ftToast('Release deleted','warning');ftRenderReleases();
+}
+function ftOpenRelease(id){
+  _ftSelectedRelease=id;
+  _ftRelTab='overview';
+  ftNav('release-detail',true);
+}
+
+// ══════════════════════════════════════════════════════
+// RELEASE DETAIL
+// ══════════════════════════════════════════════════════
+const STAGE_DEFS=[
+  {id:'s1',num:1,icon:'📥',name:'Change Request',tabName:'Change Request'},
+  {id:'s2',num:2,icon:'⚡',name:'Risk Check',tabName:'Risk Check'},
+  {id:'s3',num:3,icon:'👨‍💻',name:'Dev Self-Test',tabName:'Dev Self-Test'},
+  {id:'s4',num:4,icon:'🔥',name:'Smoke Test',tabName:'Smoke Test'},
+  {id:'s5',num:5,icon:'🧪',name:'Manual Testing',tabName:'Manual Testing'},
+  {id:'s6',num:6,icon:'🔌',name:'API & Data',tabName:'API & Data'},
+  {id:'s7',num:7,icon:'🐛',name:'Bug Retest',tabName:'Bugs'},
+  {id:'s8',num:8,icon:'🔁',name:'Regression',tabName:'Regression'},
+  {id:'s9',num:9,icon:'🚦',name:'Decision',tabName:'Decision'},
+  {id:'s10',num:10,icon:'🚀',name:'Production',tabName:'Production'},
+];
+const REL_TABS=['overview','workflow','s1','s2','s3','s4','s5','s6','s7','s8','s9','s10','team','history'];
+
+function ftRenderReleaseDetail(){
+  const el=document.getElementById('ft-view-release-detail');
+  const rel=ftRelById(_ftSelectedRelease);
+  if(!rel){el.innerHTML='<div class="ft-empty"><div class="ft-empty-icon">❌</div><div class="ft-empty-text">Release not found</div></div>';return;}
+  const proj=ftProjById(rel.projectId);
+  const health=ftGetRelHealth(rel);
+  const pct=ftRelProgress(rel);
+
+  // Stepper
+  let stepperHtml='<div class="ft-stepper">';
+  STAGE_DEFS.forEach(s=>{
+    const st=rel.stages?.[s.id]||{};
+    const sPct=st.pct||0;
+    let cls='';
+    if(sPct===100) cls='done';
+    else if(rel.currentStage===s.num) cls='active';
+    else if(st.status==='Blocked') cls='blocked';
+    stepperHtml+=`<div class="ft-step ${cls}" onclick="ftRelTab('${s.id}')">
+      <div class="ft-step-circle">${sPct===100?'✓':s.icon}</div>
+      <div class="ft-step-label">${s.name}</div>
+    </div>`;
+  });
+  stepperHtml+='</div>';
+
+  // Tabs
+  const tabLabels={overview:'Overview',workflow:'Workflow',s1:'📥 CR',s2:'⚡ Risk',s3:'👨‍💻 Dev',s4:'🔥 Smoke',s5:'🧪 Manual',s6:'🔌 API',s7:'🐛 Bugs',s8:'🔁 Regression',s9:'🚦 Decision',s10:'🚀 Production',team:'👥 Team',history:'📜 History'};
+  let tabsHtml='<div class="ft-tabs">';
+  REL_TABS.forEach(t=>{
+    tabsHtml+=`<button class="ft-tab ${_ftRelTab===t?'active':''}" onclick="ftRelTab('${t}')">${tabLabels[t]||t}</button>`;
+  });
+  tabsHtml+='</div>';
+
+  el.innerHTML=`
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+    <button class="ftbtn" onclick="ftBackToReleases()">← Releases</button>
+    <div>
+      <div style="font-size:17px;font-weight:800;color:var(--txt)">${ftEsc(rel.name)} <span style="font-size:13px;color:var(--mut)">v${ftEsc(rel.version||'?')}</span></div>
+      <div style="font-size:12px;color:var(--mut)">${ftEsc(proj?.name||'—')}</div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;align-items:center">
+      ${ftStatusBadge(rel.status||'Draft')}
+      ${ftDecisionBadge(rel.decision||'Pending')}
+      <span class="ft-health ${health.cls}" style="padding:4px 10px;font-size:11px;margin:0">${health.label}</span>
+      <button class="ftbtn sm" onclick="ftOpenEditRelease('${rel.id}')">✏ Edit</button>
+      <button class="ftbtn sm success" onclick="ftDownloadReport('${rel.id}')">⬇ Report</button>
+    </div>
+  </div>
+  <div id="ft-rel-stepper">${stepperHtml}</div>
+  <div id="ft-rel-tabs">${tabsHtml}</div>
+  <div id="ft-rel-content"></div>`;
+
+  ftRenderRelTab();
+}
+function ftBackToReleases(){ftNav('releases');}
+function ftRelTab(tab){
+  _ftRelTab=tab;
+  document.querySelectorAll('.ft-tab').forEach(t=>t.classList.remove('active'));
+  const el=document.querySelector(`.ft-tab[onclick="ftRelTab('${tab}')"]`);
+  if(el) el.classList.add('active');
+  ftRenderRelTab();
+}
+function ftRenderRelTab(){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  const el=document.getElementById('ft-rel-content');if(!el)return;
+  if(_ftRelTab==='overview') el.innerHTML=ftRelOverview(rel);
+  else if(_ftRelTab==='workflow') el.innerHTML=ftRelWorkflow(rel);
+  else if(_ftRelTab==='s1') el.innerHTML=ftStageForm(rel,'s1');
+  else if(_ftRelTab==='s2') el.innerHTML=ftStageForm(rel,'s2');
+  else if(_ftRelTab==='s3') el.innerHTML=ftStageChecklist(rel,'s3');
+  else if(_ftRelTab==='s4') el.innerHTML=ftStageSmoke(rel);
+  else if(_ftRelTab==='s5') el.innerHTML=ftStageManual(rel);
+  else if(_ftRelTab==='s6') el.innerHTML=ftStageApi(rel);
+  else if(_ftRelTab==='s7') el.innerHTML=ftStageBugs(rel);
+  else if(_ftRelTab==='s8') el.innerHTML=ftStageRegression(rel);
+  else if(_ftRelTab==='s9') el.innerHTML=ftStageDecision(rel);
+  else if(_ftRelTab==='s10') el.innerHTML=ftStageProduction(rel);
+  else if(_ftRelTab==='team') el.innerHTML=ftRelTeam(rel);
+  else if(_ftRelTab==='history') el.innerHTML=ftRelHistory(rel);
+}
+
+function ftRelOverview(rel){
+  const proj=ftProjById(rel.projectId);
+  const pct=ftRelProgress(rel);
+  const health=ftGetRelHealth(rel);
+  const bugs=rel.bugs||[];
+  const critB=bugs.filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  const highB=bugs.filter(b=>b.severity==='High'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  const openB=bugs.filter(b=>b.status!=='Closed'&&b.status!=='Deferred').length;
+  return `
+  <div class="ft-health ${health.cls}">${health.label} — ${health.reason}</div>
+  <div class="ft-metrics">
+    <div class="ft-metric"><div class="ft-metric-val" style="font-size:20px">${pct}%</div><div class="ft-metric-lbl">Overall Progress</div></div>
+    <div class="ft-metric red"><div class="ft-metric-val">${critB}</div><div class="ft-metric-lbl">Critical Bugs</div></div>
+    <div class="ft-metric amber"><div class="ft-metric-val">${highB}</div><div class="ft-metric-lbl">High Bugs</div></div>
+    <div class="ft-metric"><div class="ft-metric-val">${openB}</div><div class="ft-metric-lbl">Open Bugs</div></div>
+    <div class="ft-metric"><div class="ft-metric-val">${bugs.length}</div><div class="ft-metric-lbl">Total Bugs</div></div>
+    <div class="ft-metric"><div class="ft-metric-val">${rel.teamAssignments?.length||0}</div><div class="ft-metric-lbl">Team Assignments</div></div>
+  </div>
+  <div class="ft-card">
+    <div class="ft-card-title">Release Details</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;font-size:13px">
+      <div><span style="color:var(--mut);font-size:11px;font-weight:700;text-transform:uppercase">Project</span><div style="font-weight:600;margin-top:2px">${ftEsc(proj?.name||'—')}</div></div>
+      <div><span style="color:var(--mut);font-size:11px;font-weight:700;text-transform:uppercase">Version</span><div style="font-weight:600;margin-top:2px">${ftEsc(rel.version||'—')}</div></div>
+      <div><span style="color:var(--mut);font-size:11px;font-weight:700;text-transform:uppercase">Risk Level</span><div style="margin-top:2px">${ftRiskBadge(rel.riskLevel)}</div></div>
+      <div><span style="color:var(--mut);font-size:11px;font-weight:700;text-transform:uppercase">Release Owner</span><div style="font-weight:600;margin-top:2px">${ftEsc(rel.releaseOwner||'—')}</div></div>
+      <div><span style="color:var(--mut);font-size:11px;font-weight:700;text-transform:uppercase">QA Lead</span><div style="font-weight:600;margin-top:2px">${ftEsc(rel.qaLead||'—')}</div></div>
+      <div><span style="color:var(--mut);font-size:11px;font-weight:700;text-transform:uppercase">Planned Date</span><div style="font-weight:600;margin-top:2px">${ftFmt(rel.plannedDate)}</div></div>
+    </div>
+    ${rel.summary?`<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:13px;color:var(--txt2)">${ftEsc(rel.summary)}</div>`:''}
+    ${rel.knownRisks?`<div style="margin-top:10px;padding:10px;background:rgba(245,158,11,.06);border-radius:8px;border:1px solid rgba(245,158,11,.2);font-size:12px"><span style="font-weight:700;color:var(--warn)">⚠ Known Risks: </span>${ftEsc(rel.knownRisks)}</div>`:''}
+  </div>
+  <div class="ft-card">
+    <div class="ft-card-title">Stage Progress</div>
+    ${STAGE_DEFS.map(s=>{const st=rel.stages?.[s.id]||{};const p=st.pct||0;return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="width:24px;text-align:center;font-size:13px">${s.icon}</div>
+      <div style="flex:1;font-size:12px;font-weight:600;min-width:120px">${s.name}</div>
+      <div class="ft-progress" style="width:120px"><div class="ft-progress-fill ${ftProgressColor(p)}" style="width:${p}%"></div></div>
+      <div style="font-size:11px;color:var(--mut);width:30px">${p}%</div>
+      ${ftStatusBadge(st.status||'Not Started')}
+    </div>`;}).join('')}
+  </div>`;
+}
+
+function ftRelWorkflow(rel){
+  let rows='';
+  STAGE_DEFS.forEach(s=>{
+    const st=rel.stages?.[s.id]||{};
+    rows+=`<tr>
+      <td>${s.icon} ${s.name}</td>
+      <td>${ftStatusBadge(st.status||'Not Started')}</td>
+      <td>${st.owner||'—'}</td>
+      <td>${ftFmt(st.startDt)}</td>
+      <td>${ftFmt(st.endDt)}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="ft-progress" style="width:60px"><div class="ft-progress-fill ${ftProgressColor(st.pct||0)}" style="width:${st.pct||0}%"></div></div>
+          <span style="font-size:11px">${st.pct||0}%</span>
+        </div>
+      </td>
+      <td>${st.blocked?'<span class="ftbadge red">Blocked</span>':''}</td>
+      <td><button class="ftbtn sm primary" onclick="ftUpdateStage('${s.id}')">Update</button></td>
+    </tr>`;
+  });
+  return `<div class="ft-card">
+    <div class="ft-card-title">10-Stage Workflow</div>
+    <div class="ft-tbl-wrap"><table class="ft-tbl">
+      <thead><tr><th>Stage</th><th>Status</th><th>Owner</th><th>Start</th><th>End</th><th>Progress</th><th>Blocked</th><th>Action</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function ftUpdateStage(sid){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  const st=rel.stages?.[sid]||{};
+  const s=STAGE_DEFS.find(x=>x.id===sid);
+  ftOpenModal(`Update: ${s?.icon} ${s?.name}`,`
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Status</label><select id="fus-status">${['Not Started','In Progress','Done','Blocked','Skipped'].map(x=>`<option ${(st.status||'Not Started')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="ft-form-group"><label>Owner</label><input id="fus-owner" value="${ftEsc(st.owner||'')}"></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Start Date</label><input type="datetime-local" id="fus-start" value="${st.startDt||''}"></div>
+    <div class="ft-form-group"><label>End Date</label><input type="datetime-local" id="fus-end" value="${st.endDt||''}"></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Progress %</label><input type="number" min="0" max="100" id="fus-pct" value="${st.pct||0}"></div>
+    <div class="ft-form-group"><label>Bug Count</label><input type="number" min="0" id="fus-bugs" value="${st.bugCount||0}"></div>
+  </div>
+  <div class="ft-form-group" style="margin-bottom:10px"><label>Evidence URL</label><input id="fus-evidence" value="${ftEsc(st.evidence||'')}"></div>
+  <div class="ft-form-group" style="margin-bottom:10px"><label>Comments</label><textarea id="fus-comments">${ftEsc(st.comments||'')}</textarea></div>
+  <div style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fus-blocked" ${st.blocked?'checked':''}><label for="fus-blocked" style="font-size:13px;font-weight:600;cursor:pointer">Mark as Blocked</label></div>`,
+  `<button class="ftbtn" onclick="ftCloseModal()">Cancel</button><button class="ftbtn primary" onclick="ftSaveStageUpdate('${sid}')">Save Update</button>`);
+}
+function ftSaveStageUpdate(sid){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  if(!rel.stages) rel.stages={};
+  rel.stages[sid]={
+    status:document.getElementById('fus-status').value,
+    owner:document.getElementById('fus-owner').value,
+    startDt:document.getElementById('fus-start').value,
+    endDt:document.getElementById('fus-end').value,
+    pct:parseInt(document.getElementById('fus-pct').value)||0,
+    bugCount:parseInt(document.getElementById('fus-bugs').value)||0,
+    evidence:document.getElementById('fus-evidence').value,
+    comments:document.getElementById('fus-comments').value,
+    blocked:document.getElementById('fus-blocked').checked,
+    ...{data:rel.stages[sid]?.data||{}}
+  };
+  ftAddHistory(rel,STAGE_DEFS.find(x=>x.id===sid)?.name,'Stage','','Updated',rel.stages[sid].status,window._ftCurrentUser,'');
+  ftSaveReleases();ftCloseModal();ftToast('Stage updated');
+  ftRenderReleaseDetail();
+}
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════
+// STAGE FORMS
+// ══════════════════════════════════════════════════════
+function ftStageForm(rel,sid){
+  const st=rel.stages?.[sid]||{};
+  const d=st.data||{};
+  const sdef=STAGE_DEFS.find(x=>x.id===sid);
+  if(sid==='s1'){
+    return `<div class="ft-card">
+      <div class="ft-card-title">📥 Stage 1: Change Request</div>
+      <div class="ft-form-row">
+        <div class="ft-form-group"><label>What Changed *</label><textarea id="s1-what">${ftEsc(d.whatChanged||'')}</textarea></div>
+        <div class="ft-form-group"><label>Raised By</label><input id="s1-by" value="${ftEsc(d.raisedBy||'')}"></div>
+      </div>
+      <div class="ft-form-row">
+        <div class="ft-form-group"><label>Ticket / Story ID</label><input id="s1-ticket" value="${ftEsc(d.ticketId||'')}"></div>
+        <div class="ft-form-group"><label>Priority</label><select id="s1-priority">${['Critical','High','Normal','Low'].map(x=>`<option ${(d.priority||'Normal')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      </div>
+      <div class="ft-form-row">
+        <div class="ft-form-group"><label>Affected Modules</label><input id="s1-modules" value="${ftEsc(d.modules||'')}"></div>
+        <div class="ft-form-group"><label>Change Date</label><input type="date" id="s1-date" value="${d.changeDate||''}"></div>
+      </div>
+      <div class="ft-form-group" style="margin-bottom:12px"><label>Description / Acceptance Criteria</label><textarea id="s1-desc" style="min-height:100px">${ftEsc(d.description||'')}</textarea></div>
+      <div class="ft-form-group" style="margin-bottom:12px"><label>Additional Context / Business Justification</label><textarea id="s1-context">${ftEsc(d.context||'')}</textarea></div>
+      <div class="ft-form-row">
+        <div class="ft-form-group"><label>Approved By</label><input id="s1-approved" value="${ftEsc(d.approvedBy||'')}"></div>
+        <div class="ft-form-group"><label>Approval Date</label><input type="date" id="s1-approvalDate" value="${d.approvalDate||''}"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="ftbtn primary" onclick="ftSaveS1()">Save Change Request</button>
+        <button class="ftbtn" onclick="ftUpdateStage('s1')">Update Stage Status</button>
+      </div>
+    </div>`;
+  }
+  if(sid==='s2'){
+    const riskAuto=ftAutoRisk(d.whatChanged||d.modules||'');
+    return `<div class="ft-card">
+      <div class="ft-card-title">⚡ Stage 2: Five-Minute Risk Check</div>
+      <div class="ft-form-row">
+        <div class="ft-form-group"><label>What Changed</label><textarea id="s2-what">${ftEsc(d.whatChanged||'')}</textarea></div>
+        <div class="ft-form-group"><label>Main Module</label><input id="s2-module" value="${ftEsc(d.mainModule||'')}"></div>
+      </div>
+      <div class="ft-form-row">
+        <div class="ft-form-group"><label>Related Modules</label><input id="s2-related" value="${ftEsc(d.relatedModules||'')}"></div>
+        <div class="ft-form-group"><label>Testing Owner</label><input id="s2-owner" value="${ftEsc(d.testingOwner||'')}"></div>
+      </div>
+      <div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);margin-bottom:10px">Impact Assessment (Yes / No / NA)</div>
+        ${[['mainFlow','Main Flow Affected?'],['dataAffected','Data / Database Affected?'],['apiAffected','APIs / Integrations Affected?'],['permissionsAffected','Permissions / Auth Affected?'],['paymentAffected','Payment / Financial Logic Affected?'],['securityAffected','Security / Encryption Affected?'],['regressionImpact','Regression Impact Likely?']].map(([k,l])=>`
+        <div class="ft-check-row">
+          <div class="ft-check-label" style="font-weight:600">${l}</div>
+          <div class="ft-radio-grp">
+            ${['Yes','No','NA'].map(v=>`<button class="ft-radio-btn ${(d[k]||'')==v?'selected-'+(v==='Yes'?'yes':v==='No'?'no':'na'):''}" onclick="ftRiskToggle(this,'${k}','${v}')">${v}</button>`).join('')}
+          </div>
+        </div>`).join('')}
+        <input type="hidden" id="s2-impacts" value="${ftEsc(JSON.stringify(Object.fromEntries(['mainFlow','dataAffected','apiAffected','permissionsAffected','paymentAffected','securityAffected','regressionImpact'].map(k=>[k,d[k]||'No']))))}">
+      </div>
+      <div class="ft-form-row">
+        <div class="ft-form-group"><label>Risk Level <span style="color:var(--accent)">(Auto: ${riskAuto})</span></label>
+          <select id="s2-risk">${['Critical','High','Normal','Low'].map(x=>`<option ${(d.riskLevel||riskAuto)===x?'selected':''}>${x}</option>`).join('')}</select>
+        </div>
+        <div class="ft-form-group"><label>Planned Test Date</label><input type="date" id="s2-planned" value="${d.plannedDate||''}"></div>
+      </div>
+      <div class="ft-form-group" style="margin-bottom:12px"><label>Risk Reason / Notes</label><textarea id="s2-reason">${ftEsc(d.riskReason||'')}</textarea></div>
+      <div class="ft-form-row">
+        <div class="ft-form-group"><label>Test Data Available?</label><select id="s2-testdata">${['Yes','No','Partial'].map(x=>`<option ${(d.testDataAvailable||'No')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="ftbtn primary" onclick="ftSaveS2()">Save Risk Check</button>
+        <button class="ftbtn" onclick="ftUpdateStage('s2')">Update Stage Status</button>
+      </div>
+    </div>`;
+  }
+  return `<div class="ft-card"><div class="ft-empty"><div class="ft-empty-icon">${sdef?.icon}</div><div class="ft-empty-text">${sdef?.name}</div><div class="ft-empty-sub">Use the Workflow tab to update stage status.</div></div></div>`;
+}
+
+function ftAutoRisk(text){
+  const t=(text||'').toLowerCase();
+  if(/login|payment|trading|financial|permission|security|data.?loss|signature|subscription|production.?config/.test(t)) return 'Critical';
+  if(/create|edit|delete|export|notification|workflow|api/.test(t)) return 'High';
+  return 'Normal';
+}
+function ftRiskToggle(btn,key,val){
+  const row=btn.closest('.ft-check-row');
+  row.querySelectorAll('.ft-radio-btn').forEach(b=>{
+    b.className='ft-radio-btn';
+  });
+  const cls=val==='Yes'?'selected-yes':val==='No'?'selected-no':'selected-na';
+  btn.classList.add(cls);
+  // Update hidden input
+  try{
+    const hidden=document.getElementById('s2-impacts');
+    const obj=JSON.parse(hidden.value||'{}');
+    obj[key]=val;
+    hidden.value=JSON.stringify(obj);
+  }catch(e){}
+}
+
+function ftSaveS1(){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  if(!rel.stages) rel.stages={};
+  if(!rel.stages.s1) rel.stages.s1={status:'Not Started',pct:0};
+  rel.stages.s1.data={
+    whatChanged:document.getElementById('s1-what').value,
+    raisedBy:document.getElementById('s1-by').value,
+    ticketId:document.getElementById('s1-ticket').value,
+    priority:document.getElementById('s1-priority').value,
+    modules:document.getElementById('s1-modules').value,
+    changeDate:document.getElementById('s1-date').value,
+    description:document.getElementById('s1-desc').value,
+    context:document.getElementById('s1-context').value,
+    approvedBy:document.getElementById('s1-approved').value,
+    approvalDate:document.getElementById('s1-approvalDate').value,
+  };
+  if(!rel.stages.s1.pct) rel.stages.s1.pct=50;
+  if(rel.stages.s1.status==='Not Started') rel.stages.s1.status='In Progress';
+  ftAddHistory(rel,'Change Request','Data','—','Saved',rel.stages.s1.status,window._ftCurrentUser,'');
+  ftSaveReleases();ftToast('Change Request saved');
+}
+function ftSaveS2(){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  if(!rel.stages) rel.stages={};
+  if(!rel.stages.s2) rel.stages.s2={status:'Not Started',pct:0};
+  let impacts={};
+  try{impacts=JSON.parse(document.getElementById('s2-impacts').value||'{}');}catch(e){}
+  rel.stages.s2.data={
+    whatChanged:document.getElementById('s2-what').value,
+    mainModule:document.getElementById('s2-module').value,
+    relatedModules:document.getElementById('s2-related').value,
+    testingOwner:document.getElementById('s2-owner').value,
+    ...impacts,
+    riskLevel:document.getElementById('s2-risk').value,
+    plannedDate:document.getElementById('s2-planned').value,
+    riskReason:document.getElementById('s2-reason').value,
+    testDataAvailable:document.getElementById('s2-testdata').value,
+  };
+  rel.riskLevel=rel.stages.s2.data.riskLevel;
+  if(!rel.stages.s2.pct) rel.stages.s2.pct=100;
+  if(rel.stages.s2.status==='Not Started') rel.stages.s2.status='Done';
+  ftSaveReleases();ftToast('Risk Check saved');
+  ftRenderReleaseDetail();
+}
+
+// ── DEV SELF-TEST (S3) ──
+const S3_ITEMS=['Unit tests pass locally','Build compiles without errors','No console errors on main flow','Feature works as per requirement','Edge cases manually tested','Rollback plan identified','Environment variables confirmed','Dependent services tested','No hardcoded values / credentials','Self-test sign-off completed'];
+function ftStageChecklist(rel,sid){
+  const st=rel.stages?.[sid]||{};
+  const items=st.data?.items||{};
+  const sdef=STAGE_DEFS.find(x=>x.id===sid);
+  const list=sid==='s3'?S3_ITEMS:[];
+  let rows=list.map((lbl,i)=>{
+    const item=items[i]||{};
+    return `<div class="ft-check-row" style="flex-wrap:wrap;gap:6px" id="s3-row-${i}">
+      <div class="ft-check-num">${i+1}</div>
+      <div class="ft-check-label">${ftEsc(lbl)}</div>
+      <div class="ft-radio-grp">
+        ${['Yes','No','NA'].map(v=>`<button class="ft-radio-btn ${(item.val||'')==v?'selected-'+(v==='Yes'?'yes':v==='No'?'no':'na'):''}" onclick="ftS3Set(${i},'${v}')">${v}</button>`).join('')}
+      </div>
+      <input placeholder="Owner" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);width:110px" id="s3-owner-${i}" value="${ftEsc(item.owner||'')}">
+      <input placeholder="Notes" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);flex:1;min-width:120px" id="s3-notes-${i}" value="${ftEsc(item.notes||'')}">
+    </div>`;
+  }).join('');
+  const pass=list.filter((_,i)=>(items[i]?.val||'')==='Yes').length;
+  const na=list.filter((_,i)=>(items[i]?.val||'')==='NA').length;
+  const fail=list.filter((_,i)=>(items[i]?.val||'')==='No').length;
+  return `<div class="ft-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="ft-card-title" style="margin:0">👨‍💻 Stage 3: Dev Self-Test</div>
+      <div style="display:flex;gap:6px">
+        <span class="ftbadge green">${pass} Pass</span>
+        <span class="ftbadge red">${fail} Fail</span>
+        <span class="ftbadge grey">${na} NA</span>
+        <button class="ftbtn sm primary" onclick="ftSaveS3()">Save</button>
+        <button class="ftbtn sm" onclick="ftUpdateStage('s3')">Update Stage</button>
+      </div>
+    </div>
+    ${rows}
+  </div>`;
+}
+function ftS3Set(idx,val){
+  const btns=document.querySelectorAll(`#s3-row-${idx} .ft-radio-btn`);
+  btns.forEach(b=>{b.className='ft-radio-btn';});
+  const cls=val==='Yes'?'selected-yes':val==='No'?'selected-no':'selected-na';
+  btns[['Yes','No','NA'].indexOf(val)].classList.add(cls);
+  // store temporarily in DOM
+  const row=document.getElementById('s3-row-'+idx);
+  if(row) row.dataset.val=val;
+}
+function ftSaveS3(){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  if(!rel.stages) rel.stages={};
+  if(!rel.stages.s3) rel.stages.s3={status:'Not Started',pct:0};
+  const items={};
+  S3_ITEMS.forEach((_,i)=>{
+    const row=document.getElementById('s3-row-'+i);
+    const selBtn=row?.querySelector('.ft-radio-btn.selected-yes,.ft-radio-btn.selected-no,.ft-radio-btn.selected-na');
+    const val=selBtn?selBtn.textContent:((rel.stages.s3.data?.items?.[i]?.val)||'');
+    items[i]={val,owner:document.getElementById('s3-owner-'+i)?.value||'',notes:document.getElementById('s3-notes-'+i)?.value||''};
+  });
+  rel.stages.s3.data={items};
+  const pass=S3_ITEMS.filter((_,i)=>items[i]?.val==='Yes').length;
+  const na=S3_ITEMS.filter((_,i)=>items[i]?.val==='NA').length;
+  rel.stages.s3.pct=Math.round((pass+na)/S3_ITEMS.length*100);
+  const allDone=S3_ITEMS.every((_,i)=>items[i]?.val==='Yes'||items[i]?.val==='NA');
+  if(allDone) rel.stages.s3.status='Done';
+  else if(pass>0||na>0) rel.stages.s3.status='In Progress';
+  ftSaveReleases();ftToast('Dev Self-Test saved');ftRenderRelTab();
+}
+
+// ── SMOKE TEST (S4) ──
+const S4_TESTS=[
+  {name:'Login with valid credentials',mandatory:true,type:'Manual'},
+  {name:'Landing page loads without errors',mandatory:true,type:'Manual'},
+  {name:'Main navigation works',mandatory:true,type:'Manual'},
+  {name:'Core feature 1 accessible',mandatory:true,type:'Manual'},
+  {name:'Core feature 2 accessible',mandatory:true,type:'Manual'},
+  {name:'API health check endpoint',mandatory:true,type:'Automated'},
+  {name:'Database connectivity test',mandatory:true,type:'Automated'},
+  {name:'Logout works correctly',mandatory:false,type:'Manual'},
+];
+function ftStageSmoke(rel){
+  const st=rel.stages?.s4||{};
+  const data=st.data?.tests||{};
+  const smokeFailed=Object.values(data).some(t=>t.status==='Fail'&&t.mandatory!==false);
+  let rows=S4_TESTS.map((t,i)=>{
+    const td=data[i]||{};
+    return `<tr id="s4-row-${i}">
+      <td>${ftEsc(t.name)} ${t.mandatory?'<span style="color:var(--danger);font-size:10px">*</span>':''}</td>
+      <td><span class="ftbadge ${t.type==='Automated'?'blue':'grey'}" style="font-size:10px">${t.type}</span></td>
+      <td>
+        <select onchange="ftS4Save()" style="padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--card2);color:var(--txt);font-size:12px" id="s4-status-${i}">
+          ${['Pending','Pass','Fail','Blocked','NA'].map(v=>`<option ${(td.status||'Pending')===v?'selected':''}>${v}</option>`).join('')}
+        </select>
+      </td>
+      <td><input placeholder="Owner" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);width:100px" id="s4-owner-${i}" value="${ftEsc(td.owner||'')}"></td>
+      <td><input placeholder="Browser/Env" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);width:100px" id="s4-env-${i}" value="${ftEsc(td.env||'')}"></td>
+      <td><input placeholder="Failure reason" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);width:140px" id="s4-reason-${i}" value="${ftEsc(td.failureReason||'')}"></td>
+    </tr>`;
+  }).join('');
+  const banner=smokeFailed?
+    `<div style="background:rgba(239,68,68,.1);border:2px solid rgba(239,68,68,.4);border-radius:10px;padding:12px 16px;margin-bottom:14px;font-weight:700;color:#ef4444">🚫 BUILD REJECTED — Critical smoke test(s) failed. Fix and retest before proceeding.</div>`:
+    `<div style="background:rgba(16,185,129,.08);border:1.5px solid rgba(16,185,129,.3);border-radius:10px;padding:12px 16px;margin-bottom:14px;font-weight:700;color:#10b981">✅ SMOKE PASSED — All mandatory tests passed.</div>`;
+  return `<div class="ft-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="ft-card-title" style="margin:0">🔥 Stage 4: Smoke Test</div>
+      <button class="ftbtn sm primary" onclick="ftS4Save()">Save Smoke Tests</button>
+    </div>
+    ${banner}
+    <div class="ft-tbl-wrap"><table class="ft-tbl">
+      <thead><tr><th>Test</th><th>Type</th><th>Status</th><th>Owner</th><th>Env/Browser</th><th>Failure Reason</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
+function ftS4Save(){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  if(!rel.stages) rel.stages={};
+  if(!rel.stages.s4) rel.stages.s4={status:'Not Started',pct:0};
+  const tests={};
+  S4_TESTS.forEach((t,i)=>{
+    tests[i]={
+      name:t.name,mandatory:t.mandatory,type:t.type,
+      status:document.getElementById('s4-status-'+i)?.value||'Pending',
+      owner:document.getElementById('s4-owner-'+i)?.value||'',
+      env:document.getElementById('s4-env-'+i)?.value||'',
+      failureReason:document.getElementById('s4-reason-'+i)?.value||'',
+    };
+  });
+  rel.stages.s4.data={tests};
+  const pass=S4_TESTS.filter((_,i)=>tests[i].status==='Pass').length;
+  const na=S4_TESTS.filter((_,i)=>tests[i].status==='NA').length;
+  rel.stages.s4.pct=Math.round((pass+na)/S4_TESTS.length*100);
+  const mandatoryFail=S4_TESTS.some((t,i)=>t.mandatory&&tests[i].status==='Fail');
+  if(mandatoryFail){rel.stages.s4.status='Blocked';rel.status='Blocked';}
+  else if(rel.stages.s4.pct===100){rel.stages.s4.status='Done';}
+  else if(pass>0) rel.stages.s4.status='In Progress';
+  ftSaveReleases();ftToast('Smoke tests saved');ftRenderRelTab();
+}
+</script>
+
+<script>
+// ── MANUAL TESTING (S5) ──
+const S5_SECTIONS=[
+  {id:'A',name:'Authentication & Access',items:['Login with valid credentials succeeds','Login with invalid credentials blocked','Session timeout works correctly','Password reset flow works','Role-based access control enforced','Logout clears session','MFA flow works (if applicable)']},
+  {id:'B',name:'Core Feature Testing',items:['Main feature creates data correctly','Main feature reads/displays data correctly','Main feature updates data correctly','Main feature deletes data correctly','Form validations working','Error messages displayed correctly','Success messages displayed correctly']},
+  {id:'C',name:'UI & Navigation',items:['All navigation links work','Responsive layout on mobile','No layout breaks on resize','Loading states show correctly','Empty states show correctly','Pagination works','Search/filter works']},
+  {id:'D',name:'Integration & Data',items:['API calls succeed and return correct data','Data persists correctly after save','Data syncs correctly across modules','Email/notification triggers work','Third-party integrations work','Webhooks firing correctly','Exported data is accurate']},
+  {id:'E',name:'Edge Cases & Error Handling',items:['Graceful error handling on API failure','No JS errors in console on main flows','Duplicate data handled correctly','Large data sets handled','Special characters handled','Browser back button works','Direct URL access works']},
+];
+function ftStageManual(rel){
+  const st=rel.stages?.s5||{};
+  const data=st.data||{};
+  let allRows='';
+  let totalItems=0,totalPass=0,totalNA=0;
+  S5_SECTIONS.forEach(sec=>{
+    allRows+=`<div style="margin-bottom:4px;padding:8px 12px;background:var(--card2);border-radius:8px 8px 0 0;font-size:12px;font-weight:800;color:var(--txt)">Section ${sec.id}: ${sec.name}</div>`;
+    allRows+='<div style="border:1px solid var(--border);border-radius:0 0 8px 8px;margin-bottom:12px">';
+    sec.items.forEach((item,i)=>{
+      const key=`${sec.id}_${i}`;
+      const d=data[key]||{};
+      totalItems++;
+      if(d.status==='Pass') totalPass++;
+      if(d.status==='NA') totalNA++;
+      allRows+=`<div class="ft-check-row" style="flex-wrap:wrap;gap:6px" id="s5-row-${key}">
+        <div class="ft-check-num">${i+1}</div>
+        <div class="ft-check-label">${ftEsc(item)}</div>
+        <div class="ft-radio-grp">
+          ${['Pass','Fail','Blocked','NA','Not Tested'].map(v=>{
+            const cls=d.status===v?(v==='Pass'?'selected-pass':v==='Fail'?'selected-fail':'selected-na'):'';
+            return `<button class="ft-radio-btn ${cls}" onclick="ftS5Set('${key}','${v}')">${v}</button>`;
+          }).join('')}
+        </div>
+        <input placeholder="Owner" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);width:100px" id="s5-owner-${key}" value="${ftEsc(d.owner||'')}">
+        <input placeholder="Bug ID" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);width:80px" id="s5-bug-${key}" value="${ftEsc(d.bugId||'')}">
+        <input placeholder="Notes/Actual Result" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);flex:1;min-width:160px" id="s5-notes-${key}" value="${ftEsc(d.notes||'')}">
+      </div>`;
+    });
+    allRows+='</div>';
+  });
+  const pct=totalItems>0?Math.round((totalPass+totalNA)/totalItems*100):0;
+  return `<div class="ft-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      <div class="ft-card-title" style="margin:0">🧪 Stage 5: Manual Testing (${totalPass} Pass / ${totalItems} Total — ${pct}%)</div>
+      <button class="ftbtn sm primary" onclick="ftSaveS5()">Save Manual Tests</button>
+    </div>
+    ${allRows}
+  </div>`;
+}
+function ftS5Set(key,val){
+  const row=document.getElementById('s5-row-'+key);if(!row)return;
+  row.querySelectorAll('.ft-radio-btn').forEach(b=>{b.className='ft-radio-btn';});
+  const btns=row.querySelectorAll('.ft-radio-btn');
+  const vals=['Pass','Fail','Blocked','NA','Not Tested'];
+  const idx=vals.indexOf(val);
+  if(idx>=0&&btns[idx]){
+    const cls=val==='Pass'?'selected-pass':val==='Fail'?'selected-fail':'selected-na';
+    btns[idx].classList.add(cls);
+  }
+  row.dataset.status=val;
+}
+function ftSaveS5(){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  if(!rel.stages) rel.stages={};
+  if(!rel.stages.s5) rel.stages.s5={status:'Not Started',pct:0};
+  const data={};
+  S5_SECTIONS.forEach(sec=>{
+    sec.items.forEach((item,i)=>{
+      const key=`${sec.id}_${i}`;
+      const row=document.getElementById('s5-row-'+key);
+      const selBtn=row?.querySelector('.ft-radio-btn.selected-pass,.ft-radio-btn.selected-fail,.ft-radio-btn.selected-na');
+      const vals=['Pass','Fail','Blocked','NA','Not Tested'];
+      let status=row?.dataset.status||'';
+      if(!status&&selBtn){
+        const txt=selBtn.textContent;status=txt;
+      }
+      if(!status) status=(rel.stages.s5.data?.[key]?.status)||'Not Tested';
+      data[key]={status,owner:document.getElementById('s5-owner-'+key)?.value||'',bugId:document.getElementById('s5-bug-'+key)?.value||'',notes:document.getElementById('s5-notes-'+key)?.value||''};
+    });
+  });
+  rel.stages.s5.data=data;
+  let total=0,pass=0,na=0;
+  S5_SECTIONS.forEach(sec=>sec.items.forEach((_,i)=>{const k=`${sec.id}_${i}`;total++;if(data[k]?.status==='Pass')pass++;if(data[k]?.status==='NA')na++;}));
+  rel.stages.s5.pct=total>0?Math.round((pass+na)/total*100):0;
+  if(rel.stages.s5.pct===100) rel.stages.s5.status='Done';
+  else if(pass>0||na>0) rel.stages.s5.status='In Progress';
+  ftSaveReleases();ftToast('Manual tests saved');ftRenderRelTab();
+}
+
+// ── API & DATA (S6) ──
+const S6_CHECKS=['GET /api/auth/me — returns user profile','POST /api/login — returns JWT token','POST /api/logout — clears session','GET /api/projects — returns project list','POST /api/projects — creates project','GET /api/releases — returns release list','POST /api/releases — creates release','GET /api/qa-data/:key — returns stored data','POST /api/qa-data/:key — saves data','Health check endpoint responds 200'];
+function ftStageApi(rel){
+  const st=rel.stages?.s6||{};
+  const data=st.data||{};
+  let rows=S6_CHECKS.map((check,i)=>{
+    const d=data[i]||{};
+    return `<tr>
+      <td style="font-size:11px;font-family:monospace">${ftEsc(check)}</td>
+      <td><select onchange="ftS6Save()" style="padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--card2);color:var(--txt);font-size:12px" id="s6-status-${i}">${['Not Tested','Pass','Fail','Blocked','NA'].map(v=>`<option ${(d.status||'Not Tested')===v?'selected':''}>${v}</option>`).join('')}</select></td>
+      <td><input placeholder="Owner" id="s6-owner-${i}" value="${ftEsc(d.owner||'')}" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);width:100px"></td>
+      <td><input placeholder="Expected" id="s6-expected-${i}" value="${ftEsc(d.expected||'')}" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);width:120px"></td>
+      <td><input placeholder="Actual / Error" id="s6-actual-${i}" value="${ftEsc(d.actual||'')}" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);width:120px"></td>
+      <td><input placeholder="Bug ID" id="s6-bug-${i}" value="${ftEsc(d.bugId||'')}" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);width:70px"></td>
+    </tr>`;
+  }).join('');
+  const pass=S6_CHECKS.filter((_,i)=>(data[i]?.status||'Not Tested')==='Pass').length;
+  return `<div class="ft-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="ft-card-title" style="margin:0">🔌 Stage 6: API & Data Validation (${pass}/${S6_CHECKS.length} Pass)</div>
+      <button class="ftbtn sm primary" onclick="ftS6Save()">Save API Checks</button>
+    </div>
+    <div class="ft-tbl-wrap"><table class="ft-tbl">
+      <thead><tr><th>API / Check</th><th>Status</th><th>Owner</th><th>Expected</th><th>Actual</th><th>Bug ID</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
+function ftS6Save(){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  if(!rel.stages) rel.stages={};
+  if(!rel.stages.s6) rel.stages.s6={status:'Not Started',pct:0};
+  const data={};
+  S6_CHECKS.forEach((_,i)=>{
+    data[i]={status:document.getElementById('s6-status-'+i)?.value||'Not Tested',owner:document.getElementById('s6-owner-'+i)?.value||'',expected:document.getElementById('s6-expected-'+i)?.value||'',actual:document.getElementById('s6-actual-'+i)?.value||'',bugId:document.getElementById('s6-bug-'+i)?.value||''};
+  });
+  rel.stages.s6.data=data;
+  const pass=S6_CHECKS.filter((_,i)=>data[i].status==='Pass').length;
+  const na=S6_CHECKS.filter((_,i)=>data[i].status==='NA').length;
+  rel.stages.s6.pct=Math.round((pass+na)/S6_CHECKS.length*100);
+  if(rel.stages.s6.pct===100) rel.stages.s6.status='Done';
+  else if(pass>0) rel.stages.s6.status='In Progress';
+  ftSaveReleases();ftToast('API checks saved');ftRenderRelTab();
+}
+</script>
+
+<script>
+// ── BUGS (S7) ──
+function ftStageBugs(rel){
+  const bugs=rel.bugs||[];
+  const crit=bugs.filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  const high=bugs.filter(b=>b.severity==='High'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  const open=bugs.filter(b=>b.status!=='Closed'&&b.status!=='Deferred').length;
+  const retest=bugs.filter(b=>b.status==='Ready for QA'||b.status==='Retesting').length;
+  let rows=bugs.length===0?
+    `<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--mut)">No bugs logged. Great job!</td></tr>`:
+    bugs.map((b,i)=>`<tr>
+      <td style="font-size:11px;font-weight:700;color:var(--mut)">#${i+1}</td>
+      <td>${ftEsc(b.module||'—')}</td>
+      <td style="max-width:200px">${ftEsc(b.title||'—')}</td>
+      <td>${ftRiskBadge(b.severity)}</td>
+      <td><span class="ftbadge grey" style="font-size:10px">${ftEsc(b.priority||'—')}</span></td>
+      <td>${ftStatusBadge(b.status||'Open')}</td>
+      <td>${ftEsc(b.assignee||'—')}</td>
+      <td>${ftFmt(b.reportedDate)}</td>
+      <td>
+        <button class="ftbtn sm primary" onclick="ftEditBug('${b.id}')">Edit</button>
+        <button class="ftbtn sm danger" onclick="ftCloseBug('${b.id}')">Close</button>
+      </td>
+    </tr>`).join('');
+  return `<div class="ft-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      <div class="ft-card-title" style="margin:0">🐛 Stage 7: Bug Tracker</div>
+      <button class="ftbtn primary" onclick="ftOpenAddBug()">+ Add Bug</button>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <span class="ftbadge grey">Total: ${bugs.length}</span>
+      <span class="ftbadge red">Critical Open: ${crit}</span>
+      <span class="ftbadge amber">High Open: ${high}</span>
+      <span class="ftbadge blue">Open: ${open}</span>
+      <span class="ftbadge purple">Retest Pending: ${retest}</span>
+    </div>
+    <div class="ft-tbl-wrap"><table class="ft-tbl">
+      <thead><tr><th>#</th><th>Module</th><th>Title</th><th>Severity</th><th>Priority</th><th>Status</th><th>Assignee</th><th>Reported</th><th>Actions</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
+function ftBugFormHtml(b){
+  const v=k=>ftEsc(b?.[k]||'');
+  return `<div class="ft-form-row">
+    <div class="ft-form-group"><label>Module *</label><input id="fb-module" value="${v('module')}"></div>
+    <div class="ft-form-group"><label>Title *</label><input id="fb-title" value="${v('title')}"></div>
+  </div>
+  <div class="ft-form-group" style="margin-bottom:10px"><label>Description</label><textarea id="fb-desc">${v('description')}</textarea></div>
+  <div class="ft-form-group" style="margin-bottom:10px"><label>Steps to Reproduce</label><textarea id="fb-steps">${v('steps')}</textarea></div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Expected</label><input id="fb-expected" value="${v('expected')}"></div>
+    <div class="ft-form-group"><label>Actual</label><input id="fb-actual" value="${v('actual')}"></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Severity</label><select id="fb-severity">${['Critical','High','Medium','Low'].map(x=>`<option ${(b?.severity||'High')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="ft-form-group"><label>Priority</label><select id="fb-priority">${['P0','P1','P2','P3'].map(x=>`<option ${(b?.priority||'P1')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Status</label><select id="fb-status">${['Open','In Progress','Ready for QA','Retesting','Reopened','Closed','Deferred'].map(x=>`<option ${(b?.status||'Open')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="ft-form-group"><label>Assignee</label><input id="fb-assignee" value="${v('assignee')}"></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Reporter</label><input id="fb-reporter" value="${v('reporter')||window._ftCurrentUser||''}"></div>
+    <div class="ft-form-group"><label>Fixed Build</label><input id="fb-fixbuild" value="${v('fixedBuild')}"></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Retest Result</label><select id="fb-retest">${['Not Tested','Passed','Failed','Blocked'].map(x=>`<option ${(b?.retestResult||'Not Tested')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="ft-form-group"><label>Evidence URL</label><input id="fb-evidence" value="${v('evidence')}"></div>
+  </div>
+  <div class="ft-form-group"><label>Retest Notes</label><textarea id="fb-retnotes" style="min-height:50px">${v('retestNotes')}</textarea></div>`;
+}
+function ftOpenAddBug(){
+  ftOpenModal('Add Bug',ftBugFormHtml(null),`<button class="ftbtn" onclick="ftCloseModal()">Cancel</button><button class="ftbtn primary" onclick="ftSaveBug()">Add Bug</button>`);
+}
+function ftEditBug(id){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  const b=rel.bugs.find(x=>x.id===id);if(!b)return;
+  ftOpenModal('Edit Bug',ftBugFormHtml(b),`<button class="ftbtn" onclick="ftCloseModal()">Cancel</button><button class="ftbtn primary" onclick="ftSaveBug('${id}')">Save Bug</button>`);
+}
+function ftSaveBug(existingId){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  const module=document.getElementById('fb-module').value.trim();
+  const title=document.getElementById('fb-title').value.trim();
+  if(!title){ftToast('Bug title required','error');return;}
+  const data={module,title,description:document.getElementById('fb-desc').value,steps:document.getElementById('fb-steps').value,expected:document.getElementById('fb-expected').value,actual:document.getElementById('fb-actual').value,severity:document.getElementById('fb-severity').value,priority:document.getElementById('fb-priority').value,status:document.getElementById('fb-status').value,assignee:document.getElementById('fb-assignee').value,reporter:document.getElementById('fb-reporter').value,fixedBuild:document.getElementById('fb-fixbuild').value,retestResult:document.getElementById('fb-retest').value,evidence:document.getElementById('fb-evidence').value,retestNotes:document.getElementById('fb-retnotes').value};
+  if(!rel.bugs) rel.bugs=[];
+  if(existingId){const b=rel.bugs.find(x=>x.id===existingId);if(b)Object.assign(b,data);}
+  else{rel.bugs.push({id:ftUuid(),...data,reportedDate:new Date().toISOString()});}
+  // Update s7 pct
+  if(!rel.stages) rel.stages={};
+  if(!rel.stages.s7) rel.stages.s7={status:'Not Started',pct:0};
+  const closed=rel.bugs.filter(b=>b.status==='Closed'||b.status==='Deferred').length;
+  rel.stages.s7.pct=rel.bugs.length>0?Math.round(closed/rel.bugs.length*100):0;
+  if(rel.bugs.length>0&&closed===rel.bugs.length) rel.stages.s7.status='Done';
+  else if(rel.bugs.length>0) rel.stages.s7.status='In Progress';
+  ftAddHistory(rel,'Bug Tracker',module,title,'',data.status,window._ftCurrentUser,'');
+  ftSaveReleases();ftCloseModal();ftToast(existingId?'Bug updated':'Bug logged');ftRenderRelTab();
+}
+function ftCloseBug(id){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  const b=rel.bugs.find(x=>x.id===id);if(!b)return;
+  if(!confirm('Mark this bug as Closed?'))return;
+  b.status='Closed';
+  ftSaveReleases();ftToast('Bug closed');ftRenderRelTab();
+}
+
+// ── REGRESSION (S8) ──
+function ftDefaultRegression(){
+  return [
+    {id:ftUuid(),name:'Login flow',module:'Auth',type:'Manual',criticality:'Critical',owner:'',status:'Not Run',executedAt:'',evidence:'',bugId:'',notes:''},
+    {id:ftUuid(),name:'Logout flow',module:'Auth',type:'Manual',criticality:'High',owner:'',status:'Not Run',executedAt:'',evidence:'',bugId:'',notes:''},
+    {id:ftUuid(),name:'Dashboard loads correctly',module:'Dashboard',type:'Manual',criticality:'Critical',owner:'',status:'Not Run',executedAt:'',evidence:'',bugId:'',notes:''},
+    {id:ftUuid(),name:'Create main entity',module:'Core',type:'Manual',criticality:'Critical',owner:'',status:'Not Run',executedAt:'',evidence:'',bugId:'',notes:''},
+    {id:ftUuid(),name:'Edit main entity',module:'Core',type:'Manual',criticality:'Critical',owner:'',status:'Not Run',executedAt:'',evidence:'',bugId:'',notes:''},
+    {id:ftUuid(),name:'Delete main entity',module:'Core',type:'Manual',criticality:'High',owner:'',status:'Not Run',executedAt:'',evidence:'',bugId:'',notes:''},
+    {id:ftUuid(),name:'API health check',module:'API',type:'Automated',criticality:'Critical',owner:'',status:'Not Run',executedAt:'',evidence:'',bugId:'',notes:''},
+    {id:ftUuid(),name:'Database write/read',module:'DB',type:'Automated',criticality:'Critical',owner:'',status:'Not Run',executedAt:'',evidence:'',bugId:'',notes:''},
+    {id:ftUuid(),name:'Notification flow',module:'Notifications',type:'Manual',criticality:'Normal',owner:'',status:'Not Run',executedAt:'',evidence:'',bugId:'',notes:''},
+    {id:ftUuid(),name:'Export/download feature',module:'Reports',type:'Manual',criticality:'Normal',owner:'',status:'Not Run',executedAt:'',evidence:'',bugId:'',notes:''},
+    {id:ftUuid(),name:'Role-based access',module:'Auth',type:'Manual',criticality:'High',owner:'',status:'Not Run',executedAt:'',evidence:'',bugId:'',notes:''},
+    {id:ftUuid(),name:'Payment/subscription flow',module:'Billing',type:'Manual',criticality:'Critical',owner:'',status:'Not Run',executedAt:'',evidence:'',bugId:'',notes:''},
+  ];
+}
+function ftStageRegression(rel){
+  const pack=rel.regressionPack||[];
+  const pass=pack.filter(r=>r.status==='Pass').length;
+  const fail=pack.filter(r=>r.status==='Fail').length;
+  const pct=pack.length>0?Math.round(pack.filter(r=>r.status==='Pass'||r.status==='Skip').length/pack.length*100):0;
+  let rows=pack.length===0?
+    `<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--mut)">No regression cases. Click "Add Case" to add.</td></tr>`:
+    pack.map((r,i)=>`<tr>
+      <td style="font-size:11px;color:var(--mut)">${i+1}</td>
+      <td>${ftEsc(r.name)}</td>
+      <td>${ftEsc(r.module||'—')}</td>
+      <td><span class="ftbadge ${r.type==='Automated'?'blue':'grey'}" style="font-size:10px">${r.type||'Manual'}</span></td>
+      <td>${ftRiskBadge(r.criticality)}</td>
+      <td>
+        <select onchange="ftRegrSet('${r.id}','status',this.value)" style="padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--card2);color:var(--txt);font-size:12px">
+          ${['Not Run','Pass','Fail','Blocked','Skip'].map(v=>`<option ${r.status===v?'selected':''}>${v}</option>`).join('')}
+        </select>
+      </td>
+      <td><input placeholder="Owner" value="${ftEsc(r.owner||'')}" onchange="ftRegrSet('${r.id}','owner',this.value)" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);width:100px"></td>
+      <td><button class="ftbtn sm danger" onclick="ftRegrDelete('${r.id}')">✕</button></td>
+    </tr>`).join('');
+  return `<div class="ft-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      <div class="ft-card-title" style="margin:0">🔁 Stage 8: Critical Regression Pack (${pass} Pass / ${pack.length} — ${pct}%)</div>
+      <div style="display:flex;gap:6px">
+        ${fail>0?`<span class="ftbadge red">${fail} Failed</span>`:''}
+        <button class="ftbtn sm" onclick="ftRegrAdd()">+ Add Case</button>
+        <button class="ftbtn sm primary" onclick="ftSaveRegression()">Save</button>
+      </div>
+    </div>
+    <div class="ft-tbl-wrap"><table class="ft-tbl">
+      <thead><tr><th>#</th><th>Test Name</th><th>Module</th><th>Type</th><th>Criticality</th><th>Status</th><th>Owner</th><th>✕</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
+function ftRegrSet(id,field,val){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  const r=rel.regressionPack.find(x=>x.id===id);if(!r)return;
+  r[field]=val;
+  ftUpdateRegrPct(rel);
+  ftSaveReleases();
+}
+function ftUpdateRegrPct(rel){
+  const pack=rel.regressionPack||[];
+  if(!rel.stages) rel.stages={};
+  if(!rel.stages.s8) rel.stages.s8={status:'Not Started',pct:0};
+  rel.stages.s8.pct=pack.length>0?Math.round(pack.filter(r=>r.status==='Pass'||r.status==='Skip').length/pack.length*100):0;
+  const fail=pack.filter(r=>r.status==='Fail'&&r.criticality==='Critical').length;
+  if(fail>0) rel.stages.s8.status='Blocked';
+  else if(rel.stages.s8.pct===100) rel.stages.s8.status='Done';
+  else if(pack.filter(r=>r.status!=='Not Run').length>0) rel.stages.s8.status='In Progress';
+}
+function ftRegrDelete(id){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  rel.regressionPack=rel.regressionPack.filter(r=>r.id!==id);
+  ftUpdateRegrPct(rel);ftSaveReleases();ftRenderRelTab();
+}
+function ftRegrAdd(){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  ftOpenModal('Add Regression Case',`<div class="ft-form-row">
+    <div class="ft-form-group"><label>Test Name *</label><input id="fra-name"></div>
+    <div class="ft-form-group"><label>Module</label><input id="fra-module"></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Type</label><select id="fra-type"><option>Manual</option><option>Automated</option></select></div>
+    <div class="ft-form-group"><label>Criticality</label><select id="fra-crit"><option>Critical</option><option>High</option><option>Normal</option></select></div>
+  </div>`,`<button class="ftbtn" onclick="ftCloseModal()">Cancel</button><button class="ftbtn primary" onclick="ftRegrSaveNew()">Add Case</button>`);
+}
+function ftRegrSaveNew(){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  const name=document.getElementById('fra-name').value.trim();
+  if(!name){ftToast('Name required','error');return;}
+  if(!rel.regressionPack) rel.regressionPack=[];
+  rel.regressionPack.push({id:ftUuid(),name,module:document.getElementById('fra-module').value,type:document.getElementById('fra-type').value,criticality:document.getElementById('fra-crit').value,owner:'',status:'Not Run',executedAt:'',evidence:'',bugId:'',notes:''});
+  ftSaveReleases();ftCloseModal();ftToast('Regression case added');ftRenderRelTab();
+}
+function ftSaveRegression(){ftSaveReleases();ftToast('Regression pack saved');}
+</script>
+
+<script>
+// ── DECISION (S9) ──
+const S9_QUESTIONS=[
+  'All critical and high bugs are fixed and retested',
+  'Smoke test fully passed',
+  'Manual testing completion >= 90%',
+  'API & data validation passed',
+  'Regression pack >= 80% pass rate',
+  'Dev self-test completed and signed off',
+  'Risk check completed with documented risks',
+  'No new critical issues found in last 24h',
+  'Release notes / change log prepared',
+  'Rollback plan is documented and tested',
+];
+function ftStageDecision(rel){
+  const st=rel.stages?.s9||{};
+  const data=st.data||{};
+  const qa=data.qa||{};
+  // Auto-calculate recommendation
+  const critOpen=(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  const smokeDone=rel.stages?.s4?.status==='Done';
+  const manualPct=rel.stages?.s5?.pct||0;
+  const regrPct=rel.stages?.s8?.pct||0;
+  let rec='GO';
+  let blockers=[];
+  if(critOpen>0){rec='NO-GO';blockers.push(`${critOpen} critical bug(s) still open`);}
+  if(!smokeDone){rec='NO-GO';blockers.push('Smoke test not fully passed');}
+  if(manualPct<70){rec=rec==='NO-GO'?'NO-GO':'NO-GO';blockers.push(`Manual testing only ${manualPct}% complete`);}
+  else if(manualPct<90&&rec!=='NO-GO'){rec='GO WITH RISK';blockers.push(`Manual testing ${manualPct}% (target >=90%)`);}
+  if(regrPct<80&&rec!=='NO-GO'){rec=rec==='GO WITH RISK'?'GO WITH RISK':'GO WITH RISK';blockers.push(`Regression pack ${regrPct}% (target >=80%)`);}
+  const recColor=rec==='GO'?'#10b981':rec==='GO WITH RISK'?'#d97706':'#ef4444';
+  const recBadge=rec==='GO'?'go':rec==='GO WITH RISK'?'go-risk':'nogo';
+  let qRows=S9_QUESTIONS.map((q,i)=>{
+    const d=qa[i]||{};
+    return `<div class="ft-check-row" style="flex-wrap:wrap;gap:6px" id="s9-row-${i}">
+      <div class="ft-check-num">${i+1}</div>
+      <div class="ft-check-label" style="font-weight:600">${ftEsc(q)}</div>
+      <div class="ft-radio-grp">
+        ${['Yes','No','NA'].map(v=>`<button class="ft-radio-btn ${(d.val||'')==v?'selected-'+(v==='Yes'?'yes':v==='No'?'no':'na'):''}" onclick="ftS9Set(${i},'${v}')">${v}</button>`).join('')}
+      </div>
+      <input placeholder="Owner" id="s9-owner-${i}" value="${ftEsc(d.owner||'')}" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);width:110px">
+      <input placeholder="Notes" id="s9-notes-${i}" value="${ftEsc(d.notes||'')}" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);flex:1;min-width:150px">
+    </div>`;
+  }).join('');
+  return `<div class="ft-card">
+    <div class="ft-card-title">🚦 Stage 9: Release Decision</div>
+    <div style="background:rgba(${rec==='GO'?'16,185,129':rec==='GO WITH RISK'?'245,158,11':'239,68,68'},.08);border:2px solid rgba(${rec==='GO'?'16,185,129':rec==='GO WITH RISK'?'245,158,11':'239,68,68'},.3);border-radius:12px;padding:16px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mut)">Auto Recommendation</div>
+        <span class="ftbadge ${recBadge}" style="font-size:14px;padding:4px 16px">${rec}</span>
+      </div>
+      ${blockers.length>0?`<ul style="margin-top:10px;padding-left:18px">${blockers.map(b=>`<li style="font-size:12px;color:${recColor};margin-bottom:2px">${ftEsc(b)}</li>`).join('')}</ul>`:`<div style="font-size:12px;color:#10b981;margin-top:8px">✅ All criteria met for GO</div>`}
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);margin-bottom:10px">Release Readiness Questions</div>
+      ${qRows}
+    </div>
+    <div class="ft-form-row">
+      <div class="ft-form-group"><label>QA Recommendation</label><select id="s9-qa-rec">${['Pending','GO','GO WITH RISK','NO-GO'].map(x=>`<option ${(data.qaRecommendation||rec)===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="ft-form-group"><label>PO Decision</label><select id="s9-po-dec">${['Pending','GO','GO WITH RISK','NO-GO'].map(x=>`<option ${(data.poDecision||'Pending')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    </div>
+    <div class="ft-form-row">
+      <div class="ft-form-group"><label>Management Decision</label><select id="s9-mgmt-dec">${['Pending','GO','GO WITH RISK','NO-GO'].map(x=>`<option ${(data.mgmtDecision||'Pending')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="ft-form-group"><label>Approved By</label><input id="s9-approved-by" value="${ftEsc(data.approvedBy||'')}"></div>
+    </div>
+    <div class="ft-form-row">
+      <div class="ft-form-group"><label>Approval Date</label><input type="date" id="s9-approval-date" value="${data.approvalDate||''}"></div>
+      <div class="ft-form-group"><label>Risk Acceptance Owner (if GO WITH RISK)</label><input id="s9-risk-owner" value="${ftEsc(data.riskOwner||'')}"></div>
+    </div>
+    <div class="ft-form-group" style="margin-bottom:12px"><label>Final Notes / Conditions</label><textarea id="s9-final-notes">${ftEsc(data.finalNotes||'')}</textarea></div>
+    <div style="display:flex;gap:8px">
+      <button class="ftbtn primary" onclick="ftSaveS9()">Save Decision</button>
+      <button class="ftbtn" onclick="ftUpdateStage('s9')">Update Stage Status</button>
+    </div>
+  </div>`;
+}
+function ftS9Set(idx,val){
+  const row=document.getElementById('s9-row-'+idx);if(!row)return;
+  row.querySelectorAll('.ft-radio-btn').forEach(b=>{b.className='ft-radio-btn';});
+  const btns=row.querySelectorAll('.ft-radio-btn');
+  const idx2=['Yes','No','NA'].indexOf(val);
+  if(idx2>=0&&btns[idx2]){const cls=val==='Yes'?'selected-yes':val==='No'?'selected-no':'selected-na';btns[idx2].classList.add(cls);}
+  row.dataset.val=val;
+}
+function ftSaveS9(){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  if(!rel.stages) rel.stages={};
+  if(!rel.stages.s9) rel.stages.s9={status:'Not Started',pct:0};
+  const qa={};
+  S9_QUESTIONS.forEach((_,i)=>{
+    const row=document.getElementById('s9-row-'+i);
+    const val=row?.dataset.val||(rel.stages.s9.data?.qa?.[i]?.val||'');
+    qa[i]={val,owner:document.getElementById('s9-owner-'+i)?.value||'',notes:document.getElementById('s9-notes-'+i)?.value||''};
+  });
+  const qaRec=document.getElementById('s9-qa-rec').value;
+  const poDec=document.getElementById('s9-po-dec').value;
+  const mgmtDec=document.getElementById('s9-mgmt-dec').value;
+  const finalDec=[qaRec,poDec,mgmtDec].includes('NO-GO')?'NO-GO':[qaRec,poDec,mgmtDec].includes('GO WITH RISK')?'GO WITH RISK':[qaRec,poDec,mgmtDec].every(d=>d==='GO')?'GO':'Pending';
+  rel.stages.s9.data={qa,qaRecommendation:qaRec,poDecision:poDec,mgmtDecision:mgmtDec,approvedBy:document.getElementById('s9-approved-by').value,approvalDate:document.getElementById('s9-approval-date').value,riskOwner:document.getElementById('s9-risk-owner').value,finalNotes:document.getElementById('s9-final-notes').value};
+  rel.decision=finalDec;
+  rel.stages.s9.pct=finalDec!=='Pending'?100:50;
+  rel.stages.s9.status=finalDec!=='Pending'?'Done':'In Progress';
+  if(finalDec==='GO'||finalDec==='GO WITH RISK') rel.status='Ready for Release';
+  if(finalDec==='NO-GO') rel.status='Blocked';
+  ftAddHistory(rel,'Release Decision','—','—','Pending',finalDec,window._ftCurrentUser,'');
+  ftSaveReleases();ftToast('Decision saved: '+finalDec, finalDec==='GO'?'success':finalDec==='NO-GO'?'error':'warning');
+  ftRenderReleaseDetail();
+}
+
+// ── PRODUCTION SANITY (S10) ──
+const S10_ITEMS=['Deployment completed successfully','Environment variables configured correctly','Database migrations ran without errors','Application starts and loads correctly','Core functionality verified in production','Monitoring/alerts active and responding','Error logs checked — no critical errors','External integrations verified','Performance baseline confirmed','Rollback tested and ready if needed'];
+function ftStageProduction(rel){
+  const st=rel.stages?.s10||{};
+  const data=st.data?.items||{};
+  const pass=S10_ITEMS.filter((_,i)=>data[i]?.status==='Pass').length;
+  let rows=S10_ITEMS.map((item,i)=>{
+    const d=data[i]||{};
+    return `<div class="ft-check-row" style="flex-wrap:wrap;gap:6px">
+      <div class="ft-check-num">${i+1}</div>
+      <div class="ft-check-label">${ftEsc(item)}</div>
+      <div class="ft-radio-grp">
+        ${['Pass','Fail','NA','Not Run'].map(v=>`<button class="ft-radio-btn ${d.status===v?(v==='Pass'?'selected-pass':v==='Fail'?'selected-fail':'selected-na'):''}" onclick="ftS10Set(${i},'${v}')" id="s10-btn-${i}-${v}">${v}</button>`).join('')}
+      </div>
+      <input placeholder="Owner" id="s10-owner-${i}" value="${ftEsc(d.owner||'')}" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);width:100px">
+      <input placeholder="Incident ID" id="s10-incident-${i}" value="${ftEsc(d.incidentId||'')}" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);width:90px">
+      <input placeholder="Notes" id="s10-notes-${i}" value="${ftEsc(d.notes||'')}" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;background:var(--card2);color:var(--txt);flex:1;min-width:140px">
+    </div>`;
+  }).join('');
+  return `<div class="ft-card">
+    <div style="background:rgba(245,158,11,.06);border:1.5px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#d97706;font-weight:600">⚠ Warning: Do NOT run destructive tests on production. Verify only — do not create/delete production data.</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="ft-card-title" style="margin:0">🚀 Stage 10: Production Sanity (${pass}/${S10_ITEMS.length} Pass)</div>
+      <button class="ftbtn sm primary" onclick="ftSaveS10()">Save</button>
+    </div>
+    ${rows}
+  </div>`;
+}
+function ftS10Set(idx,val){
+  const btns=document.querySelectorAll(`[id^="s10-btn-${idx}-"]`);
+  btns.forEach(b=>{b.className='ft-radio-btn';});
+  const btn=document.getElementById(`s10-btn-${idx}-${val}`);
+  if(btn){const cls=val==='Pass'?'selected-pass':val==='Fail'?'selected-fail':'selected-na';btn.classList.add(cls);}
+}
+function ftSaveS10(){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  if(!rel.stages) rel.stages={};
+  if(!rel.stages.s10) rel.stages.s10={status:'Not Started',pct:0};
+  const items={};
+  S10_ITEMS.forEach((_,i)=>{
+    const passBtn=document.getElementById(`s10-btn-${i}-Pass`);
+    const failBtn=document.getElementById(`s10-btn-${i}-Fail`);
+    const naBtn=document.getElementById(`s10-btn-${i}-NA`);
+    let status='Not Run';
+    if(passBtn?.classList.contains('selected-pass')) status='Pass';
+    else if(failBtn?.classList.contains('selected-fail')) status='Fail';
+    else if(naBtn?.classList.contains('selected-na')) status='NA';
+    else{const stored=rel.stages.s10.data?.items?.[i];if(stored) status=stored.status||'Not Run';}
+    items[i]={status,owner:document.getElementById('s10-owner-'+i)?.value||'',incidentId:document.getElementById('s10-incident-'+i)?.value||'',notes:document.getElementById('s10-notes-'+i)?.value||''};
+  });
+  rel.stages.s10.data={items};
+  const pass=S10_ITEMS.filter((_,i)=>items[i].status==='Pass').length;
+  const na=S10_ITEMS.filter((_,i)=>items[i].status==='NA').length;
+  rel.stages.s10.pct=Math.round((pass+na)/S10_ITEMS.length*100);
+  if(rel.stages.s10.pct===100){rel.stages.s10.status='Done';rel.status='Released';}
+  else if(pass>0) rel.stages.s10.status='In Progress';
+  ftSaveReleases();ftToast('Production sanity saved');ftRenderRelTab();
+}
+
+// ── TEAM (S-Team) ──
+function ftRelTeam(rel){
+  const team=rel.teamAssignments||[];
+  let rows=team.length===0?`<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--mut)">No team assignments yet.</td></tr>`:
+    team.map(t=>`<tr>
+      <td>${ftEsc(t.member||'—')}</td>
+      <td>${ftEsc(t.role||'—')}</td>
+      <td>${ftEsc(t.module||'—')}</td>
+      <td>${ftEsc(t.testingType||'—')}</td>
+      <td>${ftStatusBadge(t.status||'Not Started')}</td>
+      <td><span class="ftbadge ${t.leadStatus==='Verified'?'green':t.leadStatus==='Rejected'?'red':'amber'}">${ftEsc(t.leadStatus||'Pending Review')}</span></td>
+      <td>${ftFmt(t.completedDate)}</td>
+      <td>
+        <button class="ftbtn sm primary" onclick="ftEditAssignment('${t.id}')">Edit</button>
+        <button class="ftbtn sm danger" onclick="ftDeleteAssignment('${t.id}')">✕</button>
+      </td>
+    </tr>`).join('');
+  return `<div class="ft-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="ft-card-title" style="margin:0">👥 Team Assignments</div>
+      <button class="ftbtn primary" onclick="ftAddAssignment()">+ Add Member</button>
+    </div>
+    <div class="ft-tbl-wrap"><table class="ft-tbl">
+      <thead><tr><th>Member</th><th>Role</th><th>Module</th><th>Testing Type</th><th>Status</th><th>Lead Status</th><th>Completed</th><th>Actions</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
+function ftAssignFormHtml(a){
+  const v=k=>ftEsc(a?.[k]||'');
+  return `<div class="ft-form-row">
+    <div class="ft-form-group"><label>Team Member *</label><input id="fa-member" value="${v('member')}"></div>
+    <div class="ft-form-group"><label>Role</label><input id="fa-role" value="${v('role')}"></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Module</label><input id="fa-module" value="${v('module')}"></div>
+    <div class="ft-form-group"><label>Testing Type</label><input id="fa-type" value="${v('testingType')}" placeholder="Manual / Automation / API"></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Status</label><select id="fa-status">${['Not Started','In Progress','Verification Completed','Failed','Blocked','Waiting for Fix','Approved'].map(x=>`<option ${(a?.status||'Not Started')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="ft-form-group"><label>Lead Status</label><select id="fa-lstatus">${['Pending Review','Verified','Changes Required','Rejected','Not Applicable'].map(x=>`<option ${(a?.leadStatus||'Pending Review')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Total Checks</label><input type="number" id="fa-total" value="${a?.totalChecks||0}"></div>
+    <div class="ft-form-group"><label>Passed</label><input type="number" id="fa-passed" value="${a?.passed||0}"></div>
+  </div>
+  <div class="ft-form-row">
+    <div class="ft-form-group"><label>Failed</label><input type="number" id="fa-failed" value="${a?.failed||0}"></div>
+    <div class="ft-form-group"><label>Completed Date</label><input type="date" id="fa-completed" value="${v('completedDate')}"></div>
+  </div>
+  <div class="ft-form-group" style="margin-bottom:10px"><label>Evidence URL</label><input id="fa-evidence" value="${v('evidence')}"></div>
+  <div class="ft-form-group"><label>Comments</label><textarea id="fa-comments">${v('comments')}</textarea></div>`;
+}
+function ftAddAssignment(){
+  ftOpenModal('Add Team Member',ftAssignFormHtml(null),`<button class="ftbtn" onclick="ftCloseModal()">Cancel</button><button class="ftbtn primary" onclick="ftSaveAssignment()">Add</button>`);
+}
+function ftEditAssignment(id){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  const a=rel.teamAssignments.find(x=>x.id===id);if(!a)return;
+  ftOpenModal('Edit Assignment',ftAssignFormHtml(a),`<button class="ftbtn" onclick="ftCloseModal()">Cancel</button><button class="ftbtn primary" onclick="ftSaveAssignment('${id}')">Save</button>`);
+}
+function ftSaveAssignment(existingId){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  const member=document.getElementById('fa-member').value.trim();
+  if(!member){ftToast('Member name required','error');return;}
+  const data={member,role:document.getElementById('fa-role').value,module:document.getElementById('fa-module').value,testingType:document.getElementById('fa-type').value,status:document.getElementById('fa-status').value,leadStatus:document.getElementById('fa-lstatus').value,totalChecks:parseInt(document.getElementById('fa-total').value)||0,passed:parseInt(document.getElementById('fa-passed').value)||0,failed:parseInt(document.getElementById('fa-failed').value)||0,completedDate:document.getElementById('fa-completed').value,evidence:document.getElementById('fa-evidence').value,comments:document.getElementById('fa-comments').value};
+  if(!rel.teamAssignments) rel.teamAssignments=[];
+  if(existingId){const a=rel.teamAssignments.find(x=>x.id===existingId);if(a) Object.assign(a,data);}
+  else rel.teamAssignments.push({id:ftUuid(),...data,assignedDate:new Date().toISOString()});
+  ftSaveReleases();ftCloseModal();ftToast('Assignment saved');ftRenderRelTab();
+}
+function ftDeleteAssignment(id){
+  const rel=ftRelById(_ftSelectedRelease);if(!rel)return;
+  if(!confirm('Remove this assignment?'))return;
+  rel.teamAssignments=rel.teamAssignments.filter(x=>x.id!==id);
+  ftSaveReleases();ftToast('Assignment removed','warning');ftRenderRelTab();
+}
+
+// ── HISTORY ──
+function ftAddHistory(rel,stage,module,item,prevStatus,newStatus,by,comments){
+  if(!rel.history) rel.history=[];
+  rel.history.unshift({stage,module,item,prevStatus,newStatus,updatedBy:by||window._ftCurrentUser||'System',updatedAt:new Date().toISOString(),comments});
+  if(rel.history.length>200) rel.history=rel.history.slice(0,200);
+}
+function ftRelHistory(rel){
+  const hist=rel.history||[];
+  if(hist.length===0) return `<div class="ft-empty"><div class="ft-empty-icon">📜</div><div class="ft-empty-text">No activity yet</div><div class="ft-empty-sub">Actions taken on this release will appear here.</div></div>`;
+  return `<div class="ft-card">
+    <div class="ft-card-title">📜 Activity History (Read-Only)</div>
+    <div class="ft-tbl-wrap"><table class="ft-tbl">
+      <thead><tr><th>When</th><th>Stage</th><th>Module</th><th>Item</th><th>Change</th><th>By</th></tr></thead>
+      <tbody>${hist.map(h=>`<tr>
+        <td style="white-space:nowrap;font-size:11px;color:var(--mut)">${new Date(h.updatedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+        <td>${ftEsc(h.stage||'—')}</td>
+        <td>${ftEsc(h.module||'—')}</td>
+        <td style="max-width:200px">${ftEsc(h.item||'—')}</td>
+        <td>${h.prevStatus?`<span style="color:var(--mut)">${ftEsc(h.prevStatus)}</span> → `:''}${ftEsc(h.newStatus||'—')}</td>
+        <td>${ftEsc(h.updatedBy||'—')}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>`;
+}
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════
+// MY ASSIGNMENTS VIEW
+// ══════════════════════════════════════════════════════
+function ftRenderAssignments(){
+  const el=document.getElementById('ft-view-assignments');
+  const me=window._ftCurrentUser||'';
+  const allAssignments=[];
+  _ftReleases.forEach(rel=>{
+    const proj=ftProjById(rel.projectId);
+    (rel.teamAssignments||[]).forEach(a=>{
+      if(a.member&&a.member.toLowerCase().includes(me.toLowerCase())){
+        allAssignments.push({...a,relName:rel.name,projName:proj?.name||'—',relId:rel.id,version:rel.version});
+      }
+    });
+  });
+  let rows=allAssignments.length===0?`<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--mut)">No assignments found for "${ftEsc(me)}".</td></tr>`:
+    allAssignments.map(a=>`<tr>
+      <td>${ftEsc(a.projName)}</td>
+      <td><button class="ftbtn sm primary" onclick="ftOpenRelease('${a.relId}')">${ftEsc(a.relName)} v${ftEsc(a.version||'?')}</button></td>
+      <td>${ftEsc(a.module||'—')}</td>
+      <td>${ftEsc(a.testingType||'—')}</td>
+      <td>${ftStatusBadge(a.status||'Not Started')}</td>
+      <td><span class="ftbadge ${a.leadStatus==='Verified'?'green':'amber'}">${ftEsc(a.leadStatus||'Pending Review')}</span></td>
+      <td>${ftFmt(a.assignedDate)}</td>
+    </tr>`).join('');
+  el.innerHTML=`
+  <div class="ft-section-hdr"><h2>📋 My Assignments</h2></div>
+  ${me?'':`<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#d97706">Your name is matched against assignment member names.</div>`}
+  <div class="ft-tbl-wrap"><table class="ft-tbl">
+    <thead><tr><th>Project</th><th>Release</th><th>Module</th><th>Type</th><th>Status</th><th>Lead Status</th><th>Assigned</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+// ══════════════════════════════════════════════════════
+// TEAM WORKLOAD VIEW
+// ══════════════════════════════════════════════════════
+function ftRenderWorkload(){
+  const el=document.getElementById('ft-view-workload');
+  const memberMap={};
+  _ftReleases.forEach(rel=>{
+    if(rel.status==='Completed'||rel.status==='Cancelled') return;
+    const proj=ftProjById(rel.projectId);
+    (rel.teamAssignments||[]).forEach(a=>{
+      if(!a.member) return;
+      if(!memberMap[a.member]) memberMap[a.member]={name:a.member,assignments:[],activeCount:0,blockedCount:0,completedCount:0};
+      const active=a.status!=='Verification Completed'&&a.status!=='Approved';
+      memberMap[a.member].assignments.push({...a,projName:proj?.name||'—',relName:rel.name,relId:rel.id});
+      if(active) memberMap[a.member].activeCount++;
+      if(a.status==='Blocked'||a.status==='Waiting for Fix') memberMap[a.member].blockedCount++;
+      if(a.status==='Verification Completed'||a.status==='Approved') memberMap[a.member].completedCount++;
+    });
+  });
+  const members=Object.values(memberMap);
+  if(members.length===0){el.innerHTML=`<div class="ft-section-hdr"><h2>👥 Team Workload</h2></div><div class="ft-empty"><div class="ft-empty-icon">👥</div><div class="ft-empty-text">No team members assigned</div><div class="ft-empty-sub">Add team members to releases to see workload.</div></div>`;return;}
+  let cards='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">';
+  members.forEach(m=>{
+    const workloadStatus=m.blockedCount>0?'Blocked':m.activeCount>=4?'Overloaded':m.activeCount>=3?'Busy':m.activeCount>=1?'Normal':'Available';
+    const wsColor={'Available':'#10b981','Normal':'#3b82f6','Busy':'#f59e0b','Overloaded':'#ef4444','Blocked':'#ef4444'}[workloadStatus];
+    cards+=`<div class="ft-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:14px;font-weight:800">${ftEsc(m.name)}</div>
+        <span style="padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;background:${wsColor}22;color:${wsColor};border:1px solid ${wsColor}44">${workloadStatus}</span>
+      </div>
+      <div style="display:flex;gap:12px;font-size:12px;color:var(--mut);margin-bottom:10px">
+        <span>Active: <strong style="color:var(--txt)">${m.activeCount}</strong></span>
+        <span>Blocked: <strong style="color:${m.blockedCount>0?'#ef4444':'var(--txt)'}">${m.blockedCount}</strong></span>
+        <span>Done: <strong style="color:var(--txt)">${m.completedCount}</strong></span>
+      </div>
+      <div style="font-size:11px;color:var(--mut)">${m.assignments.slice(0,3).map(a=>`<div style="padding:3px 0;border-bottom:1px solid var(--border)">${ftEsc(a.projName)} · ${ftEsc(a.relName)} · ${ftEsc(a.module||'—')}</div>`).join('')}${m.assignments.length>3?`<div style="padding:3px 0;color:var(--accent)">+${m.assignments.length-3} more</div>`:''}</div>
+    </div>`;
+  });
+  cards+='</div>';
+  el.innerHTML=`<div class="ft-section-hdr"><h2>👥 Team Workload</h2></div>${cards}`;
+}
+
+// ══════════════════════════════════════════════════════
+// MANAGEMENT VIEW
+// ══════════════════════════════════════════════════════
+function ftRenderManagement(){
+  const el=document.getElementById('ft-view-management');
+  const relRows=_ftReleases.map(rel=>{
+    const proj=ftProjById(rel.projectId);
+    const pct=ftRelProgress(rel);
+    const health=ftGetRelHealth(rel);
+    return `<tr>
+      <td>${ftEsc(proj?.name||'—')}</td>
+      <td>${ftEsc(rel.name)}</td>
+      <td><span class="ft-health ${health.cls}" style="padding:3px 8px;font-size:11px;margin:0">${health.label.split(' ')[0]} ${health.label.split(' ').slice(1).join(' ')}</span></td>
+      <td>${ftRiskBadge(rel.riskLevel)}</td>
+      <td>${ftStatusBadge(rel.status||'Draft')}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="ft-progress" style="width:80px"><div class="ft-progress-fill ${ftProgressColor(pct)}" style="width:${pct}%"></div></div>
+          <span style="font-size:11px">${pct}%</span>
+        </div>
+      </td>
+      <td>${ftDecisionBadge(rel.decision||'Pending')}</td>
+      <td>${rel.plannedDate?ftFmt(rel.plannedDate):'—'}</td>
+      <td style="color:var(--danger);font-weight:700">${(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Simple SVG charts
+  const byStatus={};
+  _ftReleases.forEach(r=>{const s=r.status||'Draft';byStatus[s]=(byStatus[s]||0)+1;});
+  const statusEntries=Object.entries(byStatus);
+  const maxStat=Math.max(...statusEntries.map(e=>e[1]),1);
+  let statusChart='<div style="display:flex;align-items:flex-end;gap:8px;height:80px;padding:0 4px">';
+  const statColors={'Draft':'#64748b','QA Ready':'#3b82f6','In Testing':'#6366f1','Ready for Release':'#10b981','Released':'#10b981','Blocked':'#ef4444','Completed':'#10b981','Cancelled':'#94a3b8','Waiting for Fix':'#f59e0b'};
+  statusEntries.forEach(([s,c])=>{
+    const h=Math.max(Math.round(c/maxStat*70),4);
+    statusChart+=`<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="font-size:11px;font-weight:700;color:var(--txt)">${c}</div>
+      <div style="width:32px;height:${h}px;background:${statColors[s]||'#64748b'};border-radius:4px 4px 0 0;"></div>
+      <div style="font-size:9px;color:var(--mut);text-align:center;max-width:40px;line-height:1.2">${s}</div>
+    </div>`;
+  });
+  statusChart+='</div>';
+
+  const bySev={Critical:0,High:0,Medium:0,Low:0};
+  _ftReleases.forEach(r=>(r.bugs||[]).forEach(b=>{if(b.status!=='Closed'&&b.status!=='Deferred')bySev[b.severity]=(bySev[b.severity]||0)+1;}));
+  const maxBug=Math.max(...Object.values(bySev),1);
+  const bugColors={Critical:'#ef4444',High:'#f59e0b',Medium:'#3b82f6',Low:'#10b981'};
+  let bugChart='<div style="display:flex;align-items:flex-end;gap:12px;height:80px;padding:0 4px">';
+  Object.entries(bySev).forEach(([s,c])=>{
+    const h=Math.max(Math.round(c/maxBug*70),4);
+    bugChart+=`<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="font-size:11px;font-weight:700;color:${bugColors[s]}">${c}</div>
+      <div style="width:40px;height:${h}px;background:${bugColors[s]};border-radius:4px 4px 0 0;"></div>
+      <div style="font-size:9px;color:var(--mut);text-align:center">${s}</div>
+    </div>`;
+  });
+  bugChart+='</div>';
+
+  el.innerHTML=`
+  <div class="ft-section-hdr"><h2>👔 Management View (Read-Only)</h2></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
+    <div class="ft-card"><div class="ft-card-title">Releases by Status</div>${statusChart}</div>
+    <div class="ft-card"><div class="ft-card-title">Open Bugs by Severity</div>${bugChart}</div>
+  </div>
+  <div class="ft-card">
+    <div class="ft-card-title">All Releases</div>
+    <div class="ft-tbl-wrap"><table class="ft-tbl">
+      <thead><tr><th>Project</th><th>Release</th><th>Health</th><th>Risk</th><th>Status</th><th>Progress</th><th>Decision</th><th>Planned</th><th>Crit Bugs</th></tr></thead>
+      <tbody>${relRows||`<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--mut)">No releases yet.</td></tr>`}</tbody>
+    </table></div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════
+// REPORTS VIEW
+// ══════════════════════════════════════════════════════
+function ftRenderReports(){
+  const el=document.getElementById('ft-view-reports');
+  let relOptions=_ftReleases.map(rel=>{
+    const proj=ftProjById(rel.projectId);
+    return `<option value="${rel.id}">${ftEsc(proj?.name||'—')} — ${ftEsc(rel.name)} v${ftEsc(rel.version||'?')}</option>`;
+  }).join('');
+  el.innerHTML=`
+  <div class="ft-section-hdr"><h2>📊 Reports</h2></div>
+  <div class="ft-card">
+    <div class="ft-card-title">Download QA Release Report</div>
+    <p style="font-size:13px;color:var(--mut);margin-bottom:14px">Generate a standalone offline HTML report for any release. The report includes all stages, bugs, team assignments, and release decision.</p>
+    <div class="ft-form-group" style="margin-bottom:14px;max-width:400px">
+      <label>Select Release</label>
+      <select id="rpt-release">${relOptions||'<option>No releases available</option>'}</select>
+    </div>
+    <button class="ftbtn primary" onclick="ftGenerateReport()">⬇ Download HTML Report</button>
+  </div>`;
+}
+function ftGenerateReport(){
+  const relId=document.getElementById('rpt-release')?.value;
+  if(!relId){ftToast('Select a release','warning');return;}
+  ftDownloadReport(relId);
+}
+function ftDownloadReport(relId){
+  const rel=ftRelById(relId);if(!rel){ftToast('Release not found','error');return;}
+  const proj=ftProjById(rel.projectId);
+  const pct=ftRelProgress(rel);
+  const health=ftGetRelHealth(rel);
+  const bugs=rel.bugs||[];
+  const critB=bugs.filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  const today=new Date().toLocaleDateString('en-IN');
+  const genDt=new Date().toLocaleString('en-IN');
+
+  function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function badge(s,c){return `<span style="padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;background:${c}22;color:${c};border:1px solid ${c}44">${esc(s)}</span>`;}
+  function decCol(d){return d==='GO'?'#10b981':d==='GO WITH RISK'?'#d97706':'#ef4444';}
+
+  const stageRows=STAGE_DEFS.map(s=>{
+    const st=rel.stages?.[s.id]||{};
+    return `<tr><td>${esc(s.icon+' '+s.name)}</td><td>${esc(st.status||'Not Started')}</td><td>${esc(st.owner||'—')}</td><td>${esc(st.pct||0)}%</td><td>${esc(st.startDt?st.startDt.slice(0,10):'—')}</td><td>${esc(st.endDt?st.endDt.slice(0,10):'—')}</td></tr>`;
+  }).join('');
+  const bugRows=bugs.length===0?'<tr><td colspan="6">No bugs logged</td></tr>':bugs.map(b=>`<tr><td>${esc(b.module||'—')}</td><td>${esc(b.title)}</td><td>${esc(b.severity)}</td><td>${esc(b.priority)}</td><td>${esc(b.status)}</td><td>${esc(b.assignee||'—')}</td></tr>`).join('');
+  const teamRows=(rel.teamAssignments||[]).length===0?'<tr><td colspan="5">No team assignments</td></tr>':(rel.teamAssignments||[]).map(t=>`<tr><td>${esc(t.member)}</td><td>${esc(t.role||'—')}</td><td>${esc(t.module||'—')}</td><td>${esc(t.status)}</td><td>${esc(t.leadStatus||'—')}</td></tr>`).join('');
+  const decColor=decCol(rel.decision||'Pending');
+
+  const html=`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>QA Report — ${esc(proj?.name||'—')} ${esc(rel.name)}</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;color:#1e293b;background:#f8fafc;padding:0}
+.page{max-width:1100px;margin:0 auto;padding:32px 28px}
+h1{font-size:22px;font-weight:800;margin-bottom:4px}h2{font-size:15px;font-weight:800;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid #e2e8f0}
+table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px}th{padding:8px 10px;background:#f1f5f9;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#64748b;border:1px solid #e2e8f0;text-align:left}
+td{padding:7px 10px;border:1px solid #e2e8f0;vertical-align:top}
+.meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:20px}
+.meta-item{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px}
+.meta-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#64748b;margin-bottom:2px}
+.meta-val{font-size:13px;font-weight:700;color:#1e293b}
+@media print{body{background:white}.page{padding:16px}}</style></head>
+<body><div class="page">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #e2e8f0;flex-wrap:wrap;gap:12px">
+  <div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6366f1;margin-bottom:4px">FAST-TRACK QA WORKFLOW REPORT</div>
+    <h1>${esc(proj?.name||'—')} — ${esc(rel.name)}</h1>
+    <div style="font-size:12px;color:#64748b;margin-top:4px">Version: ${esc(rel.version||'—')} · Generated: ${esc(genDt)}</div>
+  </div>
+  <div style="text-align:right">
+    <div style="padding:8px 16px;border-radius:10px;background:${decColor}22;color:${decColor};border:2px solid ${decColor}55;font-size:14px;font-weight:800;margin-bottom:6px">${esc(rel.decision||'Pending')}</div>
+    <div style="padding:6px 12px;border-radius:8px;background:#f1f5f9;font-size:12px;font-weight:700">${esc(health.label)}</div>
+  </div>
+</div>
+<div class="meta">
+  <div class="meta-item"><div class="meta-lbl">Project</div><div class="meta-val">${esc(proj?.name||'—')}</div></div>
+  <div class="meta-item"><div class="meta-lbl">Release</div><div class="meta-val">${esc(rel.name)}</div></div>
+  <div class="meta-item"><div class="meta-lbl">Version</div><div class="meta-val">${esc(rel.version||'—')}</div></div>
+  <div class="meta-item"><div class="meta-lbl">Status</div><div class="meta-val">${esc(rel.status||'—')}</div></div>
+  <div class="meta-item"><div class="meta-lbl">Risk Level</div><div class="meta-val">${esc(rel.riskLevel||'—')}</div></div>
+  <div class="meta-item"><div class="meta-lbl">Progress</div><div class="meta-val">${pct}%</div></div>
+  <div class="meta-item"><div class="meta-lbl">Critical Bugs Open</div><div class="meta-val" style="color:#ef4444">${critB}</div></div>
+  <div class="meta-item"><div class="meta-lbl">Planned Date</div><div class="meta-val">${esc(rel.plannedDate||'—')}</div></div>
+</div>
+<h2>Stage Progress</h2>
+<table><thead><tr><th>Stage</th><th>Status</th><th>Owner</th><th>Progress</th><th>Start</th><th>End</th></tr></thead><tbody>${stageRows}</tbody></table>
+<h2>Bug Tracker (${bugs.length} total)</h2>
+<table><thead><tr><th>Module</th><th>Title</th><th>Severity</th><th>Priority</th><th>Status</th><th>Assignee</th></tr></thead><tbody>${bugRows}</tbody></table>
+<h2>Team Assignments</h2>
+<table><thead><tr><th>Member</th><th>Role</th><th>Module</th><th>Status</th><th>Lead Status</th></tr></thead><tbody>${teamRows}</tbody></table>
+${rel.knownRisks?`<h2>Known Risks</h2><p style="font-size:13px;padding:12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px">${esc(rel.knownRisks)}</p>`:''}
+${rel.clientNotes?`<h2>Client Notes</h2><p style="font-size:13px;padding:12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px">${esc(rel.clientNotes)}</p>`:''}
+<div style="margin-top:30px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8">Report generated by Fast-Track QA Workflow · AdHash Technology · ${esc(genDt)}</div>
+</div></body></html>`;
+
+  const blob=new Blob([html],{type:'text/html'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`QA-FastTrack-${(proj?.name||'Project').replace(/\s+/g,'-')}-v${rel.version||'x'}-${today.replace(/\//g,'-')}.html`;
+  a.click();URL.revokeObjectURL(a.href);
+  ftToast('Report downloaded');
+}
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════
+// DEMO DATA
+// ══════════════════════════════════════════════════════
+function ftSeedDemo(){
+  const p1={id:'demo-p1',name:'SyncTrade',client:'SyncTrade Inc.',description:'Real-time trading platform with portfolio management and live market feeds.',priority:'Critical',status:'Active',projectManager:'Raj Kumar',qaLead:'Priya Sharma',manualQaOwner:'Amit Singh',automationQaOwner:'Deepa Nair',apiOwner:'Karan Mehta',devOwner:'Suresh Rao',qaEnvUrl:'https://staging.synctrade.com',productionUrl:'https://app.synctrade.com',createdAt:'2026-01-10T00:00:00Z',updatedAt:'2026-06-01T00:00:00Z'};
+  const p2={id:'demo-p2',name:'AI Sign Pro',client:'AI Sign Pro Ltd.',description:'AI-powered digital signature and document workflow platform.',priority:'High',status:'Active',projectManager:'Anika Joshi',qaLead:'Vikram Patel',manualQaOwner:'Sneha Gupta',automationQaOwner:'Ravi Verma',apiOwner:'Pooja Shah',devOwner:'Manoj Kumar',qaEnvUrl:'https://staging.aisignpro.com',productionUrl:'https://app.aisignpro.com',createdAt:'2026-02-15T00:00:00Z',updatedAt:'2026-06-10T00:00:00Z'};
+  const p3={id:'demo-p3',name:'WavedIn',client:'WavedIn Technologies',description:'Professional networking platform with AI-powered matching and job recommendations.',priority:'Normal',status:'Active',projectManager:'Nisha Reddy',qaLead:'Arjun Nair',manualQaOwner:'Kavya Pillai',automationQaOwner:'',apiOwner:'Rohit Singh',devOwner:'Pradeep Kumar',qaEnvUrl:'https://staging.wavedin.com',productionUrl:'https://wavedin.com',createdAt:'2026-03-01T00:00:00Z',updatedAt:'2026-06-15T00:00:00Z'};
+
+  const r1={
+    id:'demo-r1',projectId:'demo-p1',name:'Sprint 18 Release',version:'2.1.0',buildNumber:'218-stable',
+    summary:'Portfolio dashboard redesign, real-time P&L calculation, mobile app sync improvements.',
+    riskLevel:'Critical',status:'Ready for Release',releaseOwner:'Raj Kumar',qaLead:'Priya Sharma',
+    plannedDate:'2026-06-25',qaEnvUrl:'https://staging.synctrade.com/v2.1.0',
+    knownRisks:'Market data feed latency may spike during high-volume trading hours.',
+    clientNotes:'Client approved scope on June 20. Live trading hours must not be disrupted.',
+    currentStage:9,decision:'GO',decisionNotes:'All criteria met. QA Lead: Priya Sharma.',
+    stages:{
+      s1:{status:'Done',pct:100,owner:'Raj Kumar',startDt:'2026-06-10T09:00',endDt:'2026-06-10T11:00',evidence:'https://jira.synctrade.com/ST-218',comments:'Change request approved by PM',blocked:false,bugCount:0,data:{whatChanged:'Portfolio dashboard and P&L calculation engine',raisedBy:'Raj Kumar',ticketId:'ST-218',priority:'Critical',modules:'Dashboard, Portfolio, P&L',changeDate:'2026-06-10',description:'Complete redesign of portfolio dashboard with real-time P&L. Mobile sync improvements.',approvedBy:'CTO',approvalDate:'2026-06-10'}},
+      s2:{status:'Done',pct:100,owner:'Priya Sharma',startDt:'2026-06-10T11:00',endDt:'2026-06-10T12:00',evidence:'https://confluence.synctrade.com/risk-218',comments:'CRITICAL risk: financial data changes',blocked:false,bugCount:0,data:{riskLevel:'Critical',mainModule:'Portfolio/P&L',relatedModules:'Dashboard, Mobile Sync, API',mainFlow:'Yes',dataAffected:'Yes',apiAffected:'Yes',permissionsAffected:'No',paymentAffected:'Yes',securityAffected:'No',regressionImpact:'Yes',testingOwner:'Priya Sharma',testDataAvailable:'Yes',riskReason:'Financial calculations directly affect user P&L display and trading decisions.'}},
+      s3:{status:'Done',pct:100,owner:'Suresh Rao',startDt:'2026-06-11T09:00',endDt:'2026-06-11T14:00',evidence:'https://build.synctrade.com/218',comments:'All unit tests pass. Build stable.',blocked:false,bugCount:0,data:{items:Object.fromEntries([...Array(10)].map((_,i)=>([i,{val:'Yes',owner:'Suresh Rao',notes:'Verified'}])))}},
+      s4:{status:'Done',pct:100,owner:'Deepa Nair',startDt:'2026-06-12T09:00',endDt:'2026-06-12T11:00',evidence:'https://smoke.synctrade.com/218',comments:'All smoke tests passed.',blocked:false,bugCount:0,data:{tests:Object.fromEntries([...Array(8)].map((_,i)=>([i,{name:S4_TESTS[i]?.name,status:'Pass',owner:'Deepa Nair',env:'Chrome/UAT',failureReason:''}])))}},
+      s5:{status:'Done',pct:95,owner:'Amit Singh',startDt:'2026-06-13T09:00',endDt:'2026-06-18T17:00',evidence:'https://testrail.synctrade.com/218',comments:'95% pass rate. 1 low-priority scenario deferred.',blocked:false,bugCount:2},
+      s6:{status:'Done',pct:100,owner:'Karan Mehta',startDt:'2026-06-14T09:00',endDt:'2026-06-16T17:00',evidence:'https://postman.synctrade.com/218',comments:'All API checks passed.',blocked:false,bugCount:0},
+      s7:{status:'Done',pct:100,owner:'Priya Sharma',startDt:'2026-06-17T09:00',endDt:'2026-06-19T17:00',evidence:'',comments:'All bugs fixed and retested.',blocked:false,bugCount:0},
+      s8:{status:'Done',pct:90,owner:'Amit Singh',startDt:'2026-06-19T09:00',endDt:'2026-06-20T17:00',evidence:'',comments:'90% pass. Low-priority test deferred with approval.',blocked:false,bugCount:0},
+      s9:{status:'Done',pct:100,owner:'Priya Sharma',startDt:'2026-06-21T09:00',endDt:'2026-06-21T11:00',evidence:'',comments:'GO decision approved.',blocked:false,bugCount:0,data:{qaRecommendation:'GO',poDecision:'GO',mgmtDecision:'GO',approvedBy:'Raj Kumar',approvalDate:'2026-06-21',finalNotes:'Release approved for production deployment on June 25.'}},
+      s10:{status:'Not Started',pct:0}
+    },
+    bugs:[{id:ftUuid(),module:'Portfolio',title:'P&L decimal rounding issue on large portfolios',description:'P&L shows incorrect decimal after ₹10L portfolio value',steps:'1. Login 2. Open portfolio >₹10L 3. Check P&L',expected:'2 decimal places',actual:'Shows 4 decimals',severity:'Medium',priority:'P2',status:'Closed',reporter:'Amit Singh',assignee:'Suresh Rao',reportedDate:'2026-06-14T10:00:00Z',fixedBuild:'218-b3',retestResult:'Passed',evidence:'',consoleError:'',networkError:'',retestNotes:'Fixed in build 218-b3'},{id:ftUuid(),module:'Mobile Sync',title:'Sync delay > 3s on poor connectivity',description:'Mobile sync shows data lag on 3G networks',steps:'1. Use 3G 2. Update portfolio 3. Check sync',expected:'<2s sync',actual:'3-5s delay',severity:'Low',priority:'P3',status:'Deferred',reporter:'Priya Sharma',assignee:'Suresh Rao',reportedDate:'2026-06-15T14:00:00Z',fixedBuild:'',retestResult:'Not Tested',evidence:'',retestNotes:'Deferred to next sprint - network optimization planned'}],
+    teamAssignments:[{id:ftUuid(),member:'Amit Singh',role:'Manual QA',module:'Portfolio & P&L',testingType:'Manual',assignedDate:'2026-06-13',startDate:'2026-06-13',completedDate:'2026-06-18',totalChecks:45,passed:43,failed:1,blocked:0,notTested:1,status:'Verification Completed',evidence:'https://testrail.synctrade.com/amit-218',comments:'Excellent coverage. Minor deferred item documented.',leadStatus:'Verified',verifiedBy:'Priya Sharma',verifiedAt:'2026-06-20T10:00:00Z'},{id:ftUuid(),member:'Deepa Nair',role:'Automation QA',module:'Smoke & Regression',testingType:'Automated',assignedDate:'2026-06-12',startDate:'2026-06-12',completedDate:'2026-06-20',totalChecks:20,passed:18,failed:0,blocked:0,notTested:2,status:'Verification Completed',evidence:'',comments:'Automation suite executed successfully.',leadStatus:'Verified',verifiedBy:'Priya Sharma',verifiedAt:'2026-06-20T11:00:00Z'}],
+    regressionPack:[{id:ftUuid(),name:'Login flow',module:'Auth',type:'Manual',criticality:'Critical',owner:'Amit Singh',status:'Pass',executedAt:'2026-06-19',evidence:'',bugId:'',notes:''},{id:ftUuid(),name:'Portfolio load',module:'Portfolio',type:'Manual',criticality:'Critical',owner:'Amit Singh',status:'Pass',executedAt:'2026-06-19',evidence:'',bugId:'',notes:''},{id:ftUuid(),name:'P&L calculation',module:'P&L',type:'Automated',criticality:'Critical',owner:'Deepa Nair',status:'Pass',executedAt:'2026-06-20',evidence:'',bugId:'',notes:''},{id:ftUuid(),name:'Trade execution',module:'Trading',type:'Automated',criticality:'Critical',owner:'Deepa Nair',status:'Pass',executedAt:'2026-06-20',evidence:'',bugId:'',notes:''},{id:ftUuid(),name:'Mobile sync',module:'Mobile',type:'Manual',criticality:'Normal',owner:'Amit Singh',status:'Skip',executedAt:'',evidence:'',bugId:'',notes:'Deferred - network issue'}],
+    history:[{stage:'Release Decision',module:'—',item:'Final Decision',prevStatus:'Pending',newStatus:'GO',updatedBy:'Priya Sharma',updatedAt:'2026-06-21T11:00:00Z',comments:'All criteria met'},{stage:'Smoke Test',module:'All',item:'Smoke Pack',prevStatus:'Not Started',newStatus:'Done',updatedBy:'Deepa Nair',updatedAt:'2026-06-12T11:00:00Z',comments:'100% pass'}],
+    createdAt:'2026-06-10T00:00:00Z',updatedAt:'2026-06-21T00:00:00Z'
+  };
+
+  const r2={
+    id:'demo-r2',projectId:'demo-p2',name:'E-Sign API Integration',version:'1.3.0',buildNumber:'130-rc2',
+    summary:'New REST API for third-party e-signature integration. Webhook support added.',
+    riskLevel:'High',status:'Ready for Release',releaseOwner:'Anika Joshi',qaLead:'Vikram Patel',
+    plannedDate:'2026-06-28',qaEnvUrl:'https://staging.aisignpro.com/v1.3',
+    knownRisks:'Webhook delivery not guaranteed on enterprise firewalls. Client acceptance received.',
+    clientNotes:'3 enterprise clients waiting on this API. Approval given for GO WITH RISK.',
+    currentStage:9,decision:'GO WITH RISK',
+    stages:{
+      s1:{status:'Done',pct:100,owner:'Anika Joshi'},
+      s2:{status:'Done',pct:100,owner:'Vikram Patel',data:{riskLevel:'High'}},
+      s3:{status:'Done',pct:100,owner:'Manoj Kumar'},
+      s4:{status:'Done',pct:100,owner:'Ravi Verma'},
+      s5:{status:'Done',pct:85,owner:'Sneha Gupta'},
+      s6:{status:'Done',pct:90,owner:'Pooja Shah'},
+      s7:{status:'Done',pct:80,owner:'Vikram Patel'},
+      s8:{status:'Done',pct:75,owner:'Sneha Gupta'},
+      s9:{status:'Done',pct:100,owner:'Vikram Patel',data:{qaRecommendation:'GO WITH RISK',poDecision:'GO WITH RISK',mgmtDecision:'GO WITH RISK',approvedBy:'Anika Joshi',approvalDate:'2026-06-22',riskOwner:'Anika Joshi',finalNotes:'Webhook limitation accepted by client. Retry mechanism documented.'}},
+      s10:{status:'Not Started',pct:0}
+    },
+    bugs:[{id:ftUuid(),module:'Webhook',title:'Webhook retry fails after 3 attempts on slow networks',description:'Webhook does not retry after 3 failures on slow corporate networks',steps:'1. Configure webhook 2. Simulate slow network 3. Send document for signature',expected:'Webhook retries 5 times',actual:'Stops after 3 retries',severity:'Medium',priority:'P2',status:'Closed',reporter:'Sneha Gupta',assignee:'Manoj Kumar',reportedDate:'2026-06-16T09:00:00Z',fixedBuild:'130-rc2',retestResult:'Passed',evidence:'',retestNotes:'Fixed retry count to 5'},{id:ftUuid(),module:'API',title:'Rate limit header missing on 429 response',description:'When rate limited, X-RateLimit-Reset header is not returned',steps:'1. Hit API 100+ times/min 2. Check 429 response headers',expected:'X-RateLimit-Reset header present',actual:'Header missing',severity:'Low',priority:'P3',status:'Closed',reporter:'Pooja Shah',assignee:'Manoj Kumar',reportedDate:'2026-06-17T14:00:00Z',fixedBuild:'130-rc2',retestResult:'Passed',evidence:'',retestNotes:'Header added'}],
+    teamAssignments:[{id:ftUuid(),member:'Sneha Gupta',role:'Manual QA',module:'API Testing',testingType:'Manual',assignedDate:'2026-06-15',completedDate:'2026-06-21',totalChecks:30,passed:26,failed:2,blocked:0,notTested:2,status:'Verification Completed',evidence:'',comments:'',leadStatus:'Verified',verifiedBy:'Vikram Patel',verifiedAt:'2026-06-22T09:00:00Z'}],
+    regressionPack:ftDefaultRegression().map(r=>({...r,id:ftUuid(),status:'Pass',executedAt:'2026-06-21',owner:'Ravi Verma'})),
+    history:[{stage:'Release Decision',module:'—',item:'Final Decision',prevStatus:'Pending',newStatus:'GO WITH RISK',updatedBy:'Vikram Patel',updatedAt:'2026-06-22T10:00:00Z',comments:'Accepted with risk documentation'}],
+    createdAt:'2026-06-12T00:00:00Z',updatedAt:'2026-06-22T00:00:00Z'
+  };
+
+  const r3={
+    id:'demo-r3',projectId:'demo-p3',name:'Job Matching Engine v1',version:'0.9.0',buildNumber:'090-b7',
+    summary:'AI-powered job matching engine with skill gap analysis and recommendation scoring.',
+    riskLevel:'High',status:'Blocked',releaseOwner:'Nisha Reddy',qaLead:'Arjun Nair',
+    plannedDate:'2026-06-30',qaEnvUrl:'https://staging.wavedin.com/v0.9',
+    knownRisks:'AI model accuracy below target (72% vs 85% target). Critical login bug blocking testing.',
+    clientNotes:'Release blocked until critical login bug is fixed.',
+    currentStage:4,decision:'NO-GO',
+    stages:{
+      s1:{status:'Done',pct:100,owner:'Nisha Reddy'},
+      s2:{status:'Done',pct:100,owner:'Arjun Nair',data:{riskLevel:'High'}},
+      s3:{status:'Done',pct:90,owner:'Pradeep Kumar'},
+      s4:{status:'Blocked',pct:30,owner:'Arjun Nair',comments:'Smoke test blocked by critical login bug ST-001',blocked:true,bugCount:1},
+      s5:{status:'Not Started',pct:0},
+      s6:{status:'Not Started',pct:0},
+      s7:{status:'In Progress',pct:20,owner:'Arjun Nair'},
+      s8:{status:'Not Started',pct:0},
+      s9:{status:'In Progress',pct:20,owner:'Arjun Nair',data:{qaRecommendation:'NO-GO',poDecision:'NO-GO',mgmtDecision:'Pending',finalNotes:'Critical login bug must be fixed before any further testing.'}},
+      s10:{status:'Not Started',pct:0}
+    },
+    bugs:[{id:ftUuid(),module:'Authentication',title:'Critical: Login fails with valid credentials after new session changes',description:'Users cannot login with correct credentials after session storage refactor in v0.9',steps:'1. Open app 2. Enter valid email+password 3. Click Login',expected:'User logged in successfully',actual:'Error: Invalid credentials (even with correct ones)',severity:'Critical',priority:'P0',status:'Open',reporter:'Kavya Pillai',assignee:'Pradeep Kumar',reportedDate:'2026-06-20T10:00:00Z',fixedBuild:'',retestResult:'Not Tested',evidence:'https://jira.wavedin.com/WD-009',consoleError:'TypeError: Cannot read properties of undefined (session)',networkError:'401 Unauthorized',retestNotes:''},{id:ftUuid(),module:'Job Matching',title:'Match score shows 0% for senior profiles',description:'AI match score returns 0% for profiles with >10 years experience',steps:'1. Login as senior profile (>10 yrs exp) 2. Search jobs 3. Check match scores',expected:'Match score >70% for relevant jobs',actual:'0% for all jobs',severity:'High',priority:'P1',status:'Open',reporter:'Arjun Nair',assignee:'Pradeep Kumar',reportedDate:'2026-06-21T14:00:00Z',fixedBuild:'',retestResult:'Not Tested',evidence:'',consoleError:'',networkError:'',retestNotes:''}],
+    teamAssignments:[{id:ftUuid(),member:'Kavya Pillai',role:'Manual QA',module:'Authentication',testingType:'Manual',assignedDate:'2026-06-20',completedDate:'',totalChecks:15,passed:5,failed:3,blocked:7,notTested:0,status:'Blocked',evidence:'',comments:'Blocked on critical login bug. Cannot proceed.',leadStatus:'Pending Review',verifiedBy:'',verifiedAt:''}],
+    regressionPack:ftDefaultRegression().map(r=>({...r,id:ftUuid(),status:'Not Run',owner:''})),
+    history:[{stage:'Bug Tracker',module:'Authentication',item:'Critical login bug',prevStatus:'',newStatus:'Open',updatedBy:'Kavya Pillai',updatedAt:'2026-06-20T10:00:00Z',comments:'CRITICAL: Blocking all testing'},{stage:'Smoke Test',module:'All',item:'Smoke Pack',prevStatus:'In Progress',newStatus:'Blocked',updatedBy:'Arjun Nair',updatedAt:'2026-06-20T12:00:00Z',comments:'Blocked by critical login bug'}],
+    createdAt:'2026-06-18T00:00:00Z',updatedAt:'2026-06-20T00:00:00Z'
+  };
+
+  _ftProjects=[p1,p2,p3];
+  _ftReleases=[r1,r2,r3];
+  ftSaveProjects();ftSaveReleases();
+}
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+(async function init(){
+  await ftLoadData();
+  ftNav('dashboard');
+  if(document.body.classList.contains('dark')){
+    document.getElementById('ft-dark-btn').textContent='☀️';
+  }
+})();
+</script>
+</body>
+</html>

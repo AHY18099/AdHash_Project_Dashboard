@@ -3960,6 +3960,13 @@ app.get('/project-dashboard', (req, res) => {
     return res.sendFile(path.join(__dirname, 'public', 'project-dashboard.html'));
 });
 
+app.get('/fast-track', (req, res) => {
+    if (!isAuthenticated(req)) {
+        return res.redirect('/');
+    }
+    return res.sendFile(path.join(__dirname, 'public', 'fast-track.html'));
+});
+
 app.get('/project-dashboard.html', (req, res) => {
     if (!isAuthenticated(req)) {
         return res.redirect('/');
