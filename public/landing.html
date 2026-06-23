@@ -523,6 +523,7 @@ body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(24
       <h2>Testing Checklist &amp; Release Quality Gates</h2>
     </div>
     <div id="qacl-gonogo-badge" style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:800;background:rgba(100,116,139,.1);color:var(--mut);border:1.5px solid var(--border)">— Select Project</div>
+    <button onclick="qaclViewLogs()" style="padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--mut);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">📋 View Logs</button>
     <button id="qacl-close-btn" onclick="closeQAChecklist()">✕ Close</button>
   </div>
   <div id="qacl-body">
@@ -1445,13 +1446,14 @@ function qaclRender(){
     <div style="grid-column:1/-1;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:4px">
       <div style="font-size:13px;font-weight:700;color:var(--txt)">${projName} — <span style="color:#6366f1">${_qaclCurRel}</span></div>
       <div style="flex:1;min-width:120px;height:8px;border-radius:4px;background:var(--border);overflow:hidden">
-        <div style="height:100%;border-radius:4px;background:linear-gradient(90deg,#6366f1,#a855f7);width:${total}%;transition:width .4s"></div>
+        <div id="qacl-overall-bar" style="height:100%;border-radius:4px;background:linear-gradient(90deg,#6366f1,#a855f7);width:${total}%;transition:width .4s"></div>
       </div>
-      <div style="font-size:14px;font-weight:800;color:${gm.color}">${total}%</div>
+      <div id="qacl-overall-pct" style="font-size:14px;font-weight:800;color:${gm.color}">${total}%</div>
+      <button onclick="qaclSaveLog()" style="padding:5px 12px;border-radius:8px;border:1.5px solid rgba(99,102,241,.4);background:rgba(99,102,241,.08);color:#6366f1;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">📋 Save Log</button>
     </div>
-    <div class="qacl-metric"><div class="qacl-metric-val" style="color:#10b981">${totalChecked}</div><div class="qacl-metric-lbl">Checked</div></div>
-    <div class="qacl-metric"><div class="qacl-metric-val" style="color:var(--mut)">${totalItems-totalChecked}</div><div class="qacl-metric-lbl">Remaining</div></div>
-    <div class="qacl-metric"><div class="qacl-metric-val" style="color:#a855f7">${stagesDone}<span style="font-size:14px;color:var(--mut)">/${QACL_STAGES.length}</span></div><div class="qacl-metric-lbl">Stages Done</div></div>
+    <div class="qacl-metric"><div class="qacl-metric-val" id="qacl-mv-checked" style="color:#10b981">${totalChecked}</div><div class="qacl-metric-lbl">Checked</div></div>
+    <div class="qacl-metric"><div class="qacl-metric-val" id="qacl-mv-remaining" style="color:var(--mut)">${totalItems-totalChecked}</div><div class="qacl-metric-lbl">Remaining</div></div>
+    <div class="qacl-metric"><div class="qacl-metric-val" id="qacl-mv-stages" style="color:#a855f7">${stagesDone}<span style="font-size:14px;color:var(--mut)">/${QACL_STAGES.length}</span></div><div class="qacl-metric-lbl">Stages Done</div></div>
     <div class="qacl-metric"><div class="qacl-metric-val" style="color:${gm.color};font-size:18px">${gm.txt}</div><div class="qacl-metric-lbl">Release Status</div></div>`;
 
   // GO/NO-GO reference cards
@@ -1738,11 +1740,18 @@ function qaclUpdateNav(){
   const stagesDone=QACL_STAGES.filter(s=>_qaclStagePct(s.id)===100).length;
   const m=document.getElementById('qacl-metrics');
   if(m){
-    const vals=m.querySelectorAll('.qacl-metric-val');
-    if(vals[0])vals[0].textContent=total+'%';
-    if(vals[1])vals[1].textContent=totalChecked;
-    if(vals[2])vals[2].textContent=totalItems-totalChecked;
-    if(vals[3])vals[3].textContent=stagesDone+'/'+QACL_STAGES.length;
+    // Update overall progress bar % (not a .qacl-metric-val — targeted by id)
+    const progPct=m.querySelector('#qacl-overall-pct');
+    if(progPct)progPct.textContent=total+'%';
+    const progBar=m.querySelector('#qacl-overall-bar');
+    if(progBar)progBar.style.width=total+'%';
+    // Update metric cards by id
+    const vChecked=m.querySelector('#qacl-mv-checked');
+    const vRemaining=m.querySelector('#qacl-mv-remaining');
+    const vStages=m.querySelector('#qacl-mv-stages');
+    if(vChecked)vChecked.textContent=totalChecked;
+    if(vRemaining)vRemaining.textContent=totalItems-totalChecked;
+    if(vStages)vStages.textContent=stagesDone+'/'+QACL_STAGES.length;
   }
   // Update GO/NO-GO badge
   const gngMap={go:{txt:'✅ GO',bg:'rgba(16,185,129,.12)',color:'#10b981',border:'rgba(16,185,129,.4)'},risk:{txt:'⚠ GO WITH RISK',bg:'rgba(245,158,11,.12)',color:'#f59e0b',border:'rgba(245,158,11,.4)'},nogo:{txt:'🚫 NO-GO',bg:'rgba(239,68,68,.12)',color:'#ef4444',border:'rgba(239,68,68,.4)'},none:{txt:'— In Progress',bg:'rgba(100,116,139,.1)',color:'var(--mut)',border:'var(--border)'}};
@@ -1765,7 +1774,173 @@ function qaclSave(){
     }catch(e){console.warn('[qacl] save failed',e);}
   },600);
 }
+
+// ── QA Release Log ────────────────────────────────────────────────────────
+async function qaclSaveLog(){
+  if(!_qaclCurProj||!_qaclCurRel){alert('Select a project and release first.');return;}
+  const projName=_qaclProjs.find(p=>p.id===_qaclCurProj)?.name||_qaclCurProj;
+  const d=_qaclRelData()||{};
+  const gng=_qaclGoNoGo();
+  const total=_qaclTotalPct();
+  let totalItems=0,totalChecked=0;
+  QACL_STAGES.forEach(s=>{totalItems+=s.items.length;totalChecked+=(d[s.id]||[]).filter(Boolean).length;});
+  const stagesDone=QACL_STAGES.filter(s=>_qaclStagePct(s.id)===100).length;
+  const logEntry={
+    savedAt:new Date().toISOString(),
+    project:projName,projectId:_qaclCurProj,
+    release:_qaclCurRel,
+    decision:gng.toUpperCase(),
+    totalPct:total,
+    checked:totalChecked,remaining:totalItems-totalChecked,totalItems,
+    stagesDone,
+    stages:QACL_STAGES.map(s=>({
+      id:s.id,title:s.title,
+      pct:_qaclStagePct(s.id),
+      checked:(d[s.id]||[]).filter(Boolean).length,
+      total:s.items.length,
+      items:s.items.map((item,i)=>({
+        item,
+        checked:!!(d[s.id]||[])[i],
+        evidence:d._ev?.[s.id]?.[i]||null
+      }))
+    }))
+  };
+  // Load existing logs, append, save
+  let logs=[];
+  try{
+    const r=await fetch('/api/qa-data/qa3_release_logs',{headers:{Authorization:'Bearer '+_qaclTok()}});
+    if(r.ok){const j=await r.json();if(Array.isArray(j.value))logs=j.value;}
+  }catch(_){}
+  // Remove existing log for same project+release (overwrite)
+  logs=logs.filter(l=>!(l.projectId===_qaclCurProj&&l.release===_qaclCurRel));
+  logs.unshift(logEntry);
+  try{
+    await fetch('/api/qa-data/qa3_release_logs',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+_qaclTok()},
+      body:JSON.stringify({value:logs})
+    });
+    // Show confirmation
+    const btn=document.querySelector('[onclick="qaclSaveLog()"]');
+    if(btn){const orig=btn.textContent;btn.textContent='✅ Log Saved!';btn.style.color='#10b981';btn.style.borderColor='rgba(16,185,129,.4)';btn.style.background='rgba(16,185,129,.08)';setTimeout(()=>{btn.textContent=orig;btn.style.color='';btn.style.borderColor='';btn.style.background='';},2500);}
+  }catch(e){alert('Failed to save log: '+e.message);}
+}
+
+async function qaclViewLogs(){
+  let logs=[];
+  try{
+    const r=await fetch('/api/qa-data/qa3_release_logs',{headers:{Authorization:'Bearer '+_qaclTok()}});
+    if(r.ok){const j=await r.json();if(Array.isArray(j.value))logs=j.value;}
+  }catch(_){}
+  if(!logs.length){alert('No release logs saved yet. Use "📋 Save Log" on any release.');return;}
+  // Build modal
+  const gngColors={GO:'#10b981','GO WITH RISK':'#f59e0b','NO-GO':'#ef4444',NONE:'#64748b',SELECT:'#64748b'};
+  const rows=logs.map(l=>{
+    const col=gngColors[l.decision]||gngColors.NONE;
+    const date=new Date(l.savedAt).toLocaleString();
+    return`<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:10px 12px;font-weight:700;color:var(--txt)">${l.project}</td>
+      <td style="padding:10px 12px;color:#6366f1;font-weight:600">${l.release}</td>
+      <td style="padding:10px 12px"><span style="padding:3px 10px;border-radius:12px;font-size:11px;font-weight:800;background:${col}22;color:${col};border:1px solid ${col}66">${l.decision}</span></td>
+      <td style="padding:10px 12px;font-size:13px;font-weight:700;color:${col}">${l.totalPct}%</td>
+      <td style="padding:10px 12px;font-size:12px;color:var(--mut)">${l.checked}/${l.totalItems}</td>
+      <td style="padding:10px 12px;font-size:12px;color:var(--mut)">${l.stagesDone}/12</td>
+      <td style="padding:10px 12px;font-size:11px;color:var(--mut)">${date}</td>
+      <td style="padding:10px 12px">
+        <button onclick="qaclViewLogDetail(${logs.indexOf(l)})" style="padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card2);color:var(--txt);font-size:11px;font-weight:600;cursor:pointer">View</button>
+        <button onclick="qaclDownloadLog(${logs.indexOf(l)})" style="padding:3px 10px;border-radius:6px;border:1px solid rgba(99,102,241,.3);background:rgba(99,102,241,.06);color:#6366f1;font-size:11px;font-weight:600;cursor:pointer;margin-left:4px">↓ JSON</button>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('qacl-log-modal-body').innerHTML=`
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:var(--card2);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)">
+          <th style="padding:8px 12px;text-align:left">Project</th>
+          <th style="padding:8px 12px;text-align:left">Release</th>
+          <th style="padding:8px 12px;text-align:left">Decision</th>
+          <th style="padding:8px 12px;text-align:left">Progress</th>
+          <th style="padding:8px 12px;text-align:left">Checked</th>
+          <th style="padding:8px 12px;text-align:left">Stages</th>
+          <th style="padding:8px 12px;text-align:left">Saved At</th>
+          <th style="padding:8px 12px;text-align:left">Actions</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  _qaclLogCache=logs;
+  document.getElementById('qacl-log-modal').style.display='flex';
+}
+let _qaclLogCache=[];
+function qaclCloseLogModal(){document.getElementById('qacl-log-modal').style.display='none';document.getElementById('qacl-log-detail').style.display='none';}
+
+function qaclViewLogDetail(idx){
+  const log=_qaclLogCache[idx];if(!log)return;
+  const stageRows=log.stages.map(s=>{
+    const col=s.pct===100?'#10b981':(s.pct===0?'#64748b':'#6366f1');
+    const items=s.items.map(it=>`
+      <div style="display:flex;align-items:flex-start;gap:8px;padding:5px 8px;border-radius:6px;background:${it.checked?'rgba(16,185,129,.04)':'rgba(239,68,68,.03)'}">
+        <span style="font-size:13px;flex-shrink:0">${it.checked?'✅':'⬜'}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;color:var(--txt);font-weight:${it.checked?'600':'400'}">${it.item.replace(/^— /,'')}</div>
+          ${it.evidence&&Object.keys(it.evidence).filter(k=>k!=='_verifiedAt'&&k!=='_verifiedBy'&&it.evidence[k]).length?`<div style="font-size:10px;color:var(--mut);margin-top:2px">📎 ${Object.keys(it.evidence).filter(k=>k!=='_verifiedAt'&&k!=='_verifiedBy'&&it.evidence[k]).length} evidence fields</div>`:''}
+          ${it.evidence?._verifiedAt?`<div style="font-size:10px;color:#10b981">✓ ${it.evidence._verifiedBy||'Verified'} · ${it.evidence._verifiedAt}</div>`:''}
+        </div>
+      </div>`).join('');
+    return`<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <span style="font-size:18px">${s.title.match(/^\S+/)?.[0]||'📋'}</span>
+        <div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--txt)">${s.title}</div></div>
+        <div style="font-size:12px;font-weight:800;color:${col}">${s.pct}%</div>
+        <div style="font-size:11px;color:var(--mut)">${s.checked}/${s.total}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">${items}</div>
+    </div>`;
+  }).join('');
+  const gngColors={GO:'#10b981','GO WITH RISK':'#f59e0b','NO-GO':'#ef4444'};
+  const col=gngColors[log.decision]||'#64748b';
+  document.getElementById('qacl-log-detail-body').innerHTML=`
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+      <div style="font-size:16px;font-weight:800;color:var(--txt)">${log.project} — <span style="color:#6366f1">${log.release}</span></div>
+      <span style="padding:4px 14px;border-radius:14px;font-size:12px;font-weight:800;background:${col}22;color:${col};border:1px solid ${col}66">${log.decision}</span>
+      <div style="font-size:14px;font-weight:800;color:${col}">${log.totalPct}%</div>
+      <div style="font-size:12px;color:var(--mut)">Saved: ${new Date(log.savedAt).toLocaleString()}</div>
+      <button onclick="qaclDownloadLog(${idx})" style="margin-left:auto;padding:5px 12px;border-radius:7px;border:1.5px solid rgba(99,102,241,.4);background:rgba(99,102,241,.08);color:#6366f1;font-size:11px;font-weight:700;cursor:pointer">↓ Download JSON</button>
+    </div>
+    ${stageRows}`;
+  document.getElementById('qacl-log-modal').style.display='none';
+  document.getElementById('qacl-log-detail').style.display='flex';
+}
+
+function qaclDownloadLog(idx){
+  const log=_qaclLogCache[idx];if(!log)return;
+  const blob=new Blob([JSON.stringify(log,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`QA_Log_${log.project}_${log.release}_${log.savedAt.slice(0,10)}.json`;
+  a.click();URL.revokeObjectURL(a.href);
+}
 </script>
+
+<!-- QA RELEASE LOG MODALS -->
+<div id="qacl-log-modal" style="display:none;position:fixed;inset:0;z-index:9200;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;width:min(960px,100%);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <span style="font-size:18px">📋</span>
+      <h3 style="font-size:15px;font-weight:800;color:var(--txt);margin:0;flex:1">QA Release Logs — All Projects</h3>
+      <button onclick="qaclCloseLogModal()" style="background:none;border:1px solid var(--border);color:var(--mut);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">✕ Close</button>
+    </div>
+    <div id="qacl-log-modal-body" style="overflow-y:auto;padding:16px 20px 20px;flex:1"></div>
+  </div>
+</div>
+<div id="qacl-log-detail" style="display:none;position:fixed;inset:0;z-index:9201;background:var(--bg);flex-direction:column;overflow-y:auto">
+  <div style="display:flex;align-items:center;gap:12px;padding:14px 22px;border-bottom:1px solid var(--border);background:var(--card);position:sticky;top:0;z-index:1;flex-shrink:0">
+    <button onclick="document.getElementById('qacl-log-detail').style.display='none';document.getElementById('qacl-log-modal').style.display='flex'" style="background:none;border:1px solid var(--border);color:var(--mut);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">← Back to Logs</button>
+    <h3 style="font-size:15px;font-weight:800;color:var(--txt);margin:0;flex:1">Release Log Detail</h3>
+    <button onclick="qaclCloseLogModal()" style="background:none;border:1px solid var(--border);color:var(--mut);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">✕ Close</button>
+  </div>
+  <div id="qacl-log-detail-body" style="padding:20px 24px 40px;max-width:900px;margin:0 auto;width:100%"></div>
+</div>
 
 <!-- AUTOCHECKER OVERLAY + PANEL -->
 <style>
