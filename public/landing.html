@@ -769,21 +769,21 @@ async function qaclLoad(){
   document.getElementById('qacl-loading').style.display='block';
   document.getElementById('qacl-content').style.display='none';
   try{
-    // Load projects
     const pr=await fetch('/api/projects',{headers:{Authorization:'Bearer '+_qaclTok()}});
     _qaclProjs=pr.ok?await pr.json():[];
-    // Load checklist data
-    const dr=await fetch('/api/qa-data/qa3_checklist_data',{headers:{Authorization:'Bearer '+_qaclTok()}});
-    if(dr.ok){const d=await dr.json();_qaclData=d.value||{};}
-    else{_qaclData={};}
-    // Populate project dropdown
+    // 404 = key doesn't exist yet (first use) — treat as empty, not an error
+    try{
+      const dr=await fetch('/api/qa-data/qa3_checklist_data',{headers:{Authorization:'Bearer '+_qaclTok()}});
+      const d=await dr.json();
+      _qaclData=(dr.ok&&d.value&&typeof d.value==='object'&&!Array.isArray(d.value))?d.value:{};
+    }catch(_){_qaclData={};}
     const psel=document.getElementById('qacl-proj-sel');
     psel.innerHTML='<option value="">— Select Project —</option>'+_qaclProjs.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
     document.getElementById('qacl-loading').style.display='none';
     document.getElementById('qacl-content').style.display='block';
     if(_qaclProjs.length){psel.value=_qaclProjs[0].id;qaclSelectProject();}
   }catch(e){
-    document.getElementById('qacl-loading').innerHTML='<div style="color:#ef4444;padding:60px;text-align:center">Failed to load: '+e.message+'</div>';
+    document.getElementById('qacl-loading').innerHTML=`<div style="color:#ef4444;padding:60px;text-align:center">Failed to load: ${e.message}</div>`;
   }
 }
 
@@ -872,22 +872,45 @@ function _qaclGoNoGo(){
 }
 
 function qaclRender(){
-  if(!_qaclCurProj||!_qaclCurRel){
-    // show empty state
-    document.getElementById('qacl-metrics').innerHTML='<div style="color:var(--mut);font-size:13px;padding:10px">Select a project and release to view checklist.</div>';
+  const hasRelease=!!(  _qaclCurProj&&_qaclCurRel);
+  const badge=document.getElementById('qacl-gonogo-badge');
+
+  // Always render stage nav (shows as workflow guide even without release selected)
+  const d=hasRelease?_qaclRelData():{};
+  document.getElementById('qacl-stage-nav').innerHTML=QACL_STAGES.map(s=>{
+    const pct=hasRelease?_qaclStagePct(s.id):0;
+    const cls=pct===100?'done':(pct===0?'zero':'');
+    const shortTitle=s.title.replace(/Stage \d+ — /,'');
+    return`<button class="qacl-stage-nav-item${_qaclCurStage===s.id?' active':''}" data-stage-id="${s.id}" onclick="qaclShowStage('${s.id}')">${s.icon} <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${shortTitle}</span>${hasRelease?`<span class="qacl-stage-pct ${cls}">${pct}%</span>`:''}</button>`;
+  }).join('');
+
+  if(!hasRelease){
+    // No release — show workflow overview in main area
+    badge.textContent='— Select Release';
+    badge.style.cssText='padding:5px 14px;border-radius:20px;font-size:12px;font-weight:800;background:rgba(100,116,139,.1);color:var(--mut);border:1.5px solid var(--border)';
+    document.getElementById('qacl-metrics').innerHTML='';
     document.getElementById('qacl-gng-row').innerHTML='';
-    document.getElementById('qacl-stage-nav').innerHTML='';
-    document.getElementById('qacl-stage-content').innerHTML='';
-    document.getElementById('qacl-gonogo-badge').textContent='— Select Release';
-    document.getElementById('qacl-gonogo-badge').style.cssText='padding:5px 14px;border-radius:20px;font-size:12px;font-weight:800;background:rgba(100,116,139,.1);color:var(--mut);border:1.5px solid var(--border)';
+    document.getElementById('qacl-stage-content').innerHTML=`
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px 28px">
+        <div style="font-size:14px;font-weight:700;color:var(--txt);margin-bottom:6px">👋 Getting Started</div>
+        <div style="font-size:13px;color:var(--mut);margin-bottom:20px">Select a project and click <strong style="color:#6366f1">＋ New Release</strong> to start tracking your QA process for a release or sprint.</div>
+        <div style="font-size:12px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px">End-to-End QA Workflow</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
+          ${QACL_STAGES.map((s,i)=>`
+            <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;background:var(--card2);border:1px solid var(--border)">
+              <span style="font-size:18px;flex-shrink:0">${s.icon}</span>
+              <div>
+                <div style="font-size:11px;font-weight:700;color:var(--txt)">${s.title.replace(/Stage \d+ — /,'')}</div>
+                <div style="font-size:10px;color:var(--mut)">${s.items.length} checklist items</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`;
     return;
   }
-  const d=_qaclRelData();
+
   const total=_qaclTotalPct();
   const gng=_qaclGoNoGo();
-
-  // Badge in header
-  const badge=document.getElementById('qacl-gonogo-badge');
   const gngMap={go:{txt:'✅ GO',bg:'rgba(16,185,129,.12)',color:'#10b981',border:'rgba(16,185,129,.4)'},risk:{txt:'⚠ GO WITH RISK',bg:'rgba(245,158,11,.12)',color:'#f59e0b',border:'rgba(245,158,11,.4)'},nogo:{txt:'🚫 NO-GO',bg:'rgba(239,68,68,.12)',color:'#ef4444',border:'rgba(239,68,68,.4)'},none:{txt:'— In Progress',bg:'rgba(100,116,139,.1)',color:'var(--mut)',border:'var(--border)'}};
   const gm=gngMap[gng]||gngMap.none;
   badge.textContent=gm.txt;
@@ -896,72 +919,80 @@ function qaclRender(){
   // Metrics
   let totalItems=0,totalChecked=0;
   QACL_STAGES.forEach(s=>{totalItems+=s.items.length;totalChecked+=(d[s.id]||[]).filter(Boolean).length;});
-  const stagesStarted=QACL_STAGES.filter(s=>(d[s.id]||[]).some(Boolean)).length;
   const stagesDone=QACL_STAGES.filter(s=>_qaclStagePct(s.id)===100).length;
+  // Overall progress bar
+  const projName=_qaclProjs.find(p=>p.id===_qaclCurProj)?.name||_qaclCurProj;
   document.getElementById('qacl-metrics').innerHTML=`
-    <div class="qacl-metric"><div class="qacl-metric-val" style="color:#6366f1">${total}%</div><div class="qacl-metric-lbl">Overall Progress</div></div>
-    <div class="qacl-metric"><div class="qacl-metric-val" style="color:#10b981">${totalChecked}</div><div class="qacl-metric-lbl">Items Checked</div></div>
+    <div style="grid-column:1/-1;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:4px">
+      <div style="font-size:13px;font-weight:700;color:var(--txt)">${projName} — <span style="color:#6366f1">${_qaclCurRel}</span></div>
+      <div style="flex:1;min-width:120px;height:8px;border-radius:4px;background:var(--border);overflow:hidden">
+        <div style="height:100%;border-radius:4px;background:linear-gradient(90deg,#6366f1,#a855f7);width:${total}%;transition:width .4s"></div>
+      </div>
+      <div style="font-size:14px;font-weight:800;color:${gm.color}">${total}%</div>
+    </div>
+    <div class="qacl-metric"><div class="qacl-metric-val" style="color:#10b981">${totalChecked}</div><div class="qacl-metric-lbl">Checked</div></div>
     <div class="qacl-metric"><div class="qacl-metric-val" style="color:var(--mut)">${totalItems-totalChecked}</div><div class="qacl-metric-lbl">Remaining</div></div>
-    <div class="qacl-metric"><div class="qacl-metric-val" style="color:#a855f7">${stagesDone}/${QACL_STAGES.length}</div><div class="qacl-metric-lbl">Stages Complete</div></div>`;
+    <div class="qacl-metric"><div class="qacl-metric-val" style="color:#a855f7">${stagesDone}<span style="font-size:14px;color:var(--mut)">/${QACL_STAGES.length}</span></div><div class="qacl-metric-lbl">Stages Done</div></div>
+    <div class="qacl-metric"><div class="qacl-metric-val" style="color:${gm.color};font-size:18px">${gm.txt}</div><div class="qacl-metric-lbl">Release Status</div></div>`;
 
-  // GO/NO-GO row
+  // GO/NO-GO reference cards
   document.getElementById('qacl-gng-row').innerHTML=`
-    <div class="qacl-gonogo-card go"><div class="gng-label">✅ GO</div><div class="gng-desc">All critical flows pass · No critical defect · Smoke & regression pass · Rollback ready</div></div>
-    <div class="qacl-gonogo-card risk"><div class="gng-label">⚠ GO WITH RISK</div><div class="gng-desc">Only medium/low defects · Workaround available · Risk accepted & documented</div></div>
-    <div class="qacl-gonogo-card nogo"><div class="gng-label">🚫 NO-GO</div><div class="gng-desc">Critical flow fails · Data loss risk · Critical bug open · Build unstable · No rollback plan</div></div>`;
+    <div class="qacl-gonogo-card go${gng==='go'?' selected':''}"><div class="gng-label">✅ GO</div><div class="gng-desc">All critical flows pass · No critical bug · Stage 11 Gate 5 complete · Rollback ready</div></div>
+    <div class="qacl-gonogo-card risk${gng==='risk'?' selected':''}"><div class="gng-label">⚠ GO WITH RISK</div><div class="gng-desc">Only medium/low defects · Workaround available · Risk accepted & fix date documented</div></div>
+    <div class="qacl-gonogo-card nogo${gng==='nogo'?' selected':''}"><div class="gng-label">🚫 NO-GO</div><div class="gng-desc">Critical flow fails · Data loss risk · Critical bug open · Build unstable · No rollback plan</div></div>`;
 
-  // Stage nav
-  document.getElementById('qacl-stage-nav').innerHTML=QACL_STAGES.map(s=>{
-    const pct=_qaclStagePct(s.id);
-    const cls=pct===100?'done':(pct===0?'zero':'');
-    return`<button class="qacl-stage-nav-item${_qaclCurStage===s.id?' active':''}" onclick="qaclShowStage('${s.id}')">${s.icon} ${s.title.split('—')[0].trim()}<span class="qacl-stage-pct ${cls}">${pct}%</span></button>`;
-  }).join('');
-
-  // Stage content
   qaclRenderStage();
 }
 
 function qaclShowStage(id){
   _qaclCurStage=id;
-  // update nav active state
   document.querySelectorAll('.qacl-stage-nav-item').forEach(b=>{
-    b.classList.toggle('active',b.getAttribute('onclick').includes("'"+id+"'"));
+    b.classList.toggle('active',b.dataset.stageId===id);
   });
   qaclRenderStage();
-  document.querySelector('.qacl-main')?.scrollTo({top:0,behavior:'smooth'});
+  document.getElementById('qacl-stage-content')?.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function qaclRenderStage(){
   const stage=QACL_STAGES.find(s=>s.id===_qaclCurStage);
-  if(!stage)return;
+  if(!stage){document.getElementById('qacl-stage-content').innerHTML='';return;}
+  const hasRelease=!!(_qaclCurProj&&_qaclCurRel);
   const d=_qaclRelData()||{};
   const checks=d[stage.id]||new Array(stage.items.length).fill(false);
-  const pct=_qaclStagePct(stage.id);
+  const pct=hasRelease?_qaclStagePct(stage.id):0;
   const fillCls=pct===100?'done':'';
   const el=document.getElementById('qacl-stage-content');
   el.innerHTML=`
     <div class="qacl-stage">
-      <div class="qacl-stage-hdr" onclick="qaclToggleAll('${stage.id}')">
+      <div class="qacl-stage-hdr">
         <span style="font-size:22px">${stage.icon}</span>
         <h3>${stage.title}</h3>
-        <div class="qacl-stage-prog">
+        ${hasRelease?`<div class="qacl-stage-prog">
           <span>${checks.filter(Boolean).length}/${stage.items.length}</span>
-          <div class="qacl-stage-bar"><div class="qacl-stage-bar-fill ${fillCls}" style="width:${pct}%"></div></div>
-          <span style="color:${pct===100?'#10b981':'#6366f1'}">${pct}%</span>
-        </div>
+          <div class="qacl-stage-bar"><div class="qacl-stage-bar-fill ${fillCls}" id="qacl-fill-${stage.id}" style="width:${pct}%"></div></div>
+          <span id="qacl-pct-${stage.id}" style="color:${pct===100?'#10b981':'#6366f1'}">${pct}%</span>
+        </div>`:''}
       </div>
-      <div class="qacl-stage-body" id="qacl-items-${stage.id}">
-        ${stage.items.map((item,i)=>`
-          <label class="qacl-item${checks[i]?' checked':''}" id="qacl-item-${stage.id}-${i}">
-            <input type="checkbox" ${checks[i]?'checked':''} onchange="qaclCheck('${stage.id}',${i},this.checked)">
-            <span class="qacl-item-lbl">${item}</span>
-          </label>`).join('')}
+      ${!hasRelease?`<div style="background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#6366f1;font-weight:600">⚡ Select a project and create a release to start tracking this stage</div>`:''}
+      <div class="qacl-stage-body">
+        ${stage.items.map((item,i)=>{
+          const grp=item.startsWith('—');
+          const lbl=grp?item.replace(/^— /,''):item;
+          return`<label class="qacl-item${(hasRelease&&checks[i])?' checked':''}" id="qacl-item-${stage.id}-${i}" style="${!hasRelease?'opacity:.6;pointer-events:none':''}${grp?';padding-left:24px':''}">
+            <input type="checkbox" ${(hasRelease&&checks[i])?'checked':''} ${!hasRelease?'disabled':''} onchange="qaclCheck('${stage.id}',${i},this.checked)">
+            <span class="qacl-item-lbl">${grp?`<span style="color:var(--mut);font-size:11px;margin-right:4px">↳</span>`:''}<span>${lbl}</span></span>
+          </label>`;
+        }).join('')}
       </div>
     </div>
-    <div style="display:flex;gap:8px;margin-top:8px">
+    ${hasRelease?`<div style="display:flex;gap:8px;margin-top:8px">
       <button onclick="qaclMarkAll('${stage.id}',true)" style="flex:1;padding:9px;border-radius:8px;border:1.5px solid rgba(16,185,129,.4);background:rgba(16,185,129,.08);color:#10b981;font-size:12px;font-weight:700;cursor:pointer">✓ Mark All Done</button>
       <button onclick="qaclMarkAll('${stage.id}',false)" style="flex:1;padding:9px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);color:var(--mut);font-size:12px;font-weight:700;cursor:pointer">↺ Reset Stage</button>
-    </div>`;
+    </div>`:''}`;
+  // Update active state in nav
+  document.querySelectorAll('.qacl-stage-nav-item').forEach(b=>{
+    b.classList.toggle('active',b.dataset.stageId===stage.id);
+  });
 }
 
 function qaclCheck(stageId,idx,val){
@@ -1003,8 +1034,9 @@ function qaclUpdateNav(){
   // Update nav items
   QACL_STAGES.forEach(s=>{
     const pct=_qaclStagePct(s.id);
-    const btn=document.querySelector(`.qacl-stage-nav-item[onclick*="'${s.id}'"] .qacl-stage-pct`);
-    if(btn){btn.textContent=pct+'%';btn.className='qacl-stage-pct '+(pct===100?'done':(pct===0?'zero':''));}
+    const navBtn=document.querySelector(`.qacl-stage-nav-item[data-stage-id="${s.id}"]`);
+    const pctEl=navBtn?.querySelector('.qacl-stage-pct');
+    if(pctEl){pctEl.textContent=pct+'%';pctEl.className='qacl-stage-pct '+(pct===100?'done':(pct===0?'zero':''));}
   });
   // Update metrics
   const d=_qaclRelData()||{};
