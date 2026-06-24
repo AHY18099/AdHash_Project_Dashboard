@@ -227,6 +227,29 @@ h1{font-size:20px;font-weight:800}h2{font-size:16px;font-weight:800}h3{font-size
 .ft-blocker-title{font-size:13px;font-weight:700;color:var(--red)}
 .ft-blocker-meta{font-size:11px;color:var(--mut);margin-top:2px}
 .ft-stage-highlight{background:linear-gradient(135deg,rgba(47,107,255,.06),rgba(31,166,160,.04));border:1.5px solid rgba(47,107,255,.2);border-radius:11px;padding:13px 15px;margin-bottom:14px}
+.ft-pipeline-wrap{overflow-x:auto;border-radius:11px;border:1px solid var(--border)}
+.ft-pipeline{width:100%;border-collapse:collapse;min-width:900px}
+.ft-pipeline th{padding:7px 8px;text-align:center;background:var(--card2);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);border-bottom:1px solid var(--border);white-space:nowrap;border-right:1px solid var(--border)}
+.ft-pipeline th:first-child{text-align:left;min-width:170px;position:sticky;left:0;background:var(--card2);z-index:2;border-right:2px solid var(--border)}
+.ft-pipeline td{padding:8px 6px;text-align:center;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:middle}
+.ft-pipeline td:first-child{text-align:left;padding:8px 12px;position:sticky;left:0;background:var(--card);z-index:1;border-right:2px solid var(--border)}
+.ft-pipeline tr:last-child td{border-bottom:none}
+.ft-pipeline tr:hover td{background:rgba(47,107,255,.025)}
+.ft-pipeline tr:hover td:first-child{background:rgba(47,107,255,.04)}
+.ft-pl-cell{display:inline-flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;padding:4px 6px;border-radius:7px;transition:all .15s;min-width:44px}
+.ft-pl-cell:hover{background:rgba(47,107,255,.08);transform:scale(1.05)}
+.ft-pl-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid var(--border);background:var(--card2);color:var(--mut);transition:all .15s;flex-shrink:0}
+.ft-pl-dot.done{background:var(--green);border-color:var(--green);color:#fff}
+.ft-pl-dot.active{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 0 0 4px rgba(47,107,255,.18)}
+.ft-pl-dot.blocked{background:var(--red);border-color:var(--red);color:#fff}
+.ft-pl-dot.skipped{background:var(--mut2);border-color:var(--mut2);color:#fff;opacity:.6}
+.ft-pl-dot.inprogress{background:rgba(47,107,255,.15);border-color:var(--blue);color:var(--blue)}
+.ft-pl-pct{font-size:9px;font-weight:700;color:var(--mut);line-height:1}
+.ft-pl-rel-name{font-size:12px;font-weight:700;color:var(--txt);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.ft-pl-rel-sub{font-size:10px;color:var(--mut);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.ft-pl-overall{width:100%;height:4px;border-radius:2px;background:var(--border);overflow:hidden;margin-top:4px}
+.ft-pl-overall-fill{height:100%;border-radius:2px;background:var(--blue);transition:width .4s}
+.ft-pl-overall-fill.green{background:var(--green)}.ft-pl-overall-fill.amber{background:var(--amber)}
 @media(max-width:900px){.ft-grid-2,.ft-grid-3{grid-template-columns:1fr}#ft-sidebar{display:none}#ft-sidebar.mob-open{display:flex;position:fixed;top:0;left:0;bottom:0;z-index:500;width:210px;box-shadow:var(--shadow-lg)}.ft-stepper{min-width:unset;flex-direction:column;gap:3px}.ft-stepper::before{display:none}.ft-step{flex-direction:row;min-width:unset;align-items:center;padding:5px 0}.ft-step-line{display:none}.ft-step-circle{width:30px;height:30px;flex-shrink:0}.ft-step-label{text-align:left;margin-top:0;margin-left:9px;max-width:none}.ft-metrics-row{grid-template-columns:repeat(3,1fr)}.ft-vp{padding:11px}}
 @media(max-width:600px){.ft-metrics-row{grid-template-columns:repeat(2,1fr)}#ft-hrow1{padding:0 10px;gap:5px}#ft-hrow2{padding:4px 10px}.ft-vp{padding:9px}.ft-page-sub,.ft-search-wrap{display:none}.ft-kanban-col{width:160px}}
 @media(max-width:768px){#ft-mob-fab{display:flex}#ft-mob-menu{display:flex}}
@@ -832,25 +855,60 @@ function ftRenderDashboardRels(rels){
 function ftRenderWorkflowCards(rels){
   if(rels.length===0) return `<div class="ft-empty"><div class="ft-empty-icon">🚀</div><div class="ft-empty-text">No releases</div><div class="ft-empty-sub">Create a release to track your QA workflow.</div><button class="ftbtn primary" onclick="ftHeaderNewRelease()">+ New Release</button></div>`;
   const active=rels.filter(r=>r.status!=='Cancelled');
-  return `<div style="display:flex;flex-direction:column;gap:10px">${active.map(rel=>{
-    const proj=ftProjById(rel.projectId);const pct=ftRelProgress(rel);const health=ftGetRelHealth(rel);
-    const bugs=rel.bugs||[];const critB=bugs.filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
-    const highB=bugs.filter(b=>b.severity==='High'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  if(active.length===0) return `<div class="ft-empty"><div class="ft-empty-icon">✅</div><div class="ft-empty-text">No active releases</div></div>`;
+  const stages=typeof STAGE_DEFS!=='undefined'?STAGE_DEFS:[];
+  const stageHeaderCells=stages.map(s=>`<th title="${s.name}"><div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-size:14px">${s.icon}</span><span>${s.name.replace(' ','​')}</span></div></th>`).join('');
+  const rows=active.map(rel=>{
+    const proj=ftProjById(rel.projectId);
+    const pct=ftRelProgress(rel);
+    const health=ftGetRelHealth(rel);
     const cs=rel.currentStage||1;
-    const miniSteps=typeof STAGE_DEFS!=='undefined'?STAGE_DEFS.map(s=>{
-      const st=rel.stages?.[s.id]||{};const sPct=st.pct||0;
-      let cls='';if(sPct===100)cls='done';else if(cs===s.num)cls='active';else if(st.status==='Blocked')cls='blocked';
-      return `<div class="ft-step ${cls}" onclick="event.stopPropagation();ftOpenRelease('${rel.id}');setTimeout(()=>ftRelTab('${s.id}'),200)"><div class="ft-step-line"></div><div class="ft-step-circle">${sPct===100?'✓':s.icon}</div><div class="ft-step-label">${s.name}</div></div>`;
-    }).join(''):'';
-    return `<div class="ft-rel-card ${health.cls}" onclick="ftOpenRelease('${rel.id}')">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-        <div><div style="font-size:14px;font-weight:800">${ftEsc(rel.name)} <span style="font-size:12px;font-weight:600;color:var(--mut)">v${ftEsc(rel.version||'?')}</span></div><div style="font-size:11px;color:var(--mut);margin-top:2px">${ftEsc(proj?.name||'—')} ${rel.plannedDate?`· ${ftFmt(rel.plannedDate)}`:''}</div></div>
-        <div style="display:flex;gap:5px;flex-wrap:wrap">${ftStatusBadge(rel.status||'Draft')}${ftDecisionBadge(rel.decision||'Pending')}${critB>0?`<span class="ftbadge red">🐛 ${critB}</span>`:''}${highB>0?`<span class="ftbadge amber">⚠ ${highB}</span>`:''}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><div class="ft-progress" style="flex:1"><div class="ft-progress-fill ${ftProgressColor(pct)}" style="width:${pct}%"></div></div><span style="font-size:11px;color:var(--mut)">${pct}% · Stage ${cs}/10</span></div>
-      <div class="ft-stepper-wrap"><div class="ft-stepper">${miniSteps}</div></div>
-    </div>`;
-  }).join('')}</div>`;
+    const bugs=rel.bugs||[];
+    const critB=bugs.filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+    const stageCells=stages.map(s=>{
+      const st=rel.stages?.[s.id]||{};
+      const sPct=st.pct||0;
+      const status=st.status||'Not Started';
+      let dotCls='';
+      if(status==='Skipped') dotCls='skipped';
+      else if(status==='Blocked') dotCls='blocked';
+      else if(sPct===100||status==='Done') dotCls='done';
+      else if(cs===s.num||status==='In Progress') dotCls=(sPct>0?'inprogress':'active');
+      const icon=dotCls==='done'?'✓':dotCls==='blocked'?'✕':dotCls==='skipped'?'—':s.icon;
+      const pctLabel=sPct>0&&sPct<100?`${sPct}%`:'';
+      return `<td><div class="ft-pl-cell" onclick="event.stopPropagation();ftOpenRelease('${rel.id}');setTimeout(()=>ftRelTab('${s.id}'),220)" title="${s.name}: ${status}${sPct>0?' ('+sPct+'%)':''}"><div class="ft-pl-dot ${dotCls}">${icon}</div>${pctLabel?`<div class="ft-pl-pct">${pctLabel}</div>`:''}</div></td>`;
+    }).join('');
+    const borderCls=health.cls==='blocked'?'2px solid var(--red)':health.cls==='at-risk'||health.cls==='attention'?'2px solid var(--amber)':'1px solid var(--border)';
+    return `<tr style="border-left:${borderCls}">
+      <td onclick="ftOpenRelease('${rel.id}')" style="cursor:pointer">
+        <div class="ft-pl-rel-name">${ftEsc(rel.name)}</div>
+        <div class="ft-pl-rel-sub">${ftEsc(proj?.name||'—')} · v${ftEsc(rel.version||'?')}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap">
+          ${ftStatusBadge(rel.status||'Draft')}
+          ${critB>0?`<span class="ftbadge red" style="font-size:10px">🐛${critB}</span>`:''}
+          ${ftDecisionBadge(rel.decision||'Pending')}
+        </div>
+        <div class="ft-pl-overall"><div class="ft-pl-overall-fill ${ftProgressColor(pct)}" style="width:${pct}%"></div></div>
+        <div style="font-size:9px;color:var(--mut);margin-top:2px">${pct}% complete</div>
+      </td>
+      ${stageCells}
+    </tr>`;
+  }).join('');
+  return `<div class="ft-pipeline-wrap">
+    <div style="padding:8px 12px;background:var(--card2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px">Pipeline Legend:</span>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--mut)"><span style="width:12px;height:12px;border-radius:50%;background:var(--blue);display:inline-block"></span>Current Stage</span>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--mut)"><span style="width:12px;height:12px;border-radius:50%;background:rgba(47,107,255,.15);border:2px solid var(--blue);display:inline-block"></span>In Progress</span>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--mut)"><span style="width:12px;height:12px;border-radius:50%;background:var(--green);display:inline-block"></span>Done</span>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--mut)"><span style="width:12px;height:12px;border-radius:50%;background:var(--red);display:inline-block"></span>Blocked</span>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--mut)"><span style="width:12px;height:12px;border-radius:50%;background:var(--border);display:inline-block"></span>Not Started</span>
+      <span style="margin-left:auto;font-size:10px;color:var(--mut)">Click any stage circle to jump directly to it</span>
+    </div>
+    <table class="ft-pipeline">
+      <thead><tr><th>Release</th>${stageHeaderCells}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
 }
 
 function ftRenderCardGrid(rels){
