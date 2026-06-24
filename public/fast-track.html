@@ -970,7 +970,7 @@ function ftRenderTableView(rels){
 // ── ADMIN CHECK ──
 function ftIsAdmin(){
   const role=(window._ftCurrentRole||'').toLowerCase();
-  return role==='superadmin'||role==='admin'||role==='super admin';
+  return role==='super_admin'||role==='superadmin'||role==='admin'||role==='super admin'||role==='super-admin';
 }
 
 // ── MY TASKS VIEW ──
