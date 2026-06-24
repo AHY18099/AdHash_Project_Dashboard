@@ -422,7 +422,13 @@ async function ftLoadData(){
   const [pd,rd]=await Promise.all([ftApiGet('fast_track_projects'),ftApiGet('fast_track_releases')]);
   _ftProjects=pd?.projects||[];
   _ftReleases=rd?.releases||[];
-  if(_ftProjects.length===0&&_ftReleases.length===0) ftSeedDemo();
+  // Detect old demo data and replace with real projects; keep any real releases
+  const hasOldDemo=_ftProjects.some(p=>p.id&&p.id.startsWith('demo-'));
+  if(_ftProjects.length===0||hasOldDemo){
+    // Discard releases tied to old demo projects only
+    _ftReleases=_ftReleases.filter(r=>!String(r.projectId||'').startsWith('demo-'));
+    ftSeedDemo();
+  }
   ftUpdateHeaderSelectors();
   ftUpdateNavBadges();
 }
@@ -2551,96 +2557,44 @@ ${rel.clientNotes?`<h2>Client Notes</h2><p style="font-size:13px;padding:12px;ba
 
 
 // ══════════════════════════════════════════════════════
-// DEMO DATA
+// SEED — real AdHash projects, no demo releases
 // ══════════════════════════════════════════════════════
 function ftSeedDemo(){
-  const p1={id:'demo-p1',name:'SyncTrade',client:'SyncTrade Inc.',description:'Real-time trading platform with portfolio management and live market feeds.',priority:'Critical',status:'Active',projectManager:'Raj Kumar',qaLead:'Priya Sharma',manualQaOwner:'Amit Singh',automationQaOwner:'Deepa Nair',apiOwner:'Karan Mehta',devOwner:'Suresh Rao',qaEnvUrl:'https://staging.synctrade.com',productionUrl:'https://app.synctrade.com',createdAt:'2026-01-10T00:00:00Z',updatedAt:'2026-06-01T00:00:00Z'};
-  const p2={id:'demo-p2',name:'AI Sign Pro',client:'AI Sign Pro Ltd.',description:'AI-powered digital signature and document workflow platform.',priority:'High',status:'Active',projectManager:'Anika Joshi',qaLead:'Vikram Patel',manualQaOwner:'Sneha Gupta',automationQaOwner:'Ravi Verma',apiOwner:'Pooja Shah',devOwner:'Manoj Kumar',qaEnvUrl:'https://staging.aisignpro.com',productionUrl:'https://app.aisignpro.com',createdAt:'2026-02-15T00:00:00Z',updatedAt:'2026-06-10T00:00:00Z'};
-  const p3={id:'demo-p3',name:'WavedIn',client:'WavedIn Technologies',description:'Professional networking platform with AI-powered matching and job recommendations.',priority:'Normal',status:'Active',projectManager:'Nisha Reddy',qaLead:'Arjun Nair',manualQaOwner:'Kavya Pillai',automationQaOwner:'',apiOwner:'Rohit Singh',devOwner:'Pradeep Kumar',qaEnvUrl:'https://staging.wavedin.com',productionUrl:'https://wavedin.com',createdAt:'2026-03-01T00:00:00Z',updatedAt:'2026-06-15T00:00:00Z'};
-
-  const r1={
-    id:'demo-r1',projectId:'demo-p1',name:'Sprint 18 Release',version:'2.1.0',buildNumber:'218-stable',
-    summary:'Portfolio dashboard redesign, real-time P&L calculation, mobile app sync improvements.',
-    riskLevel:'Critical',status:'Ready for Release',releaseOwner:'Raj Kumar',qaLead:'Priya Sharma',
-    plannedDate:'2026-06-25',qaEnvUrl:'https://staging.synctrade.com/v2.1.0',
-    knownRisks:'Market data feed latency may spike during high-volume trading hours.',
-    clientNotes:'Client approved scope on June 20. Live trading hours must not be disrupted.',
-    currentStage:9,decision:'GO',decisionNotes:'All criteria met. QA Lead: Priya Sharma.',
-    stages:{
-      s1:{status:'Done',pct:100,owner:'Raj Kumar',startDt:'2026-06-10T09:00',endDt:'2026-06-10T11:00',evidence:'https://jira.synctrade.com/ST-218',comments:'Change request approved by PM',blocked:false,bugCount:0,data:{whatChanged:'Portfolio dashboard and P&L calculation engine',raisedBy:'Raj Kumar',ticketId:'ST-218',priority:'Critical',modules:'Dashboard, Portfolio, P&L',changeDate:'2026-06-10',description:'Complete redesign of portfolio dashboard with real-time P&L. Mobile sync improvements.',approvedBy:'CTO',approvalDate:'2026-06-10'}},
-      s2:{status:'Done',pct:100,owner:'Priya Sharma',startDt:'2026-06-10T11:00',endDt:'2026-06-10T12:00',evidence:'https://confluence.synctrade.com/risk-218',comments:'CRITICAL risk: financial data changes',blocked:false,bugCount:0,data:{riskLevel:'Critical',mainModule:'Portfolio/P&L',relatedModules:'Dashboard, Mobile Sync, API',mainFlow:'Yes',dataAffected:'Yes',apiAffected:'Yes',permissionsAffected:'No',paymentAffected:'Yes',securityAffected:'No',regressionImpact:'Yes',testingOwner:'Priya Sharma',testDataAvailable:'Yes',riskReason:'Financial calculations directly affect user P&L display and trading decisions.'}},
-      s3:{status:'Done',pct:100,owner:'Suresh Rao',startDt:'2026-06-11T09:00',endDt:'2026-06-11T14:00',evidence:'https://build.synctrade.com/218',comments:'All unit tests pass. Build stable.',blocked:false,bugCount:0,data:{items:Object.fromEntries([...Array(10)].map((_,i)=>([i,{val:'Yes',owner:'Suresh Rao',notes:'Verified'}])))}},
-      s4:{status:'Done',pct:100,owner:'Deepa Nair',startDt:'2026-06-12T09:00',endDt:'2026-06-12T11:00',evidence:'https://smoke.synctrade.com/218',comments:'All smoke tests passed.',blocked:false,bugCount:0,data:{tests:Object.fromEntries([...Array(8)].map((_,i)=>([i,{name:S4_TESTS[i]?.name,status:'Pass',owner:'Deepa Nair',env:'Chrome/UAT',failureReason:''}])))}},
-      s5:{status:'Done',pct:95,owner:'Amit Singh',startDt:'2026-06-13T09:00',endDt:'2026-06-18T17:00',evidence:'https://testrail.synctrade.com/218',comments:'95% pass rate. 1 low-priority scenario deferred.',blocked:false,bugCount:2},
-      s6:{status:'Done',pct:100,owner:'Karan Mehta',startDt:'2026-06-14T09:00',endDt:'2026-06-16T17:00',evidence:'https://postman.synctrade.com/218',comments:'All API checks passed.',blocked:false,bugCount:0},
-      s7:{status:'Done',pct:100,owner:'Priya Sharma',startDt:'2026-06-17T09:00',endDt:'2026-06-19T17:00',evidence:'',comments:'All bugs fixed and retested.',blocked:false,bugCount:0},
-      s8:{status:'Done',pct:90,owner:'Amit Singh',startDt:'2026-06-19T09:00',endDt:'2026-06-20T17:00',evidence:'',comments:'90% pass. Low-priority test deferred with approval.',blocked:false,bugCount:0},
-      s9:{status:'Done',pct:100,owner:'Priya Sharma',startDt:'2026-06-21T09:00',endDt:'2026-06-21T11:00',evidence:'',comments:'GO decision approved.',blocked:false,bugCount:0,data:{qaRecommendation:'GO',poDecision:'GO',mgmtDecision:'GO',approvedBy:'Raj Kumar',approvalDate:'2026-06-21',finalNotes:'Release approved for production deployment on June 25.'}},
-      s10:{status:'Not Started',pct:0}
-    },
-    bugs:[{id:ftUuid(),module:'Portfolio',title:'P&L decimal rounding issue on large portfolios',description:'P&L shows incorrect decimal after ₹10L portfolio value',steps:'1. Login 2. Open portfolio >₹10L 3. Check P&L',expected:'2 decimal places',actual:'Shows 4 decimals',severity:'Medium',priority:'P2',status:'Closed',reporter:'Amit Singh',assignee:'Suresh Rao',reportedDate:'2026-06-14T10:00:00Z',fixedBuild:'218-b3',retestResult:'Passed',evidence:'',consoleError:'',networkError:'',retestNotes:'Fixed in build 218-b3'},{id:ftUuid(),module:'Mobile Sync',title:'Sync delay > 3s on poor connectivity',description:'Mobile sync shows data lag on 3G networks',steps:'1. Use 3G 2. Update portfolio 3. Check sync',expected:'<2s sync',actual:'3-5s delay',severity:'Low',priority:'P3',status:'Deferred',reporter:'Priya Sharma',assignee:'Suresh Rao',reportedDate:'2026-06-15T14:00:00Z',fixedBuild:'',retestResult:'Not Tested',evidence:'',retestNotes:'Deferred to next sprint - network optimization planned'}],
-    teamAssignments:[{id:ftUuid(),member:'Amit Singh',role:'Manual QA',module:'Portfolio & P&L',testingType:'Manual',assignedDate:'2026-06-13',startDate:'2026-06-13',completedDate:'2026-06-18',totalChecks:45,passed:43,failed:1,blocked:0,notTested:1,status:'Verification Completed',evidence:'https://testrail.synctrade.com/amit-218',comments:'Excellent coverage. Minor deferred item documented.',leadStatus:'Verified',verifiedBy:'Priya Sharma',verifiedAt:'2026-06-20T10:00:00Z'},{id:ftUuid(),member:'Deepa Nair',role:'Automation QA',module:'Smoke & Regression',testingType:'Automated',assignedDate:'2026-06-12',startDate:'2026-06-12',completedDate:'2026-06-20',totalChecks:20,passed:18,failed:0,blocked:0,notTested:2,status:'Verification Completed',evidence:'',comments:'Automation suite executed successfully.',leadStatus:'Verified',verifiedBy:'Priya Sharma',verifiedAt:'2026-06-20T11:00:00Z'}],
-    regressionPack:[{id:ftUuid(),name:'Login flow',module:'Auth',type:'Manual',criticality:'Critical',owner:'Amit Singh',status:'Pass',executedAt:'2026-06-19',evidence:'',bugId:'',notes:''},{id:ftUuid(),name:'Portfolio load',module:'Portfolio',type:'Manual',criticality:'Critical',owner:'Amit Singh',status:'Pass',executedAt:'2026-06-19',evidence:'',bugId:'',notes:''},{id:ftUuid(),name:'P&L calculation',module:'P&L',type:'Automated',criticality:'Critical',owner:'Deepa Nair',status:'Pass',executedAt:'2026-06-20',evidence:'',bugId:'',notes:''},{id:ftUuid(),name:'Trade execution',module:'Trading',type:'Automated',criticality:'Critical',owner:'Deepa Nair',status:'Pass',executedAt:'2026-06-20',evidence:'',bugId:'',notes:''},{id:ftUuid(),name:'Mobile sync',module:'Mobile',type:'Manual',criticality:'Normal',owner:'Amit Singh',status:'Skip',executedAt:'',evidence:'',bugId:'',notes:'Deferred - network issue'}],
-    history:[{stage:'Release Decision',module:'—',item:'Final Decision',prevStatus:'Pending',newStatus:'GO',updatedBy:'Priya Sharma',updatedAt:'2026-06-21T11:00:00Z',comments:'All criteria met'},{stage:'Smoke Test',module:'All',item:'Smoke Pack',prevStatus:'Not Started',newStatus:'Done',updatedBy:'Deepa Nair',updatedAt:'2026-06-12T11:00:00Z',comments:'100% pass'}],
-    createdAt:'2026-06-10T00:00:00Z',updatedAt:'2026-06-21T00:00:00Z'
-  };
-
-  const r2={
-    id:'demo-r2',projectId:'demo-p2',name:'E-Sign API Integration',version:'1.3.0',buildNumber:'130-rc2',
-    summary:'New REST API for third-party e-signature integration. Webhook support added.',
-    riskLevel:'High',status:'Ready for Release',releaseOwner:'Anika Joshi',qaLead:'Vikram Patel',
-    plannedDate:'2026-06-28',qaEnvUrl:'https://staging.aisignpro.com/v1.3',
-    knownRisks:'Webhook delivery not guaranteed on enterprise firewalls. Client acceptance received.',
-    clientNotes:'3 enterprise clients waiting on this API. Approval given for GO WITH RISK.',
-    currentStage:9,decision:'GO WITH RISK',
-    stages:{
-      s1:{status:'Done',pct:100,owner:'Anika Joshi'},
-      s2:{status:'Done',pct:100,owner:'Vikram Patel',data:{riskLevel:'High'}},
-      s3:{status:'Done',pct:100,owner:'Manoj Kumar'},
-      s4:{status:'Done',pct:100,owner:'Ravi Verma'},
-      s5:{status:'Done',pct:85,owner:'Sneha Gupta'},
-      s6:{status:'Done',pct:90,owner:'Pooja Shah'},
-      s7:{status:'Done',pct:80,owner:'Vikram Patel'},
-      s8:{status:'Done',pct:75,owner:'Sneha Gupta'},
-      s9:{status:'Done',pct:100,owner:'Vikram Patel',data:{qaRecommendation:'GO WITH RISK',poDecision:'GO WITH RISK',mgmtDecision:'GO WITH RISK',approvedBy:'Anika Joshi',approvalDate:'2026-06-22',riskOwner:'Anika Joshi',finalNotes:'Webhook limitation accepted by client. Retry mechanism documented.'}},
-      s10:{status:'Not Started',pct:0}
-    },
-    bugs:[{id:ftUuid(),module:'Webhook',title:'Webhook retry fails after 3 attempts on slow networks',description:'Webhook does not retry after 3 failures on slow corporate networks',steps:'1. Configure webhook 2. Simulate slow network 3. Send document for signature',expected:'Webhook retries 5 times',actual:'Stops after 3 retries',severity:'Medium',priority:'P2',status:'Closed',reporter:'Sneha Gupta',assignee:'Manoj Kumar',reportedDate:'2026-06-16T09:00:00Z',fixedBuild:'130-rc2',retestResult:'Passed',evidence:'',retestNotes:'Fixed retry count to 5'},{id:ftUuid(),module:'API',title:'Rate limit header missing on 429 response',description:'When rate limited, X-RateLimit-Reset header is not returned',steps:'1. Hit API 100+ times/min 2. Check 429 response headers',expected:'X-RateLimit-Reset header present',actual:'Header missing',severity:'Low',priority:'P3',status:'Closed',reporter:'Pooja Shah',assignee:'Manoj Kumar',reportedDate:'2026-06-17T14:00:00Z',fixedBuild:'130-rc2',retestResult:'Passed',evidence:'',retestNotes:'Header added'}],
-    teamAssignments:[{id:ftUuid(),member:'Sneha Gupta',role:'Manual QA',module:'API Testing',testingType:'Manual',assignedDate:'2026-06-15',completedDate:'2026-06-21',totalChecks:30,passed:26,failed:2,blocked:0,notTested:2,status:'Verification Completed',evidence:'',comments:'',leadStatus:'Verified',verifiedBy:'Vikram Patel',verifiedAt:'2026-06-22T09:00:00Z'}],
-    regressionPack:ftDefaultRegression().map(r=>({...r,id:ftUuid(),status:'Pass',executedAt:'2026-06-21',owner:'Ravi Verma'})),
-    history:[{stage:'Release Decision',module:'—',item:'Final Decision',prevStatus:'Pending',newStatus:'GO WITH RISK',updatedBy:'Vikram Patel',updatedAt:'2026-06-22T10:00:00Z',comments:'Accepted with risk documentation'}],
-    createdAt:'2026-06-12T00:00:00Z',updatedAt:'2026-06-22T00:00:00Z'
-  };
-
-  const r3={
-    id:'demo-r3',projectId:'demo-p3',name:'Job Matching Engine v1',version:'0.9.0',buildNumber:'090-b7',
-    summary:'AI-powered job matching engine with skill gap analysis and recommendation scoring.',
-    riskLevel:'High',status:'Blocked',releaseOwner:'Nisha Reddy',qaLead:'Arjun Nair',
-    plannedDate:'2026-06-30',qaEnvUrl:'https://staging.wavedin.com/v0.9',
-    knownRisks:'AI model accuracy below target (72% vs 85% target). Critical login bug blocking testing.',
-    clientNotes:'Release blocked until critical login bug is fixed.',
-    currentStage:4,decision:'NO-GO',
-    stages:{
-      s1:{status:'Done',pct:100,owner:'Nisha Reddy'},
-      s2:{status:'Done',pct:100,owner:'Arjun Nair',data:{riskLevel:'High'}},
-      s3:{status:'Done',pct:90,owner:'Pradeep Kumar'},
-      s4:{status:'Blocked',pct:30,owner:'Arjun Nair',comments:'Smoke test blocked by critical login bug ST-001',blocked:true,bugCount:1},
-      s5:{status:'Not Started',pct:0},
-      s6:{status:'Not Started',pct:0},
-      s7:{status:'In Progress',pct:20,owner:'Arjun Nair'},
-      s8:{status:'Not Started',pct:0},
-      s9:{status:'In Progress',pct:20,owner:'Arjun Nair',data:{qaRecommendation:'NO-GO',poDecision:'NO-GO',mgmtDecision:'Pending',finalNotes:'Critical login bug must be fixed before any further testing.'}},
-      s10:{status:'Not Started',pct:0}
-    },
-    bugs:[{id:ftUuid(),module:'Authentication',title:'Critical: Login fails with valid credentials after new session changes',description:'Users cannot login with correct credentials after session storage refactor in v0.9',steps:'1. Open app 2. Enter valid email+password 3. Click Login',expected:'User logged in successfully',actual:'Error: Invalid credentials (even with correct ones)',severity:'Critical',priority:'P0',status:'Open',reporter:'Kavya Pillai',assignee:'Pradeep Kumar',reportedDate:'2026-06-20T10:00:00Z',fixedBuild:'',retestResult:'Not Tested',evidence:'https://jira.wavedin.com/WD-009',consoleError:'TypeError: Cannot read properties of undefined (session)',networkError:'401 Unauthorized',retestNotes:''},{id:ftUuid(),module:'Job Matching',title:'Match score shows 0% for senior profiles',description:'AI match score returns 0% for profiles with >10 years experience',steps:'1. Login as senior profile (>10 yrs exp) 2. Search jobs 3. Check match scores',expected:'Match score >70% for relevant jobs',actual:'0% for all jobs',severity:'High',priority:'P1',status:'Open',reporter:'Arjun Nair',assignee:'Pradeep Kumar',reportedDate:'2026-06-21T14:00:00Z',fixedBuild:'',retestResult:'Not Tested',evidence:'',consoleError:'',networkError:'',retestNotes:''}],
-    teamAssignments:[{id:ftUuid(),member:'Kavya Pillai',role:'Manual QA',module:'Authentication',testingType:'Manual',assignedDate:'2026-06-20',completedDate:'',totalChecks:15,passed:5,failed:3,blocked:7,notTested:0,status:'Blocked',evidence:'',comments:'Blocked on critical login bug. Cannot proceed.',leadStatus:'Pending Review',verifiedBy:'',verifiedAt:''}],
-    regressionPack:ftDefaultRegression().map(r=>({...r,id:ftUuid(),status:'Not Run',owner:''})),
-    history:[{stage:'Bug Tracker',module:'Authentication',item:'Critical login bug',prevStatus:'',newStatus:'Open',updatedBy:'Kavya Pillai',updatedAt:'2026-06-20T10:00:00Z',comments:'CRITICAL: Blocking all testing'},{stage:'Smoke Test',module:'All',item:'Smoke Pack',prevStatus:'In Progress',newStatus:'Blocked',updatedBy:'Arjun Nair',updatedAt:'2026-06-20T12:00:00Z',comments:'Blocked by critical login bug'}],
-    createdAt:'2026-06-18T00:00:00Z',updatedAt:'2026-06-20T00:00:00Z'
-  };
-
-  _ftProjects=[p1,p2,p3];
-  _ftReleases=[r1,r2,r3];
+  const now=new Date().toISOString();
+  // Team members from qa-dashboard DEFAULT_TEAM_MEMBERS
+  // Deepa, Prakash Raj, Raghuram, Thenilavan, Yogesh
+  // Projects from qa-dashboard DEFAULT_PROJ with defaultAssignee mapping
+  const proj=[
+    {id:'ft-adhash',    name:'Ad-Hash',      priority:'High',   defaultAssignee:'Prakash Raj', qaLead:'Thenilavan'},
+    {id:'ft-aisignpro', name:'Ai Sign Pro',  priority:'High',   defaultAssignee:'Yogesh',      qaLead:'Thenilavan', website:'https://ddp.aisignpro.com/', dashboard:'https://cpa.aisignpro.com/'},
+    {id:'ft-algomax',   name:'Algomax',      priority:'Normal', defaultAssignee:'Deepa',       qaLead:'Thenilavan'},
+    {id:'ft-autochecker',name:'Auto Checker',priority:'Normal', defaultAssignee:'Deepa',       qaLead:'Thenilavan'},
+    {id:'ft-ddp',       name:'DDP',          priority:'High',   defaultAssignee:'Prakash Raj', qaLead:'Thenilavan'},
+    {id:'ft-humee',     name:'Humee',        priority:'High',   defaultAssignee:'Yogesh',      qaLead:'Thenilavan', website:'https://humee.com/', dashboard:'https://dashboard.humee.com/'},
+    {id:'ft-metcalf',   name:'Metcalf',      priority:'Normal', defaultAssignee:'Yogesh',      qaLead:'Thenilavan'},
+    {id:'ft-smc',       name:'SMC',          priority:'Normal', defaultAssignee:'Prakash Raj', qaLead:'Thenilavan'},
+    {id:'ft-sparkme',   name:'Spark me',     priority:'Normal', defaultAssignee:'Deepa',       qaLead:'Thenilavan'},
+    {id:'ft-synctag',   name:'SyncTag',      priority:'High',   defaultAssignee:'Raghuram',    qaLead:'Thenilavan'},
+    {id:'ft-synctrade', name:'SyncTrade',    priority:'Critical',defaultAssignee:'Raghuram',   qaLead:'Thenilavan'},
+    {id:'ft-wavedin',   name:'WavedIn',      priority:'Normal', defaultAssignee:'Deepa',       qaLead:'Thenilavan'},
+    {id:'ft-zapai',     name:'ZapAI',        priority:'Normal', defaultAssignee:'Prakash Raj', qaLead:'Thenilavan'},
+    {id:'ft-zapcrm',    name:'ZapCRM',       priority:'Normal', defaultAssignee:'Raghuram',    qaLead:'Thenilavan'},
+    {id:'ft-zaptrade',  name:'ZapTrade',     priority:'High',   defaultAssignee:'Deepa',       qaLead:'Thenilavan', website:'https://zaptrade.ai/', dashboard:'https://algo.zaptrade.ai/login'},
+  ];
+  _ftProjects=proj.map(p=>({
+    id:p.id, name:p.name, client:p.name,
+    description:'',
+    priority:p.priority, status:'Active',
+    projectManager:'Thenilavan',
+    qaLead:p.qaLead||'Thenilavan',
+    manualQaOwner:p.defaultAssignee||'',
+    automationQaOwner:'',
+    apiOwner:p.defaultAssignee||'',
+    devOwner:'',
+    qaEnvUrl:'', productionUrl:p.dashboard||p.website||'',
+    createdAt:now, updatedAt:now
+  }));
+  // _ftReleases already cleaned of demo entries before this fn is called
   ftSaveProjects();ftSaveReleases();
 }
 
