@@ -967,23 +967,35 @@ function ftRenderTableView(rels){
   return `<div class="ft-tbl-wrap"><table class="ft-tbl"><thead><tr><th>Release</th><th>Project</th><th>Version</th><th>Risk</th><th>Status</th><th>Progress</th><th>Decision</th><th>Planned</th><th>Actions</th></tr></thead><tbody>${rels.map(rel=>{const proj=ftProjById(rel.projectId);const pct=ftRelProgress(rel);return `<tr><td><div style="font-weight:700">${ftEsc(rel.name)}</div></td><td><div style="font-size:11px;color:var(--mut)">${ftEsc(proj?.name||'—')}</div></td><td>${ftEsc(rel.version||'—')}</td><td>${ftRiskBadge(rel.riskLevel)}</td><td>${ftStatusBadge(rel.status||'Draft')}</td><td><div style="display:flex;align-items:center;gap:6px"><div class="ft-progress" style="width:70px"><div class="ft-progress-fill ${ftProgressColor(pct)}" style="width:${pct}%"></div></div><span style="font-size:11px">${pct}%</span></div></td><td>${ftDecisionBadge(rel.decision||'Pending')}</td><td style="white-space:nowrap;font-size:11px">${rel.plannedDate?ftFmt(rel.plannedDate):'—'}</td><td><button class="ftbtn sm primary" onclick="ftOpenRelease('${rel.id}')">Open</button></td></tr>`;}).join('')}</tbody></table></div>`;
 }
 
+// ── ADMIN CHECK ──
+function ftIsAdmin(){
+  const role=(window._ftCurrentRole||'').toLowerCase();
+  return role==='superadmin'||role==='admin'||role==='super admin';
+}
+
 // ── MY TASKS VIEW ──
 function ftRenderMyTasks(){
   const el=document.getElementById('ft-view-mytasks');
   const me=(window._ftCurrentUser||'').toLowerCase();
+  const isAdmin=ftIsAdmin();
   const tasks=[];
   _ftReleases.forEach(rel=>{
     if(rel.status==='Cancelled') return;
     const proj=ftProjById(rel.projectId);
-    (rel.teamAssignments||[]).forEach(a=>{if(a.member&&me&&a.member.toLowerCase().includes(me))tasks.push({a,rel,proj,pct:ftRelProgress(rel),health:ftGetRelHealth(rel)});});
+    (rel.teamAssignments||[]).forEach(a=>{
+      const match=isAdmin||(a.member&&me&&a.member.toLowerCase().includes(me));
+      if(match) tasks.push({a,rel,proj,pct:ftRelProgress(rel),health:ftGetRelHealth(rel)});
+    });
   });
   const pending=tasks.filter(t=>t.a.status!=='Verification Completed'&&t.a.status!=='Approved');
   const done=tasks.filter(t=>t.a.status==='Verification Completed'||t.a.status==='Approved');
-  const renderTask=({a,rel,proj,health})=>`<div class="ft-task-card" onclick="ftOpenRelease('${rel.id}')"><div class="ft-task-pri ${a.status==='Blocked'?'critical':a.status==='Waiting for Fix'?'high':'normal'}"></div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${ftEsc(a.module||'Testing')}</div><div style="font-size:11px;color:var(--mut);margin-top:2px">${ftEsc(rel.name)} v${ftEsc(rel.version||'?')} · ${ftEsc(proj?.name||'—')}</div><div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap">${ftStatusBadge(a.status)}<span class="ft-health ${health.cls}" style="padding:2px 7px;font-size:10px;margin:0;display:inline-flex">${health.label}</span></div></div><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0"><button class="ftbtn xs primary" onclick="event.stopPropagation();ftOpenRelease('${rel.id}')">Open</button><button class="ftbtn xs" onclick="event.stopPropagation();ftOpenQuickUpdate()">⚡ Update</button></div></div>`;
-  el.innerHTML=`<div class="ft-section-hdr"><h2>My Tasks</h2><span class="ftbadge amber">${pending.length} pending</span></div>
+  const renderTask=({a,rel,proj,health})=>`<div class="ft-task-card" onclick="ftOpenRelease('${rel.id}')"><div class="ft-task-pri ${a.status==='Blocked'?'critical':a.status==='Waiting for Fix'?'high':'normal'}"></div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${ftEsc(a.module||'Testing')} ${isAdmin?`<span style="font-size:10px;color:var(--mut);font-weight:600">· ${ftEsc(a.member||'Unassigned')}</span>`:''}</div><div style="font-size:11px;color:var(--mut);margin-top:2px">${ftEsc(rel.name)} v${ftEsc(rel.version||'?')} · ${ftEsc(proj?.name||'—')}</div><div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap">${ftStatusBadge(a.status)}<span class="ft-health ${health.cls}" style="padding:2px 7px;font-size:10px;margin:0;display:inline-flex">${health.label}</span></div></div><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0"><button class="ftbtn xs primary" onclick="event.stopPropagation();ftOpenRelease('${rel.id}')">Open</button><button class="ftbtn xs" onclick="event.stopPropagation();ftOpenQuickUpdate()">⚡ Update</button></div></div>`;
+  const title=isAdmin?'All Team Tasks':'My Tasks';
+  const adminNote=isAdmin?`<span class="ftbadge purple" style="font-size:10px">Admin: all members</span>`:'';
+  el.innerHTML=`<div class="ft-section-hdr"><h2>${title} ${adminNote}</h2><span class="ftbadge amber">${pending.length} pending</span></div>
   ${pending.length>0?`<div class="ftc" style="margin-bottom:14px"><div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">Pending <span class="ftbadge amber">${pending.length}</span></h2></div>${pending.map(renderTask).join('')}</div>`:''}
   ${done.length>0?`<div class="ftc"><div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">Completed <span class="ftbadge green">${done.length}</span></h2></div>${done.map(renderTask).join('')}</div>`:''}
-  ${tasks.length===0?`<div class="ft-empty"><div class="ft-empty-icon">✅</div><div class="ft-empty-text">No tasks assigned to you</div><div class="ft-empty-sub">Assignments matching your name will appear here.</div></div>`:''}`;
+  ${tasks.length===0?`<div class="ft-empty"><div class="ft-empty-icon">✅</div><div class="ft-empty-text">No tasks found</div><div class="ft-empty-sub">${isAdmin?'No team assignments exist yet. Open a release → Team tab to add assignments.':'Assignments matching your name will appear here.'}</div></div>`:''}`;
 }
 
 // ── QA LEAD VIEW ──
@@ -2399,19 +2411,23 @@ function ftRelHistory(rel){
 function ftRenderAssignments(){
   const el=document.getElementById('ft-view-assignments');
   const me=window._ftCurrentUser||'';
+  const isAdmin=ftIsAdmin();
   const allAssignments=[];
   _ftReleases.forEach(rel=>{
     const proj=ftProjById(rel.projectId);
     (rel.teamAssignments||[]).forEach(a=>{
-      if(a.member&&a.member.toLowerCase().includes(me.toLowerCase())){
-        allAssignments.push({...a,relName:rel.name,projName:proj?.name||'—',relId:rel.id,version:rel.version});
-      }
+      const match=isAdmin||(a.member&&a.member.toLowerCase().includes(me.toLowerCase()));
+      if(match) allAssignments.push({...a,relName:rel.name,projName:proj?.name||'—',relId:rel.id,version:rel.version});
     });
   });
-  let rows=allAssignments.length===0?`<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--mut)">No assignments found for "${ftEsc(me)}".</td></tr>`:
-    allAssignments.map(a=>`<tr>
+  const title=isAdmin?'All Assignments':'My Assignments';
+  const adminBadge=isAdmin?`<span class="ftbadge purple" style="font-size:10px;margin-left:8px">Admin view</span>`:'';
+  let rows=allAssignments.length===0
+    ?`<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--mut)">${isAdmin?'No assignments found across all releases.':`No assignments found for "${ftEsc(me)}".`}</td></tr>`
+    :allAssignments.map(a=>`<tr>
       <td>${ftEsc(a.projName)}</td>
       <td><button class="ftbtn sm primary" onclick="ftOpenRelease('${a.relId}')">${ftEsc(a.relName)} v${ftEsc(a.version||'?')}</button></td>
+      ${isAdmin?`<td><strong>${ftEsc(a.member||'—')}</strong></td>`:''}
       <td>${ftEsc(a.module||'—')}</td>
       <td>${ftEsc(a.testingType||'—')}</td>
       <td>${ftStatusBadge(a.status||'Not Started')}</td>
@@ -2419,10 +2435,9 @@ function ftRenderAssignments(){
       <td>${ftFmt(a.assignedDate)}</td>
     </tr>`).join('');
   el.innerHTML=`
-  <div class="ft-section-hdr"><h2>📋 My Assignments</h2></div>
-  ${me?'':`<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#d97706">Your name is matched against assignment member names.</div>`}
+  <div class="ft-section-hdr"><h2>📋 ${title}${adminBadge}</h2><span class="ftbadge grey">${allAssignments.length} total</span></div>
   <div class="ft-tbl-wrap"><table class="ft-tbl">
-    <thead><tr><th>Project</th><th>Release</th><th>Module</th><th>Type</th><th>Status</th><th>Lead Status</th><th>Assigned</th></tr></thead>
+    <thead><tr><th>Project</th><th>Release</th>${isAdmin?'<th>Member</th>':''}<th>Module</th><th>Type</th><th>Status</th><th>Lead Status</th><th>Assigned</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
 }
