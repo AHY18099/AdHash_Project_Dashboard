@@ -774,12 +774,12 @@ function ftRenderDashboard(){
   const metricsHtml=`<div class="ft-metrics-row">
     <div class="ft-mc blue" onclick="ftNav('projects')" style="cursor:pointer"><div class="ft-mc-val">${activePr}</div><div class="ft-mc-lbl">Active Projects</div></div>
     <div class="ft-mc teal" onclick="ftFilter('today')" style="cursor:pointer"><div class="ft-mc-val">${relToday}</div><div class="ft-mc-lbl">Releases Today</div></div>
-    <div class="ft-mc blue"><div class="ft-mc-val">${activeRels.length}</div><div class="ft-mc-lbl">In QA</div></div>
+    <div class="ft-mc blue" onclick="ftNav('releases')" style="cursor:pointer"><div class="ft-mc-val">${activeRels.length}</div><div class="ft-mc-lbl">In QA</div></div>
     <div class="ft-mc green" onclick="ftFilter('ready')" style="cursor:pointer"><div class="ft-mc-val">${ready}</div><div class="ft-mc-lbl">Ready for Release</div></div>
     <div class="ft-mc amber" onclick="ftFilter('atrisk')" style="cursor:pointer"><div class="ft-mc-val">${allRels.filter(r=>{const h=ftGetRelHealth(r);return h.cls==='at-risk'||h.cls==='attention';}).length}</div><div class="ft-mc-lbl">At Risk</div></div>
     <div class="ft-mc red" onclick="ftFilter('blocked')" style="cursor:pointer"><div class="ft-mc-val">${blocked}</div><div class="ft-mc-lbl">Blocked</div></div>
-    <div class="ft-mc red"><div class="ft-mc-val">${critOpen}</div><div class="ft-mc-lbl">Critical Bugs</div></div>
-    <div class="ft-mc amber"><div class="ft-mc-val">${highOpen}</div><div class="ft-mc-lbl">High Bugs</div></div>
+    <div class="ft-mc red" onclick="ftShowBugsByseverity('Critical')" style="cursor:pointer"><div class="ft-mc-val">${critOpen}</div><div class="ft-mc-lbl">Critical Bugs</div></div>
+    <div class="ft-mc amber" onclick="ftShowBugsByseverity('High')" style="cursor:pointer"><div class="ft-mc-val">${highOpen}</div><div class="ft-mc-lbl">High Bugs</div></div>
     <div class="ft-mc purple" onclick="ftNav('mytasks')" style="cursor:pointer"><div class="ft-mc-val">${myPending}</div><div class="ft-mc-lbl">My Pending</div></div>
     <div class="ft-mc purple" onclick="ftNav('qalead')" style="cursor:pointer"><div class="ft-mc-val">${qaLeadReview}</div><div class="ft-mc-lbl">Awaiting QA Lead</div></div>
   </div>`;
@@ -838,6 +838,37 @@ function ftRenderDashboard(){
     <div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">Releases ${_ftFilterMode?`<span class="ftbadge amber">${_ftFilterMode}</span>`:''} <span class="ftbadge grey">${rels.length}</span></h2><button class="ftbtn sm primary" onclick="ftHeaderNewRelease()">+ New Release</button></div>
     ${relContent}
   </div>`;
+}
+
+function ftShowBugsByseverity(severity){
+  const bugs=[];
+  _ftReleases.forEach(rel=>{
+    if(rel.status==='Cancelled') return;
+    const proj=ftProjById(rel.projectId);
+    (rel.bugs||[]).filter(b=>b.severity===severity&&b.status!=='Closed'&&b.status!=='Deferred').forEach(b=>{
+      bugs.push({b,rel,proj});
+    });
+  });
+  const clr=severity==='Critical'?'red':'amber';
+  const rows=bugs.length===0
+    ?`<div class="ft-empty" style="padding:20px"><div class="ft-empty-icon">✅</div><div class="ft-empty-text">No open ${severity} bugs</div></div>`
+    :bugs.map(({b,rel,proj})=>`
+      <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700">${ftEsc(b.title||'Untitled')}</div>
+          <div style="font-size:11px;color:var(--mut);margin-top:2px">${ftEsc(rel.name)} v${ftEsc(rel.version||'?')} · ${ftEsc(proj?.name||'—')} ${b.module?`· ${ftEsc(b.module)}`:''}</div>
+          <div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap">
+            <span class="ftbadge ${clr}">${severity}</span>
+            <span class="ftbadge grey">${ftEsc(b.status||'Open')}</span>
+          </div>
+        </div>
+        <button class="ftbtn sm primary" onclick="ftOpenRelease('${rel.id}');ftCloseModal();setTimeout(()=>ftRelTab('s7'),220)">View</button>
+      </div>`).join('');
+  ftOpenModal(
+    `${severity==='Critical'?'🔴':'🟡'} Open ${severity} Bugs (${bugs.length})`,
+    `<div style="max-height:60vh;overflow-y:auto">${rows}</div>`,
+    `<button class="ftbtn solid" onclick="ftCloseModal()">Close</button>`
+  );
 }
 
 function ftRenderDashboardRels(rels){
