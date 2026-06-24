@@ -1,262 +1,340 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fast-Track QA Workflow — AdHash</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial Black%2CArial%2Csans-serif' font-weight='900' font-size='11' fill='white'%3EFT%3C/text%3E%3C/svg%3E">
+<title>Fast-Track QA &mdash; AdHash</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{
-  --bg:#f0f4f8;--card:#fff;--card2:#f8fafc;--border:rgba(148,163,184,0.2);
-  --txt:#1e293b;--txt2:#334155;--mut:#64748b;--accent:#3b82f6;--a2:#8b5cf6;
-  --pass:#10b981;--warn:#f59e0b;--danger:#ef4444;
-  --shadow:0 4px 20px rgba(100,116,139,.12);
-  font-family:'Inter','Segoe UI',-apple-system,sans-serif;
-  background:var(--bg);color:var(--txt);min-height:100vh;
+:root{
+  --navy:#0B2A5B;--blue:#2F6BFF;--teal:#1FA6A0;
+  --green:#2E9D57;--amber:#F4A000;--red:#E5484D;--purple:#7657D5;
+  --bg:#F5F8FC;--card:#FFFFFF;--card2:#F0F4F8;
+  --border:#DCE4EE;--txt:#1E293B;--txt2:#334155;--mut:#64748B;--mut2:#94A3B8;
+  --pass:#2E9D57;--warn:#F4A000;--danger:#E5484D;--accent:#2F6BFF;
+  --shadow-sm:0 1px 3px rgba(15,23,42,.06);
+  --shadow:0 4px 16px rgba(15,23,42,.08);
+  --shadow-md:0 8px 32px rgba(15,23,42,.12);
+  --shadow-lg:0 20px 60px rgba(15,23,42,.16);
+  --ease:.2s cubic-bezier(.4,0,.2,1);
+  font-family:'Inter','Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;
 }
-body.dark{
-  --bg:#000;--card:#111;--card2:#161616;--border:rgba(255,255,255,.1);
-  --txt:#fff;--txt2:#e2e8f0;--mut:#9ca3af;--accent:#00d4ff;--a2:#00ffc6;
-  --pass:#00ff88;--warn:#fbbf24;--danger:#f87171;
-  --shadow:0 4px 20px rgba(0,0,0,.4);
-}
-
-/* ── LAYOUT ── */
+body{background:var(--bg);color:var(--txt);min-height:100vh;font-size:14px;line-height:1.5}
+body.dark{--bg:#050d1a;--card:#0d1b2e;--card2:#111e30;--border:rgba(255,255,255,.08);--txt:#f0f6ff;--txt2:#cbd5e1;--mut:#8b9cb8;--mut2:#4a5568;--blue:#4d8eff;--shadow-sm:0 1px 3px rgba(0,0,0,.3);--shadow:0 4px 16px rgba(0,0,0,.4)}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+h1{font-size:20px;font-weight:800}h2{font-size:16px;font-weight:800}h3{font-size:14px;font-weight:700}
 #ft-app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
-#ft-topbar{
-  display:flex;align-items:center;gap:12px;padding:0 20px;height:54px;
-  background:var(--card);border-bottom:1px solid var(--border);
-  flex-shrink:0;z-index:100;
-}
-#ft-topbar .logo{font-size:15px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap}
-#ft-topbar .page-title{font-size:13px;font-weight:700;color:var(--mut);white-space:nowrap}
-#ft-topbar .spacer{flex:1}
-.ft-topbtn{padding:5px 11px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--mut);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
-.ft-topbtn:hover{background:var(--card2);color:var(--txt)}
-.ft-topbtn.accent{border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.08);color:var(--accent)}
-
-#ft-body{display:flex;flex:1;overflow:hidden}
-
-/* ── SIDEBAR ── */
-#ft-sidebar{
-  width:200px;flex-shrink:0;background:var(--card);border-right:1px solid var(--border);
-  display:flex;flex-direction:column;overflow-y:auto;
-}
-.ft-nav-item{
-  display:flex;align-items:center;gap:10px;padding:10px 16px;
-  font-size:13px;font-weight:600;color:var(--mut);cursor:pointer;
-  border-left:3px solid transparent;transition:all .15s;white-space:nowrap;
-}
+#ft-header{background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0;z-index:200;position:sticky;top:0}
+#ft-hrow1{display:flex;align-items:center;gap:8px;padding:0 16px;height:50px}
+#ft-hrow2{display:flex;align-items:center;gap:6px;padding:5px 16px;border-top:1px solid var(--border);background:var(--card2);flex-wrap:wrap}
+#ft-body{display:flex;flex:1;overflow:hidden;min-height:0}
+#ft-main{flex:1;overflow-y:auto;overflow-x:hidden;min-width:0}
+.ft-logo{font-size:15px;font-weight:900;letter-spacing:-.5px;background:linear-gradient(135deg,var(--blue),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap;flex-shrink:0}
+.ft-hd{width:1px;height:26px;background:var(--border);flex-shrink:0}
+.ft-page-title{font-size:13px;font-weight:700;white-space:nowrap}
+.ft-page-sub{font-size:10px;color:var(--mut);white-space:nowrap}
+.ft-sp{flex:1;min-width:0}
+.ft-hsel{padding:4px 8px;border-radius:7px;border:1.5px solid var(--border);background:var(--card);color:var(--txt);font-size:12px;font-family:inherit;font-weight:600;cursor:pointer;max-width:160px}
+.ft-hsel:focus{outline:none;border-color:var(--blue)}
+.ft-search-wrap{position:relative;flex-shrink:0}
+.ft-search-wrap input{padding:5px 10px 5px 28px;border-radius:7px;border:1.5px solid var(--border);background:var(--card2);color:var(--txt);font-size:12px;font-family:inherit;width:160px;transition:all var(--ease)}
+.ft-search-wrap input:focus{outline:none;border-color:var(--blue);width:200px}
+.ft-search-icon{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--mut);pointer-events:none}
+.ft-icon-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:7px;border:1.5px solid var(--border);background:none;cursor:pointer;color:var(--mut);font-size:15px;flex-shrink:0;transition:all var(--ease);position:relative}
+.ft-icon-btn:hover{border-color:var(--blue);color:var(--blue)}
+.ft-notif-dot{position:absolute;top:4px;right:4px;width:6px;height:6px;background:var(--red);border-radius:50%;border:1.5px solid var(--card)}
+.ft-user-pill{display:flex;align-items:center;gap:6px;padding:3px 9px 3px 3px;border-radius:20px;border:1.5px solid var(--border);background:var(--card2);font-size:12px;font-weight:600}
+.ft-user-av{width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:800;flex-shrink:0}
+.ft-hbtn{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1.5px solid var(--border);background:none;color:var(--mut);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all var(--ease);white-space:nowrap;flex-shrink:0;text-decoration:none}
+.ft-hbtn:hover{border-color:var(--blue);color:var(--blue);background:rgba(47,107,255,.06)}
+.ft-hbtn.primary{border-color:var(--blue);background:var(--blue);color:#fff}
+.ft-hbtn.primary:hover{background:#1a5fff}
+.ft-hbtn.teal{border-color:rgba(31,166,160,.5);background:rgba(31,166,160,.1);color:var(--teal)}
+.ft-breadcrumb{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--mut);flex-wrap:wrap}
+.ft-breadcrumb a{color:var(--mut);text-decoration:none;cursor:pointer}
+.ft-breadcrumb a:hover{color:var(--blue)}
+.ft-chip{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--card);color:var(--mut);transition:all var(--ease);white-space:nowrap}
+.ft-chip:hover{border-color:var(--blue);color:var(--blue)}
+.ft-chip.active{border-color:var(--blue);background:rgba(47,107,255,.1);color:var(--blue)}
+.ft-chip.active.amber{border-color:var(--amber);background:rgba(244,160,0,.1);color:var(--amber)}
+.ft-chip.active.red{border-color:var(--red);background:rgba(229,72,77,.1);color:var(--red)}
+.ft-filters{display:flex;gap:5px;padding:4px 16px 6px;flex-wrap:wrap;align-items:center}
+.ft-filter-lbl{font-size:10px;font-weight:700;color:var(--mut2);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+#ft-sidebar{width:188px;flex-shrink:0;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;transition:width var(--ease)}
+#ft-sidebar.collapsed{width:50px}
+.ft-nav-sec{padding:8px 12px 3px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--mut2);white-space:nowrap;overflow:hidden}
+.ft-nav-item{display:flex;align-items:center;gap:9px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--mut);cursor:pointer;border-left:3px solid transparent;transition:all var(--ease);white-space:nowrap;overflow:hidden}
 .ft-nav-item:hover{background:var(--card2);color:var(--txt)}
-.ft-nav-item.active{background:rgba(59,130,246,.06);color:var(--accent);border-left-color:var(--accent)}
-.ft-nav-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
-
-/* ── MAIN ── */
-#ft-main{flex:1;overflow-y:auto;padding:20px}
-
-/* ── CARDS ── */
-.ft-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px}
-.ft-card-title{font-size:14px;font-weight:800;color:var(--txt);margin-bottom:12px}
-.ft-section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
-.ft-section-hdr h2{font-size:16px;font-weight:800;color:var(--txt)}
-
-/* ── SUMMARY CARDS ── */
-.ft-metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:20px}
-.ft-metric{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
-.ft-metric-val{font-size:26px;font-weight:800;line-height:1}
-.ft-metric-lbl{font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-top:4px}
-.ft-metric.blue .ft-metric-val{color:var(--accent)}
-.ft-metric.green .ft-metric-val{color:var(--pass)}
-.ft-metric.amber .ft-metric-val{color:var(--warn)}
-.ft-metric.red .ft-metric-val{color:var(--danger)}
-
-/* ── BADGES ── */
-.ftbadge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap}
-.ftbadge.green{background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.3)}
-.ftbadge.blue{background:rgba(59,130,246,.12);color:#3b82f6;border:1px solid rgba(59,130,246,.3)}
-.ftbadge.amber{background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.3)}
-.ftbadge.red{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
-.ftbadge.purple{background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)}
-.ftbadge.grey{background:rgba(100,116,139,.12);color:#64748b;border:1px solid rgba(100,116,139,.3)}
-.ftbadge.go{background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.4)}
-.ftbadge.go-risk{background:rgba(245,158,11,.15);color:#d97706;border:1px solid rgba(245,158,11,.4)}
-.ftbadge.nogo{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.4)}
-
-/* ── BUTTONS ── */
-.ftbtn{padding:7px 14px;border-radius:8px;border:1.5px solid var(--border);background:none;color:var(--mut);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
+.ft-nav-item.active{background:rgba(47,107,255,.07);color:var(--blue);border-left-color:var(--blue)}
+.ft-nav-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+.ft-nav-badge{margin-left:auto;padding:1px 5px;border-radius:7px;font-size:10px;font-weight:800;flex-shrink:0}
+.ft-nav-badge.red{background:rgba(229,72,77,.15);color:var(--red)}
+.ft-nav-badge.amber{background:rgba(244,160,0,.15);color:var(--amber)}
+.ft-nav-badge.purple{background:rgba(118,87,213,.15);color:var(--purple)}
+.ft-sb-toggle{padding:9px 14px;display:flex;align-items:center;gap:7px;cursor:pointer;color:var(--mut);font-size:12px;font-weight:600;border-top:1px solid var(--border);margin-top:auto;flex-shrink:0;transition:all var(--ease)}
+.ft-sb-toggle:hover{color:var(--txt);background:var(--card2)}
+.ftc{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm)}
+.ftc:hover{box-shadow:var(--shadow)}
+.ftc-title{font-size:13px;font-weight:800;color:var(--txt);margin-bottom:12px;display:flex;align-items:center;gap:7px}
+.ftc-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap}
+.ft-metrics-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:9px;margin-bottom:16px}
+.ft-mc{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:11px 13px;cursor:pointer;transition:all var(--ease);position:relative;overflow:hidden}
+.ft-mc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--mc-clr,var(--blue));border-radius:10px 10px 0 0}
+.ft-mc:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
+.ft-mc-val{font-size:22px;font-weight:900;line-height:1;color:var(--mc-clr,var(--txt))}
+.ft-mc-lbl{font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+.ft-mc-sub{font-size:10px;color:var(--mut2);margin-top:1px}
+.ft-mc.blue{--mc-clr:var(--blue)}.ft-mc.green{--mc-clr:var(--green)}.ft-mc.amber{--mc-clr:var(--amber)}.ft-mc.red{--mc-clr:var(--red)}.ft-mc.purple{--mc-clr:var(--purple)}.ft-mc.teal{--mc-clr:var(--teal)}
+.ftbadge{display:inline-flex;align-items:center;gap:2px;padding:2px 7px;border-radius:9px;font-size:11px;font-weight:700;white-space:nowrap;border:1px solid transparent}
+.ftbadge.green{background:rgba(46,157,87,.12);color:#1a7a3d;border-color:rgba(46,157,87,.25)}
+.ftbadge.go{background:rgba(46,157,87,.12);color:#1a7a3d;border-color:rgba(46,157,87,.25);font-size:12px;padding:3px 11px}
+.ftbadge.blue{background:rgba(47,107,255,.1);color:var(--blue);border-color:rgba(47,107,255,.2)}
+.ftbadge.teal{background:rgba(31,166,160,.1);color:var(--teal);border-color:rgba(31,166,160,.2)}
+.ftbadge.amber{background:rgba(244,160,0,.12);color:#b77600;border-color:rgba(244,160,0,.25)}
+.ftbadge.go-risk{background:rgba(244,160,0,.12);color:#b77600;border-color:rgba(244,160,0,.25);font-size:12px;padding:3px 11px}
+.ftbadge.red{background:rgba(229,72,77,.1);color:#c0252a;border-color:rgba(229,72,77,.2)}
+.ftbadge.nogo{background:rgba(229,72,77,.1);color:#c0252a;border-color:rgba(229,72,77,.2);font-size:12px;padding:3px 11px}
+.ftbadge.purple{background:rgba(118,87,213,.1);color:var(--purple);border-color:rgba(118,87,213,.2)}
+.ftbadge.grey{background:rgba(100,116,139,.08);color:#64748B;border-color:rgba(100,116,139,.18)}
+.ftbtn{display:inline-flex;align-items:center;gap:4px;padding:6px 13px;border-radius:8px;border:1.5px solid var(--border);background:none;color:var(--mut);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all var(--ease);white-space:nowrap}
 .ftbtn:hover{background:var(--card2);color:var(--txt)}
-.ftbtn.primary{border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.1);color:var(--accent)}
-.ftbtn.primary:hover{background:rgba(59,130,246,.18)}
-.ftbtn.success{border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.1);color:#10b981}
-.ftbtn.danger{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.06);color:#ef4444}
-.ftbtn.sm{padding:4px 10px;font-size:11px}
-
-/* ── TABLE ── */
+.ftbtn:focus{outline:2px solid var(--blue);outline-offset:2px}
+.ftbtn.primary{border-color:var(--blue);background:rgba(47,107,255,.1);color:var(--blue)}
+.ftbtn.primary:hover{background:var(--blue);color:#fff}
+.ftbtn.success{border-color:var(--green);background:rgba(46,157,87,.1);color:var(--green)}
+.ftbtn.success:hover{background:var(--green);color:#fff}
+.ftbtn.danger{border-color:rgba(229,72,77,.4);background:rgba(229,72,77,.07);color:var(--red)}
+.ftbtn.danger:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.ftbtn.solid{background:var(--blue);color:#fff;border-color:var(--blue)}
+.ftbtn.solid:hover{background:#1a5fff}
+.ftbtn.sm{padding:3px 9px;font-size:11px;border-radius:6px}
+.ftbtn.xs{padding:2px 6px;font-size:10px;border-radius:5px}
+.ftbtn:disabled{opacity:.4;cursor:not-allowed}
+.ft-progress{height:6px;background:var(--border);border-radius:4px;overflow:hidden;flex-shrink:0}
+.ft-progress-fill{height:100%;border-radius:4px;background:var(--blue);transition:width .4s}
+.ft-progress-fill.green{background:var(--green)}.ft-progress-fill.amber{background:var(--amber)}.ft-progress-fill.red{background:var(--red)}
 .ft-tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border)}
 .ft-tbl{width:100%;border-collapse:collapse;font-size:12px}
-.ft-tbl th{padding:9px 12px;text-align:left;background:var(--card2);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);border-bottom:1px solid var(--border);white-space:nowrap}
-.ft-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--txt);vertical-align:middle}
+.ft-tbl th{padding:8px 11px;text-align:left;background:var(--card2);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);border-bottom:1px solid var(--border);white-space:nowrap}
+.ft-tbl td{padding:8px 11px;border-bottom:1px solid var(--border);color:var(--txt);vertical-align:middle}
 .ft-tbl tr:last-child td{border-bottom:none}
-.ft-tbl tr:hover td{background:rgba(59,130,246,.02)}
-
-/* ── FORM ── */
-.ft-form-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:12px}
+.ft-tbl tr:hover td{background:rgba(47,107,255,.02)}
+.ft-form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px}
 .ft-form-group{display:flex;flex-direction:column;gap:4px}
 .ft-form-group label{font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.3px}
-.ft-form-group input,.ft-form-group select,.ft-form-group textarea{
-  padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);
-  background:var(--card2);color:var(--txt);font-size:13px;font-family:inherit;
-  transition:border-color .15s;
-}
-.ft-form-group input:focus,.ft-form-group select:focus,.ft-form-group textarea:focus{outline:none;border-color:var(--accent)}
-.ft-form-group textarea{resize:vertical;min-height:70px}
-
-/* ── MODAL ── */
-.ft-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;backdrop-filter:blur(4px)}
-.ft-modal-overlay.open{display:flex;align-items:center;justify-content:center;padding:20px}
-.ft-modal{background:var(--card);border-radius:14px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
-.ft-modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);z-index:1}
-.ft-modal-hdr h3{font-size:15px;font-weight:800;color:var(--txt)}
-.ft-modal-body{padding:20px}
-.ft-modal-footer{display:flex;gap:8px;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--border)}
-
-/* ── KANBAN ── */
-.ft-kanban{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;min-height:200px}
-.ft-kanban-col{flex-shrink:0;width:200px}
-.ft-kanban-col-hdr{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);padding:6px 10px;background:var(--card2);border-radius:8px 8px 0 0;border:1px solid var(--border);border-bottom:none}
-.ft-kanban-col-body{background:var(--card2);border:1px solid var(--border);border-radius:0 0 8px 8px;padding:6px;min-height:100px;display:flex;flex-direction:column;gap:6px}
-.ft-kanban-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;cursor:pointer;transition:all .15s}
-.ft-kanban-card:hover{border-color:var(--accent);box-shadow:var(--shadow)}
-.ft-kanban-card-title{font-size:12px;font-weight:700;color:var(--txt);margin-bottom:4px}
-.ft-kanban-card-sub{font-size:11px;color:var(--mut)}
-
-/* ── PROGRESS ── */
-.ft-progress{height:6px;background:var(--border);border-radius:3px;overflow:hidden;width:100%}
-.ft-progress-fill{height:100%;border-radius:3px;background:var(--accent);transition:width .3s}
-.ft-progress-fill.green{background:var(--pass)}
-.ft-progress-fill.amber{background:var(--warn)}
-.ft-progress-fill.red{background:var(--danger)}
-
-/* ── WORKFLOW STEPPER ── */
-.ft-stepper{display:flex;gap:0;overflow-x:auto;padding-bottom:8px;margin-bottom:20px;position:relative}
-.ft-step{display:flex;flex-direction:column;align-items:center;flex:1;min-width:80px;cursor:pointer;position:relative}
-.ft-step::after{content:'';position:absolute;top:16px;left:50%;width:100%;height:2px;background:var(--border);z-index:0}
-.ft-step:last-child::after{display:none}
-.ft-step-circle{width:32px;height:32px;border-radius:50%;border:2px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;z-index:1;position:relative;transition:all .2s}
-.ft-step.done .ft-step-circle{background:var(--pass);border-color:var(--pass);color:#fff}
-.ft-step.active .ft-step-circle{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 0 4px rgba(59,130,246,.15)}
-.ft-step.blocked .ft-step-circle{background:var(--danger);border-color:var(--danger);color:#fff}
-.ft-step-label{font-size:9px;font-weight:700;color:var(--mut);text-align:center;margin-top:6px;text-transform:uppercase;letter-spacing:.3px;max-width:72px;line-height:1.3}
-.ft-step.active .ft-step-label{color:var(--accent)}
-.ft-step.done .ft-step-label{color:var(--pass)}
-
-/* ── TABS ── */
-.ft-tabs{display:flex;gap:4px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:16px;flex-wrap:wrap;position:sticky;top:-20px;z-index:10}
-.ft-tab{padding:6px 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;color:var(--mut);border:none;background:none;font-family:inherit;white-space:nowrap;transition:all .15s}
-.ft-tab.active{background:var(--card);color:var(--txt);box-shadow:0 1px 4px rgba(0,0,0,.1)}
-.ft-tab:hover:not(.active){color:var(--txt);background:rgba(59,130,246,.05)}
-
-/* ── TOAST ── */
-#ft-toast-wrap{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:99999;pointer-events:none}
-.ft-toast{padding:10px 16px;border-radius:10px;font-size:13px;font-weight:600;color:#fff;box-shadow:0 4px 20px rgba(0,0,0,.25);opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
-.ft-toast.show{opacity:1;transform:translateY(0)}
-.ft-toast.success{background:#10b981}
-.ft-toast.error{background:#ef4444}
-.ft-toast.warning{background:#f59e0b}
-.ft-toast.info{background:#3b82f6}
-
-/* ── CHECKLIST ── */
-.ft-check-row{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)}
+.ft-form-group input,.ft-form-group select,.ft-form-group textarea{padding:7px 10px;border-radius:7px;border:1.5px solid var(--border);background:var(--card2);color:var(--txt);font-size:13px;font-family:inherit;transition:border-color var(--ease)}
+.ft-form-group input:focus,.ft-form-group select:focus,.ft-form-group textarea:focus{outline:none;border-color:var(--blue);background:var(--card)}
+.ft-form-group textarea{resize:vertical;min-height:65px}
+.ft-stepper-wrap{overflow-x:auto;padding:4px 0 10px;margin-bottom:14px}
+.ft-stepper{display:flex;gap:0;min-width:max-content;position:relative}
+.ft-stepper::before{content:'';position:absolute;top:17px;left:22px;right:22px;height:2px;background:var(--border);z-index:0}
+.ft-step{display:flex;flex-direction:column;align-items:center;flex:1;min-width:80px;cursor:pointer;position:relative;z-index:1;padding:0 3px}
+.ft-step-line{position:absolute;top:17px;left:50%;width:100%;height:2px;z-index:0;background:var(--border);transition:background var(--ease)}
+.ft-step:last-child .ft-step-line{display:none}
+.ft-step-circle{width:34px;height:34px;border-radius:50%;border:2px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;z-index:1;position:relative;transition:all var(--ease);box-shadow:var(--shadow-sm);color:var(--mut)}
+.ft-step.done .ft-step-circle{background:var(--green);border-color:var(--green);color:#fff}
+.ft-step.done .ft-step-line{background:var(--green)}
+.ft-step.active .ft-step-circle{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 0 0 5px rgba(47,107,255,.15)}
+.ft-step.blocked .ft-step-circle{background:var(--red);border-color:var(--red);color:#fff}
+.ft-step-label{text-align:center;margin-top:6px;font-size:8px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.3px;max-width:80px;line-height:1.3}
+.ft-step.active .ft-step-label{color:var(--blue)}.ft-step.done .ft-step-label{color:var(--green)}.ft-step.blocked .ft-step-label{color:var(--red)}
+.ft-tabs{display:flex;gap:2px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:3px;flex-wrap:wrap;margin-bottom:14px}
+.ft-tab{padding:5px 11px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;color:var(--mut);border:none;background:none;font-family:inherit;white-space:nowrap;transition:all var(--ease)}
+.ft-tab.active{background:var(--card);color:var(--txt);box-shadow:var(--shadow-sm)}
+.ft-tab:hover:not(.active){color:var(--txt);background:rgba(47,107,255,.05)}
+.ft-health{display:flex;align-items:center;gap:8px;padding:9px 13px;border-radius:9px;font-size:12px;font-weight:700;margin-bottom:11px;border:1.5px solid}
+.ft-health.healthy{background:rgba(46,157,87,.07);border-color:rgba(46,157,87,.25);color:var(--green)}
+.ft-health.attention,.ft-health.at-risk{background:rgba(244,160,0,.07);border-color:rgba(244,160,0,.25);color:var(--amber)}
+.ft-health.blocked{background:rgba(229,72,77,.06);border-color:rgba(229,72,77,.25);color:var(--red)}
+.ft-check-row{display:flex;align-items:flex-start;gap:9px;padding:8px 11px;border-bottom:1px solid var(--border)}
+.ft-check-row:hover{background:rgba(47,107,255,.02)}
 .ft-check-row:last-child{border-bottom:none}
-.ft-check-num{font-size:11px;font-weight:800;color:var(--mut);width:22px;flex-shrink:0;padding-top:2px}
-.ft-check-label{flex:1;font-size:13px;color:var(--txt);padding-top:1px}
-.ft-radio-grp{display:flex;gap:4px;flex-shrink:0}
-.ft-radio-btn{padding:3px 9px;border-radius:6px;border:1.5px solid var(--border);font-size:11px;font-weight:700;cursor:pointer;transition:all .12s;background:none;color:var(--mut);font-family:inherit}
-.ft-radio-btn.selected-pass{background:rgba(16,185,129,.15);border-color:#10b981;color:#10b981}
-.ft-radio-btn.selected-fail{background:rgba(239,68,68,.12);border-color:#ef4444;color:#ef4444}
-.ft-radio-btn.selected-na{background:rgba(100,116,139,.1);border-color:#64748b;color:#64748b}
-.ft-radio-btn.selected-yes{background:rgba(16,185,129,.15);border-color:#10b981;color:#10b981}
-.ft-radio-btn.selected-no{background:rgba(239,68,68,.12);border-color:#ef4444;color:#ef4444}
-
-/* ── HEALTH BANNER ── */
-.ft-health{border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:10px;margin-bottom:16px}
-.ft-health.healthy{background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.3);color:#10b981}
-.ft-health.attention{background:rgba(245,158,11,.1);border:1.5px solid rgba(245,158,11,.3);color:#d97706}
-.ft-health.at-risk{background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);color:#ef4444}
-.ft-health.blocked{background:rgba(239,68,68,.15);border:2px solid rgba(239,68,68,.5);color:#ef4444}
-
-/* ── EMPTY STATE ── */
-.ft-empty{text-align:center;padding:40px 20px;color:var(--mut)}
-.ft-empty-icon{font-size:36px;margin-bottom:10px}
-.ft-empty-text{font-size:14px;font-weight:600;margin-bottom:6px;color:var(--txt)}
-.ft-empty-sub{font-size:12px}
-
-/* ── MOBILE ── */
-@media(max-width:768px){
-  #ft-sidebar{display:none}
-  #ft-sidebar.mobile-open{display:flex;position:fixed;top:54px;left:0;bottom:0;z-index:500;width:220px;box-shadow:4px 0 20px rgba(0,0,0,.2)}
-  #ft-main{padding:12px}
-  .ft-stepper{gap:0}
-  .ft-step{min-width:60px}
-}
+.ft-check-num{font-size:11px;font-weight:800;color:var(--mut2);width:18px;flex-shrink:0;padding-top:2px}
+.ft-check-label{flex:1;font-size:13px;color:var(--txt);line-height:1.4}
+.ft-radio-grp{display:flex;gap:3px;flex-shrink:0}
+.ft-radio-btn{padding:2px 7px;border-radius:5px;border:1.5px solid var(--border);font-size:11px;font-weight:700;cursor:pointer;transition:all .12s;background:none;color:var(--mut);font-family:inherit}
+.ft-radio-btn.selected-yes,.ft-radio-btn.selected-pass{background:rgba(46,157,87,.12);border-color:var(--green);color:var(--green)}
+.ft-radio-btn.selected-no,.ft-radio-btn.selected-fail{background:rgba(229,72,77,.1);border-color:var(--red);color:var(--red)}
+.ft-radio-btn.selected-na{background:rgba(100,116,139,.08);border-color:var(--mut2);color:var(--mut)}
+.ft-kanban-wrap{overflow-x:auto;padding-bottom:6px}
+.ft-kanban{display:flex;gap:8px;min-width:max-content}
+.ft-kanban-col{flex-shrink:0;width:185px}
+.ft-kanban-col-hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 9px;background:var(--card2);border:1px solid var(--border);border-radius:7px 7px 0 0;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--mut)}
+.ft-kanban-col-body{background:var(--card2);border:1px solid var(--border);border-top:none;border-radius:0 0 7px 7px;padding:5px;min-height:70px;display:flex;flex-direction:column;gap:5px}
+.ft-kanban-card{background:var(--card);border:1px solid var(--border);border-radius:7px;padding:8px 9px;cursor:pointer;transition:all var(--ease)}
+.ft-kanban-card:hover{border-color:var(--blue);box-shadow:var(--shadow-sm)}
+.ft-kanban-card-title{font-size:12px;font-weight:700;color:var(--txt);margin-bottom:2px}
+.ft-kanban-card-sub{font-size:10px;color:var(--mut)}
+.ft-section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px;flex-wrap:wrap}
+.ft-section-hdr h2{font-size:15px;font-weight:800}
+.ft-metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:9px;margin-bottom:14px}
+.ft-metric{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:10px 12px;text-align:center}
+.ft-metric-val{font-size:20px;font-weight:900;color:var(--txt)}
+.ft-metric-lbl{font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+.ft-metric.blue .ft-metric-val{color:var(--blue)}.ft-metric.green .ft-metric-val{color:var(--green)}.ft-metric.red .ft-metric-val{color:var(--red)}.ft-metric.amber .ft-metric-val{color:var(--amber)}
+.ft-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm);margin-bottom:14px}
+.ft-card-title{font-size:13px;font-weight:800;color:var(--txt);margin-bottom:12px;display:flex;align-items:center;gap:7px}
+.ft-empty{text-align:center;padding:28px 18px;color:var(--mut)}
+.ft-empty-icon{font-size:28px;margin-bottom:7px}
+.ft-empty-text{font-size:13px;font-weight:700;color:var(--txt2);margin-bottom:3px}
+.ft-empty-sub{font-size:12px;margin-bottom:12px}
+.ft-modal-overlay{display:none;position:fixed;inset:0;background:rgba(11,42,91,.5);z-index:9000;backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:18px}
+.ft-modal-overlay.open{display:flex}
+.ft-modal{background:var(--card);border-radius:14px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);border:1px solid var(--border)}
+.ft-modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);z-index:1;border-radius:14px 14px 0 0}
+.ft-modal-hdr h3{font-size:14px;font-weight:800}
+.ft-modal-body{padding:18px}
+.ft-modal-footer{display:flex;gap:7px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--border);background:var(--card2);border-radius:0 0 14px 14px;position:sticky;bottom:0}
+#ft-quick-overlay{display:none;position:fixed;inset:0;z-index:7000;background:rgba(11,42,91,.4);backdrop-filter:blur(4px)}
+#ft-quick-overlay.open{display:block}
+#ft-quick-panel{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(100%);width:min(660px,100vw);background:var(--card);border-radius:14px 14px 0 0;border:1px solid var(--border);border-bottom:none;box-shadow:var(--shadow-lg);z-index:7001;transition:transform .3s cubic-bezier(.4,0,.2,1);max-height:85vh;display:flex;flex-direction:column}
+#ft-quick-panel.open{transform:translateX(-50%) translateY(0)}
+.ft-qhdr{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid var(--border);flex-shrink:0}
+.ft-qbody{flex:1;overflow-y:auto;padding:14px 18px}
+.ft-qfooter{padding:11px 18px;border-top:1px solid var(--border);display:flex;gap:7px;justify-content:flex-end;flex-shrink:0;background:var(--card2)}
+.ft-mgmt-overlay{display:none;position:fixed;inset:0;z-index:6000;background:rgba(11,42,91,.75);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px}
+.ft-mgmt-overlay.open{display:flex}
+.ft-mgmt-modal{background:var(--card);border-radius:16px;width:100%;max-width:860px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);border:1px solid var(--border)}
+.ft-mgmt-hdr{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,var(--navy),#1a3d7a);border-radius:16px 16px 0 0}
+#ft-toast-wrap{position:fixed;bottom:22px;right:22px;display:flex;flex-direction:column;gap:7px;z-index:99999;pointer-events:none}
+.ft-toast{display:flex;align-items:center;gap:9px;padding:9px 14px;border-radius:9px;font-size:13px;font-weight:600;color:#fff;box-shadow:var(--shadow-md);opacity:0;transform:translateY(10px) scale(.95);transition:all .22s;pointer-events:none;max-width:320px}
+.ft-toast.show{opacity:1;transform:translateY(0) scale(1)}
+.ft-toast.success{background:var(--green)}.ft-toast.error{background:var(--red)}.ft-toast.warning{background:var(--amber)}.ft-toast.info{background:var(--blue)}
+.ft-vp{padding:18px}
+.ft-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.ft-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
+.ft-rel-card{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:13px 15px;cursor:pointer;position:relative;border-left:4px solid var(--border);transition:all var(--ease);margin-bottom:10px}
+.ft-rel-card:hover{box-shadow:var(--shadow)}
+.ft-rel-card.blocked{border-left-color:var(--red)}.ft-rel-card.at-risk{border-left-color:var(--amber)}.ft-rel-card.healthy{border-left-color:var(--green)}
+.ft-task-card{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:11px 13px;cursor:pointer;display:flex;gap:11px;align-items:flex-start;transition:all var(--ease);margin-bottom:8px}
+.ft-task-card:hover{box-shadow:var(--shadow);border-color:var(--blue)}
+.ft-task-pri{width:4px;border-radius:2px;flex-shrink:0;align-self:stretch;min-height:36px}
+.ft-task-pri.critical{background:var(--red)}.ft-task-pri.high{background:var(--amber)}.ft-task-pri.normal{background:var(--blue)}.ft-task-pri.low{background:var(--mut2)}
+.ft-tl-item{display:flex;gap:11px;padding:9px 0;border-bottom:1px solid var(--border)}
+.ft-tl-item:last-child{border-bottom:none}
+.ft-tl-dot-col{display:flex;flex-direction:column;align-items:center;flex-shrink:0;padding-top:2px}
+.ft-tl-dot{width:9px;height:9px;border-radius:50%;background:var(--blue)}
+.ft-tl-dot.green{background:var(--green)}.ft-tl-dot.red{background:var(--red)}.ft-tl-dot.amber{background:var(--amber)}
+.ft-tl-line{width:1px;flex:1;background:var(--border);margin-top:3px}
+.ft-tl-text{flex:1;min-width:0}
+.ft-tl-action{font-size:12px;font-weight:600;color:var(--txt);line-height:1.4}
+.ft-tl-meta{font-size:11px;color:var(--mut);margin-top:2px}
+.ft-cov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px}
+.ft-cov-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:11px 13px;cursor:pointer;transition:all var(--ease)}
+.ft-cov-card:hover{box-shadow:var(--shadow);border-color:var(--blue)}
+.ft-cov-name{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);margin-bottom:7px}
+.ft-blocker-item{display:flex;gap:9px;align-items:flex-start;padding:9px 11px;border-radius:8px;background:rgba(229,72,77,.05);border:1px solid rgba(229,72,77,.15);margin-bottom:7px}
+.ft-blocker-title{font-size:13px;font-weight:700;color:var(--red)}
+.ft-blocker-meta{font-size:11px;color:var(--mut);margin-top:2px}
+.ft-stage-highlight{background:linear-gradient(135deg,rgba(47,107,255,.06),rgba(31,166,160,.04));border:1.5px solid rgba(47,107,255,.2);border-radius:11px;padding:13px 15px;margin-bottom:14px}
+@media(max-width:900px){.ft-grid-2,.ft-grid-3{grid-template-columns:1fr}#ft-sidebar{display:none}#ft-sidebar.mob-open{display:flex;position:fixed;top:0;left:0;bottom:0;z-index:500;width:210px;box-shadow:var(--shadow-lg)}.ft-stepper{min-width:unset;flex-direction:column;gap:3px}.ft-stepper::before{display:none}.ft-step{flex-direction:row;min-width:unset;align-items:center;padding:5px 0}.ft-step-line{display:none}.ft-step-circle{width:30px;height:30px;flex-shrink:0}.ft-step-label{text-align:left;margin-top:0;margin-left:9px;max-width:none}.ft-metrics-row{grid-template-columns:repeat(3,1fr)}.ft-vp{padding:11px}}
+@media(max-width:600px){.ft-metrics-row{grid-template-columns:repeat(2,1fr)}#ft-hrow1{padding:0 10px;gap:5px}#ft-hrow2{padding:4px 10px}.ft-vp{padding:9px}.ft-page-sub,.ft-search-wrap{display:none}.ft-kanban-col{width:160px}}
+@media(max-width:768px){#ft-mob-fab{display:flex}#ft-mob-menu{display:flex}}
+@media(min-width:769px){#ft-mob-fab{display:none}#ft-mob-menu{display:none}}
+#ft-mob-fab{position:fixed;bottom:18px;right:18px;z-index:500;width:50px;height:50px;border-radius:50%;background:var(--blue);color:#fff;font-size:20px;align-items:center;justify-content:center;box-shadow:var(--shadow-md);border:none;cursor:pointer;display:none}
+#ft-mob-menu{display:none;width:32px;height:32px;border-radius:7px;border:1.5px solid var(--border);background:none;cursor:pointer;color:var(--mut);font-size:15px;align-items:center;justify-content:center}
 </style>
 </head>
 <body>
 <div id="ft-app">
-
-<!-- TOPBAR -->
-<div id="ft-topbar">
-  <div class="logo">AdHash</div>
-  <div class="page-title">/ Fast-Track QA</div>
-  <div class="spacer"></div>
-  <button class="ft-topbtn" onclick="window.location.href='/landing'">← Dashboard</button>
-  <button class="ft-topbtn" id="ft-dark-btn" onclick="ftToggleDark()">🌙</button>
-  <span id="ft-user-name" style="font-size:12px;font-weight:700;color:var(--mut);padding:0 8px"></span>
-</div>
-
-<!-- BODY -->
-<div id="ft-body">
-  <!-- SIDEBAR -->
-  <div id="ft-sidebar">
-    <div style="padding:12px 8px 4px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);padding-left:16px">Navigation</div>
-    <div class="ft-nav-item active" data-view="dashboard" onclick="ftNav('dashboard')"><span class="ft-nav-icon">📊</span>Dashboard</div>
-    <div class="ft-nav-item" data-view="projects" onclick="ftNav('projects')"><span class="ft-nav-icon">📁</span>Projects</div>
-    <div class="ft-nav-item" data-view="releases" onclick="ftNav('releases')"><span class="ft-nav-icon">🚀</span>Releases</div>
-    <div class="ft-nav-item" data-view="assignments" onclick="ftNav('assignments')"><span class="ft-nav-icon">📋</span>My Assignments</div>
-    <div class="ft-nav-item" data-view="workload" onclick="ftNav('workload')"><span class="ft-nav-icon">👥</span>Team Workload</div>
-    <div class="ft-nav-item" data-view="management" onclick="ftNav('management')"><span class="ft-nav-icon">👔</span>Management</div>
-    <div class="ft-nav-item" data-view="reports" onclick="ftNav('reports')"><span class="ft-nav-icon">📊</span>Reports</div>
+<div id="ft-header">
+  <div id="ft-hrow1">
+    <button id="ft-mob-menu" onclick="ftToggleMobileSidebar()" aria-label="Menu">&#9776;</button>
+    <div class="ft-logo">AdHash</div>
+    <div class="ft-hd"></div>
+    <div><div class="ft-page-title">Fast-Track QA</div><div class="ft-page-sub">Short Time &middot; Maximum Coverage &middot; Safer Releases</div></div>
+    <div class="ft-sp"></div>
+    <select class="ft-hsel" id="ft-proj-sel" onchange="ftHeaderProjChange(this.value)" aria-label="Project"><option value="">All Projects</option></select>
+    <select class="ft-hsel" id="ft-rel-sel" onchange="ftHeaderRelChange(this.value)" aria-label="Release"><option value="">All Releases</option></select>
+    <div class="ft-search-wrap"><span class="ft-search-icon">&#128269;</span><input type="search" id="ft-global-search" placeholder="Search&hellip;" oninput="ftGlobalSearch(this.value)" aria-label="Search"></div>
+    <button class="ft-icon-btn" onclick="ftShowNotifications()" aria-label="Notifications">&#128276;<span class="ft-notif-dot" id="ft-notif-dot" style="display:none"></span></button>
+    <button class="ft-icon-btn" onclick="ftToggleDark()" id="ft-dark-btn" title="Dark mode">&#127769;</button>
+    <div class="ft-user-pill"><div class="ft-user-av" id="ft-user-avatar">?</div><span id="ft-user-name">&hellip;</span></div>
+    <a href="/landing" class="ft-hbtn">&larr; Dashboard</a>
+    <button class="ft-hbtn teal" onclick="ftOpenQuickUpdate()">&#9889; Quick Update</button>
+    <button class="ft-hbtn primary" onclick="ftHeaderNewRelease()">+ New Release</button>
   </div>
-
-  <!-- MAIN -->
-  <div id="ft-main">
-    <div id="ft-view-dashboard"></div>
-    <div id="ft-view-projects" style="display:none"></div>
-    <div id="ft-view-releases" style="display:none"></div>
-    <div id="ft-view-release-detail" style="display:none"></div>
-    <div id="ft-view-assignments" style="display:none"></div>
-    <div id="ft-view-workload" style="display:none"></div>
-    <div id="ft-view-management" style="display:none"></div>
-    <div id="ft-view-reports" style="display:none"></div>
-  </div>
-</div>
-</div>
-
-<!-- TOAST CONTAINER -->
-<div id="ft-toast-wrap"></div>
-
-<!-- MODALS -->
-<div id="ft-modal-overlay" class="ft-modal-overlay" onclick="if(event.target===this)ftCloseModal()">
-  <div class="ft-modal" id="ft-modal">
-    <div class="ft-modal-hdr">
-      <h3 id="ft-modal-title">Modal</h3>
-      <button class="ftbtn sm" onclick="ftCloseModal()">✕</button>
+  <div id="ft-hrow2">
+    <div class="ft-breadcrumb" id="ft-breadcrumb"><a onclick="ftNav('dashboard')">QA Dashboard</a><span>&rsaquo;</span><strong>Fast-Track QA</strong></div>
+    <div class="ft-sp"></div>
+    <div style="display:flex;gap:4px">
+      <button class="ft-chip active" id="chip-workflow" onclick="ftChipView('workflow')">Workflow</button>
+      <button class="ft-chip" id="chip-cards" onclick="ftChipView('cards')">Cards</button>
+      <button class="ft-chip" id="chip-kanban" onclick="ftChipView('kanban')">Kanban</button>
+      <button class="ft-chip" id="chip-table" onclick="ftChipView('table')">Table</button>
     </div>
+    <button class="ft-chip" id="ft-mgmt-chip" onclick="ftOpenMgmtView()">&#128084; Mgmt View</button>
+  </div>
+  <div class="ft-filters">
+    <span class="ft-filter-lbl">Filter:</span>
+    <button class="ft-chip" id="fchip-mine" onclick="ftFilter('mine')">My Releases</button>
+    <button class="ft-chip active amber" id="fchip-today" onclick="ftFilter('today')">Today</button>
+    <button class="ft-chip" id="fchip-atrisk" onclick="ftFilter('atrisk')">At Risk</button>
+    <button class="ft-chip active red" id="fchip-blocked" onclick="ftFilter('blocked')">Blocked</button>
+    <button class="ft-chip" id="fchip-ready" onclick="ftFilter('ready')">Ready</button>
+    <button class="ft-chip" id="fchip-all" onclick="ftFilter('all')">All</button>
+    <button class="ft-chip" onclick="ftClearFilters()" style="color:var(--mut2)">&#10005; Clear</button>
+  </div>
+</div>
+<div id="ft-body">
+<nav id="ft-sidebar">
+  <div class="ft-nav-sec">Main</div>
+  <div class="ft-nav-item active" data-view="dashboard" onclick="ftNav('dashboard')" tabindex="0"><span class="ft-nav-icon">&#128202;</span>Dashboard<span class="ft-nav-badge red" id="nb-blocked" style="display:none">0</span></div>
+  <div class="ft-nav-item" data-view="mytasks" onclick="ftNav('mytasks')" tabindex="0"><span class="ft-nav-icon">&#9989;</span>My Tasks<span class="ft-nav-badge amber" id="nb-mytasks" style="display:none">0</span></div>
+  <div class="ft-nav-item" data-view="projects" onclick="ftNav('projects')" tabindex="0"><span class="ft-nav-icon">&#128193;</span>Projects</div>
+  <div class="ft-nav-item" data-view="releases" onclick="ftNav('releases')" tabindex="0"><span class="ft-nav-icon">&#128640;</span>Releases</div>
+  <div class="ft-nav-sec">Team</div>
+  <div class="ft-nav-item" data-view="assignments" onclick="ftNav('assignments')" tabindex="0"><span class="ft-nav-icon">&#128203;</span>Assignments</div>
+  <div class="ft-nav-item" data-view="workload" onclick="ftNav('workload')" tabindex="0"><span class="ft-nav-icon">&#128101;</span>Team Workload</div>
+  <div class="ft-nav-item" data-view="qalead" onclick="ftNav('qalead')" tabindex="0"><span class="ft-nav-icon">&#128269;</span>QA Lead Review<span class="ft-nav-badge purple" id="nb-qalead" style="display:none">0</span></div>
+  <div class="ft-nav-sec">Insights</div>
+  <div class="ft-nav-item" data-view="management" onclick="ftNav('management')" tabindex="0"><span class="ft-nav-icon">&#128084;</span>Management</div>
+  <div class="ft-nav-item" data-view="reports" onclick="ftNav('reports')" tabindex="0"><span class="ft-nav-icon">&#128196;</span>Reports</div>
+  <div class="ft-sb-toggle" onclick="ftToggleSidebar()"><span>&#9664;</span><span style="font-size:11px">Collapse</span></div>
+</nav>
+<main id="ft-main">
+  <div id="ft-view-dashboard" class="ft-vp"></div>
+  <div id="ft-view-mytasks" class="ft-vp" style="display:none"></div>
+  <div id="ft-view-projects" class="ft-vp" style="display:none"></div>
+  <div id="ft-view-releases" class="ft-vp" style="display:none"></div>
+  <div id="ft-view-release-detail" class="ft-vp" style="display:none"></div>
+  <div id="ft-view-assignments" class="ft-vp" style="display:none"></div>
+  <div id="ft-view-workload" class="ft-vp" style="display:none"></div>
+  <div id="ft-view-qalead" class="ft-vp" style="display:none"></div>
+  <div id="ft-view-management" class="ft-vp" style="display:none"></div>
+  <div id="ft-view-reports" class="ft-vp" style="display:none"></div>
+</main>
+</div>
+</div>
+<div id="ft-toast-wrap" role="status" aria-live="polite"></div>
+<div id="ft-modal-overlay" class="ft-modal-overlay" onclick="if(event.target===this)ftCloseModal()">
+  <div class="ft-modal">
+    <div class="ft-modal-hdr"><h3 id="ft-modal-title">Modal</h3><button class="ftbtn sm" onclick="ftCloseModal()">&#10005;</button></div>
     <div class="ft-modal-body" id="ft-modal-body"></div>
     <div class="ft-modal-footer" id="ft-modal-footer"></div>
   </div>
 </div>
+<div id="ft-quick-overlay" onclick="ftCloseQuickUpdate()"></div>
+<div id="ft-quick-panel">
+  <div class="ft-qhdr"><div><div style="font-size:14px;font-weight:800">&#9889; Quick Update</div><div style="font-size:11px;color:var(--mut)">Update any task in under a minute</div></div><button class="ftbtn sm" onclick="ftCloseQuickUpdate()">&#10005;</button></div>
+  <div class="ft-qbody">
+    <div class="ft-form-row"><div class="ft-form-group"><label>Project</label><select id="qu-proj" onchange="ftQuUpdateRels()"></select></div><div class="ft-form-group"><label>Release</label><select id="qu-rel" onchange="ftQuUpdateStages()"></select></div></div>
+    <div class="ft-form-row"><div class="ft-form-group"><label>Stage</label><select id="qu-stage"></select></div><div class="ft-form-group"><label>Status</label><select id="qu-status"><option>Not Started</option><option>In Progress</option><option>Done</option><option>Blocked</option><option>Skipped</option></select></div></div>
+    <div class="ft-form-row"><div class="ft-form-group"><label>Progress %</label><input type="number" id="qu-pct" min="0" max="100" placeholder="0-100"></div><div class="ft-form-group"><label>Owner</label><input id="qu-owner" placeholder="Your name"></div></div>
+    <div class="ft-form-row"><div class="ft-form-group"><label>Passed</label><input type="number" id="qu-passed" min="0" placeholder="0"></div><div class="ft-form-group"><label>Failed</label><input type="number" id="qu-failed" min="0" placeholder="0"></div></div>
+    <div class="ft-form-group" style="margin-bottom:10px"><label>Evidence URL</label><input id="qu-evidence" placeholder="https://&hellip;"></div>
+    <div class="ft-form-group" style="margin-bottom:10px"><label>Comment</label><textarea id="qu-comment" style="min-height:55px" placeholder="What did you test?"></textarea></div>
+    <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;cursor:pointer"><input type="checkbox" id="qu-submit-review"> Submit for QA Lead Review</label>
+  </div>
+  <div class="ft-qfooter"><button class="ftbtn" onclick="ftCloseQuickUpdate()">Cancel</button><button class="ftbtn solid" onclick="ftSubmitQuickUpdate()">&#9889; Save Update</button></div>
+</div>
+<div id="ft-mgmt-overlay" class="ft-mgmt-overlay" onclick="if(event.target===this)ftCloseMgmtView()">
+  <div class="ft-mgmt-modal">
+    <div class="ft-mgmt-hdr"><div style="color:#fff"><div style="font-size:11px;font-weight:700;opacity:.7;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px">Management View</div><div style="font-size:17px;font-weight:900">AdHash QA &mdash; Executive Summary</div></div><button class="ftbtn sm" onclick="ftCloseMgmtView()" style="color:#fff;border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.1)">&#10005; Close</button></div>
+    <div style="padding:20px" id="ft-mgmt-body"></div>
+  </div>
+</div>
+<button id="ft-mob-fab" onclick="ftOpenQuickUpdate()" aria-label="Quick Update">&#9889;</button>
 
 <script>
 'use strict';
@@ -269,8 +347,12 @@ const _ftHdr = () => ({'Content-Type':'application/json','Authorization':'Bearer
   if(!_ftTok()){window.location.href='/';return;}
   try{
     const payload=JSON.parse(atob(_ftTok().split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
-    document.getElementById('ft-user-name').textContent=payload.name||payload.email||'';
-    window._ftCurrentUser = payload.name || payload.email || '';
+    const nameEl=document.getElementById('ft-user-name');
+    const avEl=document.getElementById('ft-user-avatar');
+    const name=payload.name||payload.email||'';
+    if(nameEl) nameEl.textContent=name;
+    if(avEl) avEl.textContent=(name.charAt(0)||'?').toUpperCase();
+    window._ftCurrentUser = name;
     window._ftCurrentRole = payload.role || '';
   }catch(e){}
 })();
@@ -332,19 +414,67 @@ let _ftCurrentView='dashboard';
 let _ftSelectedProject=null;
 let _ftSelectedRelease=null;
 let _ftRelTab='overview';
+let _ftDashboardView='workflow';
+let _ftFilterMode='';
 
-// ── DATA LOAD ──
+// ── DATA ──
 async function ftLoadData(){
   const [pd,rd]=await Promise.all([ftApiGet('fast_track_projects'),ftApiGet('fast_track_releases')]);
   _ftProjects=pd?.projects||[];
   _ftReleases=rd?.releases||[];
   if(_ftProjects.length===0&&_ftReleases.length===0) ftSeedDemo();
+  ftUpdateHeaderSelectors();
+  ftUpdateNavBadges();
 }
 async function ftSaveProjects(){await ftApiSet('fast_track_projects',{projects:_ftProjects});}
 async function ftSaveReleases(){await ftApiSet('fast_track_releases',{releases:_ftReleases});}
 
+// ── HEADER SELECTORS ──
+function ftUpdateHeaderSelectors(){
+  const pSel=document.getElementById('ft-proj-sel');
+  const rSel=document.getElementById('ft-rel-sel');
+  if(!pSel||!rSel)return;
+  pSel.innerHTML='<option value="">All Projects</option>'+_ftProjects.map(p=>`<option value="${p.id}">${ftEsc(p.name)}</option>`).join('');
+  pSel.value=_ftSelectedProject||'';
+  ftUpdateRelSelector();
+  const qProj=document.getElementById('qu-proj');
+  if(qProj) qProj.innerHTML=_ftProjects.map(p=>`<option value="${p.id}">${ftEsc(p.name)}</option>`).join('');
+}
+function ftUpdateRelSelector(){
+  const rSel=document.getElementById('ft-rel-sel');
+  if(!rSel)return;
+  const rels=_ftSelectedProject?_ftReleases.filter(r=>r.projectId===_ftSelectedProject):_ftReleases;
+  rSel.innerHTML='<option value="">All Releases</option>'+rels.map(r=>`<option value="${r.id}">${ftEsc(r.name)} v${ftEsc(r.version||'?')}</option>`).join('');
+  rSel.value=_ftSelectedRelease||'';
+}
+function ftHeaderProjChange(pid){
+  _ftSelectedProject=pid||null;
+  _ftSelectedRelease=null;
+  ftUpdateRelSelector();
+  ftRenderView(_ftCurrentView);
+}
+function ftHeaderRelChange(rid){
+  _ftSelectedRelease=rid||null;
+  if(rid) ftOpenRelease(rid);
+  else if(_ftCurrentView==='release-detail') ftNav('releases');
+}
+function ftHeaderNewRelease(){
+  if(_ftProjects.length===0){ftToast('Create a project first','warning');return;}
+  ftNav('releases');
+  setTimeout(()=>ftOpenNewRelease(),100);
+}
+
+// ── SIDEBAR ──
+function ftToggleSidebar(){
+  const s=document.getElementById('ft-sidebar');
+  s.classList.toggle('collapsed');
+}
+function ftToggleMobileSidebar(){
+  document.getElementById('ft-sidebar').classList.toggle('mob-open');
+}
+
 // ── NAV ──
-const FT_VIEWS=['dashboard','projects','releases','release-detail','assignments','workload','management','reports'];
+const FT_VIEWS=['dashboard','mytasks','projects','releases','release-detail','assignments','workload','qalead','management','reports'];
 function ftNav(view, skipSidebar){
   _ftCurrentView=view;
   FT_VIEWS.forEach(v=>{
@@ -357,16 +487,38 @@ function ftNav(view, skipSidebar){
     if(ni) ni.classList.add('active');
   }
   ftRenderView(view);
+  const sb=document.getElementById('ft-sidebar');
+  if(sb&&sb.classList.contains('mob-open')) sb.classList.remove('mob-open');
 }
 function ftRenderView(view){
   if(view==='dashboard') ftRenderDashboard();
+  else if(view==='mytasks') ftRenderMyTasks();
   else if(view==='projects') ftRenderProjects();
   else if(view==='releases') ftRenderReleases();
   else if(view==='release-detail') ftRenderReleaseDetail();
   else if(view==='assignments') ftRenderAssignments();
   else if(view==='workload') ftRenderWorkload();
+  else if(view==='qalead') ftRenderQaLead();
   else if(view==='management') ftRenderManagement();
   else if(view==='reports') ftRenderReports();
+}
+
+// ── NAV BADGES ──
+function ftUpdateNavBadges(){
+  const blocked=_ftReleases.filter(r=>r.status==='Blocked').length;
+  const nbBlocked=document.getElementById('nb-blocked');
+  if(nbBlocked){nbBlocked.textContent=blocked;nbBlocked.style.display=blocked>0?'':'none';}
+  const me=(window._ftCurrentUser||'').toLowerCase();
+  let myTasks=0;
+  if(me){_ftReleases.forEach(rel=>{(rel.teamAssignments||[]).forEach(a=>{if(a.member&&a.member.toLowerCase().includes(me)&&a.status!=='Verification Completed'&&a.status!=='Approved')myTasks++;});});}
+  const nbMy=document.getElementById('nb-mytasks');
+  if(nbMy){nbMy.textContent=myTasks;nbMy.style.display=myTasks>0?'':'none';}
+  let qaLeadPending=0;
+  _ftReleases.forEach(rel=>{qaLeadPending+=(rel._qaLeadReview||[]).filter(x=>x.status==='Pending Review').length;});
+  const nbQa=document.getElementById('nb-qalead');
+  if(nbQa){nbQa.textContent=qaLeadPending;nbQa.style.display=qaLeadPending>0?'':'none';}
+  const dot=document.getElementById('ft-notif-dot');
+  if(dot) dot.style.display=blocked>0||qaLeadPending>0?'block':'none';
 }
 
 // ── HELPERS ──
@@ -374,22 +526,19 @@ function ftGetRelHealth(rel){
   const bugs=rel.bugs||[];
   const critOpen=bugs.filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
   const s4=rel.stages?.s4||{};
-  if(critOpen>0||s4.status==='Blocked') return {cls:'blocked',label:'🚫 Blocked',reason:critOpen>0?critOpen+' critical bug(s) open':'Smoke test blocked'};
+  if(critOpen>0||s4.status==='Blocked') return {cls:'blocked',label:'Blocked',reason:critOpen>0?critOpen+' critical bug(s) open':'Smoke test blocked'};
   const highOpen=bugs.filter(b=>b.severity==='High'&&b.status!=='Closed'&&b.status!=='Deferred').length;
   const reg=rel.stages?.s8||{};
-  if(highOpen>=3||(reg.pct>0&&reg.pct<80)) return {cls:'at-risk',label:'⚠ At Risk',reason:'High bugs or regression coverage low'};
+  if(highOpen>=3||(reg.pct>0&&reg.pct<80)) return {cls:'at-risk',label:'At Risk',reason:'High bugs or regression coverage low'};
   const pct=ftRelProgress(rel);
-  if(pct<30&&rel.status!=='Draft') return {cls:'attention',label:'⚡ Attention',reason:'Testing progress low'};
-  return {cls:'healthy',label:'✅ Healthy',reason:'No blockers found'};
+  if(pct<30&&rel.status!=='Draft') return {cls:'attention',label:'Attention',reason:'Testing progress low'};
+  return {cls:'healthy',label:'Healthy',reason:'No blockers found'};
 }
 const STAGE_WEIGHTS={s1:5,s2:5,s3:10,s4:15,s5:20,s6:15,s7:10,s8:15,s9:5};
 function ftRelProgress(rel){
   if(!rel.stages) return 0;
   let total=0;
-  Object.entries(STAGE_WEIGHTS).forEach(([k,w])=>{
-    const pct=(rel.stages[k]?.pct)||0;
-    total+=pct*(w/100);
-  });
+  Object.entries(STAGE_WEIGHTS).forEach(([k,w])=>{total+=(rel.stages[k]?.pct||0)*(w/100);});
   return Math.round(total);
 }
 function ftDecisionBadge(d){
@@ -400,8 +549,7 @@ function ftDecisionBadge(d){
 }
 function ftStatusBadge(s){
   const m={'Active':'blue','In Testing':'blue','QA Ready':'green','Ready for Release':'green','Released':'green','Completed':'green','Blocked':'red','Cancelled':'grey','Draft':'grey','Waiting for Fix':'amber','Retesting':'amber','On Hold':'amber'};
-  const c=m[s]||'grey';
-  return `<span class="ftbadge ${c}">${ftEsc(s)}</span>`;
+  return `<span class="ftbadge ${m[s]||'grey'}">${ftEsc(s)}</span>`;
 }
 function ftRiskBadge(r){
   const m={'Critical':'red','High':'amber','Normal':'blue','Low':'green'};
@@ -411,35 +559,161 @@ function ftProjById(id){return _ftProjects.find(p=>p.id===id)||null;}
 function ftRelById(id){return _ftReleases.find(r=>r.id===id)||null;}
 function ftRelsByProj(pid){return _ftReleases.filter(r=>r.projectId===pid);}
 function ftProgressColor(pct){return pct>=80?'green':pct>=50?'':'amber';}
-</script>
 
-<script>
-// ══════════════════════════════════════════════════════
-// DASHBOARD VIEW
-// ══════════════════════════════════════════════════════
+// ── FILTER ──
+function ftFilter(mode){
+  if(_ftFilterMode===mode){_ftFilterMode='';document.querySelectorAll('[id^="fchip-"]').forEach(c=>c.classList.remove('active','amber','red','green'));}
+  else{
+    _ftFilterMode=mode;
+    document.querySelectorAll('[id^="fchip-"]').forEach(c=>c.classList.remove('active','amber','red','green'));
+    const chip=document.getElementById('fchip-'+mode);
+    if(chip) chip.classList.add('active');
+    ftRenderView(_ftCurrentView);
+  }
+}
+function ftClearFilters(){
+  _ftFilterMode='';
+  document.querySelectorAll('[id^="fchip-"]').forEach(c=>c.classList.remove('active','amber','red','green'));
+  ftRenderView(_ftCurrentView);
+}
+function ftGlobalSearch(q){
+  if(!q){ftRenderView(_ftCurrentView);return;}
+  const ql=q.toLowerCase();
+  const rels=_ftReleases.filter(r=>{
+    const p=ftProjById(r.projectId);
+    return r.name.toLowerCase().includes(ql)||r.version?.toLowerCase().includes(ql)||(p?.name||'').toLowerCase().includes(ql)||(r.summary||'').toLowerCase().includes(ql);
+  });
+  const el=document.getElementById('ft-view-'+_ftCurrentView);
+  if(el) el.querySelector('.ft-rel-content-area')||null;
+  ftRenderDashboardRels(rels);
+}
+function ftFilteredReleases(){
+  let rels=_ftReleases;
+  if(_ftSelectedProject) rels=rels.filter(r=>r.projectId===_ftSelectedProject);
+  const mode=_ftFilterMode;
+  if(mode==='mine'){const me=(window._ftCurrentUser||'').toLowerCase();rels=rels.filter(r=>(r.releaseOwner||'').toLowerCase().includes(me)||(r.qaLead||'').toLowerCase().includes(me));}
+  else if(mode==='today'){const td=new Date().toISOString().slice(0,10);rels=rels.filter(r=>r.plannedDate&&r.plannedDate.slice(0,10)===td);}
+  else if(mode==='atrisk'){rels=rels.filter(r=>{const h=ftGetRelHealth(r);return h.cls==='at-risk'||h.cls==='attention';});}
+  else if(mode==='blocked'){rels=rels.filter(r=>r.status==='Blocked'||ftGetRelHealth(r).cls==='blocked');}
+  else if(mode==='ready'){rels=rels.filter(r=>r.status==='Ready for Release');}
+  return rels;
+}
+
+// ── CHIP VIEW ──
+function ftChipView(mode){
+  _ftDashboardView=mode;
+  ['workflow','cards','kanban','table'].forEach(v=>{
+    const c=document.getElementById('chip-'+v);
+    if(c) c.classList.toggle('active',v===mode);
+  });
+  if(_ftCurrentView==='dashboard') ftRenderDashboard();
+}
+
+// ── NOTIFICATIONS ──
+function ftShowNotifications(){
+  const blocked=_ftReleases.filter(r=>r.status==='Blocked');
+  const crit=_ftReleases.flatMap(r=>r.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  let body='<div style="padding:0">';
+  if(blocked.length===0&&crit===0){body+='<div class="ft-empty" style="padding:16px"><div class="ft-empty-icon">✅</div><div class="ft-empty-text">All clear!</div></div>';}
+  else{
+    blocked.forEach(r=>{const p=ftProjById(r.projectId);body+=`<div class="ft-blocker-item"><span style="font-size:16px">🚫</span><div><div class="ft-blocker-title">${ftEsc(r.name)} — BLOCKED</div><div class="ft-blocker-meta">${ftEsc(p?.name||'—')} · <button class="ftbtn xs primary" onclick="ftOpenRelease('${r.id}');ftCloseModal()">View</button></div></div></div>`;});
+    if(crit>0) body+=`<div class="ft-blocker-item"><span style="font-size:16px">🐛</span><div><div class="ft-blocker-title">${crit} Critical Bug(s) Open</div></div></div>`;
+  }
+  body+='</div>';
+  ftOpenModal('Notifications',body,'<button class="ftbtn solid" onclick="ftCloseModal()">Close</button>');
+}
+
+// ── MGMT VIEW ──
+function ftOpenMgmtView(){
+  const chip=document.getElementById('ft-mgmt-chip');if(chip)chip.classList.add('active');
+  const body=document.getElementById('ft-mgmt-body');if(!body)return;
+  const activeRels=_ftReleases.filter(r=>r.status!=='Cancelled'&&r.status!=='Completed');
+  const ready=_ftReleases.filter(r=>r.status==='Ready for Release').length;
+  const blocked=_ftReleases.filter(r=>r.status==='Blocked').length;
+  const critOpen=_ftReleases.flatMap(r=>r.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  const highOpen=_ftReleases.flatMap(r=>r.bugs||[]).filter(b=>b.severity==='High'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  const relRows=activeRels.map(rel=>{
+    const proj=ftProjById(rel.projectId);const pct=ftRelProgress(rel);const health=ftGetRelHealth(rel);
+    return `<tr><td>${ftEsc(proj?.name||'—')}</td><td><strong>${ftEsc(rel.name)}</strong> <span style="font-size:11px;color:var(--mut)">v${ftEsc(rel.version||'?')}</span></td><td><span class="ft-health ${health.cls}" style="padding:3px 8px;font-size:11px;margin:0;display:inline-flex">${health.label}</span></td><td>${ftRiskBadge(rel.riskLevel)}</td><td>${ftStatusBadge(rel.status||'Draft')}</td><td><div style="display:flex;align-items:center;gap:6px"><div class="ft-progress" style="width:70px"><div class="ft-progress-fill ${ftProgressColor(pct)}" style="width:${pct}%"></div></div><span style="font-size:11px">${pct}%</span></div></td><td>${ftDecisionBadge(rel.decision||'Pending')}</td><td>${rel.plannedDate?ftFmt(rel.plannedDate):'—'}</td></tr>`;
+  }).join('');
+  body.innerHTML=`
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:20px">
+    <div class="ft-mc blue"><div class="ft-mc-val">${_ftProjects.filter(p=>p.status==='Active').length}</div><div class="ft-mc-lbl">Active Projects</div></div>
+    <div class="ft-mc blue"><div class="ft-mc-val">${activeRels.length}</div><div class="ft-mc-lbl">In QA</div></div>
+    <div class="ft-mc green"><div class="ft-mc-val">${ready}</div><div class="ft-mc-lbl">Ready</div></div>
+    <div class="ft-mc red"><div class="ft-mc-val">${blocked}</div><div class="ft-mc-lbl">Blocked</div></div>
+    <div class="ft-mc red"><div class="ft-mc-val">${critOpen}</div><div class="ft-mc-lbl">Critical Bugs</div></div>
+    <div class="ft-mc amber"><div class="ft-mc-val">${highOpen}</div><div class="ft-mc-lbl">High Bugs</div></div>
+  </div>
+  <div class="ft-tbl-wrap"><table class="ft-tbl"><thead><tr><th>Project</th><th>Release</th><th>Health</th><th>Risk</th><th>Status</th><th>Progress</th><th>Decision</th><th>Planned</th></tr></thead><tbody>${relRows||'<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--mut)">No active releases</td></tr>'}</tbody></table></div>`;
+  document.getElementById('ft-mgmt-overlay').classList.add('open');
+}
+function ftCloseMgmtView(){
+  document.getElementById('ft-mgmt-overlay').classList.remove('open');
+  const chip=document.getElementById('ft-mgmt-chip');if(chip)chip.classList.remove('active');
+}
+
+// ── QUICK UPDATE ──
+function ftOpenQuickUpdate(){
+  document.getElementById('ft-quick-overlay').classList.add('open');
+  document.getElementById('ft-quick-panel').classList.add('open');
+  ftQuUpdateRels();
+}
+function ftCloseQuickUpdate(){
+  document.getElementById('ft-quick-overlay').classList.remove('open');
+  document.getElementById('ft-quick-panel').classList.remove('open');
+}
+function ftQuUpdateRels(){
+  const pid=document.getElementById('qu-proj')?.value;
+  const relSel=document.getElementById('qu-rel');if(!relSel)return;
+  const rels=pid?_ftReleases.filter(r=>r.projectId===pid):_ftReleases;
+  relSel.innerHTML=rels.map(r=>`<option value="${r.id}">${ftEsc(r.name)} v${ftEsc(r.version||'?')}</option>`).join('');
+  if(_ftSelectedRelease) relSel.value=_ftSelectedRelease;
+  ftQuUpdateStages();
+}
+function ftQuUpdateStages(){
+  const stageSel=document.getElementById('qu-stage');if(!stageSel)return;
+  if(typeof STAGE_DEFS!=='undefined') stageSel.innerHTML=STAGE_DEFS.map(s=>`<option value="${s.id}">${s.icon} ${s.name}</option>`).join('');
+}
+function ftSubmitQuickUpdate(){
+  const relId=document.getElementById('qu-rel')?.value;
+  const rel=ftRelById(relId);if(!rel){ftToast('Select a release','error');return;}
+  const sid=document.getElementById('qu-stage')?.value;if(!sid){ftToast('Select a stage','error');return;}
+  if(!rel.stages) rel.stages={};
+  if(!rel.stages[sid]) rel.stages[sid]={status:'Not Started',pct:0};
+  const st=rel.stages[sid];
+  const newStatus=document.getElementById('qu-status')?.value;
+  const pct=parseInt(document.getElementById('qu-pct')?.value)||st.pct||0;
+  const owner=document.getElementById('qu-owner')?.value||st.owner||'';
+  const comment=document.getElementById('qu-comment')?.value||'';
+  const evidence=document.getElementById('qu-evidence')?.value||'';
+  Object.assign(st,{status:newStatus,pct,owner,comments:comment,evidence});
+  if(document.getElementById('qu-submit-review')?.checked){
+    if(!rel._qaLeadReview) rel._qaLeadReview=[];
+    rel._qaLeadReview.push({stage:sid,owner,comment,submittedAt:new Date().toISOString(),status:'Pending Review'});
+  }
+  const stageName=typeof STAGE_DEFS!=='undefined'?(STAGE_DEFS.find(x=>x.id===sid)?.name||sid):sid;
+  ftAddHistory(rel,stageName,'','',st.status,newStatus,window._ftCurrentUser||'',comment);
+  ftSaveReleases();
+  ftCloseQuickUpdate();
+  ftToast('Stage updated successfully');
+  if(_ftCurrentView==='release-detail'&&_ftSelectedRelease===relId) ftRenderReleaseDetail();
+  else if(_ftCurrentView==='dashboard') ftRenderDashboard();
+  ftUpdateNavBadges();
+}
+
+// ── KANBAN ──
 const KANBAN_COLS=[
-  {id:'change',label:'Change Received'},
-  {id:'qa-ready',label:'QA Ready'},
-  {id:'smoke',label:'Smoke Testing'},
-  {id:'manual',label:'Manual/API'},
-  {id:'fix',label:'Waiting for Fix'},
-  {id:'regression',label:'Regression'},
-  {id:'ready',label:'Ready for Release'},
-  {id:'blocked',label:'Blocked'},
-  {id:'released',label:'Released'}
+  {id:'change',label:'Change Received'},{id:'qa-ready',label:'QA Ready'},
+  {id:'smoke',label:'Smoke Testing'},{id:'manual',label:'Manual/API'},
+  {id:'fix',label:'Waiting for Fix'},{id:'regression',label:'Regression'},
+  {id:'ready',label:'Ready for Release'},{id:'blocked',label:'Blocked'},{id:'released',label:'Released'}
 ];
 function ftRelKanbanCol(rel){
   const s=rel.status||'Draft';
   if(s==='Draft'||s==='Change Received') return 'change';
   if(s==='QA Ready') return 'qa-ready';
-  if(s==='In Testing'){
-    const cs=rel.currentStage||1;
-    if(cs<=3) return 'qa-ready';
-    if(cs===4) return 'smoke';
-    if(cs<=6) return 'manual';
-    if(cs===8) return 'regression';
-    return 'manual';
-  }
+  if(s==='In Testing'){const cs=rel.currentStage||1;if(cs<=3)return 'qa-ready';if(cs===4)return 'smoke';if(cs<=6)return 'manual';if(cs===8)return 'regression';return 'manual';}
   if(s==='Waiting for Fix') return 'fix';
   if(s==='Retesting') return 'manual';
   if(s==='Ready for Release') return 'ready';
@@ -448,71 +722,194 @@ function ftRelKanbanCol(rel){
   if(s==='Cancelled') return 'blocked';
   return 'change';
 }
+
+// ── DASHBOARD ──
 function ftRenderDashboard(){
   const el=document.getElementById('ft-view-dashboard');
-  const activeRels=_ftReleases.filter(r=>r.status!=='Cancelled'&&r.status!=='Completed');
-  const critOpen=_ftReleases.flatMap(r=>r.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
-  const highOpen=_ftReleases.flatMap(r=>r.bugs||[]).filter(b=>b.severity==='High'&&b.status!=='Closed'&&b.status!=='Deferred').length;
-  const ready=_ftReleases.filter(r=>r.status==='Ready for Release').length;
-  const blocked=_ftReleases.filter(r=>r.status==='Blocked').length;
+  const rels=ftFilteredReleases();
+  const allRels=_ftReleases;
+  const activeRels=allRels.filter(r=>r.status!=='Cancelled'&&r.status!=='Completed');
+  const critOpen=allRels.flatMap(r=>r.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  const highOpen=allRels.flatMap(r=>r.bugs||[]).filter(b=>b.severity==='High'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  const ready=allRels.filter(r=>r.status==='Ready for Release').length;
+  const blocked=allRels.filter(r=>r.status==='Blocked').length;
   const activePr=_ftProjects.filter(p=>p.status==='Active').length;
+  const td=new Date().toISOString().slice(0,10);
+  const relToday=allRels.filter(r=>r.plannedDate&&r.plannedDate.slice(0,10)===td).length;
+  const me=(window._ftCurrentUser||'').toLowerCase();
+  let myPending=0;
+  allRels.forEach(rel=>(rel.teamAssignments||[]).forEach(a=>{if(a.member&&me&&a.member.toLowerCase().includes(me)&&a.status!=='Verification Completed'&&a.status!=='Approved')myPending++;}));
+  let qaLeadReview=0;
+  allRels.forEach(rel=>{qaLeadReview+=(rel._qaLeadReview||[]).filter(x=>x.status==='Pending Review').length;});
 
-  // Build kanban
-  const cols={};
-  KANBAN_COLS.forEach(c=>cols[c.id]=[]);
-  _ftReleases.forEach(rel=>{
+  const metricsHtml=`<div class="ft-metrics-row">
+    <div class="ft-mc blue" onclick="ftNav('projects')" style="cursor:pointer"><div class="ft-mc-val">${activePr}</div><div class="ft-mc-lbl">Active Projects</div></div>
+    <div class="ft-mc teal" onclick="ftFilter('today')" style="cursor:pointer"><div class="ft-mc-val">${relToday}</div><div class="ft-mc-lbl">Releases Today</div></div>
+    <div class="ft-mc blue"><div class="ft-mc-val">${activeRels.length}</div><div class="ft-mc-lbl">In QA</div></div>
+    <div class="ft-mc green" onclick="ftFilter('ready')" style="cursor:pointer"><div class="ft-mc-val">${ready}</div><div class="ft-mc-lbl">Ready for Release</div></div>
+    <div class="ft-mc amber" onclick="ftFilter('atrisk')" style="cursor:pointer"><div class="ft-mc-val">${allRels.filter(r=>{const h=ftGetRelHealth(r);return h.cls==='at-risk'||h.cls==='attention';}).length}</div><div class="ft-mc-lbl">At Risk</div></div>
+    <div class="ft-mc red" onclick="ftFilter('blocked')" style="cursor:pointer"><div class="ft-mc-val">${blocked}</div><div class="ft-mc-lbl">Blocked</div></div>
+    <div class="ft-mc red"><div class="ft-mc-val">${critOpen}</div><div class="ft-mc-lbl">Critical Bugs</div></div>
+    <div class="ft-mc amber"><div class="ft-mc-val">${highOpen}</div><div class="ft-mc-lbl">High Bugs</div></div>
+    <div class="ft-mc purple" onclick="ftNav('mytasks')" style="cursor:pointer"><div class="ft-mc-val">${myPending}</div><div class="ft-mc-lbl">My Pending</div></div>
+    <div class="ft-mc purple" onclick="ftNav('qalead')" style="cursor:pointer"><div class="ft-mc-val">${qaLeadReview}</div><div class="ft-mc-lbl">Awaiting QA Lead</div></div>
+  </div>`;
+
+  const myTasks=[];
+  allRels.forEach(rel=>{
     if(rel.status==='Cancelled') return;
-    const col=ftRelKanbanCol(rel);
-    const proj=ftProjById(rel.projectId);
-    const health=ftGetRelHealth(rel);
-    const pct=ftRelProgress(rel);
-    cols[col].push({rel,proj,health,pct});
-  });
-
-  let kanbanHtml='<div class="ft-kanban">';
-  KANBAN_COLS.forEach(c=>{
-    const items=cols[c.id];
-    let cards=items.length===0?'<div style="font-size:11px;color:var(--mut);text-align:center;padding:12px">Empty</div>':'';
-    items.forEach(({rel,proj,health,pct})=>{
-      const critB=(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
-      const highB=(rel.bugs||[]).filter(b=>b.severity==='High'&&b.status!=='Closed'&&b.status!=='Deferred').length;
-      cards+=`<div class="ft-kanban-card" onclick="ftOpenRelease('${rel.id}')">
-        <div class="ft-kanban-card-title">${ftEsc(rel.name)}</div>
-        <div class="ft-kanban-card-sub" style="margin-bottom:6px">${ftEsc(proj?.name||'—')} · v${ftEsc(rel.version||'?')}</div>
-        ${ftRiskBadge(rel.riskLevel)}
-        <div class="ft-progress" style="margin:6px 0"><div class="ft-progress-fill ${ftProgressColor(pct)}" style="width:${pct}%"></div></div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
-          ${critB>0?`<span class="ftbadge red" style="font-size:10px">🐛${critB} Crit</span>`:''}
-          ${highB>0?`<span class="ftbadge amber" style="font-size:10px">⚠${highB} High</span>`:''}
-          ${rel.plannedDate?`<span style="font-size:10px;color:var(--mut)">${ftFmt(rel.plannedDate)}</span>`:''}
-        </div>
-        <div style="margin-top:6px">${ftDecisionBadge(rel.decision||'Pending')}</div>
-      </div>`;
+    const p=ftProjById(rel.projectId);
+    (rel.teamAssignments||[]).forEach(a=>{
+      if(a.member&&me&&a.member.toLowerCase().includes(me)&&a.status!=='Verification Completed'&&a.status!=='Approved')
+        myTasks.push({a,rel,proj:p});
     });
-    kanbanHtml+=`<div class="ft-kanban-col">
-      <div class="ft-kanban-col-hdr">${c.label} <span style="float:right;background:var(--border);border-radius:8px;padding:1px 7px">${items.length}</span></div>
-      <div class="ft-kanban-col-body">${cards}</div>
-    </div>`;
   });
-  kanbanHtml+='</div>';
+  let myTasksHtml='';
+  if(myTasks.length>0){
+    myTasksHtml=`<div class="ftc" style="margin-bottom:14px">
+    <div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">My Priority Tasks <span class="ftbadge amber">${myTasks.length}</span></h2><button class="ftbtn sm primary" onclick="ftNav('mytasks')">View All</button></div>
+    ${myTasks.slice(0,4).map(({a,rel,proj})=>{
+      const health=ftGetRelHealth(rel);const pri=a.status==='Blocked'?'critical':a.status==='Waiting for Fix'?'high':'normal';
+      return `<div class="ft-task-card" onclick="ftOpenRelease('${rel.id}')"><div class="ft-task-pri ${pri}"></div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${ftEsc(a.module||'Testing')} — ${ftEsc(rel.name)}</div><div style="font-size:11px;color:var(--mut);margin-top:2px">${ftEsc(proj?.name||'—')} · v${ftEsc(rel.version||'?')}</div><div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">${ftStatusBadge(a.status)}<span class="ft-health ${health.cls}" style="padding:2px 7px;font-size:10px;margin:0;display:inline-flex">${health.label}</span></div></div><button class="ftbtn sm primary" onclick="event.stopPropagation();ftOpenRelease('${rel.id}')">Open</button></div>`;
+    }).join('')}
+    </div>`;
+  }
+
+  const blockedRels=allRels.filter(r=>r.status==='Blocked');
+  let blockersHtml='';
+  if(blockedRels.length>0){
+    blockersHtml=`<div class="ftc" style="margin-bottom:14px;border-color:rgba(229,72,77,.2)">
+    <div class="ftc-hdr"><h2 class="ftc-title" style="margin:0;color:var(--red)">Blockers <span class="ftbadge red">${blockedRels.length}</span></h2></div>
+    ${blockedRels.map(rel=>{const p=ftProjById(rel.projectId);const critB=(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;return `<div class="ft-blocker-item"><div style="font-size:15px">🚫</div><div style="flex:1"><div class="ft-blocker-title">${ftEsc(rel.name)}</div><div class="ft-blocker-meta">${ftEsc(p?.name||'—')} · v${ftEsc(rel.version||'?')} ${critB>0?`· ${critB} critical bug(s)`:''}</div></div><button class="ftbtn xs primary" onclick="ftOpenRelease('${rel.id}')">View</button></div>`;}).join('')}
+    </div>`;
+  }
+
+  const recentHistory=[];
+  allRels.forEach(rel=>{const p=ftProjById(rel.projectId);(rel.history||[]).slice(0,3).forEach(h=>recentHistory.push({...h,relName:rel.name,projName:p?.name||'—',relId:rel.id}));});
+  recentHistory.sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
+  const tlHtml=recentHistory.slice(0,8).map(h=>{
+    const dotCls=h.newStatus==='Done'||h.newStatus==='GO'?'green':h.newStatus==='Blocked'||h.newStatus==='NO-GO'?'red':h.newStatus==='GO WITH RISK'?'amber':'';
+    return `<div class="ft-tl-item"><div class="ft-tl-dot-col"><div class="ft-tl-dot ${dotCls}"></div></div><div class="ft-tl-text"><div class="ft-tl-action">${ftEsc(h.stage||'Update')} — <strong>${ftEsc(h.newStatus||'')}</strong></div><div class="ft-tl-meta">${ftEsc(h.relName)} · ${ftEsc(h.projName)} · ${ftEsc(h.updatedBy||'—')}</div></div></div>`;
+  }).join('');
+
+  let relContent='';
+  if(_ftDashboardView==='workflow') relContent=ftRenderWorkflowCards(rels);
+  else if(_ftDashboardView==='cards') relContent=ftRenderCardGrid(rels);
+  else if(_ftDashboardView==='kanban') relContent=ftRenderKanbanBoard(rels);
+  else relContent=ftRenderTableView(rels);
 
   el.innerHTML=`
-  <div class="ft-section-hdr">
-    <h2>📊 QA Dashboard</h2>
-    <button class="ftbtn primary" onclick="ftNav('releases')">+ New Release</button>
+  <div class="ft-section-hdr"><h2>QA Dashboard</h2><div style="display:flex;gap:7px;flex-wrap:wrap"><button class="ftbtn sm" onclick="ftNav('projects')">+ Project</button><button class="ftbtn sm primary" onclick="ftHeaderNewRelease()">+ Release</button></div></div>
+  ${metricsHtml}
+  <div class="ft-grid-2" style="margin-bottom:14px">
+    <div>${myTasksHtml}${blockersHtml}</div>
+    <div class="ftc"><div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">Activity Timeline</h2></div>${tlHtml||'<div class="ft-empty" style="padding:12px"><div class="ft-empty-text">No activity yet</div></div>'}</div>
   </div>
-  <div class="ft-metrics">
-    <div class="ft-metric blue"><div class="ft-metric-val">${activePr}</div><div class="ft-metric-lbl">Active Projects</div></div>
-    <div class="ft-metric blue"><div class="ft-metric-val">${activeRels.length}</div><div class="ft-metric-lbl">Releases in QA</div></div>
-    <div class="ft-metric green"><div class="ft-metric-val">${ready}</div><div class="ft-metric-lbl">Ready to Release</div></div>
-    <div class="ft-metric red"><div class="ft-metric-val">${blocked}</div><div class="ft-metric-lbl">Blocked</div></div>
-    <div class="ft-metric red"><div class="ft-metric-val">${critOpen}</div><div class="ft-metric-lbl">Open Critical Bugs</div></div>
-    <div class="ft-metric amber"><div class="ft-metric-val">${highOpen}</div><div class="ft-metric-lbl">Open High Bugs</div></div>
-  </div>
-  <div class="ft-card">
-    <div class="ft-card-title">Release Kanban Board</div>
-    ${kanbanHtml}
+  <div class="ftc">
+    <div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">Releases ${_ftFilterMode?`<span class="ftbadge amber">${_ftFilterMode}</span>`:''} <span class="ftbadge grey">${rels.length}</span></h2><button class="ftbtn sm primary" onclick="ftHeaderNewRelease()">+ New Release</button></div>
+    ${relContent}
   </div>`;
+}
+
+function ftRenderDashboardRels(rels){
+  const el=document.getElementById('ft-view-dashboard');if(!el)return;
+  const wrap=el.querySelector('.ftc:last-child');if(!wrap)return;
+  let relContent='';
+  if(_ftDashboardView==='workflow') relContent=ftRenderWorkflowCards(rels);
+  else if(_ftDashboardView==='cards') relContent=ftRenderCardGrid(rels);
+  else if(_ftDashboardView==='kanban') relContent=ftRenderKanbanBoard(rels);
+  else relContent=ftRenderTableView(rels);
+  const old=wrap.querySelector('.ft-rel-list');
+  if(old) old.innerHTML=relContent;
+}
+
+function ftRenderWorkflowCards(rels){
+  if(rels.length===0) return `<div class="ft-empty"><div class="ft-empty-icon">🚀</div><div class="ft-empty-text">No releases</div><div class="ft-empty-sub">Create a release to track your QA workflow.</div><button class="ftbtn primary" onclick="ftHeaderNewRelease()">+ New Release</button></div>`;
+  const active=rels.filter(r=>r.status!=='Cancelled');
+  return `<div style="display:flex;flex-direction:column;gap:10px">${active.map(rel=>{
+    const proj=ftProjById(rel.projectId);const pct=ftRelProgress(rel);const health=ftGetRelHealth(rel);
+    const bugs=rel.bugs||[];const critB=bugs.filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+    const highB=bugs.filter(b=>b.severity==='High'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+    const cs=rel.currentStage||1;
+    const miniSteps=typeof STAGE_DEFS!=='undefined'?STAGE_DEFS.map(s=>{
+      const st=rel.stages?.[s.id]||{};const sPct=st.pct||0;
+      let cls='';if(sPct===100)cls='done';else if(cs===s.num)cls='active';else if(st.status==='Blocked')cls='blocked';
+      return `<div class="ft-step ${cls}" onclick="event.stopPropagation();ftOpenRelease('${rel.id}');setTimeout(()=>ftRelTab('${s.id}'),200)"><div class="ft-step-line"></div><div class="ft-step-circle">${sPct===100?'✓':s.icon}</div><div class="ft-step-label">${s.name}</div></div>`;
+    }).join(''):'';
+    return `<div class="ft-rel-card ${health.cls}" onclick="ftOpenRelease('${rel.id}')">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <div><div style="font-size:14px;font-weight:800">${ftEsc(rel.name)} <span style="font-size:12px;font-weight:600;color:var(--mut)">v${ftEsc(rel.version||'?')}</span></div><div style="font-size:11px;color:var(--mut);margin-top:2px">${ftEsc(proj?.name||'—')} ${rel.plannedDate?`· ${ftFmt(rel.plannedDate)}`:''}</div></div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">${ftStatusBadge(rel.status||'Draft')}${ftDecisionBadge(rel.decision||'Pending')}${critB>0?`<span class="ftbadge red">🐛 ${critB}</span>`:''}${highB>0?`<span class="ftbadge amber">⚠ ${highB}</span>`:''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><div class="ft-progress" style="flex:1"><div class="ft-progress-fill ${ftProgressColor(pct)}" style="width:${pct}%"></div></div><span style="font-size:11px;color:var(--mut)">${pct}% · Stage ${cs}/10</span></div>
+      <div class="ft-stepper-wrap"><div class="ft-stepper">${miniSteps}</div></div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function ftRenderCardGrid(rels){
+  if(rels.length===0) return `<div class="ft-empty"><div class="ft-empty-icon">📋</div><div class="ft-empty-text">No releases</div><button class="ftbtn primary" onclick="ftHeaderNewRelease()">+ New Release</button></div>`;
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">${rels.map(rel=>{
+    const proj=ftProjById(rel.projectId);const pct=ftRelProgress(rel);const health=ftGetRelHealth(rel);
+    const critB=(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+    return `<div class="ft-rel-card ${health.cls}" onclick="ftOpenRelease('${rel.id}')"><div style="font-size:13px;font-weight:800;margin-bottom:3px">${ftEsc(rel.name)}</div><div style="font-size:11px;color:var(--mut);margin-bottom:8px">${ftEsc(proj?.name||'—')} · v${ftEsc(rel.version||'?')}</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">${ftStatusBadge(rel.status||'Draft')}${ftDecisionBadge(rel.decision||'Pending')}</div><div class="ft-progress" style="margin-bottom:6px"><div class="ft-progress-fill ${ftProgressColor(pct)}" style="width:${pct}%"></div></div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut)"><span>${pct}%</span>${critB>0?`<span class="ftbadge red" style="font-size:10px">🐛${critB}</span>`:''}</div></div>`;
+  }).join('')}</div>`;
+}
+
+function ftRenderKanbanBoard(rels){
+  const cols={};KANBAN_COLS.forEach(c=>cols[c.id]=[]);
+  rels.forEach(rel=>{if(rel.status==='Cancelled')return;const col=ftRelKanbanCol(rel);const proj=ftProjById(rel.projectId);const health=ftGetRelHealth(rel);const pct=ftRelProgress(rel);cols[col].push({rel,proj,health,pct});});
+  return `<div class="ft-kanban-wrap"><div class="ft-kanban">${KANBAN_COLS.map(c=>{
+    const items=cols[c.id];
+    let cards=items.length===0?'<div style="font-size:11px;color:var(--mut);text-align:center;padding:10px">Empty</div>':'';
+    items.forEach(({rel,proj,health,pct})=>{const critB=(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;cards+=`<div class="ft-kanban-card" onclick="ftOpenRelease('${rel.id}')"><div class="ft-kanban-card-title">${ftEsc(rel.name)}</div><div class="ft-kanban-card-sub">${ftEsc(proj?.name||'—')} · v${ftEsc(rel.version||'?')}</div>${ftRiskBadge(rel.riskLevel)}<div class="ft-progress" style="margin:5px 0"><div class="ft-progress-fill ${ftProgressColor(pct)}" style="width:${pct}%"></div></div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">${critB>0?`<span class="ftbadge red" style="font-size:10px">🐛${critB}</span>`:''}${ftDecisionBadge(rel.decision||'Pending')}</div></div>`;});
+    return `<div class="ft-kanban-col"><div class="ft-kanban-col-hdr">${c.label}<span style="background:var(--border);border-radius:6px;padding:1px 6px">${items.length}</span></div><div class="ft-kanban-col-body">${cards}</div></div>`;
+  }).join('')}</div></div>`;
+}
+
+function ftRenderTableView(rels){
+  if(rels.length===0) return `<div class="ft-empty"><div class="ft-empty-text">No releases</div></div>`;
+  return `<div class="ft-tbl-wrap"><table class="ft-tbl"><thead><tr><th>Release</th><th>Project</th><th>Version</th><th>Risk</th><th>Status</th><th>Progress</th><th>Decision</th><th>Planned</th><th>Actions</th></tr></thead><tbody>${rels.map(rel=>{const proj=ftProjById(rel.projectId);const pct=ftRelProgress(rel);return `<tr><td><div style="font-weight:700">${ftEsc(rel.name)}</div></td><td><div style="font-size:11px;color:var(--mut)">${ftEsc(proj?.name||'—')}</div></td><td>${ftEsc(rel.version||'—')}</td><td>${ftRiskBadge(rel.riskLevel)}</td><td>${ftStatusBadge(rel.status||'Draft')}</td><td><div style="display:flex;align-items:center;gap:6px"><div class="ft-progress" style="width:70px"><div class="ft-progress-fill ${ftProgressColor(pct)}" style="width:${pct}%"></div></div><span style="font-size:11px">${pct}%</span></div></td><td>${ftDecisionBadge(rel.decision||'Pending')}</td><td style="white-space:nowrap;font-size:11px">${rel.plannedDate?ftFmt(rel.plannedDate):'—'}</td><td><button class="ftbtn sm primary" onclick="ftOpenRelease('${rel.id}')">Open</button></td></tr>`;}).join('')}</tbody></table></div>`;
+}
+
+// ── MY TASKS VIEW ──
+function ftRenderMyTasks(){
+  const el=document.getElementById('ft-view-mytasks');
+  const me=(window._ftCurrentUser||'').toLowerCase();
+  const tasks=[];
+  _ftReleases.forEach(rel=>{
+    if(rel.status==='Cancelled') return;
+    const proj=ftProjById(rel.projectId);
+    (rel.teamAssignments||[]).forEach(a=>{if(a.member&&me&&a.member.toLowerCase().includes(me))tasks.push({a,rel,proj,pct:ftRelProgress(rel),health:ftGetRelHealth(rel)});});
+  });
+  const pending=tasks.filter(t=>t.a.status!=='Verification Completed'&&t.a.status!=='Approved');
+  const done=tasks.filter(t=>t.a.status==='Verification Completed'||t.a.status==='Approved');
+  const renderTask=({a,rel,proj,health})=>`<div class="ft-task-card" onclick="ftOpenRelease('${rel.id}')"><div class="ft-task-pri ${a.status==='Blocked'?'critical':a.status==='Waiting for Fix'?'high':'normal'}"></div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${ftEsc(a.module||'Testing')}</div><div style="font-size:11px;color:var(--mut);margin-top:2px">${ftEsc(rel.name)} v${ftEsc(rel.version||'?')} · ${ftEsc(proj?.name||'—')}</div><div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap">${ftStatusBadge(a.status)}<span class="ft-health ${health.cls}" style="padding:2px 7px;font-size:10px;margin:0;display:inline-flex">${health.label}</span></div></div><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0"><button class="ftbtn xs primary" onclick="event.stopPropagation();ftOpenRelease('${rel.id}')">Open</button><button class="ftbtn xs" onclick="event.stopPropagation();ftOpenQuickUpdate()">⚡ Update</button></div></div>`;
+  el.innerHTML=`<div class="ft-section-hdr"><h2>My Tasks</h2><span class="ftbadge amber">${pending.length} pending</span></div>
+  ${pending.length>0?`<div class="ftc" style="margin-bottom:14px"><div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">Pending <span class="ftbadge amber">${pending.length}</span></h2></div>${pending.map(renderTask).join('')}</div>`:''}
+  ${done.length>0?`<div class="ftc"><div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">Completed <span class="ftbadge green">${done.length}</span></h2></div>${done.map(renderTask).join('')}</div>`:''}
+  ${tasks.length===0?`<div class="ft-empty"><div class="ft-empty-icon">✅</div><div class="ft-empty-text">No tasks assigned to you</div><div class="ft-empty-sub">Assignments matching your name will appear here.</div></div>`:''}`;
+}
+
+// ── QA LEAD VIEW ──
+function ftRenderQaLead(){
+  const el=document.getElementById('ft-view-qalead');
+  const submissions=[];
+  _ftReleases.forEach(rel=>{const p=ftProjById(rel.projectId);(rel._qaLeadReview||[]).forEach((s,i)=>{submissions.push({...s,relName:rel.name,projName:p?.name||'—',relId:rel.id,idx:i});});});
+  const pending=submissions.filter(s=>s.status==='Pending Review');
+  const done=submissions.filter(s=>s.status!=='Pending Review');
+  const renderRow=s=>`<tr><td>${ftEsc(s.projName)}</td><td><button class="ftbtn xs primary" onclick="ftOpenRelease('${s.relId}')">${ftEsc(s.relName)}</button></td><td>${ftEsc(s.stage)}</td><td>${ftEsc(s.owner||'—')}</td><td style="max-width:200px;font-size:11px">${ftEsc(s.comment||'—')}</td><td><span class="ftbadge ${s.status==='Approved'?'green':s.status==='Changes Required'?'amber':'blue'}">${ftEsc(s.status)}</span></td><td><button class="ftbtn xs success" onclick="ftQaLeadAction('${s.relId}',${s.idx},'Approved')">Approve</button><button class="ftbtn xs amber" onclick="ftQaLeadAction('${s.relId}',${s.idx},'Changes Required')">Changes</button><button class="ftbtn xs danger" onclick="ftQaLeadAction('${s.relId}',${s.idx},'Rejected')">Reject</button></td></tr>`;
+  el.innerHTML=`<div class="ft-section-hdr"><h2>QA Lead Review</h2><span class="ftbadge purple">${pending.length} pending</span></div>
+  ${pending.length>0?`<div class="ftc" style="margin-bottom:14px"><div class="ftc-title">Pending Review</div><div class="ft-tbl-wrap"><table class="ft-tbl"><thead><tr><th>Project</th><th>Release</th><th>Stage</th><th>Owner</th><th>Comment</th><th>Status</th><th>Actions</th></tr></thead><tbody>${pending.map(renderRow).join('')}</tbody></table></div></div>`:''}
+  ${done.length>0?`<div class="ftc"><div class="ftc-title">Reviewed</div><div class="ft-tbl-wrap"><table class="ft-tbl"><thead><tr><th>Project</th><th>Release</th><th>Stage</th><th>Owner</th><th>Comment</th><th>Status</th><th>Actions</th></tr></thead><tbody>${done.slice(0,20).map(renderRow).join('')}</tbody></table></div></div>`:''}
+  ${submissions.length===0?`<div class="ft-empty"><div class="ft-empty-icon">🔍</div><div class="ft-empty-text">No submissions for review</div><div class="ft-empty-sub">Use Quick Update and check "Submit for QA Lead Review".</div></div>`:''}`;
+}
+function ftQaLeadAction(relId,idx,status){
+  const rel=ftRelById(relId);if(!rel||!rel._qaLeadReview||!rel._qaLeadReview[idx])return;
+  rel._qaLeadReview[idx].status=status;
+  rel._qaLeadReview[idx].reviewedAt=new Date().toISOString();
+  rel._qaLeadReview[idx].reviewedBy=window._ftCurrentUser||'';
+  ftSaveReleases();ftToast('Review: '+status);ftRenderQaLead();ftUpdateNavBadges();
 }
 
 // ══════════════════════════════════════════════════════
@@ -648,9 +1045,9 @@ function ftSelectProject(pid){
   _ftSelectedProject=pid;
   ftNav('releases');
 }
-</script>
 
-<script>
+
+
 // ══════════════════════════════════════════════════════
 // RELEASES VIEW
 // ══════════════════════════════════════════════════════
@@ -1007,9 +1404,9 @@ function ftSaveStageUpdate(sid){
   ftSaveReleases();ftCloseModal();ftToast('Stage updated');
   ftRenderReleaseDetail();
 }
-</script>
 
-<script>
+
+
 // ══════════════════════════════════════════════════════
 // STAGE FORMS
 // ══════════════════════════════════════════════════════
@@ -1288,9 +1685,9 @@ function ftS4Save(){
   else if(pass>0) rel.stages.s4.status='In Progress';
   ftSaveReleases();ftToast('Smoke tests saved');ftRenderRelTab();
 }
-</script>
 
-<script>
+
+
 // ── MANUAL TESTING (S5) ──
 const S5_SECTIONS=[
   {id:'A',name:'Authentication & Access',items:['Login with valid credentials succeeds','Login with invalid credentials blocked','Session timeout works correctly','Password reset flow works','Role-based access control enforced','Logout clears session','MFA flow works (if applicable)']},
@@ -1422,9 +1819,9 @@ function ftS6Save(){
   else if(pass>0) rel.stages.s6.status='In Progress';
   ftSaveReleases();ftToast('API checks saved');ftRenderRelTab();
 }
-</script>
 
-<script>
+
+
 // ── BUGS (S7) ──
 function ftStageBugs(rel){
   const bugs=rel.bugs||[];
@@ -1626,9 +2023,9 @@ function ftRegrSaveNew(){
   ftSaveReleases();ftCloseModal();ftToast('Regression case added');ftRenderRelTab();
 }
 function ftSaveRegression(){ftSaveReleases();ftToast('Regression pack saved');}
-</script>
 
-<script>
+
+
 // ── DECISION (S9) ──
 const S9_QUESTIONS=[
   'All critical and high bugs are fixed and retested',
@@ -1898,9 +2295,9 @@ function ftRelHistory(rel){
     </table></div>
   </div>`;
 }
-</script>
 
-<script>
+
+
 // ══════════════════════════════════════════════════════
 // MY ASSIGNMENTS VIEW
 // ══════════════════════════════════════════════════════
@@ -2150,9 +2547,9 @@ ${rel.clientNotes?`<h2>Client Notes</h2><p style="font-size:13px;padding:12px;ba
   a.click();URL.revokeObjectURL(a.href);
   ftToast('Report downloaded');
 }
-</script>
 
-<script>
+
+
 // ══════════════════════════════════════════════════════
 // DEMO DATA
 // ══════════════════════════════════════════════════════
@@ -2257,6 +2654,7 @@ function ftSeedDemo(){
     document.getElementById('ft-dark-btn').textContent='☀️';
   }
 })();
+
 </script>
 </body>
 </html>
