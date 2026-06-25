@@ -449,20 +449,12 @@ h1{font-size:20px;font-weight:800}h2{font-size:16px;font-weight:800}h3{font-size
 </div>
 <div id="ft-body">
 <nav id="ft-sidebar">
-  <div class="ft-nav-sec">Main</div>
   <div class="ft-nav-item active" data-view="dashboard" onclick="ftNav('dashboard')" tabindex="0"><span class="ft-nav-icon">&#128202;</span>Dashboard<span class="ft-nav-badge red" id="nb-blocked" style="display:none">0</span></div>
+  <div class="ft-nav-item" data-view="checklist" onclick="ftNav('checklist')" tabindex="0"><span class="ft-nav-icon">&#9989;</span>QA Checklist<span class="ft-nav-badge amber" id="nb-checklist" style="display:none">0</span></div>
+  <div class="ft-nav-item" data-view="releases" onclick="ftNav('releases')" tabindex="0"><span class="ft-nav-icon">&#128640;</span>Releases<span class="ft-nav-badge amber" id="nb-mytasks" style="display:none">0</span></div>
   <div class="ft-nav-item" data-view="projects" onclick="ftNav('projects')" tabindex="0"><span class="ft-nav-icon">&#128193;</span>Projects</div>
-  <div class="ft-nav-item" data-view="releases" onclick="ftNav('releases')" tabindex="0"><span class="ft-nav-icon">&#128640;</span>Releases</div>
-  <div class="ft-nav-sec">QA Management</div>
-  <div class="ft-nav-item" data-view="checklist" onclick="ftNav('checklist')" tabindex="0"><span class="ft-nav-icon">&#9989;</span>QA Workflow<span class="ft-nav-badge amber" id="nb-checklist" style="display:none">0</span></div>
-  <div class="ft-nav-item" data-view="mytasks" onclick="ftNav('mytasks')" tabindex="0"><span class="ft-nav-icon">&#128203;</span>My Testing Tasks<span class="ft-nav-badge amber" id="nb-mytasks" style="display:none">0</span></div>
-  <div class="ft-nav-item" data-view="workload" onclick="ftNav('workload')" tabindex="0"><span class="ft-nav-icon">&#128101;</span>Team Workload</div>
-  <div class="ft-nav-item" data-view="qalead" onclick="ftNav('qalead')" tabindex="0"><span class="ft-nav-icon">&#128269;</span>QA Lead Review<span class="ft-nav-badge purple" id="nb-qalead" style="display:none">0</span></div>
-  <div class="ft-nav-item" data-view="decisions" onclick="ftNav('decisions')" tabindex="0"><span class="ft-nav-icon">&#127959;</span>Release Decisions</div>
-  <div class="ft-nav-sec">Insights</div>
-  <div class="ft-nav-item" data-view="assignments" onclick="ftNav('assignments')" tabindex="0"><span class="ft-nav-icon">&#128101;</span>Assignments</div>
-  <div class="ft-nav-item" data-view="management" onclick="ftNav('management')" tabindex="0"><span class="ft-nav-icon">&#128084;</span>Management</div>
-  <div class="ft-nav-item" data-view="reports" onclick="ftNav('reports')" tabindex="0"><span class="ft-nav-icon">&#128196;</span>QA Reports</div>
+  <div class="ft-nav-item" data-view="workload" onclick="ftNav('workload')" tabindex="0"><span class="ft-nav-icon">&#128101;</span>Team</div>
+  <div class="ft-nav-item" data-view="reports" onclick="ftNav('reports')" tabindex="0"><span class="ft-nav-icon">&#128196;</span>Reports</div>
   <div class="ft-sb-toggle" onclick="ftToggleSidebar()"><span>&#9664;</span><span style="font-size:11px">Collapse</span></div>
 </nav>
 <main id="ft-main">
@@ -2990,9 +2982,17 @@ let _clSelectedPhase=null;
 async function clSaveReleases(){await ftApiSet('cl_releases',_clReleases);}
 async function clSaveItems(){await ftApiSet('cl_items',_clItems);}
 async function clSaveAudit(){await ftApiSet('cl_audit',_clAudit.slice(-500));}
+async function clApiGet(key){
+  try{
+    const r=await fetch('/api/qa-data/'+key,{headers:_ftHdr()});
+    if(!r.ok) return null;
+    const d=await r.json();
+    return d.value||null;
+  }catch(e){return null;}
+}
 async function clLoadData(){
   const [r,i,a]=await Promise.all([
-    ftApiGet('cl_releases'),ftApiGet('cl_items'),ftApiGet('cl_audit')
+    clApiGet('cl_releases'),clApiGet('cl_items'),clApiGet('cl_audit')
   ]);
   _clReleases=Array.isArray(r)?r:[];
   _clItems=Array.isArray(i)?i:[];
@@ -3645,7 +3645,7 @@ function clOpenItemModal(relId,itemId){
   if(existing) existing.remove();
   const m=document.createElement('div');
   m.id='cl-item-modal';
-  m.className='ft-modal-overlay';
+  m.className='ft-modal-overlay open';
   m.style.zIndex='8000';
   m.innerHTML=`<div class="ft-modal" style="max-width:680px">
     <div class="ft-modal-hdr"><div><div class="ft-modal-title">${item.itemId} — ${clEsc(item.desc)}</div><div style="font-size:11px;color:var(--mut)">${ph?.label||item.phaseCode}</div></div><button class="ft-modal-close" onclick="document.getElementById('cl-item-modal').remove()">✕</button></div>
@@ -3714,7 +3714,7 @@ function clShowNewReleaseModal(){
   if(existing) existing.remove();
   const m=document.createElement('div');
   m.id='cl-new-rel-modal';
-  m.className='ft-modal-overlay';
+  m.className='ft-modal-overlay open';
   m.style.zIndex='8000';
   // Use both _ftProjects (from main tracker) and any projectNames already in _clReleases
   const seen=new Set();
@@ -3791,7 +3791,7 @@ function clShowEditReleaseModal(relId){
   if(existing) existing.remove();
   const m=document.createElement('div');
   m.id='cl-edit-rel-modal';
-  m.className='ft-modal-overlay';
+  m.className='ft-modal-overlay open';
   m.style.zIndex='8000';
   m.innerHTML=`<div class="ft-modal" style="max-width:640px">
     <div class="ft-modal-hdr"><div class="ft-modal-title">Edit Release — ${clEsc(rel.name)}</div><button class="ft-modal-close" onclick="document.getElementById('cl-edit-rel-modal').remove()">✕</button></div>
@@ -3865,7 +3865,7 @@ function clShowNewBugModal(relId){
   if(existing) existing.remove();
   const m=document.createElement('div');
   m.id='cl-bug-modal';
-  m.className='ft-modal-overlay';
+  m.className='ft-modal-overlay open';
   m.style.zIndex='8000';
   m.innerHTML=`<div class="ft-modal" style="max-width:640px">
     <div class="ft-modal-hdr"><div class="ft-modal-title">🐛 Log New Bug</div><button class="ft-modal-close" onclick="document.getElementById('cl-bug-modal').remove()">✕</button></div>
@@ -3928,7 +3928,7 @@ function clShowEditBugModal(relId,bugId){
   if(existing) existing.remove();
   const m=document.createElement('div');
   m.id='cl-bug-edit-modal';
-  m.className='ft-modal-overlay';
+  m.className='ft-modal-overlay open';
   m.style.zIndex='8000';
   m.innerHTML=`<div class="ft-modal" style="max-width:560px">
     <div class="ft-modal-hdr"><div class="ft-modal-title">Edit Bug — ${clEsc(bug.id)}</div><button class="ft-modal-close" onclick="document.getElementById('cl-bug-edit-modal').remove()">✕</button></div>
