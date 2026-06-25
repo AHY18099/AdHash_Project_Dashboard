@@ -3357,68 +3357,56 @@ function clNewRelease(data){
   return rel;
 }
 
-// ── Render checklist list view ──
+// ══ SIMPLE CLEAN UI FUNCTIONS ══
+
+// ── Checklist list ──
 function clRenderChecklist(){
   const el=document.getElementById('ft-view-checklist');
   if(!el) return;
-  const projFilter=document.getElementById('ft-proj-select')?.value||'';
-  let rels=_clReleases;
-  if(projFilter&&projFilter!=='all') rels=rels.filter(r=>r.projectId===projFilter);
-  rels=[...rels].sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
+  let rels=[..._clReleases].sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
 
-  el.innerHTML=`
-  <div class="ft-section-hdr" style="margin-bottom:16px">
-    <div><h2>QA Workflow Dashboard</h2><div style="font-size:11px;color:var(--mut)">${rels.length} checklist release${rels.length!==1?'s':''} — 14-phase Fast-Track QA</div></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="ftbtn sm" onclick="clOpenQuickPanel()">⚡ Quick Update</button>
-      <button class="ftbtn sm primary" onclick="clShowNewReleaseModal()">+ New Checklist</button>
-    </div>
-  </div>
-  ${rels.length===0?`<div class="ft-empty"><div class="ft-empty-icon">📋</div><div class="ft-empty-text">No checklist releases yet</div><div class="ft-empty-sub">Create a checklist release to start tracking QA activities</div><button class="ftbtn primary" onclick="clShowNewReleaseModal()">+ Create Checklist Release</button></div>`
-  :rels.map(rel=>{
+  const cards=rels.map(rel=>{
     const pct=clRelProgress(rel.id);
-    const health=clRelHealth(rel.id);
     const dec=rel.decision||'Pending';
-    const decCls=clDecisionCls(dec);
+    const decColor=dec==='GO'?'var(--green)':dec==='GO WITH RISK'?'var(--amber)':dec==='NO-GO'?'var(--red)':'var(--mut)';
     const openCrit=(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed').length;
-    const openHigh=(rel.bugs||[]).filter(b=>b.severity==='High'&&b.status!=='Closed').length;
-    const phaseBar=CL_PHASES.map(ph=>{
-      const {pct:pp,blocked,failed}=clPhaseProgress(rel.id,ph.code);
-      const seg=blocked>0?'blocked':failed>0?'blocked':pp===100?'done':pp>0?'active':'';
-      return `<div class="cl-phase-bar-seg ${seg}" title="${ph.label}: ${pp}%"></div>`;
+    const phaseDots=CL_PHASES.map(ph=>{
+      const {pct:pp,failed,blocked}=clPhaseProgress(rel.id,ph.code);
+      const c=blocked>0||failed>0?'var(--red)':pp===100?'var(--green)':pp>0?'var(--blue)':'var(--border)';
+      return `<div title="${ph.label}: ${pp}%" style="width:14px;height:14px;border-radius:50%;background:${c};flex-shrink:0;cursor:default"></div>`;
     }).join('');
     return `<div class="cl-release-card" onclick="clOpenRelease('${rel.id}')">
-      <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
-        <div style="flex:1;min-width:180px">
-          <div style="font-size:14px;font-weight:800;color:var(--txt)">${clEsc(rel.name)}</div>
-          <div style="font-size:11px;color:var(--mut);margin-top:2px">${clEsc(rel.projectName||'—')} · v${clEsc(rel.version)} · ${clEsc(rel.changedModule||'—')}</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-            <span class="ftbadge ${clStatusCls(rel.status)}">${clEsc(rel.status)}</span>
-            <span class="ft-health ${health.cls}">${health.label}</span>
-            <span class="cl-decision-big ${decCls}" style="padding:3px 10px;font-size:11px">${dec==='GO'?'✅ GO':dec==='GO WITH RISK'?'⚠️ GO WITH RISK':dec==='NO-GO'?'🚫 NO-GO':'⏳ Pending'}</span>
-          </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:800;margin-bottom:3px">${clEsc(rel.name)}</div>
+          <div style="font-size:11px;color:var(--mut)">${clEsc(rel.projectName||'—')} · v${clEsc(rel.version)}${rel.changedModule?' · '+clEsc(rel.changedModule):''}</div>
         </div>
         <div style="text-align:right;flex-shrink:0">
-          <div style="font-size:24px;font-weight:900;color:${pct>=80?'var(--green)':pct>=40?'var(--amber)':'var(--red)'}">${pct}%</div>
-          <div style="font-size:10px;color:var(--mut)">Overall Progress</div>
-          ${rel.plannedDate?`<div style="font-size:10px;color:var(--mut);margin-top:3px">📅 ${new Date(rel.plannedDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'})}</div>`:''}
+          <div style="font-size:22px;font-weight:900;color:${pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)'}">${pct}%</div>
+          <div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px">Progress</div>
         </div>
       </div>
-      <div style="margin-top:10px">
-        <div class="cl-phase-bar">${phaseBar}</div>
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mut);margin-top:4px">
-          <span>Req</span><span>Risk</span><span>Plan</span><span>Dev</span><span>Env</span><span>Smoke</span><span>Manual</span><span>API</span><span>Perm</span><span>UI</span><span>Bug</span><span>Reg</span><span>Rel</span><span>Prod</span>
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;align-items:center">
-        ${rel.riskLevel?`<span style="font-size:11px;font-weight:700;color:${rel.riskLevel==='Critical'?'var(--red)':rel.riskLevel==='High'?'var(--amber)':'var(--mut)'}">⚡ ${rel.riskLevel} Risk</span>`:''}
-        ${openCrit>0?`<span class="ftbadge red">🔴 ${openCrit} Critical Bug${openCrit>1?'s':''}</span>`:''}
-        ${openHigh>0?`<span class="ftbadge amber">🟡 ${openHigh} High Bug${openHigh>1?'s':''}</span>`:''}
-        ${rel.qaLead?`<span style="font-size:11px;color:var(--mut)">QA Lead: ${clEsc(rel.qaLead)}</span>`:''}
-        <span style="font-size:11px;color:var(--mut);margin-left:auto">Updated ${clFmt(rel.updatedAt)}</span>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin:10px 0 4px">${phaseDots}</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+        <span style="font-size:12px;font-weight:800;color:${decColor}">${dec==='GO'?'✅ GO':dec==='GO WITH RISK'?'⚠️ GO WITH RISK':dec==='NO-GO'?'🚫 NO-GO':'⏳ Pending'}</span>
+        ${openCrit>0?`<span class="ftbadge red">${openCrit} Critical Bug${openCrit>1?'s':''}</span>`:''}
+        ${rel.riskLevel&&rel.riskLevel!=='Normal'?`<span class="ftbadge ${rel.riskLevel==='Critical'?'red':'amber'}">${rel.riskLevel} Risk</span>`:''}
+        ${rel.plannedDate?`<span style="font-size:11px;color:var(--mut);margin-left:auto">📅 ${new Date(rel.plannedDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}</span>`:''}
       </div>
     </div>`;
-  }).join('')}`;
+  }).join('');
+
+  el.innerHTML=`
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+    <div>
+      <h2>QA Checklist Tracker</h2>
+      <div style="font-size:11px;color:var(--mut);margin-top:2px">${rels.length} release${rels.length!==1?'s':''} — 14-phase fast-track workflow</div>
+    </div>
+    <button class="ftbtn sm primary" onclick="clShowNewReleaseModal()">+ New Checklist</button>
+  </div>
+  ${rels.length===0
+    ?`<div class="ft-empty"><div class="ft-empty-icon">📋</div><div class="ft-empty-text">No checklist releases yet</div><div class="ft-empty-sub" style="margin-top:4px">Track every release through 14 QA phases</div><button class="ftbtn primary" style="margin-top:14px" onclick="clShowNewReleaseModal()">+ Create First Checklist</button></div>`
+    :cards}`;
 }
 
 // ── Open a release detail ──
@@ -3434,219 +3422,146 @@ function clOpenRelease(relId){
   document.getElementById('ft-breadcrumb').innerHTML=`<a onclick="ftNav('checklist')">QA Workflow</a><span>›</span><strong>${clEsc(_clReleases.find(r=>r.id===relId)?.name||'Release')}</strong>`;
 }
 
-// ── Render release detail ──
+// ── Render release detail (clean) ──
 function clRenderReleaseDetail(){
   const el=document.getElementById('ft-view-checklist-detail');
   if(!el||!_clSelectedRelease) return;
   const rel=_clReleases.find(r=>r.id===_clSelectedRelease);
   if(!rel){el.innerHTML='<div class="ft-empty">Release not found</div>';return;}
   const pct=clRelProgress(rel.id);
-  const health=clRelHealth(rel.id);
   const dec=rel.decision||'Pending';
-  const decCls=clDecisionCls(dec);
-  const recommended=clRecommendDecision(rel.id);
+  const decColor=dec==='GO'?'var(--green)':dec==='GO WITH RISK'?'var(--amber)':dec==='NO-GO'?'var(--red)':'var(--mut)';
   const openCrit=(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed').length;
-
-  // Build stepper
-  const stepperHtml=CL_PHASES.map((ph,i)=>{
-    const {pct:pp,failed,blocked}=clPhaseProgress(rel.id,ph.code);
-    const cls=blocked>0||failed>0?'blocked':pp===100?'done':pp>0?'in-progress':'';
-    return `<div class="cl-step ${cls}" onclick="clScrollToPhase('${ph.id}')" title="${ph.label}">
-      <div class="cl-step-circle">${pp===100?'✓':ph.icon||String(i+1)}</div>
-      <div class="cl-step-label">${ph.code}</div>
-    </div>`;
-  }).join('');
-
-  // Summary stats
+  const recommended=clRecommendDecision(rel.id);
   const allItems=_clItems.filter(i=>i.relId===rel.id&&i.status!=='Not Applicable');
   const totPassed=allItems.filter(i=>i.status==='Passed'||i.status==='Verified').length;
   const totFailed=allItems.filter(i=>i.status==='Failed').length;
   const totBlocked=allItems.filter(i=>i.status==='Blocked').length;
-  const totPending=allItems.filter(i=>i.status==='Not Started').length;
-  const totInProg=allItems.filter(i=>i.status==='In Progress'||i.status==='Assigned'||i.status==='Retesting'||i.status==='Submitted for Review').length;
+
+  // Phase stepper dots
+  const stepperHtml=CL_PHASES.map(ph=>{
+    const {pct:pp,failed,blocked}=clPhaseProgress(rel.id,ph.code);
+    const c=blocked>0||failed>0?'var(--red)':pp===100?'var(--green)':pp>0?'var(--blue)':'var(--border)';
+    return `<div title="${ph.label}: ${pp}%" onclick="clScrollToPhase('${ph.id}')" style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;min-width:36px">
+      <div style="width:26px;height:26px;border-radius:50%;background:${c};display:flex;align-items:center;justify-content:center;font-size:10px;color:${pp===100||blocked>0||failed>0?'#fff':'var(--mut)'}">
+        ${pp===100?'✓':ph.icon}
+      </div>
+      <div style="font-size:8px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.3px;text-align:center;max-width:36px;line-height:1.2">${ph.code}</div>
+    </div>`;
+  }).join('');
+
+  // Phase cards
+  const phaseCards=CL_PHASES.map(ph=>{
+    const {pct:pp,passed,failed,blocked,notTested}=clPhaseProgress(rel.id,ph.code);
+    const items=_clItems.filter(i=>i.relId===rel.id&&i.phaseCode===ph.code);
+    const isOpen=_clSelectedPhase===ph.id;
+    const hdrColor=blocked>0||failed>0?'var(--red)':pp===100?'var(--green)':pp>0?'var(--blue)':'var(--mut)';
+    return `<div class="cl-phase-card" id="cl-ph-${ph.id}">
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;user-select:none" onclick="clTogglePhase('${ph.id}')">
+        <div style="width:28px;height:28px;border-radius:50%;background:${hdrColor};display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;flex-shrink:0;font-weight:800">${pp===100?'✓':ph.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700">${ph.label}</div>
+          <div style="display:flex;gap:8px;margin-top:3px;font-size:11px;color:var(--mut)">
+            ${passed>0?`<span style="color:var(--green)">✓ ${passed}</span>`:''}
+            ${failed>0?`<span style="color:var(--red)">✗ ${failed}</span>`:''}
+            ${blocked>0?`<span style="color:var(--red)">⊘ ${blocked}</span>`:''}
+            ${notTested>0?`<span>${notTested} pending</span>`:''}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="ft-progress" style="width:70px;height:6px"><div class="ft-progress-fill ${pp===100?'green':pp>50?'':'amber'}" style="width:${pp}%"></div></div>
+          <span style="font-size:12px;font-weight:800;color:${hdrColor};width:32px;text-align:right">${pp}%</span>
+          <span style="font-size:11px;color:var(--mut)">${isOpen?'▲':'▼'}</span>
+        </div>
+      </div>
+      ${isOpen?`<div style="border-top:1px solid var(--border);padding:12px 16px">
+        ${ph.id==='ph14'?`<div style="background:rgba(244,160,0,.08);border:1px solid rgba(244,160,0,.3);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--amber);margin-bottom:10px">⚠️ Production only — no destructive actions.</div>`:''}
+        <div class="ft-tbl-wrap">
+        <table class="cl-item-tbl">
+          <thead><tr><th>ID</th><th style="min-width:220px">Item</th><th>Owner</th><th style="min-width:140px">Status</th><th>Result</th><th>Bug</th><th></th></tr></thead>
+          <tbody>${items.map(item=>`<tr>
+            <td><span class="cl-item-id">${item.itemId}</span>${item.priority==='P0'?'<span class="cl-item-priority p0" style="margin-left:4px">P0</span>':''}</td>
+            <td>${clEsc(item.desc)}${item.mandatory==='Yes'?'<span class="cl-mandatory-star">*</span>':''}</td>
+            <td><span style="font-size:11px">${clEsc(item.owner)||'—'}</span></td>
+            <td><select class="cl-status-sel" onchange="clUpdateItemStatus('${rel.id}','${item.id}',this.value,'${ph.id}')">
+              ${CL_STATUSES.map(s=>`<option value="${s}" ${item.status===s?'selected':''}>${s}</option>`).join('')}
+            </select></td>
+            <td><span style="font-size:11px;color:var(--txt);max-width:100px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${clEsc(item.actualResult)}">${clEsc(item.actualResult)||'—'}</span></td>
+            <td><span style="font-size:11px;color:var(--red)">${clEsc(item.bugId)||'—'}</span></td>
+            <td><button class="ftbtn xs primary" onclick="clOpenItemModal('${rel.id}','${item.id}')">Edit</button></td>
+          </tr>`).join('')}</tbody>
+        </table></div>
+      </div>`:''}
+    </div>`;
+  }).join('');
+
+  // Bugs
+  const bugs=rel.bugs||[];
+  const bugRows=bugs.map(b=>`<tr>
+    <td><span class="cl-item-id">${clEsc(b.id)}</span></td>
+    <td>${clEsc(b.title)}</td>
+    <td><span class="ftbadge ${b.severity==='Critical'?'red':b.severity==='High'?'amber':'blue'}">${clEsc(b.severity)}</span></td>
+    <td><span class="ftbadge ${b.status==='Closed'?'green':b.status==='Open'||b.status==='Reopened'?'red':'amber'}">${clEsc(b.status)}</span></td>
+    <td>${clEsc(b.assignee||'—')}</td>
+    <td><button class="ftbtn xs" onclick="clShowEditBugModal('${rel.id}','${b.id}')">Edit</button></td>
+  </tr>`).join('');
 
   el.innerHTML=`
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
     <button class="ftbtn sm" onclick="ftNav('checklist')">← Back</button>
-    <div style="flex:1">
-      <h2 style="font-size:16px;margin:0">${clEsc(rel.name)}</h2>
-      <div style="font-size:11px;color:var(--mut)">${clEsc(rel.projectName||'—')} · v${clEsc(rel.version)} · ${clEsc(rel.changedModule||'—')}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:15px;font-weight:800">${clEsc(rel.name)}</div>
+      <div style="font-size:11px;color:var(--mut)">${clEsc(rel.projectName||'—')} · v${clEsc(rel.version)}${rel.changedModule?' · '+clEsc(rel.changedModule):''}</div>
     </div>
-    <button class="ftbtn sm" onclick="clOpenQuickPanel('${rel.id}')">⚡ Quick Update</button>
-    <button class="ftbtn sm primary" onclick="clDownloadReport('${rel.id}')">📥 Download Report</button>
+    <button class="ftbtn sm primary" onclick="clDownloadReport('${rel.id}')">📥 Report</button>
     <button class="ftbtn sm" onclick="clShowEditReleaseModal('${rel.id}')">✏️ Edit</button>
   </div>
 
-  <!-- Summary cards -->
-  <div class="cl-summary-grid" style="margin-bottom:18px">
-    <div class="cl-summary-cell"><div class="cl-summary-val" style="color:${pct>=80?'var(--green)':pct>=40?'var(--amber)':'var(--red)'}">${pct}%</div><div class="cl-summary-lbl">Overall Progress</div></div>
-    <div class="cl-summary-cell"><div class="cl-summary-val" style="color:var(--green)">${totPassed}</div><div class="cl-summary-lbl">Passed</div></div>
-    <div class="cl-summary-cell"><div class="cl-summary-val" style="color:var(--red)">${totFailed}</div><div class="cl-summary-lbl">Failed</div></div>
-    <div class="cl-summary-cell"><div class="cl-summary-val" style="color:var(--red)">${totBlocked}</div><div class="cl-summary-lbl">Blocked</div></div>
-    <div class="cl-summary-cell"><div class="cl-summary-val" style="color:var(--mut)">${totPending}</div><div class="cl-summary-lbl">Not Started</div></div>
-    <div class="cl-summary-cell"><div class="cl-summary-val" style="color:var(--blue)">${totInProg}</div><div class="cl-summary-lbl">In Progress</div></div>
-    <div class="cl-summary-cell"><div class="cl-summary-val" style="color:${openCrit>0?'var(--red)':'var(--green)'}">${openCrit}</div><div class="cl-summary-lbl">Critical Bugs</div></div>
-    <div class="cl-summary-cell"><div class="cl-summary-val"><span class="cl-decision-big ${decCls}" style="padding:4px 10px;font-size:12px">${dec}</span></div><div class="cl-summary-lbl">Decision</div></div>
-  </div>
-
-  <!-- Decision banner -->
-  ${openCrit>0?`<div class="cl-warn-banner">🚫 <div><strong>Blocked — ${openCrit} critical bug${openCrit>1?'s':''} open.</strong> Release cannot proceed until all critical bugs are closed.</div></div>`:''}
-  ${recommended==='NO-GO'&&dec!=='NO-GO'?`<div class="cl-gate fail">🚫 System recommends <strong>NO-GO</strong> — blocking issues detected. Review phases below.</div>`:''}
-  ${recommended==='GO'&&dec==='Pending'?`<div class="cl-gate pass">✅ All gates passed — system recommends <strong>GO</strong>. Set final decision below.</div>`:''}
-
-  <!-- Decision control -->
-  <div class="ftc" style="margin-bottom:16px">
-    <div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">🏁 Release Decision</h2></div>
-    <div style="padding:14px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="ftbtn primary" style="background:var(--green);border-color:var(--green)" onclick="clSetDecision('${rel.id}','GO')">✅ Set GO</button>
-      <button class="ftbtn" style="border-color:var(--amber);color:var(--amber)" onclick="clSetDecision('${rel.id}','GO WITH RISK')">⚠️ GO WITH RISK</button>
-      <button class="ftbtn" style="border-color:var(--red);color:var(--red)" onclick="clSetDecision('${rel.id}','NO-GO')">🚫 NO-GO</button>
-      <div style="flex:1"></div>
-      <span class="cl-decision-big ${decCls}">${dec==='GO'?'✅ GO':dec==='GO WITH RISK'?'⚠️ GO WITH RISK':dec==='NO-GO'?'🚫 NO-GO':'⏳ Pending'}</span>
-    </div>
-    ${rel.decisionNotes?`<div style="padding:8px 10px;background:var(--card2);border-radius:8px;font-size:12px;margin-top:4px"><strong>Notes:</strong> ${clEsc(rel.decisionNotes)}</div>`:''}
-    ${rel.approvedBy?`<div style="font-size:11px;color:var(--mut);margin-top:6px">Approved by: <strong>${clEsc(rel.approvedBy)}</strong> at ${clFmt(rel.approvedAt)}</div>`:''}
+  <!-- 4 key stats -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+    <div class="ftc" style="padding:12px;text-align:center"><div style="font-size:24px;font-weight:900;color:${pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)'}">${pct}%</div><div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px;margin-top:2px">Progress</div></div>
+    <div class="ftc" style="padding:12px;text-align:center"><div style="font-size:24px;font-weight:900;color:var(--green)">${totPassed}</div><div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px;margin-top:2px">Passed</div></div>
+    <div class="ftc" style="padding:12px;text-align:center"><div style="font-size:24px;font-weight:900;color:${totFailed>0?'var(--red)':'var(--txt)'}">${totFailed}</div><div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px;margin-top:2px">Failed</div></div>
+    <div class="ftc" style="padding:12px;text-align:center"><div style="font-size:24px;font-weight:900;color:${openCrit>0?'var(--red)':'var(--txt)'}">${openCrit}</div><div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px;margin-top:2px">Critical Bugs</div></div>
   </div>
 
   <!-- Phase stepper -->
-  <div class="ftc" style="margin-bottom:16px">
-    <div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">Workflow Phases</h2></div>
-    <div class="cl-stepper">${stepperHtml}</div>
+  <div class="ftc" style="margin-bottom:14px;padding:14px 16px">
+    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin">${stepperHtml}</div>
   </div>
 
-  <!-- Production sanity warning -->
-  <div class="cl-warn-banner" style="background:rgba(244,160,0,.07);border-color:rgba(244,160,0,.3);color:var(--amber)">
-    ⚠️ <div><strong>Production Sanity Warning:</strong> Do not perform destructive tests, real payment actions, mass notifications or production-data changes without explicit approval from QA Lead and Release Manager.</div>
+  <!-- Decision bar -->
+  <div class="ftc" style="margin-bottom:14px;padding:12px 16px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:13px;font-weight:700">Release Decision:</span>
+      <button class="ftbtn sm" style="background:rgba(46,157,87,.1);border-color:var(--green);color:var(--green)" onclick="clSetDecision('${rel.id}','GO')">✅ GO</button>
+      <button class="ftbtn sm" style="background:rgba(244,160,0,.1);border-color:var(--amber);color:var(--amber)" onclick="clSetDecision('${rel.id}','GO WITH RISK')">⚠️ Risk</button>
+      <button class="ftbtn sm" style="background:rgba(229,72,77,.08);border-color:var(--red);color:var(--red)" onclick="clSetDecision('${rel.id}','NO-GO')">🚫 NO-GO</button>
+      <span style="font-size:15px;font-weight:900;color:${decColor};margin-left:auto">${dec==='GO'?'✅ GO':dec==='GO WITH RISK'?'⚠️ GO WITH RISK':dec==='NO-GO'?'🚫 NO-GO':'⏳ Pending'}</span>
+    </div>
+    ${recommended!=='Pending'&&dec==='Pending'?`<div style="margin-top:8px;font-size:12px;color:var(--mut)">System recommends: <strong style="color:${recommended==='GO'?'var(--green)':recommended==='NO-GO'?'var(--red)':'var(--amber)'}">${recommended}</strong></div>`:''}
+    ${openCrit>0?`<div style="margin-top:8px;font-size:12px;font-weight:700;color:var(--red)">🚫 ${openCrit} critical bug${openCrit>1?'s':''} open — resolve before setting GO</div>`:''}
   </div>
 
   <!-- Phase cards -->
-  ${CL_PHASES.map(ph=>clRenderPhaseCard(rel,ph)).join('')}
+  ${phaseCards}
 
-  <!-- Bugs section -->
-  ${clRenderBugsSection(rel)}
-
-  <!-- Release info panel -->
-  ${clRenderReleaseInfoPanel(rel)}
-
-  <!-- Audit history -->
-  ${clRenderAuditSection(rel.id)}
-  `;
-}
-
-function clRenderPhaseCard(rel,ph){
-  const {pct,passed,failed,blocked,notTested,total}=clPhaseProgress(rel.id,ph.code);
-  const numCls=blocked>0||failed>0?'blocked':pct===100?'done':pct>0?'active':'';
-  const items=_clItems.filter(i=>i.relId===rel.id&&i.phaseCode===ph.code);
-  const isOpen=_clSelectedPhase===ph.id;
-  return `<div class="cl-phase-card" id="cl-ph-${ph.id}">
-    <div class="cl-phase-hdr ${isOpen?'open':''}" onclick="clTogglePhase('${ph.id}')">
-      <div class="cl-phase-num ${numCls}">${pct===100?'✓':ph.icon}</div>
-      <div class="cl-phase-title">${ph.label}</div>
-      <div class="cl-phase-meta">
-        <div class="cl-stats-row" style="margin:0">
-          ${passed>0?`<span class="cl-stat"><span class="cl-stat-dot" style="background:var(--green)"></span>${passed} Pass</span>`:''}
-          ${failed>0?`<span class="cl-stat"><span class="cl-stat-dot" style="background:var(--red)"></span>${failed} Fail</span>`:''}
-          ${blocked>0?`<span class="cl-stat"><span class="cl-stat-dot" style="background:var(--red)"></span>${blocked} Blocked</span>`:''}
-          ${notTested>0?`<span class="cl-stat"><span class="cl-stat-dot" style="background:var(--border)"></span>${notTested} Pending</span>`:''}
-        </div>
-        <div class="cl-phase-pct" style="color:${pct===100?'var(--green)':pct>0?'var(--blue)':'var(--mut)'}">${pct}%</div>
-        <div class="ft-progress" style="width:80px;height:6px"><div class="ft-progress-fill ${pct===100?'green':pct>50?'':'amber'}" style="width:${pct}%"></div></div>
-      </div>
-      <span style="font-size:11px;color:var(--mut);flex-shrink:0">${isOpen?'▲':'▼'}</span>
+  <!-- Bugs -->
+  <div class="ftc" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h2 style="font-size:14px;margin:0">🐛 Bugs <span class="ftbadge ${bugs.filter(b=>b.status!=='Closed').length>0?'red':'green'}">${bugs.filter(b=>b.status!=='Closed').length} open</span></h2>
+      <button class="ftbtn xs primary" onclick="clShowNewBugModal('${rel.id}')">+ Log Bug</button>
     </div>
-    <div class="cl-phase-body ${isOpen?'open':''}" id="cl-phb-${ph.id}">
-      ${ph.id==='ph14'?`<div class="cl-warn-banner">⚠️ Production environment only. No destructive actions.</div>`:''}
-      <div class="ft-tbl-wrap" style="margin-top:8px">
-      <table class="cl-item-tbl">
-        <thead><tr>
-          <th style="min-width:70px">ID</th>
-          <th style="min-width:260px">Checklist Item</th>
-          <th>Priority</th>
-          <th>Mandatory</th>
-          <th>Owner</th>
-          <th style="min-width:150px">Status</th>
-          <th>Actual Result</th>
-          <th>Evidence</th>
-          <th>Bug ID</th>
-          <th>QA Review</th>
-          <th>Actions</th>
-        </tr></thead>
-        <tbody>
-        ${items.map(item=>`<tr id="cl-row-${item.id}">
-          <td><span class="cl-item-id">${item.itemId}</span></td>
-          <td><div class="cl-item-desc">${clEsc(item.desc)}${item.mandatory==='Yes'?'<span class="cl-mandatory-star">*</span>':''}</div></td>
-          <td><span class="cl-item-priority ${clPriCls(item.priority)}">${item.priority}</span></td>
-          <td><span style="font-size:10px;color:var(--mut)">${item.mandatory}</span></td>
-          <td><span style="font-size:11px;color:var(--txt)">${clEsc(item.owner)||'—'}</span></td>
-          <td><select class="cl-status-sel" onchange="clUpdateItemStatus('${rel.id}','${item.id}',this.value,'${ph.id}')">
-            ${CL_STATUSES.map(s=>`<option value="${s}" ${item.status===s?'selected':''}>${s}</option>`).join('')}
-          </select></td>
-          <td><span style="font-size:11px;color:var(--txt);max-width:120px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${clEsc(item.actualResult)}">${clEsc(item.actualResult)||'—'}</span></td>
-          <td>${item.evidenceLink?`<a class="cl-evidence-link" href="${clEsc(item.evidenceLink)}" target="_blank" rel="noopener">🔗 View</a>`:'—'}</td>
-          <td><span style="font-size:11px;color:var(--red)">${clEsc(item.bugId)||'—'}</span></td>
-          <td><span class="ftbadge ${clStatusCls(item.qaLeadReview)}" style="font-size:9px">${item.qaLeadReview||'Pending'}</span></td>
-          <td><button class="ftbtn xs primary" onclick="clOpenItemModal('${rel.id}','${item.id}')">Edit</button></td>
-        </tr>`).join('')}
-        </tbody>
-      </table>
-      </div>
-    </div>
-  </div>`;
-}
-
-function clRenderBugsSection(rel){
-  const bugs=rel.bugs||[];
-  const openBugs=bugs.filter(b=>b.status!=='Closed'&&b.status!=='Deferred');
-  return `<div class="ftc" style="margin-bottom:14px">
-    <div class="ftc-hdr">
-      <h2 class="ftc-title" style="margin:0">🐛 Bugs <span class="ftbadge ${openBugs.length>0?'red':'green'}">${openBugs.length} open / ${bugs.length} total</span></h2>
-      <button class="ftbtn sm primary" onclick="clShowNewBugModal('${rel.id}')">+ Log Bug</button>
-    </div>
-    ${bugs.length===0?`<div class="ft-empty" style="padding:12px"><div class="ft-empty-text">No bugs logged</div></div>`
+    ${bugs.length===0?`<div style="font-size:12px;color:var(--mut);padding:8px 0">No bugs logged</div>`
     :`<div class="ft-tbl-wrap"><table class="ft-tbl" style="font-size:12px">
-      <thead><tr><th>ID</th><th>Title</th><th>Module</th><th>Severity</th><th>Priority</th><th>Status</th><th>Assignee</th><th>Actions</th></tr></thead>
-      <tbody>${bugs.map(b=>`<tr>
-        <td><span class="cl-item-id">${clEsc(b.id)}</span></td>
-        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${clEsc(b.title)}</td>
-        <td>${clEsc(b.module||'—')}</td>
-        <td><span class="ftbadge ${b.severity==='Critical'?'red':b.severity==='High'?'amber':b.severity==='Medium'?'blue':'grey'}">${clEsc(b.severity)}</span></td>
-        <td><span class="cl-item-priority ${clPriCls(b.priority||'P2')}">${clEsc(b.priority||'P2')}</span></td>
-        <td><span class="ftbadge ${b.status==='Closed'?'green':b.status==='Fixed'||b.status==='Verified'?'blue':b.status==='Open'||b.status==='Reopened'?'red':'amber'}">${clEsc(b.status)}</span></td>
-        <td>${clEsc(b.assignee||'—')}</td>
-        <td><button class="ftbtn xs" onclick="clShowEditBugModal('${rel.id}','${b.id}')">Edit</button></td>
-      </tr>`).join('')}</tbody>
+      <thead><tr><th>ID</th><th>Title</th><th>Severity</th><th>Status</th><th>Assignee</th><th></th></tr></thead>
+      <tbody>${bugRows}</tbody>
     </table></div>`}
-  </div>`;
-}
+  </div>`;}
 
-function clRenderReleaseInfoPanel(rel){
-  return `<div class="ftc" style="margin-bottom:14px">
-    <div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">📋 Release Information</h2><button class="ftbtn xs" onclick="clShowEditReleaseModal('${rel.id}')">✏️ Edit</button></div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;padding:8px 0;font-size:12px">
-      ${[['Project',rel.projectName],['Client',rel.client],['Version',rel.version],['Build',rel.buildNumber],
-         ['Risk Level',rel.riskLevel],['QA Lead',rel.qaLead],['Manual QA',rel.manualQa],
-         ['Automation QA',rel.automationQa],['Developer',rel.developer],['API Owner',rel.apiOwner],
-         ['QA Env URL',rel.qaEnvUrl],['Prod URL',rel.productionUrl],
-         ['Planned Date',rel.plannedDate?new Date(rel.plannedDate).toLocaleDateString('en-GB'):'—'],
-         ['Changed Module',rel.changedModule],['Affected Modules',rel.affectedModules],
-      ].map(([k,v])=>`<div><div style="font-size:10px;font-weight:700;color:var(--mut2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">${k}</div><div style="font-weight:600;color:var(--txt)">${clEsc(v||'—')}</div></div>`).join('')}
-      ${rel.featureSummary?`<div style="grid-column:1/-1"><div style="font-size:10px;font-weight:700;color:var(--mut2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Feature Summary</div><div style="font-weight:600;color:var(--txt)">${clEsc(rel.featureSummary)}</div></div>`:''}
-      ${rel.knownRisks?`<div style="grid-column:1/-1"><div style="font-size:10px;font-weight:700;color:var(--mut2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Known Risks</div><div style="font-weight:600;color:var(--amber)">${clEsc(rel.knownRisks)}</div></div>`:''}
-    </div>
-  </div>`;
-}
-
-function clRenderAuditSection(relId){
-  const entries=_clAudit.filter(a=>a.relId===relId).slice(-20).reverse();
-  return `<div class="ftc" style="margin-bottom:14px">
-    <div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">📜 Activity History</h2></div>
-    ${entries.length===0?`<div class="ft-empty" style="padding:10px"><div class="ft-empty-text">No activity yet</div></div>`
-    :entries.map(a=>{
-      const cls=a.action.includes('Pass')||a.action.includes('GO')?'green':a.action.includes('Fail')||a.action.includes('Block')||a.action.includes('NO-GO')?'red':a.action.includes('Review')?'purple':'blue';
-      return `<div class="cl-audit-item"><div class="cl-audit-dot ${cls}"></div><div class="cl-audit-text"><strong>${clEsc(a.action)}</strong>${a.detail?' — '+clEsc(a.detail):''}<span style="color:var(--mut)"> by ${clEsc(a.user)}</span></div><div class="cl-audit-time">${clFmt(a.at)}</div></div>`;
-    }).join('')}
-  </div>`;
-}
+function clRenderBugsSection(){}  // legacy stub
+function clRenderReleaseInfoPanel(){}  // legacy stub
+function clRenderAuditSection(){}  // legacy stub
 
 // ── Toggle phase ──
 function clTogglePhase(phId){
@@ -3801,30 +3716,38 @@ function clShowNewReleaseModal(){
   m.id='cl-new-rel-modal';
   m.className='ft-modal-overlay';
   m.style.zIndex='8000';
-  const projOpts=_ftProjects.map(p=>`<option value="${p.id}">${clEsc(p.name)}</option>`).join('');
-  m.innerHTML=`<div class="ft-modal" style="max-width:640px">
-    <div class="ft-modal-hdr"><div class="ft-modal-title">New Checklist Release</div><button class="ft-modal-close" onclick="document.getElementById('cl-new-rel-modal').remove()">✕</button></div>
+  // Use both _ftProjects (from main tracker) and any projectNames already in _clReleases
+  const seen=new Set();
+  const projOpts=_ftProjects.map(p=>{seen.add(p.name);return `<option value="${p.id}" data-name="${clEsc(p.name)}">${clEsc(p.name)}</option>`;}).join('');
+  m.innerHTML=`<div class="ft-modal" style="max-width:500px">
+    <div class="ft-modal-hdr"><div class="ft-modal-title">New QA Checklist</div><button class="ft-modal-close" onclick="document.getElementById('cl-new-rel-modal').remove()">✕</button></div>
     <div class="ft-modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-      <div class="cl-qp-field"><label>Project <span class="cl-mandatory-star">*</span></label><select id="clnr-proj"><option value="">— Select Project —</option>${projOpts}</select></div>
-      <div class="cl-qp-field"><label>Release Name <span class="cl-mandatory-star">*</span></label><input id="clnr-name" placeholder="e.g. Sprint 24 Release"></div>
+      <div class="cl-qp-field" style="grid-column:1/-1">
+        <label>Project <span class="cl-mandatory-star">*</span></label>
+        <select id="clnr-proj">
+          <option value="">— Select or type below —</option>
+          ${projOpts}
+        </select>
+      </div>
+      <div class="cl-qp-field" style="grid-column:1/-1">
+        <label>Project Name (if not in list above)</label>
+        <input id="clnr-projname" placeholder="e.g. SyncTrade, WavedIn">
+      </div>
+      <div class="cl-qp-field" style="grid-column:1/-1">
+        <label>Release Name <span class="cl-mandatory-star">*</span></label>
+        <input id="clnr-name" placeholder="e.g. Payment Gateway v3.2">
+      </div>
       <div class="cl-qp-field"><label>Version</label><input id="clnr-ver" placeholder="1.0.0"></div>
-      <div class="cl-qp-field"><label>Build Number</label><input id="clnr-build" placeholder="Build-245"></div>
       <div class="cl-qp-field"><label>Risk Level</label><select id="clnr-risk"><option>Normal</option><option>High</option><option>Critical</option></select></div>
       <div class="cl-qp-field"><label>Planned Date</label><input type="date" id="clnr-date"></div>
-      <div class="cl-qp-field"><label>QA Lead</label><input id="clnr-qalead" placeholder="QA Lead name"></div>
-      <div class="cl-qp-field"><label>Developer</label><input id="clnr-dev" placeholder="Developer name"></div>
-      <div class="cl-qp-field"><label>Manual QA</label><input id="clnr-mqa" placeholder="Manual QA tester"></div>
-      <div class="cl-qp-field"><label>Automation QA</label><input id="clnr-aqa" placeholder="Automation QA"></div>
-      <div class="cl-qp-field"><label>API Owner</label><input id="clnr-api" placeholder="API owner"></div>
-      <div class="cl-qp-field"><label>Client</label><input id="clnr-client" placeholder="Client name"></div>
-      <div class="cl-qp-field"><label>Changed Module</label><input id="clnr-module" placeholder="e.g. Payment, Login"></div>
-      <div class="cl-qp-field"><label>QA Env URL</label><input id="clnr-qaurl" placeholder="https://qa.example.com"></div>
-      <div class="cl-qp-field" style="grid-column:1/-1"><label>Feature / Fix Summary</label><textarea id="clnr-summary" rows="2" placeholder="What is being released..."></textarea></div>
-      <div class="cl-qp-field" style="grid-column:1/-1"><label>Known Risks</label><textarea id="clnr-risks" rows="2" placeholder="Any known risks or limitations..."></textarea></div>
+      <div class="cl-qp-field"><label>QA Lead</label><input id="clnr-qalead" placeholder="QA Lead"></div>
+      <div class="cl-qp-field"><label>Developer</label><input id="clnr-dev" placeholder="Developer"></div>
+      <div class="cl-qp-field" style="grid-column:1/-1"><label>Changed Module / Feature</label><input id="clnr-module" placeholder="e.g. Login, Payment, Dashboard"></div>
+      <div class="cl-qp-field" style="grid-column:1/-1"><label>Summary (optional)</label><textarea id="clnr-summary" rows="2" placeholder="What is being tested..."></textarea></div>
     </div>
     <div class="ft-modal-footer">
       <button class="ftbtn" onclick="document.getElementById('cl-new-rel-modal').remove()">Cancel</button>
-      <button class="ftbtn primary" onclick="clCreateRelease()">Create & Generate Checklist</button>
+      <button class="ftbtn primary" onclick="clCreateRelease()">Create Checklist (${CL_PHASES.reduce((s,p)=>s+p.items.length,0)} items auto-generated)</button>
     </div>
   </div>`;
   document.body.appendChild(m);
@@ -3832,28 +3755,31 @@ function clShowNewReleaseModal(){
 
 function clCreateRelease(){
   const projId=document.getElementById('clnr-proj').value;
+  const manualName=document.getElementById('clnr-projname').value.trim();
   const name=document.getElementById('clnr-name').value.trim();
   if(!name){ftShowToast('Release name is required','error');return;}
   const proj=_ftProjects.find(p=>p.id===projId);
+  const projectName=proj?.name||manualName||'—';
   const rel=clNewRelease({
-    projectId:projId,projectName:proj?.name||'',
-    client:document.getElementById('clnr-client').value.trim()||proj?.client||'',
-    name,version:document.getElementById('clnr-ver').value.trim()||'1.0.0',
-    buildNumber:document.getElementById('clnr-build').value.trim(),
+    projectId:projId||('proj-'+Date.now()),
+    projectName,
+    client:proj?.client||projectName,
+    name,
+    version:document.getElementById('clnr-ver').value.trim()||'1.0.0',
+    buildNumber:'',
     riskLevel:document.getElementById('clnr-risk').value,
     plannedDate:document.getElementById('clnr-date').value,
     qaLead:document.getElementById('clnr-qalead').value.trim(),
     developer:document.getElementById('clnr-dev').value.trim(),
-    manualQa:document.getElementById('clnr-mqa').value.trim(),
-    automationQa:document.getElementById('clnr-aqa').value.trim(),
-    apiOwner:document.getElementById('clnr-api').value.trim(),
+    manualQa:'',automationQa:'',apiOwner:'',
     changedModule:document.getElementById('clnr-module').value.trim(),
-    qaEnvUrl:document.getElementById('clnr-qaurl').value.trim(),
+    qaEnvUrl:'',
     featureSummary:document.getElementById('clnr-summary').value.trim(),
-    knownRisks:document.getElementById('clnr-risks').value.trim(),
+    knownRisks:'',
   });
   document.getElementById('cl-new-rel-modal')?.remove();
-  ftShowToast(`Checklist created — ${_clItems.filter(i=>i.relId===rel.id).length} items generated across 14 phases`,'success');
+  const count=_clItems.filter(i=>i.relId===rel.id).length;
+  ftShowToast(`Checklist created — ${count} items across 14 phases`,'success');
   clOpenRelease(rel.id);
 }
 
