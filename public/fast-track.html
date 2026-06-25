@@ -227,6 +227,59 @@ h1{font-size:20px;font-weight:800}h2{font-size:16px;font-weight:800}h3{font-size
 .ft-blocker-title{font-size:13px;font-weight:700;color:var(--red)}
 .ft-blocker-meta{font-size:11px;color:var(--mut);margin-top:2px}
 .ft-stage-highlight{background:linear-gradient(135deg,rgba(47,107,255,.06),rgba(31,166,160,.04));border:1.5px solid rgba(47,107,255,.2);border-radius:11px;padding:13px 15px;margin-bottom:14px}
+/* ── NEW DASHBOARD ── */
+.ft-wf-img-section{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:18px;box-shadow:var(--shadow-sm)}
+.ft-wf-img-hdr{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:linear-gradient(135deg,#0B2A5B,#1a3d7a)}
+.ft-wf-img-hdr h2{font-size:15px;font-weight:900;color:#fff;margin:0}
+.ft-wf-img-hdr p{font-size:11px;color:rgba(255,255,255,.65);margin:2px 0 0}
+.ft-wf-img{width:100%;display:block;cursor:zoom-in;transition:transform .2s}
+.ft-wf-img:hover{transform:scale(1.005)}
+.ft-tracker-section{margin-bottom:18px}
+.ft-tracker-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap}
+.ft-tracker-hdr h2{font-size:15px;font-weight:800}
+.ft-proj-tracker{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;box-shadow:var(--shadow-sm);transition:box-shadow var(--ease)}
+.ft-proj-tracker:hover{box-shadow:var(--shadow)}
+.ft-pt-hdr{display:flex;align-items:center;gap:10px;padding:11px 15px;cursor:pointer;background:var(--card);border-bottom:1px solid transparent;transition:background var(--ease)}
+.ft-pt-hdr:hover{background:var(--card2)}
+.ft-pt-hdr.open{border-bottom-color:var(--border)}
+.ft-pt-name{font-size:13px;font-weight:800;flex:1;min-width:0}
+.ft-pt-meta{font-size:11px;color:var(--mut);white-space:nowrap}
+.ft-pt-phases{padding:12px 14px 14px;display:none}
+.ft-pt-phases.open{display:block}
+.ft-phases-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+@media(max-width:900px){.ft-phases-grid{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:600px){.ft-phases-grid{grid-template-columns:repeat(2,1fr)}}
+.ft-phase-card{border:1.5px solid var(--border);border-radius:9px;padding:9px 8px;text-align:center;cursor:pointer;transition:all .15s;position:relative;background:var(--card2)}
+.ft-phase-card:hover{border-color:var(--blue);background:rgba(47,107,255,.04);transform:translateY(-1px)}
+.ft-phase-card.ph-done{border-color:var(--green);background:rgba(46,157,87,.07)}
+.ft-phase-card.ph-active{border-color:var(--blue);background:rgba(47,107,255,.08);box-shadow:0 0 0 3px rgba(47,107,255,.12)}
+.ft-phase-card.ph-blocked{border-color:var(--red);background:rgba(229,72,77,.06)}
+.ft-phase-card.ph-risk{border-color:var(--amber);background:rgba(244,160,0,.07)}
+.ft-phase-card.ph-skip{opacity:.5}
+.ft-phase-num{font-size:9px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.ft-phase-icon{font-size:20px;margin-bottom:4px;display:block}
+.ft-phase-name{font-size:10px;font-weight:700;color:var(--txt);line-height:1.3}
+.ft-phase-status{font-size:9px;font-weight:700;margin-top:4px;padding:2px 5px;border-radius:5px;display:inline-block}
+.ph-done .ft-phase-status{background:rgba(46,157,87,.15);color:var(--green)}
+.ph-active .ft-phase-status{background:rgba(47,107,255,.15);color:var(--blue)}
+.ph-blocked .ft-phase-status{background:rgba(229,72,77,.12);color:var(--red)}
+.ph-risk .ft-phase-status{background:rgba(244,160,0,.12);color:#b77600}
+.ft-phase-card:not(.ph-done):not(.ph-active):not(.ph-blocked):not(.ph-risk) .ft-phase-status{background:var(--border);color:var(--mut)}
+.ft-pt-progress{height:4px;background:var(--border);border-radius:2px;overflow:hidden;width:80px;flex-shrink:0}
+.ft-pt-progress-fill{height:100%;border-radius:2px;background:var(--blue);transition:width .4s}
+.ft-pt-progress-fill.green{background:var(--green)}.ft-pt-progress-fill.amber{background:var(--amber)}.ft-pt-progress-fill.red{background:var(--red)}
+.ft-pt-decision{font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;flex-shrink:0}
+.ft-pt-decision.go{background:rgba(46,157,87,.15);color:var(--green)}
+.ft-pt-decision.risk{background:rgba(244,160,0,.12);color:#b77600}
+.ft-pt-decision.nogo{background:rgba(229,72,77,.1);color:var(--red)}
+.ft-pt-decision.pending{background:var(--border);color:var(--mut)}
+.ft-pt-add-rel{display:flex;align-items:center;justify-content:center;padding:10px;border:1.5px dashed var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;color:var(--mut);transition:all .15s;margin-top:8px}
+.ft-pt-add-rel:hover{border-color:var(--blue);color:var(--blue);background:rgba(47,107,255,.04)}
+.ft-no-releases{text-align:center;padding:14px;font-size:12px;color:var(--mut)}
+/* Lightbox */
+.ft-lightbox{display:none;position:fixed;inset:0;z-index:99000;background:rgba(5,10,20,.92);backdrop-filter:blur(8px);align-items:center;justify-content:center;cursor:zoom-out}
+.ft-lightbox.open{display:flex}
+.ft-lightbox img{max-width:96vw;max-height:92vh;border-radius:10px;box-shadow:0 20px 80px rgba(0,0,0,.6)}
 .ft-pipeline-wrap{overflow-x:auto;border-radius:11px;border:1px solid var(--border)}
 .ft-pipeline{width:100%;border-collapse:collapse;min-width:900px}
 .ft-pipeline th{padding:7px 8px;text-align:center;background:var(--card2);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);border-bottom:1px solid var(--border);white-space:nowrap;border-right:1px solid var(--border)}
@@ -330,6 +383,7 @@ h1{font-size:20px;font-weight:800}h2{font-size:16px;font-weight:800}h3{font-size
 </div>
 </div>
 <div id="ft-toast-wrap" role="status" aria-live="polite"></div>
+<div class="ft-lightbox" id="ft-lightbox" onclick="this.classList.remove('open')"><img id="ft-lightbox-img" src="" alt="Workflow"></div>
 <div id="ft-modal-overlay" class="ft-modal-overlay" onclick="if(event.target===this)ftCloseModal()">
   <div class="ft-modal">
     <div class="ft-modal-hdr"><h3 id="ft-modal-title">Modal</h3><button class="ftbtn sm" onclick="ftCloseModal()">&#10005;</button></div>
@@ -752,92 +806,171 @@ function ftRelKanbanCol(rel){
   return 'change';
 }
 
+// ── DASHBOARD PHASES (maps to the 7-phase workflow image) ──
+const DASH_PHASES=[
+  {id:'p1',icon:'📋',name:'Requirement & Intake',short:'Intake',stageIds:['s1']},
+  {id:'p2',icon:'⚡',name:'Risk & Planning',short:'Risk',stageIds:['s2']},
+  {id:'p3',icon:'🛡️',name:'Pre-QA Quality Gate',short:'Pre-QA Gate',stageIds:['s3']},
+  {id:'p4',icon:'🚀',name:'Test Execution',short:'Test Exec',stageIds:['s4','s5','s6']},
+  {id:'p5',icon:'🐛',name:'Defect Management',short:'Defects',stageIds:['s7']},
+  {id:'p6',icon:'🔁',name:'Regression & Closure',short:'Regression',stageIds:['s8','s9']},
+  {id:'p7',icon:'✅',name:'Production Validation',short:'Production',stageIds:['s10']},
+];
+function ftPhaseStatus(rel,phase){
+  if(!rel.stages) return 'Not Started';
+  const stagesData=phase.stageIds.map(sid=>rel.stages[sid]||{});
+  if(stagesData.some(s=>s.status==='Blocked')) return 'Blocked';
+  if(stagesData.every(s=>s.pct===100||s.status==='Done'||s.status==='Skipped')) return 'Done';
+  if(stagesData.some(s=>s.pct>0||s.status==='In Progress')) return 'In Progress';
+  return 'Not Started';
+}
+function ftPhaseCss(status){
+  if(status==='Done') return 'ph-done';
+  if(status==='In Progress') return 'ph-active';
+  if(status==='Blocked') return 'ph-blocked';
+  return '';
+}
+function ftOpenLightbox(){
+  const lb=document.getElementById('ft-lightbox');
+  const img=document.getElementById('ft-lightbox-img');
+  if(img) img.src='/images/ft-workflow.png';
+  if(lb) lb.classList.add('open');
+}
+
+function ftToggleProjTracker(hdr){
+  hdr.classList.toggle('open');
+  const ph=hdr.nextElementSibling;
+  if(ph) ph.classList.toggle('open');
+}
+
 // ── DASHBOARD ──
 function ftRenderDashboard(){
   const el=document.getElementById('ft-view-dashboard');
-  const rels=ftFilteredReleases();
   const allRels=_ftReleases;
   const activeRels=allRels.filter(r=>r.status!=='Cancelled'&&r.status!=='Completed');
   const critOpen=allRels.flatMap(r=>r.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
-  const highOpen=allRels.flatMap(r=>r.bugs||[]).filter(b=>b.severity==='High'&&b.status!=='Closed'&&b.status!=='Deferred').length;
-  const ready=allRels.filter(r=>r.status==='Ready for Release').length;
   const blocked=allRels.filter(r=>r.status==='Blocked').length;
   const activePr=_ftProjects.filter(p=>p.status==='Active').length;
-  const td=new Date().toISOString().slice(0,10);
-  const relToday=allRels.filter(r=>r.plannedDate&&r.plannedDate.slice(0,10)===td).length;
-  const me=(window._ftCurrentUser||'').toLowerCase();
-  let myPending=0;
-  allRels.forEach(rel=>(rel.teamAssignments||[]).forEach(a=>{if(a.member&&me&&a.member.toLowerCase().includes(me)&&a.status!=='Verification Completed'&&a.status!=='Approved')myPending++;}));
-  let qaLeadReview=0;
-  allRels.forEach(rel=>{qaLeadReview+=(rel._qaLeadReview||[]).filter(x=>x.status==='Pending Review').length;});
 
-  const metricsHtml=`<div class="ft-metrics-row">
-    <div class="ft-mc blue" onclick="ftNav('projects')" style="cursor:pointer"><div class="ft-mc-val">${activePr}</div><div class="ft-mc-lbl">Active Projects</div></div>
-    <div class="ft-mc teal" onclick="ftFilter('today')" style="cursor:pointer"><div class="ft-mc-val">${relToday}</div><div class="ft-mc-lbl">Releases Today</div></div>
-    <div class="ft-mc blue" onclick="ftNav('releases')" style="cursor:pointer"><div class="ft-mc-val">${activeRels.length}</div><div class="ft-mc-lbl">In QA</div></div>
-    <div class="ft-mc green" onclick="ftFilter('ready')" style="cursor:pointer"><div class="ft-mc-val">${ready}</div><div class="ft-mc-lbl">Ready for Release</div></div>
-    <div class="ft-mc amber" onclick="ftFilter('atrisk')" style="cursor:pointer"><div class="ft-mc-val">${allRels.filter(r=>{const h=ftGetRelHealth(r);return h.cls==='at-risk'||h.cls==='attention';}).length}</div><div class="ft-mc-lbl">At Risk</div></div>
-    <div class="ft-mc red" onclick="ftFilter('blocked')" style="cursor:pointer"><div class="ft-mc-val">${blocked}</div><div class="ft-mc-lbl">Blocked</div></div>
-    <div class="ft-mc red" onclick="ftShowBugsByseverity('Critical')" style="cursor:pointer"><div class="ft-mc-val">${critOpen}</div><div class="ft-mc-lbl">Critical Bugs</div></div>
-    <div class="ft-mc amber" onclick="ftShowBugsByseverity('High')" style="cursor:pointer"><div class="ft-mc-val">${highOpen}</div><div class="ft-mc-lbl">High Bugs</div></div>
-    <div class="ft-mc purple" onclick="ftNav('mytasks')" style="cursor:pointer"><div class="ft-mc-val">${myPending}</div><div class="ft-mc-lbl">My Pending</div></div>
-    <div class="ft-mc purple" onclick="ftNav('qalead')" style="cursor:pointer"><div class="ft-mc-val">${qaLeadReview}</div><div class="ft-mc-lbl">Awaiting QA Lead</div></div>
+  // ── SECTION 1: Workflow image ──
+  const sec1=`<div class="ft-wf-img-section">
+    <div class="ft-wf-img-hdr">
+      <div>
+        <h2>Final Combined QA Workflow</h2>
+        <p>Fast, risk-based testing workflow for every project and every release</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.7)"><span style="width:10px;height:10px;border-radius:50%;background:#2E9D57;display:inline-block"></span>Pass / Ready</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.7)"><span style="width:10px;height:10px;border-radius:50%;background:#F4A000;display:inline-block"></span>At Risk</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.7)"><span style="width:10px;height:10px;border-radius:50%;background:#E5484D;display:inline-block"></span>Fail / Blocked</span>
+        <button class="ftbtn sm" onclick="ftOpenLightbox()" style="color:#fff;border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.1);font-size:11px">⛶ Full View</button>
+      </div>
+    </div>
+    <img class="ft-wf-img" src="/images/ft-workflow.png" alt="QA Workflow Diagram" onclick="ftOpenLightbox()"
+      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+    <div style="display:none;align-items:center;justify-content:center;padding:40px;flex-direction:column;gap:10px;color:var(--mut)">
+      <div style="font-size:32px">🖼️</div>
+      <div style="font-size:13px;font-weight:700">Workflow image not uploaded yet</div>
+      <div style="font-size:12px">Save your workflow image to <code style="background:var(--card2);padding:2px 6px;border-radius:4px">/public/images/ft-workflow.png</code></div>
+    </div>
   </div>`;
 
-  const myTasks=[];
-  allRels.forEach(rel=>{
-    if(rel.status==='Cancelled') return;
-    const p=ftProjById(rel.projectId);
-    (rel.teamAssignments||[]).forEach(a=>{
-      if(a.member&&me&&a.member.toLowerCase().includes(me)&&a.status!=='Verification Completed'&&a.status!=='Approved')
-        myTasks.push({a,rel,proj:p});
-    });
-  });
-  let myTasksHtml='';
-  if(myTasks.length>0){
-    myTasksHtml=`<div class="ftc" style="margin-bottom:14px">
-    <div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">My Priority Tasks <span class="ftbadge amber">${myTasks.length}</span></h2><button class="ftbtn sm primary" onclick="ftNav('mytasks')">View All</button></div>
-    ${myTasks.slice(0,4).map(({a,rel,proj})=>{
-      const health=ftGetRelHealth(rel);const pri=a.status==='Blocked'?'critical':a.status==='Waiting for Fix'?'high':'normal';
-      return `<div class="ft-task-card" onclick="ftOpenRelease('${rel.id}')"><div class="ft-task-pri ${pri}"></div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${ftEsc(a.module||'Testing')} — ${ftEsc(rel.name)}</div><div style="font-size:11px;color:var(--mut);margin-top:2px">${ftEsc(proj?.name||'—')} · v${ftEsc(rel.version||'?')}</div><div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">${ftStatusBadge(a.status)}<span class="ft-health ${health.cls}" style="padding:2px 7px;font-size:10px;margin:0;display:inline-flex">${health.label}</span></div></div><button class="ftbtn sm primary" onclick="event.stopPropagation();ftOpenRelease('${rel.id}')">Open</button></div>`;
-    }).join('')}
-    </div>`;
+  // ── SECTION 2: Per-project tracker ──
+  const PHASES=[
+    {id:'p1',icon:'📋',name:'Requirement & Intake',sids:['s1']},
+    {id:'p2',icon:'⚡',name:'Risk & Planning',sids:['s2']},
+    {id:'p3',icon:'🛡️',name:'Pre-QA Gate',sids:['s3']},
+    {id:'p4',icon:'🚀',name:'Test Execution',sids:['s4','s5','s6']},
+    {id:'p5',icon:'🐛',name:'Defect Management',sids:['s7']},
+    {id:'p6',icon:'🔁',name:'Regression & Closure',sids:['s8','s9']},
+    {id:'p7',icon:'✅',name:'Production Validation',sids:['s10']},
+  ];
+  function phStatus(rel,ph){
+    if(!rel||!rel.stages) return 'not-started';
+    const ss=ph.sids.map(sid=>rel.stages[sid]||{});
+    if(ss.some(s=>s.status==='Blocked')) return 'blocked';
+    if(ss.every(s=>s.pct===100||s.status==='Done'||s.status==='Skipped')) return 'done';
+    if(ss.some(s=>s.pct>0||s.status==='In Progress')) return 'active';
+    return 'not-started';
   }
+  function phCls(st){return st==='done'?'ph-done':st==='active'?'ph-active':st==='blocked'?'ph-blocked':'';}
+  function phLabel(st){return st==='done'?'Done':st==='active'?'In Progress':st==='blocked'?'Blocked':'Pending';}
 
-  const blockedRels=allRels.filter(r=>r.status==='Blocked');
-  let blockersHtml='';
-  if(blockedRels.length>0){
-    blockersHtml=`<div class="ftc" style="margin-bottom:14px;border-color:rgba(229,72,77,.2)">
-    <div class="ftc-hdr"><h2 class="ftc-title" style="margin:0;color:var(--red)">Blockers <span class="ftbadge red">${blockedRels.length}</span></h2></div>
-    ${blockedRels.map(rel=>{const p=ftProjById(rel.projectId);const critB=(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;return `<div class="ft-blocker-item"><div style="font-size:15px">🚫</div><div style="flex:1"><div class="ft-blocker-title">${ftEsc(rel.name)}</div><div class="ft-blocker-meta">${ftEsc(p?.name||'—')} · v${ftEsc(rel.version||'?')} ${critB>0?`· ${critB} critical bug(s)`:''}</div></div><button class="ftbtn xs primary" onclick="ftOpenRelease('${rel.id}')">View</button></div>`;}).join('')}
+  const projCards=_ftProjects.map(proj=>{
+    const projRels=activeRels.filter(r=>r.projectId===proj.id);
+    const latestRel=projRels.sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0))[0]||null;
+    const pct=latestRel?ftRelProgress(latestRel):0;
+    const pctCls=pct>=80?'green':pct>=40?'':'amber';
+    const dec=latestRel?.decision||'';
+    const decCls=dec==='GO'?'go':dec==='GO WITH RISK'?'risk':dec==='NO-GO'?'nogo':'pending';
+    const decLbl=dec||'Pending';
+
+    const phaseCells=PHASES.map(ph=>{
+      const st=phStatus(latestRel,ph);
+      return `<div class="ft-phase-card ${phCls(st)}" onclick="${latestRel?`ftOpenRelease('${latestRel.id}');setTimeout(()=>ftRelTab('${ph.sids[0]}'),220)`:'ftHeaderNewRelease()'}" title="${ph.name}: ${phLabel(st)}">
+        <div class="ft-phase-num">Phase ${ph.id.slice(1)}</div>
+        <span class="ft-phase-icon">${ph.icon}</span>
+        <div class="ft-phase-name">${ph.name}</div>
+        <div class="ft-phase-status">${phLabel(st)}</div>
+      </div>`;
+    }).join('');
+
+    return `<div class="ft-proj-tracker">
+      <div class="ft-pt-hdr ${latestRel?'open':''}" onclick="ftToggleProjTracker(this)">
+        <div style="width:8px;height:8px;border-radius:50%;background:${proj.status==='Active'?'var(--green)':'var(--mut2)'};flex-shrink:0"></div>
+        <div class="ft-pt-name">${ftEsc(proj.name)}</div>
+        <div class="ft-pt-meta">${projRels.length} release${projRels.length!==1?'s':''} active</div>
+        ${latestRel?`
+        <div class="ft-pt-progress"><div class="ft-pt-progress-fill ${pctCls}" style="width:${pct}%"></div></div>
+        <div style="font-size:10px;color:var(--mut);width:28px;text-align:right">${pct}%</div>
+        <div class="ft-pt-decision ${decCls}">${decLbl}</div>`:
+        `<span class="ftbadge grey" style="font-size:10px">No releases</span>`}
+        <div style="font-size:11px;color:var(--mut);flex-shrink:0">${latestRel?'▲':'▼'}</div>
+      </div>
+      <div class="ft-pt-phases ${latestRel?'open':''}">
+        ${latestRel?`
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <div style="font-size:12px;font-weight:700;color:var(--txt)">${ftEsc(latestRel.name)} <span style="font-weight:600;color:var(--mut)">v${ftEsc(latestRel.version||'?')}</span></div>
+          ${ftStatusBadge(latestRel.status||'Draft')}
+          ${ftDecisionBadge(latestRel.decision||'Pending')}
+          <button class="ftbtn xs primary" onclick="ftOpenRelease('${latestRel.id}')">Open Release →</button>
+          ${projRels.length>1?`<button class="ftbtn xs" onclick="ftNav('releases')" style="font-size:10px">+${projRels.length-1} more</button>`:''}
+        </div>
+        <div class="ft-phases-grid">${phaseCells}</div>`:
+        `<div class="ft-no-releases">No active releases for this project.<br>
+        <button class="ftbtn sm primary" style="margin-top:8px" onclick="ftHeaderNewRelease()">+ Create Release</button></div>`}
+        <div class="ft-pt-add-rel" onclick="ftHeaderNewRelease()">+ New Release for ${ftEsc(proj.name)}</div>
+      </div>
     </div>`;
-  }
-
-  const recentHistory=[];
-  allRels.forEach(rel=>{const p=ftProjById(rel.projectId);(rel.history||[]).slice(0,3).forEach(h=>recentHistory.push({...h,relName:rel.name,projName:p?.name||'—',relId:rel.id}));});
-  recentHistory.sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
-  const tlHtml=recentHistory.slice(0,8).map(h=>{
-    const dotCls=h.newStatus==='Done'||h.newStatus==='GO'?'green':h.newStatus==='Blocked'||h.newStatus==='NO-GO'?'red':h.newStatus==='GO WITH RISK'?'amber':'';
-    return `<div class="ft-tl-item"><div class="ft-tl-dot-col"><div class="ft-tl-dot ${dotCls}"></div></div><div class="ft-tl-text"><div class="ft-tl-action">${ftEsc(h.stage||'Update')} — <strong>${ftEsc(h.newStatus||'')}</strong></div><div class="ft-tl-meta">${ftEsc(h.relName)} · ${ftEsc(h.projName)} · ${ftEsc(h.updatedBy||'—')}</div></div></div>`;
   }).join('');
 
-  let relContent='';
-  if(_ftDashboardView==='workflow') relContent=ftRenderWorkflowCards(rels);
-  else if(_ftDashboardView==='cards') relContent=ftRenderCardGrid(rels);
-  else if(_ftDashboardView==='kanban') relContent=ftRenderKanbanBoard(rels);
-  else relContent=ftRenderTableView(rels);
+  const sec2=`<div class="ft-tracker-section">
+    <div class="ft-tracker-hdr">
+      <h2>Project Workflow Tracker <span class="ftbadge grey">${_ftProjects.length} projects</span></h2>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--mut);display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:rgba(46,157,87,.15);border:1.5px solid var(--green);display:inline-block"></span>Done</span>
+        <span style="font-size:11px;color:var(--mut);display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:rgba(47,107,255,.1);border:1.5px solid var(--blue);display:inline-block"></span>In Progress</span>
+        <span style="font-size:11px;color:var(--mut);display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:rgba(229,72,77,.08);border:1.5px solid var(--red);display:inline-block"></span>Blocked</span>
+        <button class="ftbtn sm primary" onclick="ftHeaderNewRelease()">+ New Release</button>
+      </div>
+    </div>
+    ${_ftProjects.length===0
+      ?'<div class="ft-empty"><div class="ft-empty-icon">📋</div><div class="ft-empty-text">No projects yet</div><button class="ftbtn primary" onclick="ftNav(\'projects\')">+ Add Project</button></div>'
+      :projCards}
+  </div>`;
 
   el.innerHTML=`
-  <div class="ft-section-hdr"><h2>QA Dashboard</h2><div style="display:flex;gap:7px;flex-wrap:wrap"><button class="ftbtn sm" onclick="ftNav('projects')">+ Project</button><button class="ftbtn sm primary" onclick="ftHeaderNewRelease()">+ Release</button></div></div>
-  ${metricsHtml}
-  <div class="ft-grid-2" style="margin-bottom:14px">
-    <div>${myTasksHtml}${blockersHtml}</div>
-    <div class="ftc"><div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">Activity Timeline</h2></div>${tlHtml||'<div class="ft-empty" style="padding:12px"><div class="ft-empty-text">No activity yet</div></div>'}</div>
+  <div class="ft-section-hdr" style="margin-bottom:14px">
+    <div><h2 style="font-size:16px">QA Dashboard</h2><div style="font-size:11px;color:var(--mut)">Fast-risk based testing — every project, every release</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div class="ft-mc blue" onclick="ftNav('releases')" style="cursor:pointer;padding:8px 14px;display:inline-flex;flex-direction:column;border-radius:9px;min-width:60px;text-align:center"><div class="ft-mc-val" style="font-size:18px">${activeRels.length}</div><div class="ft-mc-lbl">In QA</div></div>
+      <div class="ft-mc red" onclick="ftFilter('blocked')" style="cursor:pointer;padding:8px 14px;display:inline-flex;flex-direction:column;border-radius:9px;min-width:60px;text-align:center"><div class="ft-mc-val" style="font-size:18px">${blocked}</div><div class="ft-mc-lbl">Blocked</div></div>
+      <div class="ft-mc red" onclick="ftShowBugsByseverity('Critical')" style="cursor:pointer;padding:8px 14px;display:inline-flex;flex-direction:column;border-radius:9px;min-width:60px;text-align:center"><div class="ft-mc-val" style="font-size:18px">${critOpen}</div><div class="ft-mc-lbl">Critical Bugs</div></div>
+      <button class="ftbtn sm primary" onclick="ftHeaderNewRelease()">+ New Release</button>
+    </div>
   </div>
-  <div class="ftc">
-    <div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">Releases ${_ftFilterMode?`<span class="ftbadge amber">${_ftFilterMode}</span>`:''} <span class="ftbadge grey">${rels.length}</span></h2><button class="ftbtn sm primary" onclick="ftHeaderNewRelease()">+ New Release</button></div>
-    ${relContent}
-  </div>`;
+  ${sec1}
+  ${sec2}`;
 }
 
 function ftShowBugsByseverity(severity){
