@@ -309,6 +309,101 @@ h1{font-size:20px;font-weight:800}h2{font-size:16px;font-weight:800}h3{font-size
 @media(min-width:769px){#ft-mob-fab{display:none}#ft-mob-menu{display:none}}
 #ft-mob-fab{position:fixed;bottom:18px;right:18px;z-index:500;width:50px;height:50px;border-radius:50%;background:var(--blue);color:#fff;font-size:20px;align-items:center;justify-content:center;box-shadow:var(--shadow-md);border:none;cursor:pointer;display:none}
 #ft-mob-menu{display:none;width:32px;height:32px;border-radius:7px;border:1.5px solid var(--border);background:none;cursor:pointer;color:var(--mut);font-size:15px;align-items:center;justify-content:center}
+/* ══ CHECKLIST MODULE CSS ══ */
+.cl-stepper{display:flex;gap:0;overflow-x:auto;padding:0 0 6px 0;margin-bottom:18px;scrollbar-width:thin}
+.cl-stepper::-webkit-scrollbar{height:4px}.cl-stepper::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.cl-step{display:flex;flex-direction:column;align-items:center;min-width:72px;max-width:90px;cursor:pointer;position:relative;padding:0 6px}
+.cl-step:not(:last-child)::after{content:'';position:absolute;top:17px;left:calc(50% + 18px);right:calc(-50% + 18px);height:2px;background:var(--border);z-index:0}
+.cl-step:not(:last-child).done::after{background:var(--green)}
+.cl-step:not(:last-child).active::after,.cl-step:not(:last-child).in-progress::after{background:linear-gradient(90deg,var(--blue),var(--border))}
+.cl-step-circle{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;border:2.5px solid var(--border);background:var(--card);color:var(--mut);z-index:1;position:relative;transition:all .2s;flex-shrink:0}
+.cl-step.done .cl-step-circle{background:var(--green);border-color:var(--green);color:#fff}
+.cl-step.active .cl-step-circle{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 0 0 5px rgba(47,107,255,.15)}
+.cl-step.in-progress .cl-step-circle{background:rgba(47,107,255,.1);border-color:var(--blue);color:var(--blue)}
+.cl-step.blocked .cl-step-circle{background:var(--red);border-color:var(--red);color:#fff}
+.cl-step.warning .cl-step-circle{background:var(--amber);border-color:var(--amber);color:#fff}
+.cl-step-label{font-size:8px;font-weight:700;text-align:center;color:var(--mut);margin-top:4px;text-transform:uppercase;letter-spacing:.3px;line-height:1.3;max-width:80px}
+.cl-step.active .cl-step-label{color:var(--blue)}
+.cl-step.done .cl-step-label{color:var(--green)}
+.cl-step.blocked .cl-step-label{color:var(--red)}
+.cl-phase-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px;transition:box-shadow .2s}
+.cl-phase-card:hover{box-shadow:var(--shadow)}
+.cl-phase-hdr{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;user-select:none;background:var(--card);border-bottom:1px solid transparent;transition:background .15s}
+.cl-phase-hdr.open{border-bottom-color:var(--border)}
+.cl-phase-hdr:hover{background:var(--card2)}
+.cl-phase-num{width:26px;height:26px;border-radius:50%;background:var(--card2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:var(--mut);flex-shrink:0}
+.cl-phase-num.done{background:var(--green);border-color:var(--green);color:#fff}
+.cl-phase-num.active{background:var(--blue);border-color:var(--blue);color:#fff}
+.cl-phase-num.blocked{background:var(--red);border-color:var(--red);color:#fff}
+.cl-phase-num.warning{background:var(--amber);border-color:var(--amber);color:#fff}
+.cl-phase-title{flex:1;font-size:13px;font-weight:700;color:var(--txt)}
+.cl-phase-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.cl-phase-pct{font-size:11px;font-weight:800;color:var(--mut);min-width:32px;text-align:right}
+.cl-phase-body{display:none;padding:0 16px 14px}
+.cl-phase-body.open{display:block}
+.cl-item-tbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+.cl-item-tbl th{padding:6px 8px;background:var(--card2);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);border-bottom:1px solid var(--border);white-space:nowrap}
+.cl-item-tbl td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+.cl-item-tbl tr:last-child td{border-bottom:none}
+.cl-item-tbl tr:hover td{background:rgba(47,107,255,.025)}
+.cl-item-id{font-size:10px;font-weight:700;color:var(--mut);white-space:nowrap;font-family:monospace}
+.cl-item-desc{font-size:12px;font-weight:600;color:var(--txt);line-height:1.4}
+.cl-item-priority{display:inline-flex;align-items:center;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:800}
+.cl-item-priority.p0{background:rgba(229,72,77,.12);color:var(--red)}
+.cl-item-priority.p1{background:rgba(244,160,0,.12);color:var(--amber)}
+.cl-item-priority.p2{background:rgba(47,107,255,.1);color:var(--blue)}
+.cl-item-priority.p3{background:var(--card2);color:var(--mut)}
+.cl-status-sel{font-size:11px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;background:var(--card);color:var(--txt);cursor:pointer;font-weight:600;max-width:140px}
+.cl-status-sel:focus{outline:none;border-color:var(--blue)}
+.cl-stats-row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.cl-stat{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700}
+.cl-stat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cl-quick-panel{position:fixed;right:0;top:0;bottom:0;width:420px;max-width:100vw;background:var(--card);border-left:1.5px solid var(--border);z-index:800;box-shadow:var(--shadow-lg);transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);overflow-y:auto}
+.cl-quick-panel.open{transform:translateX(0)}
+.cl-quick-panel-overlay{position:fixed;inset:0;z-index:799;background:rgba(5,10,20,.3);backdrop-filter:blur(2px);display:none}
+.cl-quick-panel-overlay.open{display:block}
+.cl-qp-hdr{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);z-index:2}
+.cl-qp-hdr h3{flex:1;font-size:14px;font-weight:800;margin:0}
+.cl-qp-body{padding:18px}
+.cl-qp-field{margin-bottom:14px}
+.cl-qp-field label{display:block;font-size:11px;font-weight:700;color:var(--mut2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.cl-qp-field input,.cl-qp-field select,.cl-qp-field textarea{width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;background:var(--card);color:var(--txt);box-sizing:border-box}
+.cl-qp-field input:focus,.cl-qp-field select:focus,.cl-qp-field textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(47,107,255,.1)}
+.cl-qp-field textarea{resize:vertical;min-height:70px}
+.cl-release-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer;transition:all .2s}
+.cl-release-card:hover{box-shadow:var(--shadow);border-color:var(--blue)}
+.cl-release-card.selected{border-color:var(--blue);box-shadow:0 0 0 3px rgba(47,107,255,.12)}
+.cl-phase-bar{display:flex;gap:3px;margin:8px 0}
+.cl-phase-bar-seg{height:5px;flex:1;border-radius:2px;background:var(--border)}
+.cl-phase-bar-seg.done{background:var(--green)}
+.cl-phase-bar-seg.active{background:var(--blue)}
+.cl-phase-bar-seg.blocked{background:var(--red)}
+.cl-phase-bar-seg.warning{background:var(--amber)}
+.cl-decision-big{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:12px;font-size:15px;font-weight:900;letter-spacing:.3px}
+.cl-decision-big.go{background:rgba(46,157,87,.12);color:var(--green);border:2px solid var(--green)}
+.cl-decision-big.risk{background:rgba(244,160,0,.12);color:var(--amber);border:2px solid var(--amber)}
+.cl-decision-big.nogo{background:rgba(229,72,77,.1);color:var(--red);border:2px solid var(--red)}
+.cl-decision-big.pending{background:var(--card2);color:var(--mut);border:2px solid var(--border)}
+.cl-gate{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;margin:8px 0}
+.cl-gate.pass{background:rgba(46,157,87,.1);color:var(--green);border:1px solid rgba(46,157,87,.3)}
+.cl-gate.fail{background:rgba(229,72,77,.08);color:var(--red);border:1px solid rgba(229,72,77,.25)}
+.cl-gate.warn{background:rgba(244,160,0,.1);color:var(--amber);border:1px solid rgba(244,160,0,.3)}
+.cl-gate.info{background:rgba(47,107,255,.07);color:var(--blue);border:1px solid rgba(47,107,255,.2)}
+.cl-warn-banner{background:rgba(229,72,77,.07);border:1.5px solid rgba(229,72,77,.25);border-radius:10px;padding:12px 16px;font-size:12px;color:var(--red);margin:12px 0;display:flex;gap:8px;align-items:flex-start}
+.cl-summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin:12px 0}
+.cl-summary-cell{background:var(--card2);border-radius:9px;padding:10px 12px;text-align:center}
+.cl-summary-val{font-size:22px;font-weight:900;line-height:1}
+.cl-summary-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);margin-top:2px}
+.cl-evidence-link{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--blue);text-decoration:none;font-weight:600}
+.cl-evidence-link:hover{text-decoration:underline}
+.cl-mandatory-star{color:var(--red);font-size:10px;vertical-align:super}
+.cl-audit-item{display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)}
+.cl-audit-item:last-child{border-bottom:none}
+.cl-audit-dot{width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0;margin-top:4px}
+.cl-audit-dot.green{background:var(--green)}.cl-audit-dot.red{background:var(--red)}.cl-audit-dot.blue{background:var(--blue)}.cl-audit-dot.amber{background:var(--amber)}
+.cl-audit-text{flex:1;font-size:11px;line-height:1.5}
+.cl-audit-time{font-size:10px;color:var(--mut);white-space:nowrap}
+@media(max-width:768px){.cl-stepper{gap:0}.cl-step{min-width:56px;max-width:70px}.cl-step-label{font-size:7px}.cl-quick-panel{width:100vw}.cl-summary-grid{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
 <body>
@@ -356,16 +451,18 @@ h1{font-size:20px;font-weight:800}h2{font-size:16px;font-weight:800}h3{font-size
 <nav id="ft-sidebar">
   <div class="ft-nav-sec">Main</div>
   <div class="ft-nav-item active" data-view="dashboard" onclick="ftNav('dashboard')" tabindex="0"><span class="ft-nav-icon">&#128202;</span>Dashboard<span class="ft-nav-badge red" id="nb-blocked" style="display:none">0</span></div>
-  <div class="ft-nav-item" data-view="mytasks" onclick="ftNav('mytasks')" tabindex="0"><span class="ft-nav-icon">&#9989;</span>My Tasks<span class="ft-nav-badge amber" id="nb-mytasks" style="display:none">0</span></div>
   <div class="ft-nav-item" data-view="projects" onclick="ftNav('projects')" tabindex="0"><span class="ft-nav-icon">&#128193;</span>Projects</div>
   <div class="ft-nav-item" data-view="releases" onclick="ftNav('releases')" tabindex="0"><span class="ft-nav-icon">&#128640;</span>Releases</div>
-  <div class="ft-nav-sec">Team</div>
-  <div class="ft-nav-item" data-view="assignments" onclick="ftNav('assignments')" tabindex="0"><span class="ft-nav-icon">&#128203;</span>Assignments</div>
+  <div class="ft-nav-sec">QA Management</div>
+  <div class="ft-nav-item" data-view="checklist" onclick="ftNav('checklist')" tabindex="0"><span class="ft-nav-icon">&#9989;</span>QA Workflow<span class="ft-nav-badge amber" id="nb-checklist" style="display:none">0</span></div>
+  <div class="ft-nav-item" data-view="mytasks" onclick="ftNav('mytasks')" tabindex="0"><span class="ft-nav-icon">&#128203;</span>My Testing Tasks<span class="ft-nav-badge amber" id="nb-mytasks" style="display:none">0</span></div>
   <div class="ft-nav-item" data-view="workload" onclick="ftNav('workload')" tabindex="0"><span class="ft-nav-icon">&#128101;</span>Team Workload</div>
   <div class="ft-nav-item" data-view="qalead" onclick="ftNav('qalead')" tabindex="0"><span class="ft-nav-icon">&#128269;</span>QA Lead Review<span class="ft-nav-badge purple" id="nb-qalead" style="display:none">0</span></div>
+  <div class="ft-nav-item" data-view="decisions" onclick="ftNav('decisions')" tabindex="0"><span class="ft-nav-icon">&#127959;</span>Release Decisions</div>
   <div class="ft-nav-sec">Insights</div>
+  <div class="ft-nav-item" data-view="assignments" onclick="ftNav('assignments')" tabindex="0"><span class="ft-nav-icon">&#128101;</span>Assignments</div>
   <div class="ft-nav-item" data-view="management" onclick="ftNav('management')" tabindex="0"><span class="ft-nav-icon">&#128084;</span>Management</div>
-  <div class="ft-nav-item" data-view="reports" onclick="ftNav('reports')" tabindex="0"><span class="ft-nav-icon">&#128196;</span>Reports</div>
+  <div class="ft-nav-item" data-view="reports" onclick="ftNav('reports')" tabindex="0"><span class="ft-nav-icon">&#128196;</span>QA Reports</div>
   <div class="ft-sb-toggle" onclick="ftToggleSidebar()"><span>&#9664;</span><span style="font-size:11px">Collapse</span></div>
 </nav>
 <main id="ft-main">
@@ -379,11 +476,48 @@ h1{font-size:20px;font-weight:800}h2{font-size:16px;font-weight:800}h3{font-size
   <div id="ft-view-qalead" class="ft-vp" style="display:none"></div>
   <div id="ft-view-management" class="ft-vp" style="display:none"></div>
   <div id="ft-view-reports" class="ft-vp" style="display:none"></div>
+  <div id="ft-view-checklist" class="ft-vp" style="display:none"></div>
+  <div id="ft-view-checklist-detail" class="ft-vp" style="display:none"></div>
+  <div id="ft-view-decisions" class="ft-vp" style="display:none"></div>
 </main>
 </div>
 </div>
 <div id="ft-toast-wrap" role="status" aria-live="polite"></div>
 <div class="ft-lightbox" id="ft-lightbox" onclick="this.classList.remove('open')"><img id="ft-lightbox-img" src="" alt="Workflow"></div>
+<!-- Quick Update Panel -->
+<div class="cl-quick-panel-overlay" id="cl-qp-overlay" onclick="clCloseQuickPanel()"></div>
+<div class="cl-quick-panel" id="cl-quick-panel">
+  <div class="cl-qp-hdr">
+    <div style="font-size:18px">⚡</div>
+    <h3>Quick Update</h3>
+    <button class="ftbtn xs" onclick="clCloseQuickPanel()">✕ Close</button>
+  </div>
+  <div class="cl-qp-body">
+    <div class="cl-qp-field"><label>Project</label><select id="cl-qp-project" onchange="clQpLoadReleases()"></select></div>
+    <div class="cl-qp-field"><label>Release</label><select id="cl-qp-release" onchange="clQpLoadItems()"></select></div>
+    <div class="cl-qp-field"><label>Phase</label><select id="cl-qp-phase" onchange="clQpFilterItems()"></select></div>
+    <div class="cl-qp-field"><label>Checklist Item</label><select id="cl-qp-item"></select></div>
+    <div class="cl-qp-field"><label>Owner</label><input type="text" id="cl-qp-owner" placeholder="Tester name"></div>
+    <div class="cl-qp-field"><label>Status</label><select id="cl-qp-status">
+      <option>Not Started</option><option>Assigned</option><option>In Progress</option>
+      <option>Passed</option><option>Failed</option><option>Blocked</option>
+      <option>Waiting for Fix</option><option>Retesting</option>
+      <option>Submitted for Review</option><option>Verified</option><option>Not Applicable</option>
+    </select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="cl-qp-field"><label>Passed</label><input type="number" id="cl-qp-passed" min="0" value="0"></div>
+      <div class="cl-qp-field"><label>Failed</label><input type="number" id="cl-qp-failed" min="0" value="0"></div>
+    </div>
+    <div class="cl-qp-field"><label>Actual Result</label><textarea id="cl-qp-actual" rows="2" placeholder="What actually happened..."></textarea></div>
+    <div class="cl-qp-field"><label>Evidence Link</label><input type="text" id="cl-qp-evidence" placeholder="https://..."></div>
+    <div class="cl-qp-field"><label>Bug ID (if any)</label><input type="text" id="cl-qp-bugid" placeholder="BUG-001"></div>
+    <div class="cl-qp-field"><label>Comment / Notes</label><textarea id="cl-qp-comment" rows="2" placeholder="Any notes..."></textarea></div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="ftbtn primary" style="flex:1" onclick="clQpSave(false)">Save Update</button>
+      <button class="ftbtn" onclick="clQpSave(true)">Submit for Review</button>
+    </div>
+  </div>
+</div>
 <div id="ft-modal-overlay" class="ft-modal-overlay" onclick="if(event.target===this)ftCloseModal()">
   <div class="ft-modal">
     <div class="ft-modal-hdr"><h3 id="ft-modal-title">Modal</h3><button class="ftbtn sm" onclick="ftCloseModal()">&#10005;</button></div>
@@ -445,6 +579,7 @@ function ftToggleDark(){
 }
 
 // ── TOAST ──
+function ftShowToast(msg,type='success'){ftToast(msg,type);}
 function ftToast(msg, type='success'){
   const wrap=document.getElementById('ft-toast-wrap');
   const t=document.createElement('div');
@@ -557,7 +692,7 @@ function ftToggleMobileSidebar(){
 }
 
 // ── NAV ──
-const FT_VIEWS=['dashboard','mytasks','projects','releases','release-detail','assignments','workload','qalead','management','reports'];
+const FT_VIEWS=['dashboard','mytasks','projects','releases','release-detail','assignments','workload','qalead','management','reports','checklist','checklist-detail','decisions'];
 function ftNav(view, skipSidebar){
   _ftCurrentView=view;
   FT_VIEWS.forEach(v=>{
@@ -566,7 +701,9 @@ function ftNav(view, skipSidebar){
   });
   if(!skipSidebar){
     document.querySelectorAll('.ft-nav-item').forEach(n=>n.classList.remove('active'));
-    const ni=document.querySelector('.ft-nav-item[data-view="'+view+'"]');
+    // checklist-detail highlights the checklist nav item
+    const navTarget=view==='checklist-detail'?'checklist':view;
+    const ni=document.querySelector('.ft-nav-item[data-view="'+navTarget+'"]');
     if(ni) ni.classList.add('active');
   }
   ftRenderView(view);
@@ -584,6 +721,9 @@ function ftRenderView(view){
   else if(view==='qalead') ftRenderQaLead();
   else if(view==='management') ftRenderManagement();
   else if(view==='reports') ftRenderReports();
+  else if(view==='checklist') clRenderChecklist();
+  else if(view==='checklist-detail') clRenderReleaseDetail();
+  else if(view==='decisions') clRenderDecisions();
 }
 
 // ── NAV BADGES ──
@@ -2835,12 +2975,1345 @@ function ftSeedDemo(){
   ftSaveProjects();ftSaveReleases();
 }
 
+// ══════════════════════════════════════════════════════════════════
+// FAST-TRACK QA CHECKLIST TRACKER
+// ══════════════════════════════════════════════════════════════════
+
+// ── Data stores ──
+let _clReleases=[];   // checklist releases
+let _clItems=[];      // all checklist items across all releases
+let _clAudit=[];      // audit history
+let _clSelectedRelease=null;
+let _clSelectedPhase=null;
+
+// ── Save / Load ──
+async function clSaveReleases(){await ftApiSet('cl_releases',_clReleases);}
+async function clSaveItems(){await ftApiSet('cl_items',_clItems);}
+async function clSaveAudit(){await ftApiSet('cl_audit',_clAudit.slice(-500));}
+async function clLoadData(){
+  const [r,i,a]=await Promise.all([
+    ftApiGet('cl_releases'),ftApiGet('cl_items'),ftApiGet('cl_audit')
+  ]);
+  _clReleases=Array.isArray(r)?r:[];
+  _clItems=Array.isArray(i)?i:[];
+  _clAudit=Array.isArray(a)?a:[];
+  if(_clReleases.length===0) clSeedDemo();
+}
+
+// ── Phase definitions (14 phases) ──
+const CL_PHASES=[
+  {id:'ph1',code:'REQ',label:'Requirement & Intake',icon:'📋',weight:5,
+   items:[
+    {id:'REQ-01',desc:'Change type is identified',priority:'P1',mandatory:'Yes'},
+    {id:'REQ-02',desc:'Requirement and expected outcome are understood',priority:'P1',mandatory:'Yes'},
+    {id:'REQ-03',desc:'Acceptance criteria are available',priority:'P1',mandatory:'Yes'},
+    {id:'REQ-04',desc:'Changed module is identified',priority:'P1',mandatory:'Yes'},
+    {id:'REQ-05',desc:'Related or affected modules are identified',priority:'P1',mandatory:'Yes'},
+    {id:'REQ-06',desc:'Affected user roles are identified',priority:'P2',mandatory:'Yes'},
+    {id:'REQ-07',desc:'API, database or third-party impact is identified',priority:'P1',mandatory:'Yes'},
+    {id:'REQ-08',desc:'Test credentials and test data are available',priority:'P1',mandatory:'Yes'},
+    {id:'REQ-09',desc:'Unknown points are clarified',priority:'P2',mandatory:'When Applicable'},
+    {id:'REQ-10',desc:'Planned release date is confirmed',priority:'P2',mandatory:'Yes'},
+  ]},
+  {id:'ph2',code:'RSK',label:'Risk Assessment',icon:'⚡',weight:5,
+   items:[
+    {id:'RSK-01',desc:'Login/authentication impact assessed',priority:'P0',mandatory:'Yes'},
+    {id:'RSK-02',desc:'Payment/subscription/financial impact assessed',priority:'P0',mandatory:'Yes'},
+    {id:'RSK-03',desc:'Permission/security impact assessed',priority:'P0',mandatory:'Yes'},
+    {id:'RSK-04',desc:'Data loss/corruption risk assessed',priority:'P0',mandatory:'Yes'},
+    {id:'RSK-05',desc:'Create/edit/delete impact assessed',priority:'P1',mandatory:'Yes'},
+    {id:'RSK-06',desc:'Export/notification/integration impact assessed',priority:'P1',mandatory:'Yes'},
+    {id:'RSK-07',desc:'Shared component impact assessed',priority:'P1',mandatory:'Yes'},
+    {id:'RSK-08',desc:'Risk level assigned: Critical / High / Normal',priority:'P1',mandatory:'Yes'},
+    {id:'RSK-09',desc:'Risk reason recorded',priority:'P1',mandatory:'Yes'},
+    {id:'RSK-10',desc:'Required testing types identified',priority:'P1',mandatory:'Yes'},
+  ]},
+  {id:'ph3',code:'PLN',label:'Test Planning',icon:'📐',weight:5,
+   items:[
+    {id:'PLN-01',desc:'Main business flow is listed',priority:'P1',mandatory:'Yes'},
+    {id:'PLN-02',desc:'Critical positive scenarios are listed',priority:'P1',mandatory:'Yes'},
+    {id:'PLN-03',desc:'Important negative scenarios are listed',priority:'P1',mandatory:'Yes'},
+    {id:'PLN-04',desc:'Empty and no-result scenarios are listed',priority:'P2',mandatory:'When Applicable'},
+    {id:'PLN-05',desc:'Permission scenarios are listed',priority:'P1',mandatory:'Yes'},
+    {id:'PLN-06',desc:'API and data checks are identified',priority:'P1',mandatory:'When Applicable'},
+    {id:'PLN-07',desc:'Affected regression cases are selected',priority:'P1',mandatory:'Yes'},
+    {id:'PLN-08',desc:'Test owners are assigned',priority:'P1',mandatory:'Yes'},
+    {id:'PLN-09',desc:'Estimated testing time is recorded',priority:'P2',mandatory:'When Applicable'},
+    {id:'PLN-10',desc:'Out-of-scope items are documented',priority:'P2',mandatory:'When Applicable'},
+  ]},
+  {id:'ph4',code:'DEV',label:'Developer Self-Test',icon:'👨‍💻',weight:10,
+   items:[
+    {id:'DEV-01',desc:'Feature opens successfully',priority:'P1',mandatory:'Yes'},
+    {id:'DEV-02',desc:'Main positive flow works',priority:'P1',mandatory:'Yes'},
+    {id:'DEV-03',desc:'Basic invalid scenario checked',priority:'P2',mandatory:'Yes'},
+    {id:'DEV-04',desc:'API response verified',priority:'P1',mandatory:'Yes'},
+    {id:'DEV-05',desc:'Database/configuration verified',priority:'P1',mandatory:'When Applicable'},
+    {id:'DEV-06',desc:'No blocking console errors',priority:'P1',mandatory:'Yes'},
+    {id:'DEV-07',desc:'Related existing flow checked',priority:'P2',mandatory:'Yes'},
+    {id:'DEV-08',desc:'Test data and credentials shared with QA',priority:'P1',mandatory:'Yes'},
+    {id:'DEV-09',desc:'Changed files/modules listed',priority:'P2',mandatory:'Yes'},
+    {id:'DEV-10',desc:'Known limitations documented',priority:'P2',mandatory:'When Applicable'},
+  ]},
+  {id:'ph5',code:'ENV',label:'Env & Data Readiness',icon:'🌐',weight:5,
+   items:[
+    {id:'ENV-01',desc:'Correct build deployed to QA environment',priority:'P1',mandatory:'Yes'},
+    {id:'ENV-02',desc:'QA URL accessible',priority:'P1',mandatory:'Yes'},
+    {id:'ENV-03',desc:'Build/version number confirmed',priority:'P1',mandatory:'Yes'},
+    {id:'ENV-04',desc:'Required role-based users available',priority:'P1',mandatory:'Yes'},
+    {id:'ENV-05',desc:'Test data available',priority:'P1',mandatory:'Yes'},
+    {id:'ENV-06',desc:'APIs reachable and responding',priority:'P1',mandatory:'Yes'},
+    {id:'ENV-07',desc:'Database/configuration ready',priority:'P1',mandatory:'Yes'},
+    {id:'ENV-08',desc:'Third-party integrations available',priority:'P1',mandatory:'When Applicable'},
+    {id:'ENV-09',desc:'Browser/device requirements available',priority:'P2',mandatory:'Yes'},
+    {id:'ENV-10',desc:'Environment blockers documented if any',priority:'P1',mandatory:'When Applicable'},
+  ]},
+  {id:'ph6',code:'SMK',label:'Smoke Test',icon:'🔥',weight:15,
+   items:[
+    {id:'SMK-01',desc:'Application opens without errors',priority:'P0',mandatory:'Yes'},
+    {id:'SMK-02',desc:'Login works for all roles',priority:'P0',mandatory:'Yes'},
+    {id:'SMK-03',desc:'Dashboard loads correctly',priority:'P0',mandatory:'Yes'},
+    {id:'SMK-04',desc:'Main menu/navigation works',priority:'P1',mandatory:'Yes'},
+    {id:'SMK-05',desc:'Changed module opens',priority:'P0',mandatory:'Yes'},
+    {id:'SMK-06',desc:'Main business action works',priority:'P0',mandatory:'Yes'},
+    {id:'SMK-07',desc:'Critical API responds',priority:'P0',mandatory:'Yes'},
+    {id:'SMK-08',desc:'Logout/session works',priority:'P1',mandatory:'Yes'},
+    {id:'SMK-09',desc:'No blocking console/network error',priority:'P0',mandatory:'Yes'},
+    {id:'SMK-10',desc:'Automation report and evidence attached',priority:'P1',mandatory:'When Applicable'},
+  ]},
+  {id:'ph7',code:'MAN',label:'Manual Testing',icon:'🧪',weight:15,
+   items:[
+    {id:'MAN-01',desc:'Valid user completes full flow',priority:'P0',mandatory:'Yes'},
+    {id:'MAN-02',desc:'Expected result is displayed',priority:'P0',mandatory:'Yes'},
+    {id:'MAN-03',desc:'Data saves correctly',priority:'P0',mandatory:'Yes'},
+    {id:'MAN-04',desc:'Edit/update works',priority:'P1',mandatory:'Yes'},
+    {id:'MAN-05',desc:'Delete/cancel works',priority:'P1',mandatory:'Yes'},
+    {id:'MAN-06',desc:'Success message is correct',priority:'P2',mandatory:'Yes'},
+    {id:'NEG-01',desc:'Mandatory field left blank — correct error',priority:'P1',mandatory:'Yes'},
+    {id:'NEG-02',desc:'Invalid value handled',priority:'P1',mandatory:'Yes'},
+    {id:'NEG-03',desc:'Duplicate action handled',priority:'P1',mandatory:'When Applicable'},
+    {id:'NEG-04',desc:'Min/max limits enforced',priority:'P2',mandatory:'When Applicable'},
+    {id:'NEG-05',desc:'Long text and special characters handled',priority:'P2',mandatory:'Yes'},
+    {id:'NEG-06',desc:'Empty/no-result scenario shows useful state',priority:'P2',mandatory:'Yes'},
+    {id:'NEG-07',desc:'Unsupported file/type/value rejected',priority:'P2',mandatory:'When Applicable'},
+    {id:'NEG-08',desc:'Error messages are helpful and clear',priority:'P1',mandatory:'Yes'},
+    {id:'NAV-01',desc:'Refresh during process does not lose data',priority:'P2',mandatory:'Yes'},
+    {id:'NAV-02',desc:'Browser back/forward works',priority:'P2',mandatory:'Yes'},
+    {id:'NAV-03',desc:'Double-click/repeated submission prevented',priority:'P1',mandatory:'Yes'},
+    {id:'NAV-04',desc:'Multiple browser tabs handled',priority:'P3',mandatory:'When Applicable'},
+    {id:'NAV-05',desc:'Session expiry handled correctly',priority:'P1',mandatory:'Yes'},
+    {id:'NAV-06',desc:'Slow API/network degrades gracefully',priority:'P2',mandatory:'When Applicable'},
+    {id:'NAV-07',desc:'Temporary network failure handled',priority:'P2',mandatory:'When Applicable'},
+  ]},
+  {id:'ph8',code:'API',label:'API & Data Validation',icon:'🔌',weight:10,
+   items:[
+    {id:'API-01',desc:'Correct request method and endpoint',priority:'P1',mandatory:'Yes'},
+    {id:'API-02',desc:'Correct request payload',priority:'P1',mandatory:'Yes'},
+    {id:'API-03',desc:'Correct response status code',priority:'P1',mandatory:'Yes'},
+    {id:'API-04',desc:'Required response fields exist',priority:'P1',mandatory:'Yes'},
+    {id:'API-05',desc:'UI data matches API response data',priority:'P1',mandatory:'Yes'},
+    {id:'API-06',desc:'Database data is correct after actions',priority:'P1',mandatory:'Yes'},
+    {id:'API-07',desc:'Created/updated timestamps are correct',priority:'P2',mandatory:'Yes'},
+    {id:'API-08',desc:'User-specific data is restricted correctly',priority:'P0',mandatory:'Yes'},
+    {id:'API-09',desc:'Duplicate data is prevented',priority:'P1',mandatory:'When Applicable'},
+    {id:'API-10',desc:'Error response is handled correctly in UI',priority:'P1',mandatory:'Yes'},
+    {id:'API-11',desc:'Exported data matches UI data',priority:'P1',mandatory:'When Applicable'},
+    {id:'API-12',desc:'Sensitive data is not exposed in response',priority:'P0',mandatory:'Yes'},
+  ]},
+  {id:'ph9',code:'PER',label:'Permission & Security',icon:'🔐',weight:5,
+   items:[
+    {id:'PER-01',desc:'Allowed user can access allowed pages',priority:'P0',mandatory:'Yes'},
+    {id:'PER-02',desc:'Restricted user cannot access protected pages',priority:'P0',mandatory:'Yes'},
+    {id:'PER-03',desc:'Direct URL access is blocked for unauthorised roles',priority:'P0',mandatory:'Yes'},
+    {id:'PER-04',desc:'Admin and user permissions differ correctly',priority:'P0',mandatory:'Yes'},
+    {id:'PER-05',desc:"User cannot see another user's private data",priority:'P0',mandatory:'Yes'},
+    {id:'PER-06',desc:'Session expiry works and redirects to login',priority:'P1',mandatory:'Yes'},
+    {id:'PER-07',desc:'Sensitive values are protected in requests/responses',priority:'P0',mandatory:'Yes'},
+    {id:'PER-08',desc:'Basic injection/XSS handling is safe',priority:'P0',mandatory:'Yes'},
+  ]},
+  {id:'ph10',code:'UI',label:'UI, UX & Compatibility',icon:'🖥️',weight:5,
+   items:[
+    {id:'UI-01',desc:'Labels and messages are clear and correct',priority:'P2',mandatory:'Yes'},
+    {id:'UI-02',desc:'Buttons are visible and enabled/disabled correctly',priority:'P2',mandatory:'Yes'},
+    {id:'UI-03',desc:'Loading indicator works during async operations',priority:'P2',mandatory:'Yes'},
+    {id:'UI-04',desc:'No overlap or broken alignment',priority:'P2',mandatory:'Yes'},
+    {id:'UI-05',desc:'Empty state is useful and actionable',priority:'P2',mandatory:'Yes'},
+    {id:'UI-06',desc:'Desktop layout works at 1280px+',priority:'P2',mandatory:'Yes'},
+    {id:'UI-07',desc:'Mobile/responsive layout works at 375px',priority:'P2',mandatory:'Yes'},
+    {id:'UI-08',desc:'Supported browsers work (Chrome, Edge, Firefox)',priority:'P2',mandatory:'Yes'},
+    {id:'UI-09',desc:'Keyboard and focus behaviour works',priority:'P3',mandatory:'When Applicable'},
+    {id:'UI-10',desc:'Status is not represented by colour only',priority:'P2',mandatory:'Yes'},
+  ]},
+  {id:'ph11',code:'BUG',label:'Bug & Retesting',icon:'🐛',weight:5,
+   items:[
+    {id:'BUG-01',desc:'Bug title is clear and descriptive',priority:'P1',mandatory:'Yes'},
+    {id:'BUG-02',desc:'Environment/build/version recorded',priority:'P1',mandatory:'Yes'},
+    {id:'BUG-03',desc:'Complete and reproducible steps listed',priority:'P1',mandatory:'Yes'},
+    {id:'BUG-04',desc:'Expected result recorded',priority:'P1',mandatory:'Yes'},
+    {id:'BUG-05',desc:'Actual result recorded',priority:'P1',mandatory:'Yes'},
+    {id:'BUG-06',desc:'Severity and priority assigned',priority:'P1',mandatory:'Yes'},
+    {id:'BUG-07',desc:'Evidence (screenshot/video) attached',priority:'P1',mandatory:'Yes'},
+    {id:'BUG-08',desc:'Console/network evidence attached if applicable',priority:'P2',mandatory:'When Applicable'},
+    {id:'BUG-09',desc:'Test case linked to bug',priority:'P2',mandatory:'Yes'},
+    {id:'BUG-10',desc:'Developer assigned to bug',priority:'P1',mandatory:'Yes'},
+    {id:'RET-01',desc:'Correct fixed build deployed for retest',priority:'P1',mandatory:'Yes'},
+    {id:'RET-02',desc:'Exact reported issue retested step by step',priority:'P1',mandatory:'Yes'},
+    {id:'RET-03',desc:'Related flow checked after fix',priority:'P1',mandatory:'Yes'},
+    {id:'RET-04',desc:'API/data impact after fix checked',priority:'P1',mandatory:'When Applicable'},
+    {id:'RET-05',desc:'Role impact after fix checked',priority:'P1',mandatory:'When Applicable'},
+    {id:'RET-06',desc:'Bug closed only after successful verification',priority:'P1',mandatory:'Yes'},
+    {id:'RET-07',desc:'Reopened failed fix with new evidence',priority:'P1',mandatory:'When Applicable'},
+    {id:'RET-08',desc:'Critical bug added to permanent regression pack',priority:'P1',mandatory:'When Applicable'},
+  ]},
+  {id:'ph12',code:'REG',label:'Regression Pack',icon:'🔁',weight:10,
+   items:[
+    {id:'REG-01',desc:'Login flow',priority:'P0',mandatory:'Yes'},
+    {id:'REG-02',desc:'Dashboard loads',priority:'P0',mandatory:'Yes'},
+    {id:'REG-03',desc:'Main navigation',priority:'P1',mandatory:'Yes'},
+    {id:'REG-04',desc:'Create flow (main entity)',priority:'P0',mandatory:'Yes'},
+    {id:'REG-05',desc:'Edit flow',priority:'P0',mandatory:'Yes'},
+    {id:'REG-06',desc:'Search/filter',priority:'P1',mandatory:'Yes'},
+    {id:'REG-07',desc:'Role and permission check',priority:'P0',mandatory:'Yes'},
+    {id:'REG-08',desc:'Payment/subscription flow',priority:'P0',mandatory:'When Applicable'},
+    {id:'REG-09',desc:'Export/download',priority:'P1',mandatory:'When Applicable'},
+    {id:'REG-10',desc:'Email/SMS/notification',priority:'P1',mandatory:'When Applicable'},
+    {id:'REG-11',desc:'Main API integration',priority:'P1',mandatory:'When Applicable'},
+    {id:'REG-12',desc:'Logout/session',priority:'P1',mandatory:'Yes'},
+    {id:'REG-13',desc:'Previous production bugs',priority:'P0',mandatory:'Yes'},
+    {id:'REG-14',desc:'Affected shared component',priority:'P1',mandatory:'Yes'},
+    {id:'REG-15',desc:'Critical browser/device flow',priority:'P1',mandatory:'Yes'},
+  ]},
+  {id:'ph13',code:'REL',label:'Release Decision',icon:'🏁',weight:5,
+   items:[
+    {id:'REL-01',desc:'Requirement verification completed',priority:'P0',mandatory:'Yes'},
+    {id:'REL-02',desc:'Developer self-test passed',priority:'P0',mandatory:'Yes'},
+    {id:'REL-03',desc:'Automation smoke passed',priority:'P0',mandatory:'Yes'},
+    {id:'REL-04',desc:'Mandatory manual testing passed',priority:'P0',mandatory:'Yes'},
+    {id:'REL-05',desc:'API/data validation passed',priority:'P0',mandatory:'Yes'},
+    {id:'REL-06',desc:'Permission/security validation passed',priority:'P0',mandatory:'Yes'},
+    {id:'REL-07',desc:'Critical regression passed',priority:'P0',mandatory:'Yes'},
+    {id:'REL-08',desc:'All critical bugs closed',priority:'P0',mandatory:'Yes'},
+    {id:'REL-09',desc:'High bugs are non-blocking or deferred',priority:'P1',mandatory:'Yes'},
+    {id:'REL-10',desc:'Known risks documented',priority:'P1',mandatory:'Yes'},
+    {id:'REL-11',desc:'QA Lead review completed',priority:'P0',mandatory:'Yes'},
+    {id:'REL-12',desc:'Rollback/monitoring plan ready',priority:'P1',mandatory:'Yes'},
+    {id:'REL-13',desc:'Production sanity assigned to tester',priority:'P1',mandatory:'Yes'},
+  ]},
+  {id:'ph14',code:'PRD',label:'Production Sanity',icon:'✅',weight:0,
+   items:[
+    {id:'PRD-01',desc:'Production application opens',priority:'P0',mandatory:'Yes'},
+    {id:'PRD-02',desc:'Login works on production',priority:'P0',mandatory:'Yes'},
+    {id:'PRD-03',desc:'Dashboard loads on production',priority:'P0',mandatory:'Yes'},
+    {id:'PRD-04',desc:'Main navigation works',priority:'P1',mandatory:'Yes'},
+    {id:'PRD-05',desc:'Critical API responds',priority:'P0',mandatory:'Yes'},
+    {id:'PRD-06',desc:'Approved safe flow verified (no destructive actions)',priority:'P0',mandatory:'Yes'},
+    {id:'PRD-07',desc:'Error logs reviewed',priority:'P1',mandatory:'Yes'},
+    {id:'PRD-08',desc:'Performance appears normal',priority:'P1',mandatory:'Yes'},
+    {id:'PRD-09',desc:'Integrations are working',priority:'P1',mandatory:'When Applicable'},
+    {id:'PRD-10',desc:'No unexpected failure increase observed',priority:'P0',mandatory:'Yes'},
+    {id:'PRD-11',desc:'Production incidents recorded',priority:'P0',mandatory:'When Applicable'},
+    {id:'PRD-12',desc:'Final release status updated to Released',priority:'P0',mandatory:'Yes'},
+  ]},
+];
+
+const CL_STATUSES=['Not Started','Assigned','In Progress','Passed','Failed','Blocked','Waiting for Fix','Retesting','Submitted for Review','Verified','Not Applicable'];
+const CL_REVIEW_STATUSES=['Pending','Verified','Changes Required','Rejected','Not Applicable'];
+const CL_DECISIONS=['Pending','GO','GO WITH RISK','NO-GO'];
+
+// ── Helpers ──
+function clUid(){return 'cl-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function clEsc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function clFmt(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'});}
+function clAuditAdd(rel,action,detail,user){
+  _clAudit.push({id:clUid(),relId:rel.id,relName:rel.name,action,detail,user:user||window._ftCurrentUser||'—',at:new Date().toISOString()});
+  clSaveAudit();
+}
+function clStatusCls(s){
+  if(s==='Passed'||s==='Verified') return 'green';
+  if(s==='In Progress'||s==='Assigned'||s==='Retesting') return 'blue';
+  if(s==='Failed'||s==='Blocked') return 'red';
+  if(s==='Waiting for Fix'||s==='Submitted for Review') return 'amber';
+  if(s==='Not Applicable') return 'grey';
+  return 'grey';
+}
+function clDecisionCls(d){return d==='GO'?'go':d==='GO WITH RISK'?'risk':d==='NO-GO'?'nogo':'pending';}
+function clPriCls(p){return p==='P0'?'p0':p==='P1'?'p1':p==='P2'?'p2':'p3';}
+
+// ── Phase completion calculation ──
+function clPhaseProgress(relId,phaseCode){
+  const items=_clItems.filter(i=>i.relId===relId&&i.phaseCode===phaseCode&&i.status!=='Not Applicable');
+  if(!items.length) return {pct:0,passed:0,failed:0,blocked:0,notTested:0,total:0};
+  const passed=items.filter(i=>i.status==='Passed'||i.status==='Verified').length;
+  const failed=items.filter(i=>i.status==='Failed').length;
+  const blocked=items.filter(i=>i.status==='Blocked').length;
+  const notTested=items.filter(i=>i.status==='Not Started').length;
+  return {pct:Math.round(passed/items.length*100),passed,failed,blocked,notTested,total:items.length};
+}
+
+// ── Overall release progress ──
+function clRelProgress(relId){
+  let weighted=0,totalWeight=0;
+  CL_PHASES.slice(0,13).forEach(ph=>{
+    if(!ph.weight) return;
+    const {pct}=clPhaseProgress(relId,ph.code);
+    weighted+=pct*ph.weight;
+    totalWeight+=ph.weight;
+  });
+  return totalWeight?Math.round(weighted/totalWeight):0;
+}
+
+// ── Recommended decision ──
+function clRecommendDecision(relId){
+  const smoke=clPhaseProgress(relId,'SMK');
+  const reg=clPhaseProgress(relId,'REG');
+  const man=clPhaseProgress(relId,'MAN');
+  const rel=_clReleases.find(r=>r.id===relId);
+  const openCrit=(rel?.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  if(smoke.failed>0||smoke.blocked>0) return 'NO-GO';
+  if(openCrit>0) return 'NO-GO';
+  if(man.failed>0||reg.failed>0) return 'NO-GO';
+  const overallPct=clRelProgress(relId);
+  if(overallPct>=85&&smoke.pct===100&&openCrit===0) return 'GO';
+  if(overallPct>=60) return 'GO WITH RISK';
+  return 'Pending';
+}
+
+// ── Release health ──
+function clRelHealth(relId){
+  const rel=_clReleases.find(r=>r.id===relId);
+  if(!rel) return {label:'Unknown',cls:'at-risk'};
+  const openCrit=(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed'&&b.status!=='Deferred').length;
+  const smoke=clPhaseProgress(relId,'SMK');
+  const pct=clRelProgress(relId);
+  if(rel.decision==='NO-GO'||smoke.blocked>0||openCrit>0) return {label:'Blocked',cls:'blocked'};
+  if(rel.decision==='GO'&&pct>=90) return {label:'Ready for Release',cls:'healthy'};
+  if(smoke.failed>0) return {label:'Blocked',cls:'blocked'};
+  if(pct>=70) return {label:'Healthy',cls:'healthy'};
+  if(pct>=40) return {label:'Attention Required',cls:'attention'};
+  return {label:'At Risk',cls:'at-risk'};
+}
+
+// ── Generate checklist items for a release ──
+function clGenerateItems(relId){
+  const existing=_clItems.filter(i=>i.relId===relId);
+  if(existing.length>0) return; // already generated
+  const now=new Date().toISOString();
+  CL_PHASES.forEach(ph=>{
+    ph.items.forEach(tmpl=>{
+      _clItems.push({
+        id:clUid(),relId,phaseId:ph.id,phaseCode:ph.code,
+        itemId:tmpl.id,desc:tmpl.desc,priority:tmpl.priority,
+        mandatory:tmpl.mandatory,category:'',module:'',
+        owner:'',status:'Not Started',expectedResult:'',actualResult:'',
+        evidenceLink:'',screenshotLink:'',bugId:'',
+        passedCount:0,failedCount:0,blockedCount:0,
+        qaLeadReview:'Pending',qaLeadComment:'',
+        verifiedBy:'',verifiedDate:'',notes:'',
+        startTime:'',completedTime:'',
+        lastUpdatedBy:'',lastUpdatedAt:now,createdAt:now
+      });
+    });
+  });
+  clSaveItems();
+}
+
+// ── Create new checklist release ──
+function clNewRelease(data){
+  const now=new Date().toISOString();
+  const rel={
+    id:clUid(),
+    projectId:data.projectId||'',
+    projectName:data.projectName||'',
+    client:data.client||'',
+    name:data.name||'New Release',
+    version:data.version||'1.0.0',
+    buildNumber:data.buildNumber||'',
+    featureSummary:data.featureSummary||'',
+    changedModule:data.changedModule||'',
+    affectedModules:data.affectedModules||'',
+    qaEnvUrl:data.qaEnvUrl||'',
+    productionUrl:data.productionUrl||'',
+    plannedDate:data.plannedDate||'',
+    actualDate:'',
+    riskLevel:data.riskLevel||'Normal',
+    developer:data.developer||'',
+    qaLead:data.qaLead||'',
+    manualQa:data.manualQa||'',
+    automationQa:data.automationQa||'',
+    apiOwner:data.apiOwner||'',
+    status:'Draft',
+    health:'At Risk',
+    decision:'Pending',
+    knownRisks:data.knownRisks||'',
+    decisionNotes:'',
+    approvedBy:'',
+    approvedAt:'',
+    bugs:[],
+    createdAt:now,updatedAt:now
+  };
+  _clReleases.push(rel);
+  clGenerateItems(rel.id);
+  clSaveReleases();
+  clAuditAdd(rel,'Release Created','New checklist release created');
+  return rel;
+}
+
+// ── Render checklist list view ──
+function clRenderChecklist(){
+  const el=document.getElementById('ft-view-checklist');
+  if(!el) return;
+  const projFilter=document.getElementById('ft-proj-select')?.value||'';
+  let rels=_clReleases;
+  if(projFilter&&projFilter!=='all') rels=rels.filter(r=>r.projectId===projFilter);
+  rels=[...rels].sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
+
+  el.innerHTML=`
+  <div class="ft-section-hdr" style="margin-bottom:16px">
+    <div><h2>QA Workflow Dashboard</h2><div style="font-size:11px;color:var(--mut)">${rels.length} checklist release${rels.length!==1?'s':''} — 14-phase Fast-Track QA</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="ftbtn sm" onclick="clOpenQuickPanel()">⚡ Quick Update</button>
+      <button class="ftbtn sm primary" onclick="clShowNewReleaseModal()">+ New Checklist</button>
+    </div>
+  </div>
+  ${rels.length===0?`<div class="ft-empty"><div class="ft-empty-icon">📋</div><div class="ft-empty-text">No checklist releases yet</div><div class="ft-empty-sub">Create a checklist release to start tracking QA activities</div><button class="ftbtn primary" onclick="clShowNewReleaseModal()">+ Create Checklist Release</button></div>`
+  :rels.map(rel=>{
+    const pct=clRelProgress(rel.id);
+    const health=clRelHealth(rel.id);
+    const dec=rel.decision||'Pending';
+    const decCls=clDecisionCls(dec);
+    const openCrit=(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed').length;
+    const openHigh=(rel.bugs||[]).filter(b=>b.severity==='High'&&b.status!=='Closed').length;
+    const phaseBar=CL_PHASES.map(ph=>{
+      const {pct:pp,blocked,failed}=clPhaseProgress(rel.id,ph.code);
+      const seg=blocked>0?'blocked':failed>0?'blocked':pp===100?'done':pp>0?'active':'';
+      return `<div class="cl-phase-bar-seg ${seg}" title="${ph.label}: ${pp}%"></div>`;
+    }).join('');
+    return `<div class="cl-release-card" onclick="clOpenRelease('${rel.id}')">
+      <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <div style="font-size:14px;font-weight:800;color:var(--txt)">${clEsc(rel.name)}</div>
+          <div style="font-size:11px;color:var(--mut);margin-top:2px">${clEsc(rel.projectName||'—')} · v${clEsc(rel.version)} · ${clEsc(rel.changedModule||'—')}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+            <span class="ftbadge ${clStatusCls(rel.status)}">${clEsc(rel.status)}</span>
+            <span class="ft-health ${health.cls}">${health.label}</span>
+            <span class="cl-decision-big ${decCls}" style="padding:3px 10px;font-size:11px">${dec==='GO'?'✅ GO':dec==='GO WITH RISK'?'⚠️ GO WITH RISK':dec==='NO-GO'?'🚫 NO-GO':'⏳ Pending'}</span>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:24px;font-weight:900;color:${pct>=80?'var(--green)':pct>=40?'var(--amber)':'var(--red)'}">${pct}%</div>
+          <div style="font-size:10px;color:var(--mut)">Overall Progress</div>
+          ${rel.plannedDate?`<div style="font-size:10px;color:var(--mut);margin-top:3px">📅 ${new Date(rel.plannedDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'})}</div>`:''}
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <div class="cl-phase-bar">${phaseBar}</div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mut);margin-top:4px">
+          <span>Req</span><span>Risk</span><span>Plan</span><span>Dev</span><span>Env</span><span>Smoke</span><span>Manual</span><span>API</span><span>Perm</span><span>UI</span><span>Bug</span><span>Reg</span><span>Rel</span><span>Prod</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;align-items:center">
+        ${rel.riskLevel?`<span style="font-size:11px;font-weight:700;color:${rel.riskLevel==='Critical'?'var(--red)':rel.riskLevel==='High'?'var(--amber)':'var(--mut)'}">⚡ ${rel.riskLevel} Risk</span>`:''}
+        ${openCrit>0?`<span class="ftbadge red">🔴 ${openCrit} Critical Bug${openCrit>1?'s':''}</span>`:''}
+        ${openHigh>0?`<span class="ftbadge amber">🟡 ${openHigh} High Bug${openHigh>1?'s':''}</span>`:''}
+        ${rel.qaLead?`<span style="font-size:11px;color:var(--mut)">QA Lead: ${clEsc(rel.qaLead)}</span>`:''}
+        <span style="font-size:11px;color:var(--mut);margin-left:auto">Updated ${clFmt(rel.updatedAt)}</span>
+      </div>
+    </div>`;
+  }).join('')}`;
+}
+
+// ── Open a release detail ──
+function clOpenRelease(relId){
+  _clSelectedRelease=relId;
+  _clSelectedPhase=null;
+  const v=document.getElementById('ft-view-checklist-detail');
+  document.querySelectorAll('.ft-vp').forEach(el=>el.style.display='none');
+  if(v){v.style.display='';clRenderReleaseDetail();}
+  document.querySelectorAll('.ft-nav-item').forEach(n=>n.classList.remove('active'));
+  const ni=document.querySelector('.ft-nav-item[data-view="checklist"]');
+  if(ni) ni.classList.add('active');
+  document.getElementById('ft-breadcrumb').innerHTML=`<a onclick="ftNav('checklist')">QA Workflow</a><span>›</span><strong>${clEsc(_clReleases.find(r=>r.id===relId)?.name||'Release')}</strong>`;
+}
+
+// ── Render release detail ──
+function clRenderReleaseDetail(){
+  const el=document.getElementById('ft-view-checklist-detail');
+  if(!el||!_clSelectedRelease) return;
+  const rel=_clReleases.find(r=>r.id===_clSelectedRelease);
+  if(!rel){el.innerHTML='<div class="ft-empty">Release not found</div>';return;}
+  const pct=clRelProgress(rel.id);
+  const health=clRelHealth(rel.id);
+  const dec=rel.decision||'Pending';
+  const decCls=clDecisionCls(dec);
+  const recommended=clRecommendDecision(rel.id);
+  const openCrit=(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed').length;
+
+  // Build stepper
+  const stepperHtml=CL_PHASES.map((ph,i)=>{
+    const {pct:pp,failed,blocked}=clPhaseProgress(rel.id,ph.code);
+    const cls=blocked>0||failed>0?'blocked':pp===100?'done':pp>0?'in-progress':'';
+    return `<div class="cl-step ${cls}" onclick="clScrollToPhase('${ph.id}')" title="${ph.label}">
+      <div class="cl-step-circle">${pp===100?'✓':ph.icon||String(i+1)}</div>
+      <div class="cl-step-label">${ph.code}</div>
+    </div>`;
+  }).join('');
+
+  // Summary stats
+  const allItems=_clItems.filter(i=>i.relId===rel.id&&i.status!=='Not Applicable');
+  const totPassed=allItems.filter(i=>i.status==='Passed'||i.status==='Verified').length;
+  const totFailed=allItems.filter(i=>i.status==='Failed').length;
+  const totBlocked=allItems.filter(i=>i.status==='Blocked').length;
+  const totPending=allItems.filter(i=>i.status==='Not Started').length;
+  const totInProg=allItems.filter(i=>i.status==='In Progress'||i.status==='Assigned'||i.status==='Retesting'||i.status==='Submitted for Review').length;
+
+  el.innerHTML=`
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    <button class="ftbtn sm" onclick="ftNav('checklist')">← Back</button>
+    <div style="flex:1">
+      <h2 style="font-size:16px;margin:0">${clEsc(rel.name)}</h2>
+      <div style="font-size:11px;color:var(--mut)">${clEsc(rel.projectName||'—')} · v${clEsc(rel.version)} · ${clEsc(rel.changedModule||'—')}</div>
+    </div>
+    <button class="ftbtn sm" onclick="clOpenQuickPanel('${rel.id}')">⚡ Quick Update</button>
+    <button class="ftbtn sm primary" onclick="clDownloadReport('${rel.id}')">📥 Download Report</button>
+    <button class="ftbtn sm" onclick="clShowEditReleaseModal('${rel.id}')">✏️ Edit</button>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="cl-summary-grid" style="margin-bottom:18px">
+    <div class="cl-summary-cell"><div class="cl-summary-val" style="color:${pct>=80?'var(--green)':pct>=40?'var(--amber)':'var(--red)'}">${pct}%</div><div class="cl-summary-lbl">Overall Progress</div></div>
+    <div class="cl-summary-cell"><div class="cl-summary-val" style="color:var(--green)">${totPassed}</div><div class="cl-summary-lbl">Passed</div></div>
+    <div class="cl-summary-cell"><div class="cl-summary-val" style="color:var(--red)">${totFailed}</div><div class="cl-summary-lbl">Failed</div></div>
+    <div class="cl-summary-cell"><div class="cl-summary-val" style="color:var(--red)">${totBlocked}</div><div class="cl-summary-lbl">Blocked</div></div>
+    <div class="cl-summary-cell"><div class="cl-summary-val" style="color:var(--mut)">${totPending}</div><div class="cl-summary-lbl">Not Started</div></div>
+    <div class="cl-summary-cell"><div class="cl-summary-val" style="color:var(--blue)">${totInProg}</div><div class="cl-summary-lbl">In Progress</div></div>
+    <div class="cl-summary-cell"><div class="cl-summary-val" style="color:${openCrit>0?'var(--red)':'var(--green)'}">${openCrit}</div><div class="cl-summary-lbl">Critical Bugs</div></div>
+    <div class="cl-summary-cell"><div class="cl-summary-val"><span class="cl-decision-big ${decCls}" style="padding:4px 10px;font-size:12px">${dec}</span></div><div class="cl-summary-lbl">Decision</div></div>
+  </div>
+
+  <!-- Decision banner -->
+  ${openCrit>0?`<div class="cl-warn-banner">🚫 <div><strong>Blocked — ${openCrit} critical bug${openCrit>1?'s':''} open.</strong> Release cannot proceed until all critical bugs are closed.</div></div>`:''}
+  ${recommended==='NO-GO'&&dec!=='NO-GO'?`<div class="cl-gate fail">🚫 System recommends <strong>NO-GO</strong> — blocking issues detected. Review phases below.</div>`:''}
+  ${recommended==='GO'&&dec==='Pending'?`<div class="cl-gate pass">✅ All gates passed — system recommends <strong>GO</strong>. Set final decision below.</div>`:''}
+
+  <!-- Decision control -->
+  <div class="ftc" style="margin-bottom:16px">
+    <div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">🏁 Release Decision</h2></div>
+    <div style="padding:14px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="ftbtn primary" style="background:var(--green);border-color:var(--green)" onclick="clSetDecision('${rel.id}','GO')">✅ Set GO</button>
+      <button class="ftbtn" style="border-color:var(--amber);color:var(--amber)" onclick="clSetDecision('${rel.id}','GO WITH RISK')">⚠️ GO WITH RISK</button>
+      <button class="ftbtn" style="border-color:var(--red);color:var(--red)" onclick="clSetDecision('${rel.id}','NO-GO')">🚫 NO-GO</button>
+      <div style="flex:1"></div>
+      <span class="cl-decision-big ${decCls}">${dec==='GO'?'✅ GO':dec==='GO WITH RISK'?'⚠️ GO WITH RISK':dec==='NO-GO'?'🚫 NO-GO':'⏳ Pending'}</span>
+    </div>
+    ${rel.decisionNotes?`<div style="padding:8px 10px;background:var(--card2);border-radius:8px;font-size:12px;margin-top:4px"><strong>Notes:</strong> ${clEsc(rel.decisionNotes)}</div>`:''}
+    ${rel.approvedBy?`<div style="font-size:11px;color:var(--mut);margin-top:6px">Approved by: <strong>${clEsc(rel.approvedBy)}</strong> at ${clFmt(rel.approvedAt)}</div>`:''}
+  </div>
+
+  <!-- Phase stepper -->
+  <div class="ftc" style="margin-bottom:16px">
+    <div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">Workflow Phases</h2></div>
+    <div class="cl-stepper">${stepperHtml}</div>
+  </div>
+
+  <!-- Production sanity warning -->
+  <div class="cl-warn-banner" style="background:rgba(244,160,0,.07);border-color:rgba(244,160,0,.3);color:var(--amber)">
+    ⚠️ <div><strong>Production Sanity Warning:</strong> Do not perform destructive tests, real payment actions, mass notifications or production-data changes without explicit approval from QA Lead and Release Manager.</div>
+  </div>
+
+  <!-- Phase cards -->
+  ${CL_PHASES.map(ph=>clRenderPhaseCard(rel,ph)).join('')}
+
+  <!-- Bugs section -->
+  ${clRenderBugsSection(rel)}
+
+  <!-- Release info panel -->
+  ${clRenderReleaseInfoPanel(rel)}
+
+  <!-- Audit history -->
+  ${clRenderAuditSection(rel.id)}
+  `;
+}
+
+function clRenderPhaseCard(rel,ph){
+  const {pct,passed,failed,blocked,notTested,total}=clPhaseProgress(rel.id,ph.code);
+  const numCls=blocked>0||failed>0?'blocked':pct===100?'done':pct>0?'active':'';
+  const items=_clItems.filter(i=>i.relId===rel.id&&i.phaseCode===ph.code);
+  const isOpen=_clSelectedPhase===ph.id;
+  return `<div class="cl-phase-card" id="cl-ph-${ph.id}">
+    <div class="cl-phase-hdr ${isOpen?'open':''}" onclick="clTogglePhase('${ph.id}')">
+      <div class="cl-phase-num ${numCls}">${pct===100?'✓':ph.icon}</div>
+      <div class="cl-phase-title">${ph.label}</div>
+      <div class="cl-phase-meta">
+        <div class="cl-stats-row" style="margin:0">
+          ${passed>0?`<span class="cl-stat"><span class="cl-stat-dot" style="background:var(--green)"></span>${passed} Pass</span>`:''}
+          ${failed>0?`<span class="cl-stat"><span class="cl-stat-dot" style="background:var(--red)"></span>${failed} Fail</span>`:''}
+          ${blocked>0?`<span class="cl-stat"><span class="cl-stat-dot" style="background:var(--red)"></span>${blocked} Blocked</span>`:''}
+          ${notTested>0?`<span class="cl-stat"><span class="cl-stat-dot" style="background:var(--border)"></span>${notTested} Pending</span>`:''}
+        </div>
+        <div class="cl-phase-pct" style="color:${pct===100?'var(--green)':pct>0?'var(--blue)':'var(--mut)'}">${pct}%</div>
+        <div class="ft-progress" style="width:80px;height:6px"><div class="ft-progress-fill ${pct===100?'green':pct>50?'':'amber'}" style="width:${pct}%"></div></div>
+      </div>
+      <span style="font-size:11px;color:var(--mut);flex-shrink:0">${isOpen?'▲':'▼'}</span>
+    </div>
+    <div class="cl-phase-body ${isOpen?'open':''}" id="cl-phb-${ph.id}">
+      ${ph.id==='ph14'?`<div class="cl-warn-banner">⚠️ Production environment only. No destructive actions.</div>`:''}
+      <div class="ft-tbl-wrap" style="margin-top:8px">
+      <table class="cl-item-tbl">
+        <thead><tr>
+          <th style="min-width:70px">ID</th>
+          <th style="min-width:260px">Checklist Item</th>
+          <th>Priority</th>
+          <th>Mandatory</th>
+          <th>Owner</th>
+          <th style="min-width:150px">Status</th>
+          <th>Actual Result</th>
+          <th>Evidence</th>
+          <th>Bug ID</th>
+          <th>QA Review</th>
+          <th>Actions</th>
+        </tr></thead>
+        <tbody>
+        ${items.map(item=>`<tr id="cl-row-${item.id}">
+          <td><span class="cl-item-id">${item.itemId}</span></td>
+          <td><div class="cl-item-desc">${clEsc(item.desc)}${item.mandatory==='Yes'?'<span class="cl-mandatory-star">*</span>':''}</div></td>
+          <td><span class="cl-item-priority ${clPriCls(item.priority)}">${item.priority}</span></td>
+          <td><span style="font-size:10px;color:var(--mut)">${item.mandatory}</span></td>
+          <td><span style="font-size:11px;color:var(--txt)">${clEsc(item.owner)||'—'}</span></td>
+          <td><select class="cl-status-sel" onchange="clUpdateItemStatus('${rel.id}','${item.id}',this.value,'${ph.id}')">
+            ${CL_STATUSES.map(s=>`<option value="${s}" ${item.status===s?'selected':''}>${s}</option>`).join('')}
+          </select></td>
+          <td><span style="font-size:11px;color:var(--txt);max-width:120px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${clEsc(item.actualResult)}">${clEsc(item.actualResult)||'—'}</span></td>
+          <td>${item.evidenceLink?`<a class="cl-evidence-link" href="${clEsc(item.evidenceLink)}" target="_blank" rel="noopener">🔗 View</a>`:'—'}</td>
+          <td><span style="font-size:11px;color:var(--red)">${clEsc(item.bugId)||'—'}</span></td>
+          <td><span class="ftbadge ${clStatusCls(item.qaLeadReview)}" style="font-size:9px">${item.qaLeadReview||'Pending'}</span></td>
+          <td><button class="ftbtn xs primary" onclick="clOpenItemModal('${rel.id}','${item.id}')">Edit</button></td>
+        </tr>`).join('')}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+function clRenderBugsSection(rel){
+  const bugs=rel.bugs||[];
+  const openBugs=bugs.filter(b=>b.status!=='Closed'&&b.status!=='Deferred');
+  return `<div class="ftc" style="margin-bottom:14px">
+    <div class="ftc-hdr">
+      <h2 class="ftc-title" style="margin:0">🐛 Bugs <span class="ftbadge ${openBugs.length>0?'red':'green'}">${openBugs.length} open / ${bugs.length} total</span></h2>
+      <button class="ftbtn sm primary" onclick="clShowNewBugModal('${rel.id}')">+ Log Bug</button>
+    </div>
+    ${bugs.length===0?`<div class="ft-empty" style="padding:12px"><div class="ft-empty-text">No bugs logged</div></div>`
+    :`<div class="ft-tbl-wrap"><table class="ft-tbl" style="font-size:12px">
+      <thead><tr><th>ID</th><th>Title</th><th>Module</th><th>Severity</th><th>Priority</th><th>Status</th><th>Assignee</th><th>Actions</th></tr></thead>
+      <tbody>${bugs.map(b=>`<tr>
+        <td><span class="cl-item-id">${clEsc(b.id)}</span></td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${clEsc(b.title)}</td>
+        <td>${clEsc(b.module||'—')}</td>
+        <td><span class="ftbadge ${b.severity==='Critical'?'red':b.severity==='High'?'amber':b.severity==='Medium'?'blue':'grey'}">${clEsc(b.severity)}</span></td>
+        <td><span class="cl-item-priority ${clPriCls(b.priority||'P2')}">${clEsc(b.priority||'P2')}</span></td>
+        <td><span class="ftbadge ${b.status==='Closed'?'green':b.status==='Fixed'||b.status==='Verified'?'blue':b.status==='Open'||b.status==='Reopened'?'red':'amber'}">${clEsc(b.status)}</span></td>
+        <td>${clEsc(b.assignee||'—')}</td>
+        <td><button class="ftbtn xs" onclick="clShowEditBugModal('${rel.id}','${b.id}')">Edit</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`}
+  </div>`;
+}
+
+function clRenderReleaseInfoPanel(rel){
+  return `<div class="ftc" style="margin-bottom:14px">
+    <div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">📋 Release Information</h2><button class="ftbtn xs" onclick="clShowEditReleaseModal('${rel.id}')">✏️ Edit</button></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;padding:8px 0;font-size:12px">
+      ${[['Project',rel.projectName],['Client',rel.client],['Version',rel.version],['Build',rel.buildNumber],
+         ['Risk Level',rel.riskLevel],['QA Lead',rel.qaLead],['Manual QA',rel.manualQa],
+         ['Automation QA',rel.automationQa],['Developer',rel.developer],['API Owner',rel.apiOwner],
+         ['QA Env URL',rel.qaEnvUrl],['Prod URL',rel.productionUrl],
+         ['Planned Date',rel.plannedDate?new Date(rel.plannedDate).toLocaleDateString('en-GB'):'—'],
+         ['Changed Module',rel.changedModule],['Affected Modules',rel.affectedModules],
+      ].map(([k,v])=>`<div><div style="font-size:10px;font-weight:700;color:var(--mut2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">${k}</div><div style="font-weight:600;color:var(--txt)">${clEsc(v||'—')}</div></div>`).join('')}
+      ${rel.featureSummary?`<div style="grid-column:1/-1"><div style="font-size:10px;font-weight:700;color:var(--mut2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Feature Summary</div><div style="font-weight:600;color:var(--txt)">${clEsc(rel.featureSummary)}</div></div>`:''}
+      ${rel.knownRisks?`<div style="grid-column:1/-1"><div style="font-size:10px;font-weight:700;color:var(--mut2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Known Risks</div><div style="font-weight:600;color:var(--amber)">${clEsc(rel.knownRisks)}</div></div>`:''}
+    </div>
+  </div>`;
+}
+
+function clRenderAuditSection(relId){
+  const entries=_clAudit.filter(a=>a.relId===relId).slice(-20).reverse();
+  return `<div class="ftc" style="margin-bottom:14px">
+    <div class="ftc-hdr"><h2 class="ftc-title" style="margin:0">📜 Activity History</h2></div>
+    ${entries.length===0?`<div class="ft-empty" style="padding:10px"><div class="ft-empty-text">No activity yet</div></div>`
+    :entries.map(a=>{
+      const cls=a.action.includes('Pass')||a.action.includes('GO')?'green':a.action.includes('Fail')||a.action.includes('Block')||a.action.includes('NO-GO')?'red':a.action.includes('Review')?'purple':'blue';
+      return `<div class="cl-audit-item"><div class="cl-audit-dot ${cls}"></div><div class="cl-audit-text"><strong>${clEsc(a.action)}</strong>${a.detail?' — '+clEsc(a.detail):''}<span style="color:var(--mut)"> by ${clEsc(a.user)}</span></div><div class="cl-audit-time">${clFmt(a.at)}</div></div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ── Toggle phase ──
+function clTogglePhase(phId){
+  if(_clSelectedPhase===phId){_clSelectedPhase=null;}
+  else{_clSelectedPhase=phId;}
+  clRenderReleaseDetail();
+  if(_clSelectedPhase){
+    setTimeout(()=>{
+      const el=document.getElementById('cl-ph-'+phId);
+      if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+    },80);
+  }
+}
+
+function clScrollToPhase(phId){
+  _clSelectedPhase=phId;
+  clRenderReleaseDetail();
+  setTimeout(()=>{
+    const el=document.getElementById('cl-ph-'+phId);
+    if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+  },80);
+}
+
+// ── Update item status inline ──
+function clUpdateItemStatus(relId,itemId,newStatus,phId){
+  const item=_clItems.find(i=>i.id===itemId);
+  if(!item) return;
+  const old=item.status;
+  item.status=newStatus;
+  item.lastUpdatedBy=window._ftCurrentUser||'—';
+  item.lastUpdatedAt=new Date().toISOString();
+  if(newStatus==='In Progress'&&!item.startTime) item.startTime=item.lastUpdatedAt;
+  if((newStatus==='Passed'||newStatus==='Verified')&&!item.completedTime) item.completedTime=item.lastUpdatedAt;
+  clSaveItems();
+  const rel=_clReleases.find(r=>r.id===relId);
+  if(rel){
+    rel.updatedAt=new Date().toISOString();
+    clAuditAdd(rel,`Status: ${item.itemId} → ${newStatus}`,`Was: ${old}`,window._ftCurrentUser);
+    clSaveReleases();
+    // Recalculate health and decision
+    const health=clRelHealth(relId);
+    rel.health=health.label;
+    clSaveReleases();
+  }
+  // Refresh phase progress bar in header without full re-render
+  const {pct,passed,failed,blocked,notTested}=clPhaseProgress(relId,item.phaseCode);
+  const numEl=document.querySelector(`#cl-ph-${phId} .cl-phase-num`);
+  if(numEl){
+    numEl.className='cl-phase-num '+(blocked>0||failed>0?'blocked':pct===100?'done':pct>0?'active':'');
+    numEl.textContent=pct===100?'✓':CL_PHASES.find(p=>p.code===item.phaseCode)?.icon||'';
+  }
+  ftShowToast(`${item.itemId} → ${newStatus}`,'success');
+}
+
+// ── Set decision ──
+function clSetDecision(relId,dec){
+  const rel=_clReleases.find(r=>r.id===relId);
+  if(!rel) return;
+  const openCrit=(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed').length;
+  if(dec==='GO'&&openCrit>0){ftShowToast('Cannot set GO — critical bugs remain open','error');return;}
+  if(dec==='GO'&&clPhaseProgress(relId,'SMK').failed>0){ftShowToast('Cannot set GO — smoke test has failures','error');return;}
+  const reason=dec==='GO WITH RISK'?prompt('GO WITH RISK reason (required):',rel.decisionNotes||''):null;
+  if(dec==='GO WITH RISK'&&!reason){ftShowToast('Reason required for GO WITH RISK','error');return;}
+  rel.decision=dec;
+  if(reason) rel.decisionNotes=reason;
+  rel.approvedBy=window._ftCurrentUser||'—';
+  rel.approvedAt=new Date().toISOString();
+  rel.updatedAt=rel.approvedAt;
+  clSaveReleases();
+  clAuditAdd(rel,'Decision Set',dec,window._ftCurrentUser);
+  ftShowToast(`Decision set: ${dec}`,'success');
+  clRenderReleaseDetail();
+}
+
+// ── Item edit modal ──
+function clOpenItemModal(relId,itemId){
+  const item=_clItems.find(i=>i.id===itemId);
+  if(!item) return;
+  const ph=CL_PHASES.find(p=>p.code===item.phaseCode);
+  const existing=document.getElementById('cl-item-modal');
+  if(existing) existing.remove();
+  const m=document.createElement('div');
+  m.id='cl-item-modal';
+  m.className='ft-modal-overlay';
+  m.style.zIndex='8000';
+  m.innerHTML=`<div class="ft-modal" style="max-width:680px">
+    <div class="ft-modal-hdr"><div><div class="ft-modal-title">${item.itemId} — ${clEsc(item.desc)}</div><div style="font-size:11px;color:var(--mut)">${ph?.label||item.phaseCode}</div></div><button class="ft-modal-close" onclick="document.getElementById('cl-item-modal').remove()">✕</button></div>
+    <div class="ft-modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="cl-qp-field"><label>Status</label><select id="clm-status">
+        ${CL_STATUSES.map(s=>`<option ${item.status===s?'selected':''}>${s}</option>`).join('')}
+      </select></div>
+      <div class="cl-qp-field"><label>Owner</label><input id="clm-owner" value="${clEsc(item.owner)}"></div>
+      <div class="cl-qp-field" style="grid-column:1/-1"><label>Expected Result</label><textarea id="clm-expected" rows="2">${clEsc(item.expectedResult)}</textarea></div>
+      <div class="cl-qp-field" style="grid-column:1/-1"><label>Actual Result</label><textarea id="clm-actual" rows="2">${clEsc(item.actualResult)}</textarea></div>
+      <div class="cl-qp-field"><label>Evidence Link</label><input id="clm-evidence" value="${clEsc(item.evidenceLink)}"></div>
+      <div class="cl-qp-field"><label>Screenshot Link</label><input id="clm-screenshot" value="${clEsc(item.screenshotLink)}"></div>
+      <div class="cl-qp-field"><label>Bug ID</label><input id="clm-bugid" value="${clEsc(item.bugId)}"></div>
+      <div class="cl-qp-field"><label>QA Lead Review</label><select id="clm-qa-review">
+        ${CL_REVIEW_STATUSES.map(s=>`<option ${item.qaLeadReview===s?'selected':''}>${s}</option>`).join('')}
+      </select></div>
+      <div class="cl-qp-field"><label>QA Lead Comment</label><input id="clm-qa-comment" value="${clEsc(item.qaLeadComment)}"></div>
+      <div class="cl-qp-field" style="grid-column:1/-1"><label>Notes</label><textarea id="clm-notes" rows="2">${clEsc(item.notes)}</textarea></div>
+      <div class="cl-qp-field"><label>Passed Count</label><input type="number" id="clm-passed" value="${item.passedCount||0}" min="0"></div>
+      <div class="cl-qp-field"><label>Failed Count</label><input type="number" id="clm-failed" value="${item.failedCount||0}" min="0"></div>
+    </div>
+    <div class="ft-modal-footer">
+      <button class="ftbtn" onclick="document.getElementById('cl-item-modal').remove()">Cancel</button>
+      <button class="ftbtn primary" onclick="clSaveItemModal('${relId}','${itemId}','${ph?.id}')">Save Changes</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+function clSaveItemModal(relId,itemId,phId){
+  const item=_clItems.find(i=>i.id===itemId);
+  if(!item) return;
+  const old=item.status;
+  item.status=document.getElementById('clm-status').value;
+  item.owner=document.getElementById('clm-owner').value.trim();
+  item.expectedResult=document.getElementById('clm-expected').value.trim();
+  item.actualResult=document.getElementById('clm-actual').value.trim();
+  item.evidenceLink=document.getElementById('clm-evidence').value.trim();
+  item.screenshotLink=document.getElementById('clm-screenshot').value.trim();
+  item.bugId=document.getElementById('clm-bugid').value.trim();
+  item.qaLeadReview=document.getElementById('clm-qa-review').value;
+  item.qaLeadComment=document.getElementById('clm-qa-comment').value.trim();
+  item.notes=document.getElementById('clm-notes').value.trim();
+  item.passedCount=parseInt(document.getElementById('clm-passed').value)||0;
+  item.failedCount=parseInt(document.getElementById('clm-failed').value)||0;
+  item.lastUpdatedBy=window._ftCurrentUser||'—';
+  item.lastUpdatedAt=new Date().toISOString();
+  if(item.status!=='Not Started'&&!item.startTime) item.startTime=item.lastUpdatedAt;
+  if((item.status==='Passed'||item.status==='Verified')&&!item.completedTime) item.completedTime=item.lastUpdatedAt;
+  clSaveItems();
+  const rel=_clReleases.find(r=>r.id===relId);
+  if(rel){
+    rel.updatedAt=new Date().toISOString();
+    if(old!==item.status) clAuditAdd(rel,`${item.itemId}: ${old} → ${item.status}`,'',window._ftCurrentUser);
+    clSaveReleases();
+  }
+  document.getElementById('cl-item-modal')?.remove();
+  ftShowToast('Item updated','success');
+  _clSelectedPhase=phId||null;
+  clRenderReleaseDetail();
+}
+
+// ── New Release Modal ──
+function clShowNewReleaseModal(){
+  const existing=document.getElementById('cl-new-rel-modal');
+  if(existing) existing.remove();
+  const m=document.createElement('div');
+  m.id='cl-new-rel-modal';
+  m.className='ft-modal-overlay';
+  m.style.zIndex='8000';
+  const projOpts=_ftProjects.map(p=>`<option value="${p.id}">${clEsc(p.name)}</option>`).join('');
+  m.innerHTML=`<div class="ft-modal" style="max-width:640px">
+    <div class="ft-modal-hdr"><div class="ft-modal-title">New Checklist Release</div><button class="ft-modal-close" onclick="document.getElementById('cl-new-rel-modal').remove()">✕</button></div>
+    <div class="ft-modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="cl-qp-field"><label>Project <span class="cl-mandatory-star">*</span></label><select id="clnr-proj"><option value="">— Select Project —</option>${projOpts}</select></div>
+      <div class="cl-qp-field"><label>Release Name <span class="cl-mandatory-star">*</span></label><input id="clnr-name" placeholder="e.g. Sprint 24 Release"></div>
+      <div class="cl-qp-field"><label>Version</label><input id="clnr-ver" placeholder="1.0.0"></div>
+      <div class="cl-qp-field"><label>Build Number</label><input id="clnr-build" placeholder="Build-245"></div>
+      <div class="cl-qp-field"><label>Risk Level</label><select id="clnr-risk"><option>Normal</option><option>High</option><option>Critical</option></select></div>
+      <div class="cl-qp-field"><label>Planned Date</label><input type="date" id="clnr-date"></div>
+      <div class="cl-qp-field"><label>QA Lead</label><input id="clnr-qalead" placeholder="QA Lead name"></div>
+      <div class="cl-qp-field"><label>Developer</label><input id="clnr-dev" placeholder="Developer name"></div>
+      <div class="cl-qp-field"><label>Manual QA</label><input id="clnr-mqa" placeholder="Manual QA tester"></div>
+      <div class="cl-qp-field"><label>Automation QA</label><input id="clnr-aqa" placeholder="Automation QA"></div>
+      <div class="cl-qp-field"><label>API Owner</label><input id="clnr-api" placeholder="API owner"></div>
+      <div class="cl-qp-field"><label>Client</label><input id="clnr-client" placeholder="Client name"></div>
+      <div class="cl-qp-field"><label>Changed Module</label><input id="clnr-module" placeholder="e.g. Payment, Login"></div>
+      <div class="cl-qp-field"><label>QA Env URL</label><input id="clnr-qaurl" placeholder="https://qa.example.com"></div>
+      <div class="cl-qp-field" style="grid-column:1/-1"><label>Feature / Fix Summary</label><textarea id="clnr-summary" rows="2" placeholder="What is being released..."></textarea></div>
+      <div class="cl-qp-field" style="grid-column:1/-1"><label>Known Risks</label><textarea id="clnr-risks" rows="2" placeholder="Any known risks or limitations..."></textarea></div>
+    </div>
+    <div class="ft-modal-footer">
+      <button class="ftbtn" onclick="document.getElementById('cl-new-rel-modal').remove()">Cancel</button>
+      <button class="ftbtn primary" onclick="clCreateRelease()">Create & Generate Checklist</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+function clCreateRelease(){
+  const projId=document.getElementById('clnr-proj').value;
+  const name=document.getElementById('clnr-name').value.trim();
+  if(!name){ftShowToast('Release name is required','error');return;}
+  const proj=_ftProjects.find(p=>p.id===projId);
+  const rel=clNewRelease({
+    projectId:projId,projectName:proj?.name||'',
+    client:document.getElementById('clnr-client').value.trim()||proj?.client||'',
+    name,version:document.getElementById('clnr-ver').value.trim()||'1.0.0',
+    buildNumber:document.getElementById('clnr-build').value.trim(),
+    riskLevel:document.getElementById('clnr-risk').value,
+    plannedDate:document.getElementById('clnr-date').value,
+    qaLead:document.getElementById('clnr-qalead').value.trim(),
+    developer:document.getElementById('clnr-dev').value.trim(),
+    manualQa:document.getElementById('clnr-mqa').value.trim(),
+    automationQa:document.getElementById('clnr-aqa').value.trim(),
+    apiOwner:document.getElementById('clnr-api').value.trim(),
+    changedModule:document.getElementById('clnr-module').value.trim(),
+    qaEnvUrl:document.getElementById('clnr-qaurl').value.trim(),
+    featureSummary:document.getElementById('clnr-summary').value.trim(),
+    knownRisks:document.getElementById('clnr-risks').value.trim(),
+  });
+  document.getElementById('cl-new-rel-modal')?.remove();
+  ftShowToast(`Checklist created — ${_clItems.filter(i=>i.relId===rel.id).length} items generated across 14 phases`,'success');
+  clOpenRelease(rel.id);
+}
+
+// ── Edit Release Modal ──
+function clShowEditReleaseModal(relId){
+  const rel=_clReleases.find(r=>r.id===relId);
+  if(!rel) return;
+  const existing=document.getElementById('cl-edit-rel-modal');
+  if(existing) existing.remove();
+  const m=document.createElement('div');
+  m.id='cl-edit-rel-modal';
+  m.className='ft-modal-overlay';
+  m.style.zIndex='8000';
+  m.innerHTML=`<div class="ft-modal" style="max-width:640px">
+    <div class="ft-modal-hdr"><div class="ft-modal-title">Edit Release — ${clEsc(rel.name)}</div><button class="ft-modal-close" onclick="document.getElementById('cl-edit-rel-modal').remove()">✕</button></div>
+    <div class="ft-modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="cl-qp-field"><label>Release Name</label><input id="cer-name" value="${clEsc(rel.name)}"></div>
+      <div class="cl-qp-field"><label>Version</label><input id="cer-ver" value="${clEsc(rel.version)}"></div>
+      <div class="cl-qp-field"><label>Build Number</label><input id="cer-build" value="${clEsc(rel.buildNumber)}"></div>
+      <div class="cl-qp-field"><label>Status</label><select id="cer-status">
+        ${['Draft','QA Ready','In Testing','Waiting for Fix','Retesting','Ready for Release','Released','Blocked','Cancelled'].map(s=>`<option ${rel.status===s?'selected':''}>${s}</option>`).join('')}
+      </select></div>
+      <div class="cl-qp-field"><label>Risk Level</label><select id="cer-risk">
+        ${['Normal','High','Critical'].map(s=>`<option ${rel.riskLevel===s?'selected':''}>${s}</option>`).join('')}
+      </select></div>
+      <div class="cl-qp-field"><label>Planned Date</label><input type="date" id="cer-date" value="${rel.plannedDate||''}"></div>
+      <div class="cl-qp-field"><label>QA Lead</label><input id="cer-qalead" value="${clEsc(rel.qaLead)}"></div>
+      <div class="cl-qp-field"><label>Developer</label><input id="cer-dev" value="${clEsc(rel.developer)}"></div>
+      <div class="cl-qp-field"><label>Manual QA</label><input id="cer-mqa" value="${clEsc(rel.manualQa)}"></div>
+      <div class="cl-qp-field"><label>Automation QA</label><input id="cer-aqa" value="${clEsc(rel.automationQa)}"></div>
+      <div class="cl-qp-field"><label>Changed Module</label><input id="cer-module" value="${clEsc(rel.changedModule)}"></div>
+      <div class="cl-qp-field"><label>QA Env URL</label><input id="cer-qaurl" value="${clEsc(rel.qaEnvUrl)}"></div>
+      <div class="cl-qp-field" style="grid-column:1/-1"><label>Feature Summary</label><textarea id="cer-summary" rows="2">${clEsc(rel.featureSummary)}</textarea></div>
+      <div class="cl-qp-field" style="grid-column:1/-1"><label>Decision Notes / Risk Notes</label><textarea id="cer-notes" rows="2">${clEsc(rel.decisionNotes||rel.knownRisks)}</textarea></div>
+    </div>
+    <div class="ft-modal-footer">
+      <button class="ftbtn danger" onclick="clDeleteRelease('${relId}')">Delete</button>
+      <button class="ftbtn" onclick="document.getElementById('cl-edit-rel-modal').remove()">Cancel</button>
+      <button class="ftbtn primary" onclick="clSaveEditRelease('${relId}')">Save</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+function clSaveEditRelease(relId){
+  const rel=_clReleases.find(r=>r.id===relId);
+  if(!rel) return;
+  rel.name=document.getElementById('cer-name').value.trim()||rel.name;
+  rel.version=document.getElementById('cer-ver').value.trim();
+  rel.buildNumber=document.getElementById('cer-build').value.trim();
+  rel.status=document.getElementById('cer-status').value;
+  rel.riskLevel=document.getElementById('cer-risk').value;
+  rel.plannedDate=document.getElementById('cer-date').value;
+  rel.qaLead=document.getElementById('cer-qalead').value.trim();
+  rel.developer=document.getElementById('cer-dev').value.trim();
+  rel.manualQa=document.getElementById('cer-mqa').value.trim();
+  rel.automationQa=document.getElementById('cer-aqa').value.trim();
+  rel.changedModule=document.getElementById('cer-module').value.trim();
+  rel.qaEnvUrl=document.getElementById('cer-qaurl').value.trim();
+  rel.featureSummary=document.getElementById('cer-summary').value.trim();
+  rel.decisionNotes=document.getElementById('cer-notes').value.trim();
+  rel.updatedAt=new Date().toISOString();
+  clSaveReleases();
+  clAuditAdd(rel,'Release Updated','Release details edited',window._ftCurrentUser);
+  document.getElementById('cl-edit-rel-modal')?.remove();
+  ftShowToast('Release updated','success');
+  clRenderReleaseDetail();
+}
+
+function clDeleteRelease(relId){
+  if(!confirm('Delete this checklist release and all its items? This cannot be undone.')) return;
+  _clReleases=_clReleases.filter(r=>r.id!==relId);
+  _clItems=_clItems.filter(i=>i.relId!==relId);
+  clSaveReleases();clSaveItems();
+  document.getElementById('cl-edit-rel-modal')?.remove();
+  ftShowToast('Release deleted','success');
+  ftNav('checklist');
+}
+
+// ── New Bug Modal ──
+function clShowNewBugModal(relId){
+  const existing=document.getElementById('cl-bug-modal');
+  if(existing) existing.remove();
+  const m=document.createElement('div');
+  m.id='cl-bug-modal';
+  m.className='ft-modal-overlay';
+  m.style.zIndex='8000';
+  m.innerHTML=`<div class="ft-modal" style="max-width:640px">
+    <div class="ft-modal-hdr"><div class="ft-modal-title">🐛 Log New Bug</div><button class="ft-modal-close" onclick="document.getElementById('cl-bug-modal').remove()">✕</button></div>
+    <div class="ft-modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="cl-qp-field" style="grid-column:1/-1"><label>Bug Title <span class="cl-mandatory-star">*</span></label><input id="clb-title" placeholder="Clear, descriptive title"></div>
+      <div class="cl-qp-field"><label>Module</label><input id="clb-module" placeholder="e.g. Login, Payment"></div>
+      <div class="cl-qp-field"><label>Severity</label><select id="clb-sev"><option>Critical</option><option>High</option><option selected>Medium</option><option>Low</option></select></div>
+      <div class="cl-qp-field"><label>Priority</label><select id="clb-pri"><option>P0</option><option selected>P1</option><option>P2</option><option>P3</option></select></div>
+      <div class="cl-qp-field"><label>Status</label><select id="clb-status"><option selected>Open</option><option>Assigned</option><option>In Progress</option><option>Fixed</option><option>Closed</option></select></div>
+      <div class="cl-qp-field"><label>Assignee</label><input id="clb-assignee" placeholder="Developer name"></div>
+      <div class="cl-qp-field" style="grid-column:1/-1"><label>Steps to Reproduce</label><textarea id="clb-steps" rows="3" placeholder="1. Go to...\n2. Click..."></textarea></div>
+      <div class="cl-qp-field" style="grid-column:1/-1"><label>Expected Result</label><textarea id="clb-expected" rows="2"></textarea></div>
+      <div class="cl-qp-field" style="grid-column:1/-1"><label>Actual Result</label><textarea id="clb-actual" rows="2"></textarea></div>
+      <div class="cl-qp-field"><label>Evidence Link</label><input id="clb-evidence" placeholder="https://..."></div>
+      <div class="cl-qp-field"><label>Linked Checklist ID</label><input id="clb-linked" placeholder="MAN-01"></div>
+    </div>
+    <div class="ft-modal-footer">
+      <button class="ftbtn" onclick="document.getElementById('cl-bug-modal').remove()">Cancel</button>
+      <button class="ftbtn primary" onclick="clSaveBug('${relId}')">Log Bug</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+function clSaveBug(relId){
+  const rel=_clReleases.find(r=>r.id===relId);
+  if(!rel) return;
+  const title=document.getElementById('clb-title').value.trim();
+  if(!title){ftShowToast('Bug title is required','error');return;}
+  const bug={
+    id:'BUG-'+Date.now().toString(36).toUpperCase(),
+    title,module:document.getElementById('clb-module').value.trim(),
+    severity:document.getElementById('clb-sev').value,
+    priority:document.getElementById('clb-pri').value,
+    status:document.getElementById('clb-status').value,
+    assignee:document.getElementById('clb-assignee').value.trim(),
+    steps:document.getElementById('clb-steps').value.trim(),
+    expectedResult:document.getElementById('clb-expected').value.trim(),
+    actualResult:document.getElementById('clb-actual').value.trim(),
+    evidenceLink:document.getElementById('clb-evidence').value.trim(),
+    linkedItem:document.getElementById('clb-linked').value.trim(),
+    reporter:window._ftCurrentUser||'—',
+    createdAt:new Date().toISOString(),
+  };
+  rel.bugs=rel.bugs||[];
+  rel.bugs.push(bug);
+  rel.updatedAt=new Date().toISOString();
+  clSaveReleases();
+  clAuditAdd(rel,'Bug Logged',`${bug.id}: ${title} (${bug.severity})`,window._ftCurrentUser);
+  document.getElementById('cl-bug-modal')?.remove();
+  ftShowToast('Bug logged: '+bug.id,'success');
+  clRenderReleaseDetail();
+}
+
+function clShowEditBugModal(relId,bugId){
+  const rel=_clReleases.find(r=>r.id===relId);
+  const bug=rel?.bugs?.find(b=>b.id===bugId);
+  if(!bug) return;
+  const existing=document.getElementById('cl-bug-edit-modal');
+  if(existing) existing.remove();
+  const m=document.createElement('div');
+  m.id='cl-bug-edit-modal';
+  m.className='ft-modal-overlay';
+  m.style.zIndex='8000';
+  m.innerHTML=`<div class="ft-modal" style="max-width:560px">
+    <div class="ft-modal-hdr"><div class="ft-modal-title">Edit Bug — ${clEsc(bug.id)}</div><button class="ft-modal-close" onclick="document.getElementById('cl-bug-edit-modal').remove()">✕</button></div>
+    <div class="ft-modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="cl-qp-field" style="grid-column:1/-1"><label>Title</label><input id="cbe-title" value="${clEsc(bug.title)}"></div>
+      <div class="cl-qp-field"><label>Severity</label><select id="cbe-sev">${['Critical','High','Medium','Low'].map(s=>`<option ${bug.severity===s?'selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="cl-qp-field"><label>Status</label><select id="cbe-status">${['Open','Assigned','In Progress','Fixed','Ready for QA','Retesting','Verified','Closed','Reopened','Deferred'].map(s=>`<option ${bug.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="cl-qp-field"><label>Assignee</label><input id="cbe-assignee" value="${clEsc(bug.assignee||'')}"></div>
+      <div class="cl-qp-field"><label>Retest Result</label><select id="cbe-retest"><option value="">—</option><option ${bug.retestResult==='Pass'?'selected':''}>Pass</option><option ${bug.retestResult==='Fail'?'selected':''}>Fail</option></select></div>
+      <div class="cl-qp-field" style="grid-column:1/-1"><label>Retest Notes</label><textarea id="cbe-retnotes" rows="2">${clEsc(bug.retestNotes||'')}</textarea></div>
+    </div>
+    <div class="ft-modal-footer">
+      <button class="ftbtn" onclick="document.getElementById('cl-bug-edit-modal').remove()">Cancel</button>
+      <button class="ftbtn primary" onclick="clUpdateBug('${relId}','${bugId}')">Save</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+function clUpdateBug(relId,bugId){
+  const rel=_clReleases.find(r=>r.id===relId);
+  const bug=rel?.bugs?.find(b=>b.id===bugId);
+  if(!bug) return;
+  const oldStatus=bug.status;
+  bug.title=document.getElementById('cbe-title').value.trim()||bug.title;
+  bug.severity=document.getElementById('cbe-sev').value;
+  bug.status=document.getElementById('cbe-status').value;
+  bug.assignee=document.getElementById('cbe-assignee').value.trim();
+  bug.retestResult=document.getElementById('cbe-retest').value;
+  bug.retestNotes=document.getElementById('cbe-retnotes').value.trim();
+  rel.updatedAt=new Date().toISOString();
+  clSaveReleases();
+  if(oldStatus!==bug.status) clAuditAdd(rel,`Bug ${bug.id}: ${oldStatus} → ${bug.status}`,'',window._ftCurrentUser);
+  document.getElementById('cl-bug-edit-modal')?.remove();
+  ftShowToast('Bug updated','success');
+  clRenderReleaseDetail();
+}
+
+// ── Quick Panel ──
+function clOpenQuickPanel(relId){
+  // Populate project dropdown
+  const projSel=document.getElementById('cl-qp-project');
+  projSel.innerHTML='<option value="">— Select Project —</option>'+_ftProjects.map(p=>`<option value="${p.id}">${clEsc(p.name)}</option>`).join('');
+  // Populate phases
+  const phaseSel=document.getElementById('cl-qp-phase');
+  phaseSel.innerHTML='<option value="">All Phases</option>'+CL_PHASES.map(ph=>`<option value="${ph.code}">${ph.label}</option>`).join('');
+  if(relId){
+    const rel=_clReleases.find(r=>r.id===relId);
+    if(rel){
+      projSel.value=rel.projectId;
+      clQpLoadReleases();
+      setTimeout(()=>{document.getElementById('cl-qp-release').value=relId;clQpLoadItems();},100);
+    }
+  }
+  document.getElementById('cl-quick-panel').classList.add('open');
+  document.getElementById('cl-qp-overlay').classList.add('open');
+}
+
+function clCloseQuickPanel(){
+  document.getElementById('cl-quick-panel').classList.remove('open');
+  document.getElementById('cl-qp-overlay').classList.remove('open');
+}
+
+function clQpLoadReleases(){
+  const projId=document.getElementById('cl-qp-project').value;
+  const rels=projId?_clReleases.filter(r=>r.projectId===projId):_clReleases;
+  document.getElementById('cl-qp-release').innerHTML='<option value="">— Select Release —</option>'+rels.map(r=>`<option value="${r.id}">${clEsc(r.name)}</option>`).join('');
+}
+
+function clQpLoadItems(){
+  const relId=document.getElementById('cl-qp-release').value;
+  const phCode=document.getElementById('cl-qp-phase').value;
+  const items=_clItems.filter(i=>i.relId===relId&&(!phCode||i.phaseCode===phCode));
+  document.getElementById('cl-qp-item').innerHTML='<option value="">— Select Item —</option>'+items.map(i=>`<option value="${i.id}">[${i.itemId}] ${clEsc(i.desc.slice(0,50))}</option>`).join('');
+  const owner=document.getElementById('cl-qp-owner');
+  if(!owner.value){
+    const rel=_clReleases.find(r=>r.id===relId);
+    if(rel?.manualQa) owner.value=rel.manualQa;
+  }
+}
+
+function clQpFilterItems(){clQpLoadItems();}
+
+function clQpSave(submitForReview){
+  const relId=document.getElementById('cl-qp-release').value;
+  const itemId=document.getElementById('cl-qp-item').value;
+  if(!relId||!itemId){ftShowToast('Select a release and checklist item','error');return;}
+  const item=_clItems.find(i=>i.id===itemId);
+  if(!item){ftShowToast('Item not found','error');return;}
+  const oldStatus=item.status;
+  item.owner=document.getElementById('cl-qp-owner').value.trim()||item.owner;
+  item.status=submitForReview?'Submitted for Review':document.getElementById('cl-qp-status').value;
+  item.actualResult=document.getElementById('cl-qp-actual').value.trim()||item.actualResult;
+  item.evidenceLink=document.getElementById('cl-qp-evidence').value.trim()||item.evidenceLink;
+  item.bugId=document.getElementById('cl-qp-bugid').value.trim()||item.bugId;
+  item.notes=(document.getElementById('cl-qp-comment').value.trim()||item.notes);
+  item.passedCount=parseInt(document.getElementById('cl-qp-passed').value)||item.passedCount;
+  item.failedCount=parseInt(document.getElementById('cl-qp-failed').value)||item.failedCount;
+  item.lastUpdatedBy=window._ftCurrentUser||'—';
+  item.lastUpdatedAt=new Date().toISOString();
+  if(item.status!=='Not Started'&&!item.startTime) item.startTime=item.lastUpdatedAt;
+  if((item.status==='Passed'||item.status==='Verified')&&!item.completedTime) item.completedTime=item.lastUpdatedAt;
+  clSaveItems();
+  const rel=_clReleases.find(r=>r.id===relId);
+  if(rel){
+    rel.updatedAt=new Date().toISOString();
+    clAuditAdd(rel,`Quick Update: ${item.itemId} → ${item.status}`,submitForReview?'Submitted for review':'',window._ftCurrentUser);
+    clSaveReleases();
+  }
+  // reset fields
+  ['cl-qp-actual','cl-qp-evidence','cl-qp-bugid','cl-qp-comment'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('cl-qp-passed').value='0';
+  document.getElementById('cl-qp-failed').value='0';
+  ftShowToast(submitForReview?`${item.itemId} submitted for review`:`${item.itemId} updated → ${item.status}`,'success');
+  if(_clSelectedRelease===relId) clRenderReleaseDetail();
+  else if(document.getElementById('ft-view-checklist').style.display!=='none') clRenderChecklist();
+}
+
+// ── Decisions view ──
+function clRenderDecisions(){
+  const el=document.getElementById('ft-view-decisions');
+  if(!el) return;
+  const rels=[..._clReleases].sort((a,b)=>{
+    const order={GO:0,'GO WITH RISK':1,'NO-GO':2,Pending:3};
+    return (order[a.decision]||3)-(order[b.decision]||3);
+  });
+  el.innerHTML=`
+  <div class="ft-section-hdr" style="margin-bottom:16px">
+    <div><h2>Release Decisions</h2><div style="font-size:11px;color:var(--mut)">${rels.length} releases tracked</div></div>
+    <button class="ftbtn sm primary" onclick="clShowNewReleaseModal()">+ New Checklist</button>
+  </div>
+  ${rels.length===0?'<div class="ft-empty"><div class="ft-empty-icon">🏁</div><div class="ft-empty-text">No releases tracked yet</div></div>'
+  :`<div class="ft-tbl-wrap"><table class="ft-tbl">
+    <thead><tr><th>Release</th><th>Project</th><th>Risk</th><th>Progress</th><th>Critical Bugs</th><th>Health</th><th>Decision</th><th>Approved By</th><th>Actions</th></tr></thead>
+    <tbody>${rels.map(rel=>{
+      const pct=clRelProgress(rel.id);
+      const health=clRelHealth(rel.id);
+      const openCrit=(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed').length;
+      const dec=rel.decision||'Pending';
+      return `<tr>
+        <td><div style="font-weight:700;font-size:12px">${clEsc(rel.name)}</div><div style="font-size:10px;color:var(--mut)">v${clEsc(rel.version)}</div></td>
+        <td style="font-size:12px">${clEsc(rel.projectName||'—')}</td>
+        <td><span class="ftbadge ${rel.riskLevel==='Critical'?'red':rel.riskLevel==='High'?'amber':'grey'}">${clEsc(rel.riskLevel||'Normal')}</span></td>
+        <td><div style="display:flex;align-items:center;gap:6px"><div class="ft-progress" style="width:70px;height:6px"><div class="ft-progress-fill ${pct>=80?'green':pct>=40?'':'amber'}" style="width:${pct}%"></div></div><span style="font-size:11px;font-weight:700">${pct}%</span></div></td>
+        <td><span class="ftbadge ${openCrit>0?'red':'green'}">${openCrit}</span></td>
+        <td><span class="ft-health ${health.cls}">${health.label}</span></td>
+        <td><span class="cl-decision-big ${clDecisionCls(dec)}" style="padding:4px 10px;font-size:11px">${dec}</span></td>
+        <td style="font-size:11px">${clEsc(rel.approvedBy||'—')}</td>
+        <td><button class="ftbtn xs primary" onclick="clOpenRelease('${rel.id}')">View</button></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`}`;
+}
+
+// ── HTML Report Download ──
+function clDownloadReport(relId){
+  const rel=_clReleases.find(r=>r.id===relId);
+  if(!rel){ftShowToast('Release not found','error');return;}
+  const items=_clItems.filter(i=>i.relId===relId);
+  const pct=clRelProgress(relId);
+  const health=clRelHealth(relId);
+  const openCrit=(rel.bugs||[]).filter(b=>b.severity==='Critical'&&b.status!=='Closed').length;
+  const openHigh=(rel.bugs||[]).filter(b=>b.severity==='High'&&b.status!=='Closed').length;
+  const generatedAt=new Date().toLocaleString('en-GB');
+  const reportId='RPT-'+Date.now().toString(36).toUpperCase();
+
+  function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function badge(s,cls){const map={green:'#2E9D57',blue:'#2F6BFF',amber:'#F4A000',red:'#E5484D',grey:'#94A3B8',purple:'#7657D5'};const c=map[cls]||map.grey;return `<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;background:${c}22;color:${c};border:1px solid ${c}44">${esc(s)}</span>`;}
+
+  const phaseRows=CL_PHASES.map(ph=>{
+    const {pct:pp,passed,failed,blocked,notTested,total}=clPhaseProgress(relId,ph.code);
+    const statusColor=blocked>0||failed>0?'#E5484D':pp===100?'#2E9D57':pp>0?'#2F6BFF':'#94A3B8';
+    return `<tr><td>${esc(ph.icon)} ${esc(ph.label)}</td><td style="font-weight:700;color:${statusColor}">${pp}%</td><td style="color:#2E9D57">${passed}</td><td style="color:#E5484D">${failed}</td><td style="color:#E5484D">${blocked}</td><td style="color:#94A3B8">${notTested}</td><td>${total}</td></tr>`;
+  }).join('');
+
+  const bugRows=(rel.bugs||[]).map(b=>`<tr><td>${esc(b.id)}</td><td>${esc(b.title)}</td><td>${esc(b.module||'—')}</td><td style="color:${b.severity==='Critical'?'#E5484D':b.severity==='High'?'#F4A000':'#2F6BFF'}">${esc(b.severity)}</td><td>${esc(b.status)}</td><td>${esc(b.assignee||'—')}</td></tr>`).join('');
+
+  const html=`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>QA Report — ${esc(rel.name)}</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F5F8FC;color:#1E293B;font-size:13px;line-height:1.6}
+.wrap{max-width:1100px;margin:0 auto;padding:24px}
+h1{font-size:24px;font-weight:900;color:#0B2A5B;margin-bottom:4px}
+h2{font-size:16px;font-weight:800;color:#0B2A5B;margin:24px 0 10px}
+h3{font-size:13px;font-weight:800;color:#334155;margin:12px 0 6px}
+.hdr{background:linear-gradient(135deg,#0B2A5B,#2F6BFF);color:#fff;padding:24px 32px;border-radius:14px;margin-bottom:24px}
+.hdr h1{color:#fff}.hdr .sub{font-size:13px;opacity:.8;margin-top:4px}
+.hdr .meta{display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;font-size:12px;opacity:.9}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 4px rgba(15,23,42,.06);text-align:center}
+.card .val{font-size:26px;font-weight:900;line-height:1}
+.card .lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#64748B;margin-top:4px}
+.section{background:#fff;border-radius:12px;padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(15,23,42,.06)}
+table{width:100%;border-collapse:collapse}
+th{background:#F0F4F8;padding:8px 10px;text-align:left;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#64748B;border-bottom:2px solid #DCE4EE}
+td{padding:8px 10px;border-bottom:1px solid #DCE4EE;font-size:12px}
+tr:last-child td{border-bottom:none}
+.dec{display:inline-block;padding:10px 20px;border-radius:10px;font-size:15px;font-weight:900}
+.dec.go{background:#2E9D5722;color:#2E9D57;border:2px solid #2E9D57}
+.dec.risk{background:#F4A00022;color:#F4A000;border:2px solid #F4A000}
+.dec.nogo{background:#E5484D22;color:#E5484D;border:2px solid #E5484D}
+.dec.pending{background:#F0F4F8;color:#64748B;border:2px solid #DCE4EE}
+.footer{text-align:center;font-size:11px;color:#94A3B8;margin-top:32px;padding-top:16px;border-top:1px solid #DCE4EE}
+.progress{background:#DCE4EE;border-radius:4px;height:8px;overflow:hidden;margin-top:4px}
+.progress-fill{height:100%;border-radius:4px;background:#2F6BFF}
+@media print{body{background:#fff}.hdr{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body><div class="wrap">
+<div class="hdr"><h1>QA Checklist Report</h1><div class="sub">${esc(rel.name)} — ${esc(rel.projectName||'—')} | Report ID: ${reportId}</div>
+<div class="meta"><span>Version: ${esc(rel.version)}</span><span>Build: ${esc(rel.buildNumber||'—')}</span><span>Risk: ${esc(rel.riskLevel)}</span><span>Generated: ${generatedAt}</span>${rel.plannedDate?`<span>Planned: ${new Date(rel.plannedDate).toLocaleDateString('en-GB')}</span>`:''}</div></div>
+
+<h2>Executive Summary</h2>
+<div class="grid">
+  <div class="card"><div class="val" style="color:${pct>=80?'#2E9D57':pct>=40?'#F4A000':'#E5484D'}">${pct}%</div><div class="lbl">Overall Progress</div></div>
+  <div class="card"><div class="val" style="color:#2E9D57">${items.filter(i=>i.status==='Passed'||i.status==='Verified').length}</div><div class="lbl">Passed</div></div>
+  <div class="card"><div class="val" style="color:#E5484D">${items.filter(i=>i.status==='Failed').length}</div><div class="lbl">Failed</div></div>
+  <div class="card"><div class="val" style="color:#E5484D">${items.filter(i=>i.status==='Blocked').length}</div><div class="lbl">Blocked</div></div>
+  <div class="card"><div class="val" style="color:#E5484D">${openCrit}</div><div class="lbl">Critical Bugs</div></div>
+  <div class="card"><div class="val" style="color:#F4A000">${openHigh}</div><div class="lbl">High Bugs</div></div>
+  <div class="card"><div class="val"><span class="dec ${clDecisionCls(rel.decision||'Pending')}" style="padding:4px 10px;font-size:13px">${esc(rel.decision||'Pending')}</span></div><div class="lbl">Final Decision</div></div>
+  <div class="card"><div class="val" style="font-size:14px;color:#2F6BFF">${health.label}</div><div class="lbl">Release Health</div></div>
+</div>
+
+<div class="section">
+<h2>Phase-by-Phase Progress</h2>
+<table><thead><tr><th>Phase</th><th>Progress</th><th>Passed</th><th>Failed</th><th>Blocked</th><th>Pending</th><th>Total</th></tr></thead>
+<tbody>${phaseRows}</tbody></table></div>
+
+<div class="section"><h2>Release Decision</h2>
+<div style="margin-bottom:12px"><span class="dec ${clDecisionCls(rel.decision||'Pending')}">${rel.decision==='GO'?'✅ GO':rel.decision==='GO WITH RISK'?'⚠️ GO WITH RISK':rel.decision==='NO-GO'?'🚫 NO-GO':'⏳ Pending'}</span></div>
+${rel.decisionNotes?`<div><strong>Decision Notes:</strong> ${esc(rel.decisionNotes)}</div>`:''}
+${rel.approvedBy?`<div style="margin-top:8px"><strong>Approved By:</strong> ${esc(rel.approvedBy)} at ${new Date(rel.approvedAt||'').toLocaleString('en-GB')}</div>`:''}
+${rel.knownRisks?`<div style="margin-top:8px"><strong>Known Risks:</strong> ${esc(rel.knownRisks)}</div>`:''}
+</div>
+
+<div class="section"><h2>Release Information</h2>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;font-size:12px">
+${[['Project',rel.projectName],['Client',rel.client],['Version',rel.version],['Build',rel.buildNumber],['Risk Level',rel.riskLevel],['QA Lead',rel.qaLead],['Manual QA',rel.manualQa],['Developer',rel.developer],['API Owner',rel.apiOwner],['Changed Module',rel.changedModule],['QA Env URL',rel.qaEnvUrl],['Prod URL',rel.productionUrl]].map(([k,v])=>`<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#94A3B8;margin-bottom:2px">${k}</div><div style="font-weight:600">${esc(v||'—')}</div></div>`).join('')}
+</div></div>
+
+${(rel.bugs||[]).length>0?`<div class="section"><h2>Bug Summary (${(rel.bugs||[]).length} total, ${openCrit} critical open, ${openHigh} high open)</h2>
+<table><thead><tr><th>Bug ID</th><th>Title</th><th>Module</th><th>Severity</th><th>Status</th><th>Assignee</th></tr></thead>
+<tbody>${bugRows}</tbody></table></div>`:'<div class="section"><h2>Bug Summary</h2><div style="color:#64748B;padding:12px 0">No bugs logged for this release.</div></div>'}
+
+<div class="footer"><div style="font-size:13px;font-weight:700;color:#0B2A5B;margin-bottom:4px">AdHash Fast-Track QA — Confidential</div>Report ID: ${reportId} · Generated: ${generatedAt}<br>This report reflects the QA status at the time of generation. For the latest status, view the live dashboard.</div>
+</div></body></html>`;
+
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const proj=(rel.projectName||'project').replace(/[^a-z0-9]/gi,'-').toLowerCase();
+  const ver=(rel.version||'v1').replace(/[^a-z0-9.]/gi,'-');
+  const dt=new Date().toISOString().slice(0,10);
+  a.href=url;a.download=`qa-checklist-report-${proj}-${ver}-${dt}.html`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  ftShowToast('Report downloaded: '+a.download,'success');
+}
+
+// ── Demo data ──
+function clSeedDemo(){
+  const now=new Date().toISOString();
+  const td=new Date().toISOString().slice(0,10);
+  // 3 demo releases with realistic data
+  const demos=[
+    {projectId:'synctrade',projectName:'SyncTrade',client:'SyncTrade Ltd',name:'Payment Gateway v3.2',version:'3.2.0',buildNumber:'Build-312',riskLevel:'Critical',plannedDate:td,qaLead:'Thenilavan',developer:'Raghu',manualQa:'Deepa',automationQa:'Arun',changedModule:'Payment, Checkout',featureSummary:'New Stripe integration with 3DS support',knownRisks:'Third-party Stripe API rate limits'},
+    {projectId:'aisign',projectName:'AI Sign Pro',client:'AI Sign Ltd',name:'E-Signature Flow v2.1',version:'2.1.0',buildNumber:'Build-201',riskLevel:'High',plannedDate:new Date(Date.now()+86400000*2).toISOString().slice(0,10),qaLead:'Thenilavan',developer:'Priya',manualQa:'Karthik',changedModule:'Signature, PDF Generation',featureSummary:'Multi-party signature workflow',knownRisks:''},
+    {projectId:'wavedin',projectName:'WavedIn',client:'WavedIn',name:'Profile & Matching v1.5',version:'1.5.0',buildNumber:'Build-155',riskLevel:'Normal',plannedDate:new Date(Date.now()+86400000*5).toISOString().slice(0,10),qaLead:'Thenilavan',developer:'Suresh',manualQa:'Meena',changedModule:'Profile, Search',featureSummary:'Advanced matching algorithm',knownRisks:''},
+  ];
+  demos.forEach(d=>{const rel=clNewRelease(d);
+    // Seed some realistic progress on SyncTrade
+    if(rel.projectId==='synctrade'){
+      const relItems=_clItems.filter(i=>i.relId===rel.id);
+      const toPass=['REQ','RSK','PLN','DEV','ENV'];
+      toPass.forEach(code=>{
+        relItems.filter(i=>i.phaseCode===code).forEach(i=>{i.status='Passed';i.owner='Deepa';i.completedTime=now;});
+      });
+      // Smoke: mostly done
+      relItems.filter(i=>i.phaseCode==='SMK').forEach((i,idx)=>{
+        i.status=idx<8?'Passed':'In Progress';i.owner='Arun';
+      });
+      // Manual: in progress
+      relItems.filter(i=>i.phaseCode==='MAN').forEach((i,idx)=>{
+        i.status=idx<10?'Passed':idx<14?'In Progress':'Not Started';i.owner='Deepa';
+      });
+      // One critical bug
+      rel.bugs=[{id:'BUG-001',title:'Payment fails silently on 3DS redirect',module:'Payment',severity:'Critical',priority:'P0',status:'Fixed',assignee:'Raghu',reporter:'Deepa',createdAt:now}];
+      rel.decision='GO WITH RISK';rel.decisionNotes='Critical bug fixed, awaiting final retest';rel.approvedBy='Thenilavan';rel.approvedAt=now;
+    }
+    if(rel.projectId==='aisign'){
+      const relItems=_clItems.filter(i=>i.relId===rel.id);
+      ['REQ','RSK','PLN'].forEach(code=>relItems.filter(i=>i.phaseCode===code).forEach(i=>{i.status='Passed';i.owner='Karthik';}));
+      relItems.filter(i=>i.phaseCode==='SMK').forEach((i,idx)=>{i.status=idx<6?'Passed':'Not Started';i.owner='Karthik';});
+      rel.bugs=[{id:'BUG-002',title:'PDF signature misaligned on mobile',module:'PDF Generation',severity:'High',priority:'P1',status:'Open',assignee:'Priya',reporter:'Karthik',createdAt:now}];
+    }
+  });
+  clSaveReleases();clSaveItems();
+}
+
+// checklist views wired into ftRenderView above
+
 // ══════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════
 (async function init(){
   await ftLoadData();
+  await clLoadData();
   ftNav('dashboard');
+  // Update checklist badge
+  setTimeout(()=>{
+    const pending=_clItems.filter(i=>i.owner&&i.owner.toLowerCase().includes((window._ftCurrentUser||'').toLowerCase())&&i.status!=='Passed'&&i.status!=='Verified'&&i.status!=='Not Applicable').length;
+    const nb=document.getElementById('nb-checklist');
+    if(nb&&pending>0){nb.textContent=pending;nb.style.display='';}
+  },600);
   if(document.body.classList.contains('dark')){
     document.getElementById('ft-dark-btn').textContent='☀️';
   }
