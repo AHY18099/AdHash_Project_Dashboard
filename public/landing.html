@@ -374,24 +374,15 @@ body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(24
   </div>
 
   <!-- 5th card — Fast-Track QA Workflow -->
-  <div class="dash-card" onclick="window.location.href='/fast-track'" style="cursor:pointer;grid-column:1/-1;border-color:rgba(99,102,241,.3);background:linear-gradient(135deg,rgba(99,102,241,.04) 0%,rgba(168,85,247,.04) 100%)">
-    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-      <div class="card-icon" style="background:rgba(99,102,241,.12);border:1.5px solid rgba(99,102,241,.25);flex-shrink:0">🚀</div>
-      <div class="card-body" style="flex:1;min-width:220px">
-        <div class="card-label" style="color:#6366f1">QA Process Framework</div>
-        <div class="card-title">Fast-Track QA Workflow</div>
-        <div class="card-desc">Complete 10-stage QA management system — Change Request → Risk Check → Dev Self-Test → Smoke → Manual Testing → API &amp; Data → Bug Retest → Regression → Release Decision → Production Sanity. Includes kanban dashboard, bug tracker, team workload, management view &amp; downloadable HTML reports.</div>
+  <div class="dash-card" style="grid-column:1/-1;border-color:rgba(99,102,241,.3);background:linear-gradient(135deg,rgba(99,102,241,.04) 0%,rgba(168,85,247,.04) 100%);padding:0;overflow:hidden">
+    <div style="padding:18px 22px 12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#6366f1;margin-bottom:3px">QA Process Framework</div>
+        <div style="font-size:17px;font-weight:800;color:#1e293b">Fast-Track QA Workflow</div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
-        <div class="card-tags">
-          <span class="tag" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">10-Stage Workflow</span>
-          <span class="tag" style="background:rgba(168,85,247,.1);border-color:rgba(168,85,247,.3);color:#a855f7">GO/NO-GO</span>
-          <span class="tag" style="background:rgba(236,72,153,.1);border-color:rgba(236,72,153,.3);color:#ec4899">Bug Tracker</span>
-          <span class="tag" style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#3b82f6">HTML Report</span>
-        </div>
-        <div class="arrow-btn" style="align-self:flex-end">→</div>
-      </div>
+      <a href="/fast-track" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;background:#6366f1;color:#fff;font-size:13px;font-weight:700;text-decoration:none;transition:opacity .2s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Open Dashboard →</a>
     </div>
+    <img src="/images/ft-workflow.png" alt="Fast-Track QA Workflow" style="width:100%;display:block;border-top:1px solid rgba(99,102,241,.15)">
   </div>
 
 </div>
