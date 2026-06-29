@@ -42,16 +42,14 @@ router.post('/error', requireAuth, (req, res) => {
 // GET /api/tavus/env-check  — confirms which vars are present (no values exposed)
 router.get('/env-check', requireAuth, (req, res) => {
   res.json({
-    TAVUS_API_KEY:                        !!process.env.TAVUS_API_KEY,
-    TAVUS_BASE_URL:                       !!process.env.TAVUS_BASE_URL,
-    TAVUS_ACCOUNT_USAGE_ENDPOINT:         !!process.env.TAVUS_ACCOUNT_USAGE_ENDPOINT,
-    TAVUS_WARNING_PERCENTAGE:             !!process.env.TAVUS_WARNING_PERCENTAGE,
-    TAVUS_CRITICAL_PERCENTAGE:            !!process.env.TAVUS_CRITICAL_PERCENTAGE,
-    TAVUS_PLAN_NAME:                      !!process.env.TAVUS_PLAN_NAME,
-    TAVUS_LIMIT_TYPE:                     !!process.env.TAVUS_LIMIT_TYPE,
-    TAVUS_CONVERSATION_MINUTES_LIMIT:     !!process.env.TAVUS_CONVERSATION_MINUTES_LIMIT,
-    TAVUS_VIDEO_GENERATION_MINUTES_LIMIT: !!process.env.TAVUS_VIDEO_GENERATION_MINUTES_LIMIT,
-    TAVUS_CONCURRENT_STREAM_LIMIT:        !!process.env.TAVUS_CONCURRENT_STREAM_LIMIT,
+    TAVUS_API_KEY:                !!process.env.TAVUS_API_KEY,
+    TAVUS_BASE_URL:               !!process.env.TAVUS_BASE_URL,
+    TAVUS_ACCOUNT_USAGE_ENDPOINT: !!process.env.TAVUS_ACCOUNT_USAGE_ENDPOINT,
+    TAVUS_BILLING_AUTH_TOKEN:     !!process.env.TAVUS_BILLING_AUTH_TOKEN,
+    TAVUS_WARNING_PERCENTAGE:     !!process.env.TAVUS_WARNING_PERCENTAGE,
+    TAVUS_CRITICAL_PERCENTAGE:    !!process.env.TAVUS_CRITICAL_PERCENTAGE,
+    TAVUS_PLAN_NAME:              !!process.env.TAVUS_PLAN_NAME,
+    TAVUS_LIMIT_TYPE:             !!process.env.TAVUS_LIMIT_TYPE,
   });
 });
 

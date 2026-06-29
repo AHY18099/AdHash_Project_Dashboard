@@ -7084,10 +7084,7 @@ async function tpRefreshTavus(p,acctIdx){
       return`<span style="background:rgba(99,102,241,.08);color:var(--mut);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:2px 8px;font-size:11px">— ${escH(s||'Unknown')}</span>`;
     };
     const fmtDate=s=>{if(!s)return'—';try{return new Date(s).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e2){return s;}};
-    // fmtLimit: numbers formatted normally; strings (e.g. 'Custom / Enterprise') shown as-is; null → '—'
     const fmtNum=n=>typeof n==='number'?n.toLocaleString():'—';
-    const fmtLimit=v=>typeof v==='number'?v.toLocaleString()+'&nbsp;min':typeof v==='string'?escH(v):'—';
-    const fmtLimitPlain=v=>typeof v==='number'?v.toLocaleString():typeof v==='string'?v:'—';
     const warnPct=d.warningPercentage||75;
     const critPct=d.criticalPercentage||90;
     // Credential chip
@@ -7096,57 +7093,62 @@ async function tpRefreshTavus(p,acctIdx){
     const credBorder=d.credentialStatus==='Valid'?'rgba(16,185,129,.3)':d.credentialStatus==='Invalid'?'rgba(239,68,68,.3)':'rgba(99,102,241,.2)';
     const apiErrNote=d.apiError?`<div style="font-size:10px;color:var(--mut);margin-top:3px;max-width:320px;word-break:break-word">API error: ${escH(d.apiError)}</div>`:'';
     const credChip=`<div style="display:flex;flex-direction:column;align-items:flex-start"><span style="background:${credBg};color:${credColor};border:1px solid ${credBorder};border-radius:10px;padding:2px 9px;font-size:11px;font-weight:700">${d.credentialStatus==='Valid'?'✓':'✕'} API Key: ${escH(d.credentialStatus||'Unknown')}</span>${apiErrNote}</div>`;
-    // Enterprise plan badge
     const enterpriseBadge=d.enterprisePlan?`<span style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.35);border-radius:10px;padding:2px 9px;font-size:11px;font-weight:700">★ Enterprise</span>`:'';
-    // Usage bar helper — uses response threshold values; only renders for numeric limits
-    const mkUsageBar=(used,limit,pct,label)=>{
-      if(typeof limit!=='number'||typeof used!=='number')return'';
-      if(pct===null&&(limit===0))return'';
-      const resolvedPct=pct!==null?pct:(limit>0?Math.min(100,Number(((used/limit)*100).toFixed(2))):0);
-      const bc=resolvedPct>=100?'#ef4444':resolvedPct>=critPct?'#f97316':resolvedPct>=warnPct?'#f59e0b':'#10b981';
-      const remaining=Math.max(0,limit-used);
-      return`<div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">
-          <span style="font-weight:600;color:var(--txt)">${escH(label)}</span>
-          <span style="font-weight:700;color:${bc}">${resolvedPct.toFixed(1)}%</span>
-        </div>
-        <div style="height:8px;background:var(--card);border-radius:4px;overflow:hidden;border:1px solid var(--border)">
-          <div style="height:100%;width:${resolvedPct}%;background:${bc};border-radius:4px;transition:width .5s ease"></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mut);margin-top:3px">
-          <span>Used: <strong style="color:var(--txt)">${fmtNum(used)}</strong> / ${fmtNum(limit)} min</span>
-          <span>Remaining: <strong style="color:var(--txt)">${fmtNum(remaining)} min</strong></span>
-        </div>
+    const hasUsage=d.usageStatus==='Available';
+    // Render a single quota row — progress bar only for finite limits
+    const mkQuotaRow=(item,unit)=>{
+      if(!item||typeof item!=='object')return'';
+      const label=item.label||'';
+      const used=item.currentUsage;
+      const limitVal=item.usageLimit; // 'Unlimited' or number
+      const pct=item.usagePercentage; // null for Unlimited
+      const notAllowed=item.isAllowed===false;
+      const usedStr=typeof used==='number'?used.toLocaleString():'—';
+      const limitStr=limitVal==='Unlimited'?'<span style="color:#8b5cf6;font-weight:700">Unlimited</span>'
+        :(typeof limitVal==='number'?limitVal.toLocaleString()+(unit?` ${unit}`:'')
+        :(limitVal!==null&&limitVal!==undefined?escH(String(limitVal)):'—'));
+      const notAllowedNote=notAllowed?`<span style="margin-left:6px;color:#ef4444;font-size:10px;font-weight:700">✕ Not Allowed</span>`:'';
+      if(pct!==null&&typeof pct==='number'){
+        const bc=pct>=100?'#ef4444':pct>=critPct?'#f97316':pct>=warnPct?'#f59e0b':'#10b981';
+        const barW=Math.min(100,pct);
+        return`<div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:4px">
+            <span style="font-weight:600;color:var(--txt)">${escH(label)}${notAllowedNote}</span>
+            <span style="font-weight:700;color:${bc}">${pct.toFixed(1)}%</span>
+          </div>
+          <div style="height:7px;background:var(--card);border-radius:4px;overflow:hidden;border:1px solid var(--border)">
+            <div style="height:100%;width:${barW}%;background:${bc};border-radius:4px;transition:width .5s ease"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mut);margin-top:3px">
+            <span>Used: <strong style="color:var(--txt)">${usedStr}</strong> / ${limitStr}</span>
+          </div>
+        </div>`;
+      }
+      // Unlimited or no percentage — simple row
+      return`<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:5px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--mut)">${escH(label)}${notAllowedNote}</span>
+        <span style="color:var(--txt);font-weight:600">${usedStr} / ${limitStr}</span>
       </div>`;
     };
-    const hasUsage=d.usageStatus==='Available';
-    const hasConvBar=hasUsage&&(d.conversationUsagePercentage!==null||(typeof d.conversationMinutesUsed==='number'&&typeof d.conversationMinutesLimit==='number'));
-    const hasVidBar=hasUsage&&(d.videoGenerationUsagePercentage!==null||(typeof d.videoGenerationMinutesUsed==='number'&&typeof d.videoGenerationMinutesLimit==='number'));
-    // Usage section — shown only when live data is available
-    const usageSection=hasUsage&&(hasConvBar||hasVidBar)?`
+    // Quota keys in display order
+    const QUOTA_KEYS=[
+      {k:'conversation',unit:''},
+      {k:'replica',unit:''},
+      {k:'video',unit:''},
+      {k:'concurrentConversations',unit:''},
+      {k:'conversationLengthLimit',unit:'sec'},
+    ];
+    const quotaRows=QUOTA_KEYS.map(({k,unit})=>mkQuotaRow(d[k],unit)).join('');
+    const quotaSection=hasUsage&&quotaRows?`
       <div style="padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:10px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-bottom:8px">Usage</div>
-        ${hasConvBar?mkUsageBar(d.conversationMinutesUsed,d.conversationMinutesLimit,d.conversationUsagePercentage,'Conversation Minutes'):''}
-        ${hasVidBar?mkUsageBar(d.videoGenerationMinutesUsed,d.videoGenerationMinutesLimit,d.videoGenerationUsagePercentage,'Video Generation Minutes'):''}
-        ${d.overallUsagePercentage!==null?`<div style="font-size:11px;color:var(--mut);margin-top:4px;border-top:1px solid var(--border);padding-top:6px">Overall usage: <strong style="color:var(--txt)">${d.overallUsagePercentage.toFixed(1)}%</strong></div>`:''}
-        ${typeof d.concurrentStreamLimit==='number'?`<div style="font-size:11px;color:var(--mut);margin-top:4px">Concurrent Streams: <strong style="color:var(--txt)">${fmtNum(d.concurrentStreamLimit)}</strong></div>`:''}
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-bottom:10px">Billing Quotas</div>
+        ${quotaRows}
       </div>`:'';
-    // Usage unavailable info box — informational, not an error
-    const usageUnavailBox=!hasUsage?`
+    // Info box when usage is not available
+    const usageUnavailBox=!hasUsage&&d.usageMessage?`
       <div style="padding:8px 12px;background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:8px;margin-bottom:10px;display:flex;gap:8px;align-items:flex-start">
         <span style="font-size:13px;margin-top:1px">ℹ</span>
-        <span style="font-size:11px;color:var(--mut);line-height:1.55">${escH(d.usageMessage||'Usage data not available. Configure TAVUS_ACCOUNT_USAGE_ENDPOINT or set manual plan limits in Railway.')}</span>
-      </div>`:'';
-    // Plan limits — always shown when any limit value is present (numeric or string sentinel)
-    const hasLimits=d.conversationMinutesLimit!==null||d.videoGenerationMinutesLimit!==null||d.concurrentStreamLimit!==null;
-    const planLimitsSection=hasLimits?`
-      <div style="padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:10px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-bottom:8px">Plan Limits${d.limitType?` <span style="font-weight:400;color:var(--mut);font-size:10px;text-transform:none">(${escH(d.limitType)})</span>`:''}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 18px;font-size:11px">
-          ${d.conversationMinutesLimit!==null?`<div><span style="color:var(--mut)">Conv. Minutes:</span> <strong style="color:var(--txt)">${fmtLimit(d.conversationMinutesLimit)}</strong></div>`:''}
-          ${d.videoGenerationMinutesLimit!==null?`<div><span style="color:var(--mut)">Video Gen. Minutes:</span> <strong style="color:var(--txt)">${fmtLimit(d.videoGenerationMinutesLimit)}</strong></div>`:''}
-          ${d.concurrentStreamLimit!==null?`<div><span style="color:var(--mut)">Concurrent Streams:</span> <strong style="color:var(--txt)">${fmtLimitPlain(d.concurrentStreamLimit)}</strong></div>`:''}
-        </div>
+        <span style="font-size:11px;color:var(--mut);line-height:1.55">${escH(d.usageMessage)}</span>
       </div>`:'';
     bodyEl.innerHTML=`
       <div style="display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;margin-bottom:10px">
@@ -7159,15 +7161,14 @@ async function tpRefreshTavus(p,acctIdx){
         <div><span style="color:var(--mut)">Provider:</span> <strong style="color:var(--txt)">${escH(d.provider||'—')}</strong></div>
         <div><span style="color:var(--mut)">Portal:</span> <a href="${escH(d.portal||'#')}" target="_blank" style="color:var(--link);font-size:11px">${escH((d.portal||'').replace(/^https?:\/\//,''))}</a></div>
         <div><span style="color:var(--mut)">Plan:</span> <strong style="color:var(--txt)">${escH(d.planName||'Unknown')}</strong></div>
-        ${d.limitType?`<div><span style="color:var(--mut)">Limit Type:</span> <strong style="color:var(--txt)">${escH(d.limitType)}</strong></div>`:`<div><span style="color:var(--mut)">Usage Data:</span> <span style="color:${hasUsage?'#10b981':'var(--mut)'}">${escH(d.usageStatus||'—')}</span></div>`}
-        ${d.limitType?`<div><span style="color:var(--mut)">Usage Data:</span> <span style="color:${hasUsage?'#10b981':'var(--mut)'}">${escH(d.usageStatus||'—')}</span></div>`:''}
+        ${d.limitType?`<div><span style="color:var(--mut)">Limit Type:</span> <strong style="color:var(--txt)">${escH(d.limitType)}</strong></div>`:''}
+        <div><span style="color:var(--mut)">Usage Data:</span> <span style="color:${hasUsage?'#10b981':statusKey==='warning'?'#f59e0b':'var(--mut)'}">${escH(d.usageStatus||'—')}</span></div>
         <div><span style="color:var(--mut)">Warning at:</span> <span style="color:#f59e0b;font-weight:700">${warnPct}%</span></div>
         <div><span style="color:var(--mut)">Critical at:</span> <span style="color:#f97316;font-weight:700">${critPct}%</span></div>
         <div style="grid-column:1/-1"><span style="color:var(--mut)">Last Checked:</span> <span style="color:var(--txt)">${fmtDate(d.lastCheckedTime)}</span></div>
       </div>
-      ${usageSection}
+      ${quotaSection}
       ${usageUnavailBox}
-      ${planLimitsSection}
       ${d.lastErrorCode?`
       <div style="padding:8px 12px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:8px;margin-bottom:8px">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#ef4444;margin-bottom:5px">Last Tavus Error</div>

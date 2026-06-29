@@ -1,7 +1,7 @@
 'use strict';
 
-// Tavus real usage monitoring requires an official usage endpoint.
-// If Tavus provides account usage API, configure TAVUS_ACCOUNT_USAGE_ENDPOINT in Railway.
+// Tavus usage monitoring uses the official billing quotas endpoint.
+// Configure TAVUS_ACCOUNT_USAGE_ENDPOINT and TAVUS_BILLING_AUTH_TOKEN in Railway.
 
 const https = require('node:https');
 
@@ -15,9 +15,9 @@ function recordTavusError(code, message) {
   console.error(`[Tavus Error] ${code}: ${message}`);
 }
 
-// ── HTTP helper — x-api-key GET ───────────────────────────────────────────────
+// ── HTTP helpers ──────────────────────────────────────────────────────────────
 
-function httpsGetApiKey(endpoint, apiKey) {
+function httpsGet(endpoint, headers) {
   return new Promise((resolve, reject) => {
     const url = new URL(endpoint);
     const options = {
@@ -25,10 +25,7 @@ function httpsGetApiKey(endpoint, apiKey) {
       port:     url.port || 443,
       path:     url.pathname + url.search,
       method:   'GET',
-      headers: {
-        'x-api-key': apiKey,
-        'Accept':    'application/json',
-      },
+      headers:  { 'Accept': 'application/json', ...headers },
     };
     const req = https.request(options, (res) => {
       let body = '';
@@ -47,28 +44,52 @@ function tryParseJson(body) {
   try { return JSON.parse(body); } catch { return null; }
 }
 
-// ── Coerce value to finite number or null ─────────────────────────────────────
+// ── Quota helpers ─────────────────────────────────────────────────────────────
 
-function toNum(v) {
-  if (v === null || v === undefined) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
+const UNLIMITED_THRESHOLD = 99999999;
+
+function isUnlimitedLimit(limit) {
+  return Number(limit) >= UNLIMITED_THRESHOLD;
 }
 
-// ── API health + credential check ────────────────────────────────────────────
-// Uses GET /replicas as a lightweight authenticated probe.
+function formatLimit(limit) {
+  if (limit === null || limit === undefined) return null;
+  return isUnlimitedLimit(limit) ? 'Unlimited' : limit;
+}
+
+function calculateUsagePercentage(currentUsage, usageLimit) {
+  if (!usageLimit || isUnlimitedLimit(usageLimit)) return null;
+  return Number(((currentUsage / usageLimit) * 100).toFixed(2));
+}
+
+function normaliseQuotaItem(raw, label) {
+  if (!raw || typeof raw !== 'object') return null;
+  const current  = typeof raw.currentUsage  === 'number' ? raw.currentUsage  : 0;
+  const rawLimit = typeof raw.usageLimit    === 'number' ? raw.usageLimit    : (raw.planLimit ?? null);
+  return {
+    label,
+    currentUsage:    current,
+    usageLimit:      formatLimit(rawLimit),
+    rawUsageLimit:   rawLimit,
+    usagePercentage: calculateUsagePercentage(current, rawLimit),
+    isAllowed:       raw.isAllowed !== false,
+    includedInPlan:  raw.includedInPlan === true,
+  };
+}
+
+// ── API health check — uses x-api-key on GET /replicas ───────────────────────
 
 async function checkApiHealth(baseUrl, apiKey) {
   const endpoint = `${baseUrl}/replicas`;
   try {
-    const { statusCode, body } = await httpsGetApiKey(endpoint, apiKey);
+    const { statusCode, body } = await httpsGet(endpoint, { 'x-api-key': apiKey });
 
     if (statusCode === 200) {
       return { credentialStatus: 'Valid', apiHealth: 'Healthy', apiError: null };
     }
     if (statusCode === 401 || statusCode === 403) {
-      const parsed  = tryParseJson(body);
-      const detail  = parsed?.message || parsed?.error || parsed?.detail || null;
+      const parsed   = tryParseJson(body);
+      const detail   = parsed?.message || parsed?.error || parsed?.detail || null;
       const apiError = detail ? String(detail) : `Tavus API returned HTTP ${statusCode} — API key rejected.`;
       return { credentialStatus: 'Invalid', apiHealth: 'Auth Failed', apiError };
     }
@@ -76,12 +97,12 @@ async function checkApiHealth(baseUrl, apiKey) {
       return { credentialStatus: 'Valid', apiHealth: 'Rate Limited', apiError: 'Tavus API rate limit reached. Retry later.' };
     }
     if (statusCode >= 500) {
-      const parsed  = tryParseJson(body);
-      const detail  = parsed?.message || parsed?.error || null;
+      const parsed   = tryParseJson(body);
+      const detail   = parsed?.message || parsed?.error || null;
       const apiError = detail ? String(detail) : `Tavus API server error (HTTP ${statusCode}).`;
       return { credentialStatus: 'Unknown', apiHealth: 'Failed', apiError };
     }
-    // 404 and other 4xx — endpoint may not exist for this plan but key is accepted
+    // 404 and other 4xx — endpoint may not exist for this plan but key was accepted
     console.info(`[Tavus] /replicas returned HTTP ${statusCode} — treating credentials as valid.`);
     return { credentialStatus: 'Valid', apiHealth: 'Healthy', apiError: null };
 
@@ -92,159 +113,72 @@ async function checkApiHealth(baseUrl, apiKey) {
   }
 }
 
-// ── Flexible usage field probe ────────────────────────────────────────────────
-// Tavus usage API shape is undocumented and may vary by plan. Probe all likely
-// field names and pick the first non-null numeric value for each metric.
+// ── Billing quota fetch — uses Bearer token on TAVUS_ACCOUNT_USAGE_ENDPOINT ──
 
-function probeField(src, ...keys) {
-  for (const k of keys) {
-    const v = src[k];
-    const n = toNum(v);
-    if (n !== null) return n;
-  }
-  return null;
-}
-
-function extractUsageFields(raw) {
-  // Normalise: support top-level or nested .data
-  const src = (raw && typeof raw === 'object' && raw.data && typeof raw.data === 'object')
-    ? { ...raw, ...raw.data }
-    : (raw || {});
-
-  const planName = src.plan_name ?? src.plan ?? src.planName ?? null;
-
-  const convUsed  = probeField(src, 'conversation_minutes_used',  'conversationMinutesUsed',  'minutes_used',  'credits_used',  'usage');
-  const convLimit = probeField(src, 'conversation_minutes_limit', 'conversationMinutesLimit', 'minutes_limit', 'credits_limit', 'limit');
-  const vidUsed   = probeField(src, 'video_generation_minutes_used',  'videoGenerationMinutesUsed');
-  const vidLimit  = probeField(src, 'video_generation_minutes_limit', 'videoGenerationMinutesLimit');
-  const concLimit = probeField(src, 'concurrent_stream_limit', 'concurrentStreamLimit', 'concurrent_streams');
-
-  const convRemaining = (convUsed !== null && convLimit !== null) ? Math.max(0, convLimit - convUsed) : null;
-  const vidRemaining  = (vidUsed  !== null && vidLimit  !== null) ? Math.max(0, vidLimit  - vidUsed)  : null;
-
-  const convPct = (convUsed !== null && convLimit !== null && convLimit > 0)
-    ? Number(((convUsed / convLimit) * 100).toFixed(2)) : null;
-  const vidPct  = (vidUsed !== null && vidLimit  !== null && vidLimit  > 0)
-    ? Number(((vidUsed  / vidLimit)  * 100).toFixed(2)) : null;
-
-  // Overall = highest available percentage
-  let overallPct = null;
-  if (convPct !== null) overallPct = Math.max(overallPct ?? 0, convPct);
-  if (vidPct  !== null) overallPct = Math.max(overallPct ?? 0, vidPct);
-
-  return {
-    planName:                        typeof planName === 'string' ? planName : null,
-    conversationMinutesUsed:         convUsed,
-    conversationMinutesLimit:        convLimit,
-    conversationMinutesRemaining:    convRemaining,
-    conversationUsagePercentage:     convPct,
-    videoGenerationMinutesUsed:      vidUsed,
-    videoGenerationMinutesLimit:     vidLimit,
-    videoGenerationMinutesRemaining: vidRemaining,
-    videoGenerationUsagePercentage:  vidPct,
-    overallUsagePercentage:          overallPct,
-    concurrentStreamLimit:           concLimit,
-  };
-}
-
-// ── Usage endpoint fetch ──────────────────────────────────────────────────────
-
-async function fetchUsage(usageEndpoint, apiKey) {
+async function fetchBillingQuotas(usageEndpoint, billingToken) {
   if (!usageEndpoint) {
-    return {
-      usageStatus:  'Not Available',
-      usageMessage: 'TAVUS_ACCOUNT_USAGE_ENDPOINT is not configured. Showing manual plan limits only.',
-      ...emptyUsageFields(),
-    };
+    return { quotaStatus: 'Not Configured', quotaMessage: 'TAVUS_ACCOUNT_USAGE_ENDPOINT is not configured. Showing plan information only.', quotas: null };
+  }
+  if (!billingToken) {
+    return { quotaStatus: 'No Token', quotaMessage: 'TAVUS_BILLING_AUTH_TOKEN is not configured. Cannot fetch billing quotas.', quotas: null };
   }
 
   try {
-    const { statusCode, body } = await httpsGetApiKey(usageEndpoint, apiKey);
+    const { statusCode, body } = await httpsGet(usageEndpoint, { 'Authorization': `Bearer ${billingToken}` });
 
     if (statusCode === 401 || statusCode === 403) {
-      return {
-        usageStatus:  'Unavailable',
-        usageMessage: 'Tavus usage endpoint authorization failed. Please verify API key.',
-        usageAuthFailed: true,
-        ...emptyUsageFields(),
-      };
+      return { quotaStatus: 'Auth Failed', quotaMessage: 'Tavus billing quota authorization failed. Verify TAVUS_BILLING_AUTH_TOKEN.', quotas: null, quotaAuthFailed: true };
     }
     if (statusCode === 404) {
-      return {
-        usageStatus:  'Not Available',
-        usageMessage: 'Tavus usage endpoint is not available for this account or endpoint path.',
-        ...emptyUsageFields(),
-      };
+      return { quotaStatus: 'Not Found', quotaMessage: 'Tavus billing quota endpoint not found. Check TAVUS_ACCOUNT_USAGE_ENDPOINT.', quotas: null };
+    }
+    if (statusCode === 429) {
+      return { quotaStatus: 'Rate Limited', quotaMessage: 'Tavus billing quota endpoint rate limited. Retry later.', quotas: null };
+    }
+    if (statusCode >= 500) {
+      return { quotaStatus: 'Server Error', quotaMessage: `Tavus billing quota endpoint server error (HTTP ${statusCode}).`, quotas: null };
     }
     if (statusCode !== 200) {
-      return {
-        usageStatus:  'Not Available',
-        usageMessage: `Tavus usage endpoint returned HTTP ${statusCode}. Usage monitoring is not available.`,
-        ...emptyUsageFields(),
-      };
+      return { quotaStatus: 'Unavailable', quotaMessage: `Tavus billing quota endpoint returned HTTP ${statusCode}.`, quotas: null };
     }
 
     const raw = tryParseJson(body);
-    if (!raw) {
-      return {
-        usageStatus:  'Not Available',
-        usageMessage: 'Tavus usage endpoint returned a non-JSON response.',
-        ...emptyUsageFields(),
-      };
+    if (!raw || typeof raw !== 'object') {
+      return { quotaStatus: 'Parse Error', quotaMessage: 'Tavus billing quota endpoint returned non-JSON response.', quotas: null };
     }
 
-    const fields = extractUsageFields(raw);
-
-    // Consider "available" if at least one numeric usage or limit field was found
-    const hasData = Object.values(fields).some(v => typeof v === 'number');
-    if (!hasData) {
-      return {
-        usageStatus:  'Not Available',
-        usageMessage: 'Tavus usage endpoint returned 200 but no recognisable usage fields were found.',
-        ...emptyUsageFields(),
-      };
-    }
-
-    return {
-      usageStatus:  'Available',
-      usageMessage: null,
-      usageAuthFailed: false,
-      ...fields,
+    const quotas = {
+      conversation:             normaliseQuotaItem(raw.conversation,              'CVI / Conversation Minutes'),
+      replica:                  normaliseQuotaItem(raw.replica,                   'Custom Replicas'),
+      video:                    normaliseQuotaItem(raw.video,                     'Video Generation'),
+      concurrentConversations:  normaliseQuotaItem(raw.concurrent_conversations_limit, 'Max Concurrent Streams'),
+      conversationLengthLimit:  normaliseQuotaItem(raw.conversation_length_limit, 'Conversation Length Limit'),
     };
+
+    // Drop quota keys that had no data
+    for (const k of Object.keys(quotas)) {
+      if (quotas[k] === null) delete quotas[k];
+    }
+
+    return { quotaStatus: 'Available', quotaMessage: null, quotas, quotaAuthFailed: false };
 
   } catch (e) {
-    const msg = e.message && e.message.length < 200 ? e.message : 'Network error fetching Tavus usage.';
-    console.warn('[Tavus] Usage fetch error:', msg);
-    return {
-      usageStatus:  'Not Available',
-      usageMessage: `Error fetching usage: ${msg}`,
-      ...emptyUsageFields(),
-    };
+    const msg = e.message && e.message.length < 200 ? e.message : 'Network error fetching Tavus billing quotas.';
+    console.warn('[Tavus] Billing quota fetch error:', msg);
+    return { quotaStatus: 'Error', quotaMessage: `Error fetching billing quotas: ${msg}`, quotas: null };
   }
 }
 
-function emptyUsageFields() {
-  return {
-    usageAuthFailed:                 false,
-    planName:                        null,
-    conversationMinutesUsed:         null,
-    conversationMinutesLimit:        null,
-    conversationMinutesRemaining:    null,
-    conversationUsagePercentage:     null,
-    videoGenerationMinutesUsed:      null,
-    videoGenerationMinutesLimit:     null,
-    videoGenerationMinutesRemaining: null,
-    videoGenerationUsagePercentage:  null,
-    overallUsagePercentage:          null,
-    concurrentStreamLimit:           null,
-  };
-}
+// ── Overall status determination ──────────────────────────────────────────────
 
-// ── Overall status ────────────────────────────────────────────────────────────
-
-function determineStatus(credentialStatus, apiHealth, usageStatus, usageAuthFailed, overallPct, warningPct, criticalPct) {
-  if (credentialStatus === 'Invalid' || usageAuthFailed) {
-    return { status: 'Blocked', message: 'Tavus usage limit is fully consumed or API key is invalid.' };
+function determineStatus(credentialStatus, apiHealth, quotaResult, warningPct, criticalPct) {
+  // API key invalid — hard block
+  if (credentialStatus === 'Invalid') {
+    return { status: 'Blocked', message: 'Tavus API key is invalid. Verify TAVUS_API_KEY.' };
+  }
+  // API health failures — block or critical
+  if (apiHealth === 'Auth Failed') {
+    return { status: 'Blocked', message: 'Tavus API key is invalid. Verify TAVUS_API_KEY.' };
   }
   if (apiHealth === 'Failed') {
     return { status: 'Critical', message: 'Tavus API server is unreachable or returning server errors.' };
@@ -252,36 +186,44 @@ function determineStatus(credentialStatus, apiHealth, usageStatus, usageAuthFail
   if (apiHealth === 'Rate Limited') {
     return { status: 'Critical', message: 'Tavus API rate limit reached. Retry later.' };
   }
-  if (overallPct !== null) {
-    if (overallPct >= 100) {
-      return { status: 'Blocked', message: 'Tavus usage limit is fully consumed or API key is invalid.' };
-    }
-    if (overallPct >= criticalPct) {
-      return { status: 'Critical', message: `Tavus usage crossed ${criticalPct}%. Please upgrade or add usage immediately.` };
-    }
-    if (overallPct >= warningPct) {
-      return { status: 'Warning', message: `Tavus usage crossed ${warningPct}%. Please monitor usage.` };
-    }
-  }
-  if (usageStatus === 'Not Available') {
-    return { status: 'Normal', message: 'Tavus API is healthy. Usage data is not available because usage endpoint is not configured.' };
-  }
-  return { status: 'Normal', message: 'Tavus API service is normal.' };
-}
 
-// ── Enterprise plan status message ───────────────────────────────────────────
+  // Billing quota auth failure — warning only (API health still works)
+  if (quotaResult.quotaAuthFailed) {
+    return { status: 'Warning', message: 'Tavus billing quota authorization failed. Verify TAVUS_BILLING_AUTH_TOKEN.' };
+  }
 
-function determineStatusEnterprise(credentialStatus, apiHealth, usageAuthFailed) {
-  if (credentialStatus === 'Invalid' || usageAuthFailed) {
-    return { status: 'Blocked', message: 'Tavus usage limit is fully consumed or API key is invalid.' };
+  // Missing billing token — warning only
+  if (quotaResult.quotaStatus === 'No Token') {
+    return { status: 'Warning', message: 'TAVUS_BILLING_AUTH_TOKEN is not configured. Billing quota monitoring is unavailable.' };
   }
-  if (apiHealth === 'Failed') {
-    return { status: 'Critical', message: 'Tavus API server is unreachable or returning server errors.' };
+
+  // Check per-quota item status
+  if (quotaResult.quotas) {
+    for (const item of Object.values(quotaResult.quotas)) {
+      if (!item.isAllowed) {
+        return { status: 'Blocked', message: `Tavus quota "${item.label}" is not allowed. Usage limit may be exhausted.` };
+      }
+      const pct = item.usagePercentage;
+      if (pct !== null) {
+        if (pct >= 100) {
+          return { status: 'Blocked', message: `Tavus quota "${item.label}" is fully consumed (${pct}%).` };
+        }
+        if (pct >= criticalPct) {
+          return { status: 'Critical', message: `Tavus quota "${item.label}" crossed ${criticalPct}% (${pct}%). Please upgrade or add capacity immediately.` };
+        }
+        if (pct >= warningPct) {
+          return { status: 'Warning', message: `Tavus quota "${item.label}" crossed ${warningPct}% (${pct}%). Please monitor usage.` };
+        }
+      }
+    }
   }
-  if (apiHealth === 'Rate Limited') {
-    return { status: 'Critical', message: 'Tavus API rate limit reached. Retry later.' };
+
+  if (quotaResult.quotaStatus === 'Available') {
+    return { status: 'Normal', message: 'Tavus API service is normal.' };
   }
-  return { status: 'Normal', message: 'Enterprise plan detected. Tavus API is healthy. Usage data is not available via configured usage endpoint.' };
+
+  // No usage data but API is healthy — normal for enterprise or unconfigured endpoint
+  return { status: 'Normal', message: 'Tavus API is healthy. Billing quota data is not available.' };
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -290,8 +232,12 @@ async function fetchTavusStatus() {
   const apiKey        = process.env.TAVUS_API_KEY;
   const baseUrl       = (process.env.TAVUS_BASE_URL || 'https://tavusapi.com/v2').replace(/\/$/, '');
   const usageEndpoint = process.env.TAVUS_ACCOUNT_USAGE_ENDPOINT || null;
+  const billingToken  = process.env.TAVUS_BILLING_AUTH_TOKEN || null;
   const warningPct    = Number.parseInt(process.env.TAVUS_WARNING_PERCENTAGE  || '75', 10);
   const criticalPct   = Number.parseInt(process.env.TAVUS_CRITICAL_PERCENTAGE || '90', 10);
+  const envPlanName   = process.env.TAVUS_PLAN_NAME || null;
+  const envLimitType  = process.env.TAVUS_LIMIT_TYPE || null;
+  const isEnterprise  = (envPlanName || '').toLowerCase() === 'enterprise';
 
   if (!apiKey) {
     const err = new Error('TAVUS_API_KEY is not configured.');
@@ -299,17 +245,9 @@ async function fetchTavusStatus() {
     throw err;
   }
 
-  // Manual plan limits from env — shown when usage endpoint is absent
-  const envPlanName        = process.env.TAVUS_PLAN_NAME || null;
-  const envLimitType       = process.env.TAVUS_LIMIT_TYPE || null;
-  const envConvLimit       = toNum(process.env.TAVUS_CONVERSATION_MINUTES_LIMIT);
-  const envVideoLimit      = toNum(process.env.TAVUS_VIDEO_GENERATION_MINUTES_LIMIT);
-  const envConcurrentLimit = toNum(process.env.TAVUS_CONCURRENT_STREAM_LIMIT);
-  const isEnterprise       = (envPlanName || '').toLowerCase() === 'enterprise';
-
-  const [healthResult, usageResult] = await Promise.all([
+  const [healthResult, quotaResult] = await Promise.all([
     checkApiHealth(baseUrl, apiKey),
-    fetchUsage(usageEndpoint, apiKey),
+    fetchBillingQuotas(usageEndpoint, billingToken),
   ]);
 
   if (healthResult.credentialStatus === 'Invalid') {
@@ -318,37 +256,21 @@ async function fetchTavusStatus() {
     throw err;
   }
 
-  const { status, message } = isEnterprise
-    ? determineStatusEnterprise(healthResult.credentialStatus, healthResult.apiHealth, !!usageResult.usageAuthFailed)
-    : determineStatus(
-        healthResult.credentialStatus,
-        healthResult.apiHealth,
-        usageResult.usageStatus,
-        !!usageResult.usageAuthFailed,
-        usageResult.overallUsagePercentage,
-        warningPct,
-        criticalPct
-      );
+  const { status, message } = determineStatus(
+    healthResult.credentialStatus,
+    healthResult.apiHealth,
+    quotaResult,
+    warningPct,
+    criticalPct
+  );
 
-  // Merge usage-endpoint results with env-based manual limits as fallbacks
-  const planName              = usageResult.planName              ?? envPlanName        ?? 'Unknown';
-  const limitType             = envLimitType || (isEnterprise ? 'Custom Enterprise' : null);
-  const convLimit             = usageResult.conversationMinutesLimit   ?? envConvLimit;
-  const videoLimit            = usageResult.videoGenerationMinutesLimit ?? envVideoLimit;
-  const concurrentStreamLimit = usageResult.concurrentStreamLimit  ?? envConcurrentLimit;
+  const planName  = envPlanName  || 'Unknown';
+  const limitType = envLimitType || (isEnterprise ? 'Custom Enterprise' : null);
 
-  // For Enterprise with no numeric limits set, use sentinel so UI shows "Custom / Enterprise"
-  const convLimitDisplay        = convLimit        ?? (isEnterprise ? 'Custom / Enterprise' : null);
-  const videoLimitDisplay       = videoLimit       ?? (isEnterprise ? 'Custom / Enterprise' : null);
-  const concurrentLimitDisplay  = concurrentStreamLimit ?? (isEnterprise ? 'Custom / Enterprise' : null);
-
-  // Enterprise: usage not available via API is expected — show informative status, not error
-  const usageStatus  = isEnterprise && usageResult.usageStatus === 'Not Available'
-    ? 'Not Available via API'
-    : usageResult.usageStatus;
-  const usageMessage = isEnterprise && usageResult.usageStatus === 'Not Available'
-    ? 'Enterprise plan detected. Usage data is not available via API. Limits shown below reflect your plan configuration.'
-    : (usageResult.usageMessage || null);
+  // usageStatus exposed to frontend
+  const usageStatus = quotaResult.quotaStatus === 'Available' ? 'Available'
+    : quotaResult.quotaStatus === 'Not Configured' ? (isEnterprise ? 'Not Available via API' : 'Not Configured')
+    : quotaResult.quotaStatus;
 
   return {
     provider:         'Tavus',
@@ -361,17 +283,9 @@ async function fetchTavusStatus() {
     limitType,
     enterprisePlan:   isEnterprise,
     usageStatus,
-    usageMessage,
-    conversationMinutesUsed:         usageResult.conversationMinutesUsed,
-    conversationMinutesLimit:        convLimitDisplay,
-    conversationMinutesRemaining:    usageResult.conversationMinutesRemaining,
-    conversationUsagePercentage:     usageResult.conversationUsagePercentage,
-    videoGenerationMinutesUsed:      usageResult.videoGenerationMinutesUsed,
-    videoGenerationMinutesLimit:     videoLimitDisplay,
-    videoGenerationMinutesRemaining: usageResult.videoGenerationMinutesRemaining,
-    videoGenerationUsagePercentage:  usageResult.videoGenerationUsagePercentage,
-    overallUsagePercentage:          usageResult.overallUsagePercentage,
-    concurrentStreamLimit:           concurrentLimitDisplay,
+    usageMessage:     quotaResult.quotaMessage || null,
+    // Individual quota items (null when billing endpoint not available)
+    ...(quotaResult.quotas || {}),
     warningPercentage:  warningPct,
     criticalPercentage: criticalPct,
     lastCheckedTime:    new Date().toISOString(),
@@ -389,13 +303,13 @@ function checkTavusAllowed(statusData) {
   if (statusData.status === 'Blocked') {
     return {
       allowed: false,
-      reason: 'Tavus service is temporarily unavailable because API key, usage limit, or Tavus service health has an issue. Please contact admin.',
+      reason: 'Tavus service is temporarily unavailable due to API key, quota limit, or service health issue. Please contact admin.',
     };
   }
   if (statusData.status === 'Critical') {
-    // Usage-only critical (apiHealth is Healthy) — allow but log warning
+    // Usage-only critical (API itself is Healthy) — allow but log alert
     if (statusData.apiHealth === 'Healthy') {
-      console.warn('[Tavus] Request allowed but usage is Critical. Review plan immediately.');
+      console.warn('[Tavus] Request allowed but quota is Critical. Review plan immediately.');
       return { allowed: true, reason: null };
     }
     // API health failure — block
