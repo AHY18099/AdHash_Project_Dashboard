@@ -253,7 +253,8 @@ try {
     app.use('/api/qa-state', require('./routes/qaState'));
     app.use('/api/apyhub', require('./routes/apyhub'));
     app.use('/api/firebase', require('./routes/firebase'));
-    console.log('[startup] ✅ Mongoose route modules mounted (/api/projects, /api/qa-state, /api/apyhub, /api/firebase)');
+    app.use('/api/messagemedia', require('./routes/messagemedia'));
+    console.log('[startup] ✅ Mongoose route modules mounted (/api/projects, /api/qa-state, /api/apyhub, /api/firebase, /api/messagemedia)');
     console.log('[startup] ApyHub env vars present:',
         'ENDPOINT=' + !!process.env.APYHUB_SUBSCRIPTION_USAGE_ENDPOINT,
         'TOKEN=' + !!process.env.APYHUB_AUTH_TOKEN,
@@ -263,6 +264,11 @@ try {
         'SA_JSON=' + !!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON,
         'PROJECT_ID=' + !!process.env.FIREBASE_PROJECT_ID,
         'PROJECT_NUMBER=' + !!process.env.FIREBASE_PROJECT_NUMBER
+    );
+    console.log('[startup] MessageMedia env vars present:',
+        'KEY=' + !!process.env.MESSAGEMEDIA_API_KEY,
+        'SECRET=' + !!process.env.MESSAGEMEDIA_API_SECRET,
+        'SOURCE=' + !!process.env.MESSAGEMEDIA_SOURCE_NUMBER
     );
 } catch (e) {
     console.warn('[startup] ⚠️  Mongoose route modules failed to load:', e.message, '— falling back to legacy routes');
