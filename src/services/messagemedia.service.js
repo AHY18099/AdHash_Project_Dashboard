@@ -3,8 +3,16 @@
 const https = require('node:https');
 const http  = require('node:http');
 
-// ── In-memory last-error cache (resets on redeploy — acceptable, no DB needed) ─
+// ── In-memory caches (reset on redeploy — acceptable, no DB needed) ──────────
 const _lastError = { code: null, message: null, time: null };
+
+const _healthCheck = {
+  status:       null,   // 'Success' | 'Failed' | null
+  time:         null,
+  messageId:    null,
+  errorCode:    null,
+  errorMessage: null,
+};
 
 function recordSmsError(code, message) {
   _lastError.code    = code    || null;
@@ -241,8 +249,168 @@ async function fetchMessageMediaStatus() {
     lastErrorCode:       _lastError.code,
     lastErrorMessage:    _lastError.message,
     lastErrorTime:       _lastError.time,
+    ...getHealthCheckState(),
+    healthCheckEnabled:  process.env.MESSAGEMEDIA_HEALTH_CHECK_ENABLED !== 'false',
+    healthCheckToNumber: !!process.env.MESSAGEMEDIA_HEALTH_CHECK_TO_NUMBER,
     status,
     message,
+  };
+}
+
+// ── Health check — send a real test SMS ──────────────────────────────────────
+
+function httpsPostJson(endpoint, apiKey, apiSecret, payload) {
+  return new Promise((resolve, reject) => {
+    const url     = new URL(endpoint);
+    const encoded = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
+    const body    = JSON.stringify(payload);
+    const options = {
+      hostname: url.hostname,
+      port:     url.port || 443,
+      path:     url.pathname + url.search,
+      method:   'POST',
+      headers: {
+        'Authorization':  `Basic ${encoded}`,
+        'Content-Type':   'application/json',
+        'Accept':         'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    };
+    const req = require('node:https').request(options, (res) => {
+      let data = '';
+      res.on('data', (c) => { data += c; });
+      res.on('end', () => resolve({ statusCode: res.statusCode, body: data }));
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => { req.destroy(new Error('Health check request timed out after 15s')); });
+    req.write(body);
+    req.end();
+  });
+}
+
+async function runHealthCheck() {
+  const apiKey     = process.env.MESSAGEMEDIA_API_KEY;
+  const apiSecret  = process.env.MESSAGEMEDIA_API_SECRET;
+  const fromNumber = process.env.MESSAGEMEDIA_SOURCE_NUMBER;
+  const toNumber   = process.env.MESSAGEMEDIA_HEALTH_CHECK_TO_NUMBER;
+  const enabled    = process.env.MESSAGEMEDIA_HEALTH_CHECK_ENABLED !== 'false';
+
+  if (!enabled) {
+    return {
+      smsApiHealth:              'Skipped',
+      lastHealthCheckStatus:     'Skipped',
+      lastHealthCheckTime:       null,
+      lastHealthCheckMessageId:  null,
+      lastHealthCheckErrorCode:  null,
+      lastHealthCheckErrorMessage: 'Health check is disabled (MESSAGEMEDIA_HEALTH_CHECK_ENABLED=false).',
+    };
+  }
+
+  if (!apiKey || !apiSecret) {
+    const err = new Error('MESSAGEMEDIA_API_KEY or MESSAGEMEDIA_API_SECRET is not configured.');
+    err.configError = true;
+    throw err;
+  }
+  if (!fromNumber) {
+    const err = new Error('MESSAGEMEDIA_SOURCE_NUMBER is not configured.');
+    err.configError = true;
+    throw err;
+  }
+  if (!toNumber) {
+    const err = new Error('MESSAGEMEDIA_HEALTH_CHECK_TO_NUMBER is not configured.');
+    err.configError = true;
+    throw err;
+  }
+
+  const now = new Date();
+  const dateLabel = now.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+  const messageText = `MessageMedia health check successful - ${dateLabel}`;
+
+  const payload = {
+    messages: [
+      {
+        source_number:      fromNumber,
+        destination_number: toNumber,
+        content:            messageText,
+      },
+    ],
+  };
+
+  let statusCode, responseBody;
+  try {
+    ({ statusCode, body: responseBody } = await httpsPostJson(
+      'https://api.messagemedia.com/v1/messages',
+      apiKey, apiSecret, payload
+    ));
+  } catch (e) {
+    const msg = e.message || 'Network error during health check.';
+    _healthCheck.status       = 'Failed';
+    _healthCheck.time         = now.toISOString();
+    _healthCheck.messageId    = null;
+    _healthCheck.errorCode    = 'NETWORK_ERROR';
+    _healthCheck.errorMessage = msg;
+    console.error('[MessageMedia] Health check network error:', msg);
+    return buildHealthResult('Failed', null, 'NETWORK_ERROR', msg);
+  }
+
+  if (statusCode === 401 || statusCode === 403) {
+    const msg = 'API credentials rejected (HTTP ' + statusCode + '). Verify MESSAGEMEDIA_API_KEY and MESSAGEMEDIA_API_SECRET.';
+    _healthCheck.status       = 'Failed';
+    _healthCheck.time         = now.toISOString();
+    _healthCheck.messageId    = null;
+    _healthCheck.errorCode    = 'AUTH_ERROR_' + statusCode;
+    _healthCheck.errorMessage = msg;
+    const err = new Error(msg);
+    err.authError = true;
+    throw err;
+  }
+
+  let parsed = null;
+  try { parsed = JSON.parse(responseBody); } catch { /* ignore */ }
+
+  // MessageMedia returns 202 Accepted on success
+  if (statusCode === 201 || statusCode === 202 || statusCode === 200) {
+    const messageId = parsed?.messages?.[0]?.message_id ?? parsed?.message_id ?? null;
+    _healthCheck.status       = 'Success';
+    _healthCheck.time         = now.toISOString();
+    _healthCheck.messageId    = messageId;
+    _healthCheck.errorCode    = null;
+    _healthCheck.errorMessage = null;
+    console.info('[MessageMedia] Health check SMS sent successfully. MessageId:', messageId);
+    return buildHealthResult('Success', messageId, null, null);
+  }
+
+  // Any other status — extract provider error details
+  const errCode = parsed?.details?.[0]?.code ?? parsed?.error?.code ?? String(statusCode);
+  const errMsg  = parsed?.details?.[0]?.message ?? parsed?.error?.message ?? parsed?.message ?? `SMS API returned HTTP ${statusCode}.`;
+  _healthCheck.status       = 'Failed';
+  _healthCheck.time         = now.toISOString();
+  _healthCheck.messageId    = null;
+  _healthCheck.errorCode    = String(errCode);
+  _healthCheck.errorMessage = errMsg;
+  console.error('[MessageMedia] Health check failed. Code:', errCode, 'Message:', errMsg);
+  return buildHealthResult('Failed', null, String(errCode), errMsg);
+}
+
+function buildHealthResult(status, messageId, errorCode, errorMessage) {
+  return {
+    smsApiHealth:                status,
+    lastHealthCheckStatus:       _healthCheck.status,
+    lastHealthCheckTime:         _healthCheck.time,
+    lastHealthCheckMessageId:    _healthCheck.messageId,
+    lastHealthCheckErrorCode:    _healthCheck.errorCode,
+    lastHealthCheckErrorMessage: _healthCheck.errorMessage,
+  };
+}
+
+function getHealthCheckState() {
+  return {
+    smsApiHealth:                _healthCheck.status ?? 'Not Run',
+    lastHealthCheckStatus:       _healthCheck.status,
+    lastHealthCheckTime:         _healthCheck.time,
+    lastHealthCheckMessageId:    _healthCheck.messageId,
+    lastHealthCheckErrorCode:    _healthCheck.errorCode,
+    lastHealthCheckErrorMessage: _healthCheck.errorMessage,
   };
 }
 
@@ -261,4 +429,4 @@ function checkSmsAllowed(statusData) {
   return { allowed: true, reason: null };
 }
 
-module.exports = { fetchMessageMediaStatus, checkSmsAllowed, recordSmsError };
+module.exports = { fetchMessageMediaStatus, checkSmsAllowed, recordSmsError, runHealthCheck };

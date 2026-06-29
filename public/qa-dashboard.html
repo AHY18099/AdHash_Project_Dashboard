@@ -5885,7 +5885,7 @@ function renderThirdPartyTab(p){
         ${apisHtml}
         ${acct.name&&acct.name.toLowerCase().includes('apyhub')?`<div id="apyhub-usage-${p}-${i}" class="apyhub-usage-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:12px;font-weight:700;color:var(--txt);letter-spacing:.4px">📊 SUBSCRIPTION USAGE</span><button class="tp-api-run-btn" style="font-size:11px;padding:3px 10px" onclick="tpRefreshApyHub('${p}',${i})">↻ Refresh</button></div><div id="apyhub-usage-body-${p}-${i}"><div style="color:var(--mut);font-size:12px;font-style:italic">Click Refresh to load usage data</div></div></div>`:''}
         ${acct.name&&acct.name.toLowerCase().includes('firebase')?`<div id="firebase-otp-${p}-${i}" class="firebase-otp-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:12px;font-weight:700;color:var(--txt);letter-spacing:.4px">🔥 FIREBASE OTP QUOTA</span><button class="tp-api-run-btn" style="font-size:11px;padding:3px 10px" onclick="tpRefreshFirebaseOtp('${p}',${i})">↻ Refresh</button></div><div id="firebase-otp-body-${p}-${i}"><div style="color:var(--mut);font-size:12px;font-style:italic">Click Refresh to load OTP quota data</div></div></div>`:''}
-        ${acct.name&&(acct.name.toLowerCase().includes('messagemedia')||acct.name.toLowerCase().includes('sinch'))?`<div id="messagemedia-${p}-${i}" class="messagemedia-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:12px;font-weight:700;color:var(--txt);letter-spacing:.4px">📱 SINCH MESSAGEMEDIA SMS</span><button class="tp-api-run-btn" style="font-size:11px;padding:3px 10px" onclick="tpRefreshMessageMedia('${p}',${i})">↻ Refresh</button></div><div id="messagemedia-body-${p}-${i}"><div style="color:var(--mut);font-size:12px;font-style:italic">Click Refresh to load SMS status</div></div></div>`:''}
+        ${acct.name&&(acct.name.toLowerCase().includes('messagemedia')||acct.name.toLowerCase().includes('sinch'))?`<div id="messagemedia-${p}-${i}" class="messagemedia-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:12px;font-weight:700;color:var(--txt);letter-spacing:.4px">📱 SINCH MESSAGEMEDIA SMS</span><div style="display:flex;gap:6px"><button class="tp-api-run-btn" style="font-size:11px;padding:3px 10px" onclick="tpRefreshMessageMedia('${p}',${i})">↻ Refresh</button><button id="mm-hc-btn-${p}-${i}" class="tp-api-run-btn" style="font-size:11px;padding:3px 10px;background:rgba(14,165,233,.12);color:#0ea5e9;border-color:rgba(14,165,233,.3)" onclick="tpRunMessageMediaHealthCheck('${p}',${i})">📤 Health Check</button></div></div><div id="messagemedia-body-${p}-${i}"><div style="color:var(--mut);font-size:12px;font-style:italic">Click Refresh to load SMS status</div></div></div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -6893,6 +6893,107 @@ async function tpRefreshFirebaseOtp(p,acctIdx){
   }
 }
 
+function _mmRenderCard(d,bodyEl){
+  const statusKey=(d.status||'Normal').toLowerCase();
+  const barColor=statusKey==='blocked'?'#ef4444':statusKey==='critical'?'#f97316':statusKey==='warning'?'#f59e0b':'#10b981';
+  const mkBadge=(s)=>({
+    normal:`<span style="background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">✓ Normal</span>`,
+    warning:`<span style="background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">⚠ Warning</span>`,
+    critical:`<span style="background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">🔴 Critical</span>`,
+    blocked:`<span style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">✕ Blocked</span>`,
+  })[(s||'normal').toLowerCase()]||`<span style="font-size:11px;color:var(--mut)">${escH(s)}</span>`;
+  const mkHealthBadge=(s)=>{
+    const sl=(s||'').toLowerCase();
+    if(sl==='success')return`<span style="background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">✓ Success</span>`;
+    if(sl==='failed')return`<span style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">✕ Failed</span>`;
+    if(sl==='skipped')return`<span style="background:rgba(99,102,241,.08);color:var(--mut);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:2px 8px;font-size:11px">— Disabled</span>`;
+    return`<span style="background:rgba(99,102,241,.08);color:var(--mut);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:2px 8px;font-size:11px">— Not Run</span>`;
+  };
+  const mkAvailBadge=(s)=>{
+    const sl=(s||'').toLowerCase();
+    if(sl==='available')return`<span style="color:#10b981;font-weight:700">✓ Available</span>`;
+    if(sl==='not applicable')return`<span style="color:var(--mut)">— Not Applicable</span>`;
+    if(sl.startsWith('available in'))return`<span style="color:#6366f1;font-weight:600">↗ ${escH(s)}</span>`;
+    return`<span style="color:var(--mut)">— Not Available</span>`;
+  };
+  const fmtDate=s=>{if(!s)return'—';try{return new Date(s).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e2){return s;}};
+  // Credential chip
+  const credColor=d.credentialStatus==='Valid'?'#10b981':d.credentialStatus==='Invalid'?'#ef4444':'var(--mut)';
+  const credBg=d.credentialStatus==='Valid'?'rgba(16,185,129,.1)':d.credentialStatus==='Invalid'?'rgba(239,68,68,.08)':'rgba(99,102,241,.08)';
+  const credBorder=d.credentialStatus==='Valid'?'rgba(16,185,129,.3)':d.credentialStatus==='Invalid'?'rgba(239,68,68,.3)':'rgba(99,102,241,.2)';
+  const credErrorNote=d.credentialError?`<div style="font-size:10px;color:var(--mut);margin-top:3px;max-width:320px;word-break:break-word">Credential check failed: ${escH(d.credentialError)}</div>`:'';
+  const credChip=`<div style="display:flex;flex-direction:column;align-items:flex-start"><span style="background:${credBg};color:${credColor};border:1px solid ${credBorder};border-radius:10px;padding:2px 9px;font-size:11px;font-weight:700">${d.credentialStatus==='Valid'?'✓':'✕'} Credentials: ${escH(d.credentialStatus||'Unknown')}</span>${credErrorNote}</div>`;
+  // Billing type chip
+  const btColor=d.billingType==='Prepaid'?'#6366f1':'var(--mut)';
+  const btBg=d.billingType==='Prepaid'?'rgba(99,102,241,.1)':'rgba(99,102,241,.06)';
+  const btBorder=d.billingType==='Prepaid'?'rgba(99,102,241,.3)':'rgba(99,102,241,.18)';
+  const billingTypeChip=`<span style="background:${btBg};color:${btColor};border:1px solid ${btBorder};border-radius:10px;padding:2px 9px;font-size:11px;font-weight:700">💳 ${escH(d.billingType||'Unknown')}</span>`;
+  // Credit balance block (prepaid only)
+  const creditBlock=d.creditStatus==='Available'&&typeof d.creditBalance==='number'?`
+    <div style="padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-bottom:8px">Credit Balance</div>
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
+        <span style="font-size:24px;font-weight:800;color:${barColor}">${d.creditBalance.toLocaleString()}</span>
+        <span style="font-size:11px;color:var(--mut)">credits remaining</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:var(--mut)">
+        <span>⚠ Warning below: <strong style="color:#f59e0b">${d.warningCredits}</strong></span>
+        <span>🔴 Critical below: <strong style="color:#f97316">${d.criticalCredits}</strong></span>
+      </div>
+    </div>`:'';
+  // Health check section
+  const hcStatus=d.smsApiHealth||'Not Run';
+  const hcBlock=`
+    <div style="padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-bottom:8px">SMS API Health Check</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        ${mkHealthBadge(hcStatus)}
+        ${d.lastHealthCheckTime?`<span style="font-size:11px;color:var(--mut)">Last run: ${fmtDate(d.lastHealthCheckTime)}</span>`:'<span style="font-size:11px;color:var(--mut)">Not run yet — click 📤 Health Check button above</span>'}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px">
+        <div><span style="color:var(--mut)">SMS API Health:</span> <strong style="color:var(--txt)">${escH(hcStatus)}</strong></div>
+        <div><span style="color:var(--mut)">Message ID:</span> <span style="color:var(--txt);font-family:monospace;font-size:10px">${d.lastHealthCheckMessageId?escH(d.lastHealthCheckMessageId):'—'}</span></div>
+        ${d.lastHealthCheckErrorCode?`<div style="grid-column:1/-1"><span style="color:var(--mut)">Error:</span> <code style="color:#ef4444;font-size:11px">${escH(d.lastHealthCheckErrorCode)}</code>${d.lastHealthCheckErrorMessage?` — <span style="color:var(--txt)">${escH(d.lastHealthCheckErrorMessage)}</span>`:''}</div>`:''}
+      </div>
+      ${!d.healthCheckEnabled?'<div style="margin-top:6px;font-size:11px;color:var(--mut)">Health check is disabled. Set MESSAGEMEDIA_HEALTH_CHECK_ENABLED=true in Railway to enable.</div>':''}
+      ${d.healthCheckEnabled&&!d.healthCheckToNumber?'<div style="margin-top:6px;font-size:11px;color:#f59e0b">⚠ MESSAGEMEDIA_HEALTH_CHECK_TO_NUMBER is not set. Add a test phone number in Railway to enable health checks.</div>':''}
+    </div>`;
+  bodyEl.innerHTML=`
+    <div style="display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      ${mkBadge(d.status)}
+      ${credChip}
+      ${billingTypeChip}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:11px;margin-bottom:12px">
+      <div><span style="color:var(--mut)">Provider:</span> <strong style="color:var(--txt)">${escH(d.provider||'—')}</strong></div>
+      <div><span style="color:var(--mut)">Portal:</span> <a href="${escH(d.portal||'#')}" target="_blank" style="color:var(--link);font-size:11px">${escH((d.portal||'').replace(/^https?:\/\//,''))}</a></div>
+      <div><span style="color:var(--mut)">Source Number:</span> <strong style="color:var(--txt)">${escH(d.sourceNumber||'—')}</strong></div>
+      <div><span style="color:var(--mut)">Source Status:</span> <span style="color:${d.sourceNumberStatus==='Configured'?'#10b981':'#ef4444'}">${escH(d.sourceNumberStatus||'—')}</span></div>
+      <div><span style="color:var(--mut)">Credit Balance:</span> ${typeof d.creditBalance==='number'?`<strong style="color:var(--txt)">${d.creditBalance.toLocaleString()}</strong>`:mkAvailBadge(d.creditStatus)}</div>
+      <div><span style="color:var(--mut)">Credit Expiry:</span> ${d.creditExpiryDate?`<strong style="color:var(--txt)">${escH(fmtDate(d.creditExpiryDate))}</strong>`:mkAvailBadge(d.creditExpiryStatus)}</div>
+      <div><span style="color:var(--mut)">Next Payment:</span> ${d.nextPaymentDate?`<strong style="color:var(--txt)">${escH(fmtDate(d.nextPaymentDate))}</strong>`:mkAvailBadge(d.nextPaymentStatus)}</div>
+      <div><span style="color:var(--mut)">Payment Check:</span> <span style="color:var(--mut);font-size:10px">Manual in Hub Billing</span></div>
+      <div style="grid-column:1/-1"><span style="color:var(--mut)">Last Checked:</span> <span style="color:var(--txt)">${fmtDate(d.lastCheckedTime)}</span></div>
+    </div>
+    ${creditBlock}
+    ${hcBlock}
+    <div style="padding:8px 10px;background:var(--card);border:1px solid var(--border);border-radius:7px;font-size:11px;color:var(--mut);margin-bottom:10px;line-height:1.5">
+      <strong style="color:var(--txt)">Billing:</strong> ${escH(d.billingMessage||'—')}
+    </div>
+    ${d.lastErrorCode?`
+    <div style="padding:8px 12px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:8px;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#ef4444;margin-bottom:5px">Last SMS Error</div>
+      <div style="font-size:11px;display:grid;grid-template-columns:1fr 1fr;gap:4px">
+        <div><span style="color:var(--mut)">Code:</span> <code style="color:#ef4444;font-size:11px">${escH(d.lastErrorCode)}</code></div>
+        <div><span style="color:var(--mut)">Time:</span> <span style="color:var(--txt)">${fmtDate(d.lastErrorTime)}</span></div>
+        ${d.lastErrorMessage?`<div style="grid-column:1/-1"><span style="color:var(--mut)">Message:</span> <span style="color:var(--txt)">${escH(d.lastErrorMessage)}</span></div>`:''}
+      </div>
+    </div>`:'<div style="font-size:11px;color:var(--mut);margin-bottom:8px">No SMS errors recorded since last deploy.</div>'}
+    <div style="padding:7px 10px;background:${statusKey==='blocked'?'rgba(239,68,68,.08)':statusKey==='critical'?'rgba(249,115,22,.08)':statusKey==='warning'?'rgba(245,158,11,.06)':'rgba(16,185,129,.06)'};border-radius:7px;border-left:3px solid ${barColor}">
+      <span style="font-size:11px;color:var(--txt)">${escH(d.message||'')}</span>
+    </div>`;
+}
+
 async function tpRefreshMessageMedia(p,acctIdx){
   const bodyEl=document.getElementById(`messagemedia-body-${p}-${acctIdx}`);
   if(!bodyEl)return;
@@ -6912,82 +7013,38 @@ async function tpRefreshMessageMedia(p,acctIdx){
       </div>`;
       return;
     }
-    const d=json.data;
-    const statusKey=(d.status||'Normal').toLowerCase();
-    const barColor=statusKey==='blocked'?'#ef4444':statusKey==='critical'?'#f97316':statusKey==='warning'?'#f59e0b':'#10b981';
-    const mkBadge=(s)=>({
-      normal:`<span style="background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">✓ Normal</span>`,
-      warning:`<span style="background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">⚠ Warning</span>`,
-      critical:`<span style="background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">🔴 Critical</span>`,
-      blocked:`<span style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">✕ Blocked</span>`,
-    })[(s||'normal').toLowerCase()]||`<span style="font-size:11px;color:var(--mut)">${escH(s)}</span>`;
-    const mkAvailBadge=(s)=>{
-      const sl=(s||'').toLowerCase();
-      if(sl==='available')return`<span style="color:#10b981;font-weight:700">✓ Available</span>`;
-      if(sl==='not applicable')return`<span style="color:var(--mut)">— Not Applicable</span>`;
-      if(sl.startsWith('available in'))return`<span style="color:#6366f1;font-weight:600">↗ ${escH(s)}</span>`;
-      return`<span style="color:var(--mut)">— Not Available</span>`;
-    };
-    const fmtDate=s=>{if(!s)return'—';try{return new Date(s).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e2){return s;}};
-    // Credential chip
-    const credColor=d.credentialStatus==='Valid'?'#10b981':d.credentialStatus==='Invalid'?'#ef4444':'var(--mut)';
-    const credBg=d.credentialStatus==='Valid'?'rgba(16,185,129,.1)':d.credentialStatus==='Invalid'?'rgba(239,68,68,.08)':'rgba(99,102,241,.08)';
-    const credBorder=d.credentialStatus==='Valid'?'rgba(16,185,129,.3)':d.credentialStatus==='Invalid'?'rgba(239,68,68,.3)':'rgba(99,102,241,.2)';
-    const credErrorNote=d.credentialError?`<div style="font-size:10px;color:var(--mut);margin-top:3px;max-width:320px;word-break:break-word">Credential check failed: ${escH(d.credentialError)}</div>`:'';
-    const credChip=`<div style="display:flex;flex-direction:column;align-items:flex-start"><span style="background:${credBg};color:${credColor};border:1px solid ${credBorder};border-radius:10px;padding:2px 9px;font-size:11px;font-weight:700">${d.credentialStatus==='Valid'?'✓':'✕'} Credentials: ${escH(d.credentialStatus||'Unknown')}</span>${credErrorNote}</div>`;
-    // Billing type chip
-    const btColor=d.billingType==='Prepaid'?'#6366f1':'var(--mut)';
-    const btBg=d.billingType==='Prepaid'?'rgba(99,102,241,.1)':'rgba(99,102,241,.06)';
-    const btBorder=d.billingType==='Prepaid'?'rgba(99,102,241,.3)':'rgba(99,102,241,.18)';
-    const billingTypeChip=`<span style="background:${btBg};color:${btColor};border:1px solid ${btBorder};border-radius:10px;padding:2px 9px;font-size:11px;font-weight:700">💳 ${escH(d.billingType||'Unknown')}</span>`;
-    // Credit balance block (prepaid only)
-    const creditBlock=d.creditStatus==='Available'&&typeof d.creditBalance==='number'?`
-      <div style="padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:10px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-bottom:8px">Credit Balance</div>
-        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
-          <span style="font-size:24px;font-weight:800;color:${barColor}">${d.creditBalance.toLocaleString()}</span>
-          <span style="font-size:11px;color:var(--mut)">credits remaining</span>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:var(--mut)">
-          <span>⚠ Warning below: <strong style="color:#f59e0b">${d.warningCredits}</strong></span>
-          <span>🔴 Critical below: <strong style="color:#f97316">${d.criticalCredits}</strong></span>
-        </div>
-      </div>`:''
-    ;
-    bodyEl.innerHTML=`
-      <div style="display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-        ${mkBadge(d.status)}
-        ${credChip}
-        ${billingTypeChip}
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:11px;margin-bottom:12px">
-        <div><span style="color:var(--mut)">Provider:</span> <strong style="color:var(--txt)">${escH(d.provider||'—')}</strong></div>
-        <div><span style="color:var(--mut)">Portal:</span> <a href="${escH(d.portal||'#')}" target="_blank" style="color:var(--link);font-size:11px">${escH((d.portal||'').replace(/^https?:\/\//,''))}</a></div>
-        <div><span style="color:var(--mut)">Source Number:</span> <strong style="color:var(--txt)">${escH(d.sourceNumber||'—')}</strong></div>
-        <div><span style="color:var(--mut)">Source Status:</span> <span style="color:${d.sourceNumberStatus==='Configured'?'#10b981':'#ef4444'}">${escH(d.sourceNumberStatus||'—')}</span></div>
-        <div><span style="color:var(--mut)">Credit Balance:</span> ${typeof d.creditBalance==='number'?`<strong style="color:var(--txt)">${d.creditBalance.toLocaleString()}</strong>`:mkAvailBadge(d.creditStatus)}</div>
-        <div><span style="color:var(--mut)">Credit Expiry:</span> ${d.creditExpiryDate?`<strong style="color:var(--txt)">${escH(fmtDate(d.creditExpiryDate))}</strong>`:mkAvailBadge(d.creditExpiryStatus)}</div>
-        <div><span style="color:var(--mut)">Next Payment:</span> ${d.nextPaymentDate?`<strong style="color:var(--txt)">${escH(fmtDate(d.nextPaymentDate))}</strong>`:mkAvailBadge(d.nextPaymentStatus)}</div>
-        <div style="grid-column:1/-1"><span style="color:var(--mut)">Last Checked:</span> <span style="color:var(--txt)">${fmtDate(d.lastCheckedTime)}</span></div>
-      </div>
-      ${creditBlock}
-      <div style="padding:8px 10px;background:var(--card);border:1px solid var(--border);border-radius:7px;font-size:11px;color:var(--mut);margin-bottom:10px;line-height:1.5">
-        <strong style="color:var(--txt)">Billing:</strong> ${escH(d.billingMessage||'—')}
-      </div>
-      ${d.lastErrorCode?`
-      <div style="padding:8px 12px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:8px;margin-bottom:8px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#ef4444;margin-bottom:5px">Last SMS Error</div>
-        <div style="font-size:11px;display:grid;grid-template-columns:1fr 1fr;gap:4px">
-          <div><span style="color:var(--mut)">Code:</span> <code style="color:#ef4444;font-size:11px">${escH(d.lastErrorCode)}</code></div>
-          <div><span style="color:var(--mut)">Time:</span> <span style="color:var(--txt)">${fmtDate(d.lastErrorTime)}</span></div>
-          ${d.lastErrorMessage?`<div style="grid-column:1/-1"><span style="color:var(--mut)">Message:</span> <span style="color:var(--txt)">${escH(d.lastErrorMessage)}</span></div>`:''}
-        </div>
-      </div>`:'<div style="font-size:11px;color:var(--mut);margin-bottom:8px">No SMS errors recorded since last deploy.</div>'}
-      <div style="padding:7px 10px;background:${statusKey==='blocked'?'rgba(239,68,68,.08)':statusKey==='critical'?'rgba(249,115,22,.08)':statusKey==='warning'?'rgba(245,158,11,.06)':'rgba(16,185,129,.06)'};border-radius:7px;border-left:3px solid ${barColor}">
-        <span style="font-size:11px;color:var(--txt)">${escH(d.message||'')}</span>
-      </div>`;
+    _mmRenderCard(json.data,bodyEl);
   }catch(e){
     bodyEl.innerHTML=`<div style="color:var(--fail);font-size:12px;padding:8px 0">✕ Error: ${escH(e.message)}</div>`;
+  }
+}
+
+async function tpRunMessageMediaHealthCheck(p,acctIdx){
+  const btn=document.getElementById(`mm-hc-btn-${p}-${acctIdx}`);
+  const bodyEl=document.getElementById(`messagemedia-body-${p}-${acctIdx}`);
+  if(btn){btn.disabled=true;btn.textContent='⏳ Sending…';}
+  try{
+    const resp=await fetch('/api/messagemedia/health-check',{method:'POST',headers:{'Authorization':'Bearer '+_getToken(),'Content-Type':'application/json'}});
+    const json=await resp.json();
+    if(resp.status===429){
+      toast(json.message||'Health check rate limited — please wait before retrying.','warn');
+      if(btn){btn.disabled=false;btn.textContent='📤 Health Check';}
+      return;
+    }
+    if(!json.success){
+      toast('Health check failed: '+(json.message||json.error||'Unknown error'),'err');
+      if(btn){btn.disabled=false;btn.textContent='📤 Health Check';}
+      // Still refresh the main card so the updated error state is visible
+      tpRefreshMessageMedia(p,acctIdx);
+      return;
+    }
+    toast('Health check SMS sent successfully!','ok');
+    if(btn){btn.disabled=false;btn.textContent='📤 Health Check';}
+    // Refresh card to show the new health check result
+    tpRefreshMessageMedia(p,acctIdx);
+  }catch(e){
+    toast('Health check error: '+e.message,'err');
+    if(btn){btn.disabled=false;btn.textContent='📤 Health Check';}
   }
 }
 
