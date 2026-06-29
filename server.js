@@ -254,7 +254,8 @@ try {
     app.use('/api/apyhub', require('./routes/apyhub'));
     app.use('/api/firebase', require('./routes/firebase'));
     app.use('/api/messagemedia', require('./routes/messagemedia'));
-    console.log('[startup] ✅ Mongoose route modules mounted (/api/projects, /api/qa-state, /api/apyhub, /api/firebase, /api/messagemedia)');
+    app.use('/api/tavus', require('./routes/tavus'));
+    console.log('[startup] ✅ Mongoose route modules mounted (/api/projects, /api/qa-state, /api/apyhub, /api/firebase, /api/messagemedia, /api/tavus)');
     console.log('[startup] ApyHub env vars present:',
         'ENDPOINT=' + !!process.env.APYHUB_SUBSCRIPTION_USAGE_ENDPOINT,
         'TOKEN=' + !!process.env.APYHUB_AUTH_TOKEN,
@@ -269,6 +270,11 @@ try {
         'KEY=' + !!process.env.MESSAGEMEDIA_API_KEY,
         'SECRET=' + !!process.env.MESSAGEMEDIA_API_SECRET,
         'SOURCE=' + !!process.env.MESSAGEMEDIA_SOURCE_NUMBER
+    );
+    console.log('[startup] Tavus env vars present:',
+        'KEY=' + !!process.env.TAVUS_API_KEY,
+        'BASE_URL=' + !!process.env.TAVUS_BASE_URL,
+        'USAGE_ENDPOINT=' + !!process.env.TAVUS_ACCOUNT_USAGE_ENDPOINT
     );
 } catch (e) {
     console.warn('[startup] ⚠️  Mongoose route modules failed to load:', e.message, '— falling back to legacy routes');

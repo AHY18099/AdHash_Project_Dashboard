@@ -1299,6 +1299,7 @@ body.dark .tt-task-card:hover{box-shadow:0 8px 28px rgba(0,0,0,0.5),0 0 0 1px rg
 .apyhub-usage-card{margin-top:14px;padding:14px 16px;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;border-top:3px solid #6366f1}
 .firebase-otp-card{margin-top:14px;padding:14px 16px;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;border-top:3px solid #f59e0b}
 .messagemedia-card{margin-top:14px;padding:14px 16px;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;border-top:3px solid #0ea5e9}
+.tavus-card{margin-top:14px;padding:14px 16px;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;border-top:3px solid #8b5cf6}
 .tp-apis-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .tp-apis-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
 .tp-api-modal-row{background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:6px}
@@ -5886,6 +5887,7 @@ function renderThirdPartyTab(p){
         ${acct.name&&acct.name.toLowerCase().includes('apyhub')?`<div id="apyhub-usage-${p}-${i}" class="apyhub-usage-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:12px;font-weight:700;color:var(--txt);letter-spacing:.4px">📊 SUBSCRIPTION USAGE</span><button class="tp-api-run-btn" style="font-size:11px;padding:3px 10px" onclick="tpRefreshApyHub('${p}',${i})">↻ Refresh</button></div><div id="apyhub-usage-body-${p}-${i}"><div style="color:var(--mut);font-size:12px;font-style:italic">Click Refresh to load usage data</div></div></div>`:''}
         ${acct.name&&acct.name.toLowerCase().includes('firebase')?`<div id="firebase-otp-${p}-${i}" class="firebase-otp-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:12px;font-weight:700;color:var(--txt);letter-spacing:.4px">🔥 FIREBASE OTP QUOTA</span><button class="tp-api-run-btn" style="font-size:11px;padding:3px 10px" onclick="tpRefreshFirebaseOtp('${p}',${i})">↻ Refresh</button></div><div id="firebase-otp-body-${p}-${i}"><div style="color:var(--mut);font-size:12px;font-style:italic">Click Refresh to load OTP quota data</div></div></div>`:''}
         ${acct.name&&(acct.name.toLowerCase().includes('messagemedia')||acct.name.toLowerCase().includes('sinch'))?`<div id="messagemedia-${p}-${i}" class="messagemedia-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:12px;font-weight:700;color:var(--txt);letter-spacing:.4px">📱 SINCH MESSAGEMEDIA SMS</span><div style="display:flex;gap:6px"><button class="tp-api-run-btn" style="font-size:11px;padding:3px 10px" onclick="tpRefreshMessageMedia('${p}',${i})">↻ Refresh</button><button id="mm-hc-btn-${p}-${i}" class="tp-api-run-btn" style="font-size:11px;padding:3px 10px;background:rgba(14,165,233,.12);color:#0ea5e9;border-color:rgba(14,165,233,.3)" onclick="tpRunMessageMediaHealthCheck('${p}',${i})">📤 Health Check</button></div></div><div id="messagemedia-body-${p}-${i}"><div style="color:var(--mut);font-size:12px;font-style:italic">Click Refresh to load SMS status</div></div></div>`:''}
+        ${acct.name&&acct.name.toLowerCase().includes('tavus')?`<div id="tavus-${p}-${i}" class="tavus-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:12px;font-weight:700;color:var(--txt);letter-spacing:.4px">🎬 TAVUS AI VIDEO</span><button class="tp-api-run-btn" style="font-size:11px;padding:3px 10px" onclick="tpRefreshTavus('${p}',${i})">↻ Refresh</button></div><div id="tavus-body-${p}-${i}"><div style="color:var(--mut);font-size:12px;font-style:italic">Click Refresh to load Tavus status</div></div></div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -7045,6 +7047,117 @@ async function tpRunMessageMediaHealthCheck(p,acctIdx){
   }catch(e){
     toast('Health check error: '+e.message,'err');
     if(btn){btn.disabled=false;btn.textContent='📤 Health Check';}
+  }
+}
+
+async function tpRefreshTavus(p,acctIdx){
+  const bodyEl=document.getElementById(`tavus-body-${p}-${acctIdx}`);
+  if(!bodyEl)return;
+  bodyEl.innerHTML='<div style="color:var(--mut);font-size:12px">⏳ Loading Tavus status…</div>';
+  try{
+    const resp=await fetch('/api/tavus/status',{headers:{'Authorization':'Bearer '+_getToken()}});
+    const json=await resp.json();
+    if(!json.success){
+      bodyEl.innerHTML=`<div style="padding:10px 0">
+        <div style="color:var(--fail);font-size:12px;font-weight:600;margin-bottom:6px">✕ ${escH(json.message||json.error||'Failed to load')}</div>
+        ${json.fix?`<div style="padding:8px 12px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.25);border-radius:8px;font-size:11px;color:var(--txt);line-height:1.6">
+          <strong style="color:#f59e0b">How to fix:</strong> ${escH(json.fix)}<br>
+          Required: <code style="background:var(--card2);padding:1px 5px;border-radius:4px">TAVUS_API_KEY</code>
+        </div>`:''}
+      </div>`;
+      return;
+    }
+    const d=json.data;
+    const statusKey=(d.status||'Normal').toLowerCase();
+    const barColor=statusKey==='blocked'?'#ef4444':statusKey==='critical'?'#f97316':statusKey==='warning'?'#f59e0b':'#10b981';
+    const mkBadge=(s)=>({
+      normal:`<span style="background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">✓ Normal</span>`,
+      warning:`<span style="background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">⚠ Warning</span>`,
+      critical:`<span style="background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">🔴 Critical</span>`,
+      blocked:`<span style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">✕ Blocked</span>`,
+    })[(s||'normal').toLowerCase()]||`<span style="font-size:11px;color:var(--mut)">${escH(s)}</span>`;
+    const mkHealthBadge=(s)=>{
+      const sl=(s||'').toLowerCase();
+      if(sl==='success')return`<span style="background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">✓ Healthy</span>`;
+      if(sl==='rate limited')return`<span style="background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">⚡ Rate Limited</span>`;
+      if(sl==='failed'||sl==='auth failed')return`<span style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">✕ ${escH(s)}</span>`;
+      return`<span style="background:rgba(99,102,241,.08);color:var(--mut);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:2px 8px;font-size:11px">— ${escH(s||'Unknown')}</span>`;
+    };
+    const fmtDate=s=>{if(!s)return'—';try{return new Date(s).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e2){return s;}};
+    const fmtNum=n=>typeof n==='number'?n.toLocaleString():'—';
+    // Credential chip
+    const credColor=d.credentialStatus==='Valid'?'#10b981':d.credentialStatus==='Invalid'?'#ef4444':'var(--mut)';
+    const credBg=d.credentialStatus==='Valid'?'rgba(16,185,129,.1)':d.credentialStatus==='Invalid'?'rgba(239,68,68,.08)':'rgba(99,102,241,.08)';
+    const credBorder=d.credentialStatus==='Valid'?'rgba(16,185,129,.3)':d.credentialStatus==='Invalid'?'rgba(239,68,68,.3)':'rgba(99,102,241,.2)';
+    const apiErrNote=d.apiError?`<div style="font-size:10px;color:var(--mut);margin-top:3px;max-width:320px;word-break:break-word">API error: ${escH(d.apiError)}</div>`:'';
+    const credChip=`<div style="display:flex;flex-direction:column;align-items:flex-start"><span style="background:${credBg};color:${credColor};border:1px solid ${credBorder};border-radius:10px;padding:2px 9px;font-size:11px;font-weight:700">${d.credentialStatus==='Valid'?'✓':'✕'} API Key: ${escH(d.credentialStatus||'Unknown')}</span>${apiErrNote}</div>`;
+    // Usage bar helper
+    const mkUsageBar=(used,limit,label)=>{
+      if(used===null||limit===null||limit===0)return'';
+      const pct=Math.min(100,Number(((used/limit)*100).toFixed(2)));
+      const bc=pct>=100?'#ef4444':pct>=(d.criticalThreshold||90)?'#f97316':pct>=(d.warningThreshold||75)?'#f59e0b':'#10b981';
+      const remaining=Math.max(0,limit-used);
+      return`<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">
+          <span style="font-weight:600;color:var(--txt)">${escH(label)}</span>
+          <span style="font-weight:700;color:${bc}">${pct.toFixed(1)}%</span>
+        </div>
+        <div style="height:8px;background:var(--card);border-radius:4px;overflow:hidden;border:1px solid var(--border)">
+          <div style="height:100%;width:${pct}%;background:${bc};border-radius:4px;transition:width .5s ease"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mut);margin-top:3px">
+          <span>Used: <strong style="color:var(--txt)">${fmtNum(used)}</strong> / ${fmtNum(limit)} min</span>
+          <span>Remaining: <strong style="color:var(--txt)">${fmtNum(remaining)} min</strong></span>
+        </div>
+      </div>`;
+    };
+    const hasUsage=d.usageStatus==='Available';
+    const usageSection=hasUsage?`
+      <div style="padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:10px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-bottom:8px">Usage</div>
+        ${mkUsageBar(d.conversationMinutesUsed,d.conversationMinutesLimit,'Conversation Minutes')}
+        ${mkUsageBar(d.videoGenerationMinutesUsed,d.videoGenerationMinutesLimit,'Video Generation Minutes')}
+        ${d.concurrentStreamLimit!==null?`<div style="font-size:11px;color:var(--mut);margin-top:4px">Concurrent Streams: <strong style="color:var(--txt)">${fmtNum(d.concurrentStreamLimit)}</strong></div>`:''}
+      </div>`
+    :`<div style="font-size:11px;color:var(--mut);margin-bottom:10px;padding:8px 10px;background:var(--card);border:1px solid var(--border);border-radius:7px">${escH(d.usageMessage||'Usage data not available. Configure TAVUS_ACCOUNT_USAGE_ENDPOINT or set manual plan limits in Railway.')}</div>`;
+    // Plan limits from env when usage endpoint not set
+    const planLimitsSection=!hasUsage&&(d.conversationMinutesLimit!==null||d.videoGenerationMinutesLimit!==null||d.concurrentStreamLimit!==null)?`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;font-size:11px;margin-bottom:10px">
+        ${d.conversationMinutesLimit!==null?`<div><span style="color:var(--mut)">Conv. Limit:</span> <strong style="color:var(--txt)">${fmtNum(d.conversationMinutesLimit)} min</strong></div>`:''}
+        ${d.videoGenerationMinutesLimit!==null?`<div><span style="color:var(--mut)">Video Limit:</span> <strong style="color:var(--txt)">${fmtNum(d.videoGenerationMinutesLimit)} min</strong></div>`:''}
+        ${d.concurrentStreamLimit!==null?`<div><span style="color:var(--mut)">Concurrent Streams:</span> <strong style="color:var(--txt)">${fmtNum(d.concurrentStreamLimit)}</strong></div>`:''}
+      </div>`:'';
+    bodyEl.innerHTML=`
+      <div style="display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        ${mkBadge(d.status)}
+        ${credChip}
+        ${mkHealthBadge(d.apiHealth)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:11px;margin-bottom:12px">
+        <div><span style="color:var(--mut)">Provider:</span> <strong style="color:var(--txt)">${escH(d.provider||'—')}</strong></div>
+        <div><span style="color:var(--mut)">Portal:</span> <a href="${escH(d.portal||'#')}" target="_blank" style="color:var(--link);font-size:11px">${escH((d.portal||'').replace(/^https?:\/\//,''))}</a></div>
+        <div><span style="color:var(--mut)">Plan:</span> <strong style="color:var(--txt)">${escH(d.planName||'Unknown')}</strong></div>
+        <div><span style="color:var(--mut)">Usage Data:</span> <span style="color:${d.usageStatus==='Available'?'#10b981':'var(--mut)'}">${escH(d.usageStatus||'—')}</span></div>
+        <div><span style="color:var(--mut)">Warning at:</span> <span style="color:#f59e0b;font-weight:700">${d.warningThreshold||75}%</span></div>
+        <div><span style="color:var(--mut)">Critical at:</span> <span style="color:#f97316;font-weight:700">${d.criticalThreshold||90}%</span></div>
+        <div style="grid-column:1/-1"><span style="color:var(--mut)">Last Checked:</span> <span style="color:var(--txt)">${fmtDate(d.lastCheckedTime)}</span></div>
+      </div>
+      ${usageSection}
+      ${planLimitsSection}
+      ${d.lastErrorCode?`
+      <div style="padding:8px 12px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:8px;margin-bottom:8px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#ef4444;margin-bottom:5px">Last Tavus Error</div>
+        <div style="font-size:11px;display:grid;grid-template-columns:1fr 1fr;gap:4px">
+          <div><span style="color:var(--mut)">Code:</span> <code style="color:#ef4444;font-size:11px">${escH(d.lastErrorCode)}</code></div>
+          <div><span style="color:var(--mut)">Time:</span> <span style="color:var(--txt)">${fmtDate(d.lastErrorTime)}</span></div>
+          ${d.lastErrorMessage?`<div style="grid-column:1/-1"><span style="color:var(--mut)">Message:</span> <span style="color:var(--txt)">${escH(d.lastErrorMessage)}</span></div>`:''}
+        </div>
+      </div>`:'<div style="font-size:11px;color:var(--mut);margin-bottom:8px">No Tavus errors recorded since last deploy.</div>'}
+      <div style="padding:7px 10px;background:${statusKey==='blocked'?'rgba(239,68,68,.08)':statusKey==='critical'?'rgba(249,115,22,.08)':statusKey==='warning'?'rgba(245,158,11,.06)':'rgba(16,185,129,.06)'};border-radius:7px;border-left:3px solid ${barColor}">
+        <span style="font-size:11px;color:var(--txt)">${escH(d.message||'')}</span>
+      </div>`;
+  }catch(e){
+    bodyEl.innerHTML=`<div style="color:var(--fail);font-size:12px;padding:8px 0">✕ Error: ${escH(e.message)}</div>`;
   }
 }
 
