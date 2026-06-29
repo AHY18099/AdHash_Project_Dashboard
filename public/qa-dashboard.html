@@ -6826,7 +6826,8 @@ async function tpRefreshFirebaseOtp(p,acctIdx){
     const billingColor=d.billingStatus==='Active'?'#10b981':d.billingStatus==='Inactive'?'#ef4444':'var(--mut)';
     const billingBg=d.billingStatus==='Active'?'rgba(16,185,129,.1)':d.billingStatus==='Inactive'?'rgba(239,68,68,.08)':'rgba(99,102,241,.08)';
     const billingBorder=d.billingStatus==='Active'?'rgba(16,185,129,.3)':d.billingStatus==='Inactive'?'rgba(239,68,68,.3)':'rgba(99,102,241,.2)';
-    const billingChip=`<span style="background:${billingBg};color:${billingColor};border:1px solid ${billingBorder};border-radius:10px;padding:2px 9px;font-size:11px;font-weight:700">${d.billingStatus==='Active'?'✓':'✕'} Billing: ${escH(d.billingStatus||'Unknown')}</span>`;
+    const billingErrorNote=d.billingError?`<div style="font-size:10px;color:var(--mut);margin-top:3px;max-width:320px;word-break:break-word">Billing check failed: ${escH(d.billingError)}</div>`:'';
+    const billingChip=`<div style="display:flex;flex-direction:column;align-items:flex-start"><span style="background:${billingBg};color:${billingColor};border:1px solid ${billingBorder};border-radius:10px;padding:2px 9px;font-size:11px;font-weight:700">${d.billingStatus==='Active'?'✓':'✕'} Billing: ${escH(d.billingStatus||'Unknown')}</span>${billingErrorNote}</div>`;
     // Phone auth chip
     const phoneColor=d.phoneAuthEnabled===true?'#10b981':d.phoneAuthEnabled===false?'#ef4444':'var(--mut)';
     const phoneBg=d.phoneAuthEnabled===true?'rgba(16,185,129,.1)':d.phoneAuthEnabled===false?'rgba(239,68,68,.08)':'rgba(99,102,241,.08)';

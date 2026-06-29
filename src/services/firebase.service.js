@@ -116,7 +116,9 @@ function determineOverallStatus(billingStatus, phoneAuthEnabled, primaryPct, sec
 // ── Billing status ────────────────────────────────────────────────────────────
 
 async function fetchBillingStatus(projectId, token) {
-  if (process.env.FIREBASE_CHECK_BILLING === 'false') return 'Unknown';
+  if (process.env.FIREBASE_CHECK_BILLING === 'false') {
+    return { status: 'Unknown', error: 'Billing check is disabled (FIREBASE_CHECK_BILLING=false).' };
+  }
   try {
     const { statusCode, body } = await httpsGet(
       'cloudbilling.googleapis.com',
@@ -124,16 +126,29 @@ async function fetchBillingStatus(projectId, token) {
       token
     );
     if (statusCode === 403 || statusCode === 401) {
-      console.warn('[Firebase] Billing API access denied — returning Unknown');
-      return 'Unknown';
+      let errorMsg = 'Permission denied while reading billing info. Verify service account has Billing Account Viewer or Project Billing Manager permission.';
+      try {
+        const parsed = JSON.parse(body);
+        const detail = parsed?.error?.message || '';
+        if (detail.toLowerCase().includes('billing') && detail.toLowerCase().includes('not enabled')) {
+          errorMsg = 'Cloud Billing API is not enabled. Enable it at console.cloud.google.com/apis/library/cloudbilling.googleapis.com';
+        }
+      } catch (_) { /* ignore parse errors */ }
+      console.warn('[Firebase] Billing API access denied:', errorMsg);
+      return { status: 'Unknown', error: errorMsg };
     }
-    if (statusCode === 404) return 'Unknown';
-    if (statusCode !== 200) return 'Unknown';
+    if (statusCode === 404) {
+      return { status: 'Unknown', error: `Project "${projectId}" not found in Cloud Billing API.` };
+    }
+    if (statusCode !== 200) {
+      return { status: 'Unknown', error: `Cloud Billing API returned unexpected status ${statusCode}.` };
+    }
     const raw = JSON.parse(body);
-    return raw.billingEnabled === true ? 'Active' : 'Inactive';
+    return { status: raw.billingEnabled === true ? 'Active' : 'Inactive', error: null };
   } catch (e) {
-    console.warn('[Firebase] Billing API error:', e.message, '— returning Unknown');
-    return 'Unknown';
+    const safeMsg = e.message && e.message.length < 200 ? e.message : 'Unexpected error contacting Cloud Billing API.';
+    console.warn('[Firebase] Billing API error:', safeMsg);
+    return { status: 'Unknown', error: safeMsg };
   }
 }
 
@@ -320,7 +335,7 @@ async function fetchOtpStatus() {
   // Fire all independent fetches in parallel
   const [
     allMetrics,
-    billingStatus,
+    billingResult,
     phoneAuthEnabled,
     primaryUsage,
     secondaryUsage,
@@ -331,6 +346,9 @@ async function fetchOtpStatus() {
     fetchQuotaUsage(projectId, token, ['send_verification', 'verificationcode', 'verifyphone', 'sendverification']),
     fetchQuotaUsage(projectId, token, ['phone', 'instances', 'phoneverification']),
   ]);
+
+  const billingStatus = billingResult.status;
+  const billingError  = billingResult.error;
 
   // Extract limits
   const primaryLimit   = extractLimitFromMetrics(allMetrics, ['send verification code', 'send_verification_code'], 10000);
@@ -351,6 +369,7 @@ async function fetchOtpStatus() {
     projectId,
     serviceName:      process.env.FIREBASE_SERVICE_NAME || 'identitytoolkit.googleapis.com',
     billingStatus,
+    billingError,
     phoneAuthEnabled,
     lastCheckedTime:  new Date().toISOString(),
     lastErrorCode:    _lastError.code,
