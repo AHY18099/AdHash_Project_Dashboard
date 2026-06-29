@@ -252,11 +252,17 @@ try {
     app.use('/api/projects', require('./routes/projects'));
     app.use('/api/qa-state', require('./routes/qaState'));
     app.use('/api/apyhub', require('./routes/apyhub'));
-    console.log('[startup] ✅ Mongoose route modules mounted (/api/projects, /api/qa-state, /api/apyhub)');
+    app.use('/api/firebase', require('./routes/firebase'));
+    console.log('[startup] ✅ Mongoose route modules mounted (/api/projects, /api/qa-state, /api/apyhub, /api/firebase)');
     console.log('[startup] ApyHub env vars present:',
         'ENDPOINT=' + !!process.env.APYHUB_SUBSCRIPTION_USAGE_ENDPOINT,
         'TOKEN=' + !!process.env.APYHUB_AUTH_TOKEN,
         'WORKSPACE=' + !!process.env.APYHUB_WORKSPACE
+    );
+    console.log('[startup] Firebase env vars present:',
+        'SA_JSON=' + !!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON,
+        'PROJECT_ID=' + !!process.env.FIREBASE_PROJECT_ID,
+        'PROJECT_NUMBER=' + !!process.env.FIREBASE_PROJECT_NUMBER
     );
 } catch (e) {
     console.warn('[startup] ⚠️  Mongoose route modules failed to load:', e.message, '— falling back to legacy routes');

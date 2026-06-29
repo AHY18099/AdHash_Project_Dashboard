@@ -1297,6 +1297,7 @@ body.dark .tt-task-card:hover{box-shadow:0 8px 28px rgba(0,0,0,0.5),0 0 0 1px rg
 .tp-note-list li{padding:2px 0;line-height:1.5}
 .tp-apis-section{margin-top:14px;padding-top:12px;border-top:1.5px solid var(--border)}
 .apyhub-usage-card{margin-top:14px;padding:14px 16px;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;border-top:3px solid #6366f1}
+.firebase-otp-card{margin-top:14px;padding:14px 16px;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;border-top:3px solid #f59e0b}
 .tp-apis-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .tp-apis-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
 .tp-api-modal-row{background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:6px}
@@ -5882,6 +5883,7 @@ function renderThirdPartyTab(p){
         ${acct.note?`<div class="tp-note-box"><span class="tp-note-lbl">📝 Note</span><ul class="tp-note-list">${acct.note.split(' | ').map(s=>s.trim()).filter(Boolean).map(s=>`<li>${escH(s)}</li>`).join('')}</ul></div>`:''}
         ${apisHtml}
         ${acct.name&&acct.name.toLowerCase().includes('apyhub')?`<div id="apyhub-usage-${p}-${i}" class="apyhub-usage-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:12px;font-weight:700;color:var(--txt);letter-spacing:.4px">📊 SUBSCRIPTION USAGE</span><button class="tp-api-run-btn" style="font-size:11px;padding:3px 10px" onclick="tpRefreshApyHub('${p}',${i})">↻ Refresh</button></div><div id="apyhub-usage-body-${p}-${i}"><div style="color:var(--mut);font-size:12px;font-style:italic">Click Refresh to load usage data</div></div></div>`:''}
+        ${acct.name&&acct.name.toLowerCase().includes('firebase')?`<div id="firebase-otp-${p}-${i}" class="firebase-otp-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:12px;font-weight:700;color:var(--txt);letter-spacing:.4px">🔥 FIREBASE OTP QUOTA</span><button class="tp-api-run-btn" style="font-size:11px;padding:3px 10px" onclick="tpRefreshFirebaseOtp('${p}',${i})">↻ Refresh</button></div><div id="firebase-otp-body-${p}-${i}"><div style="color:var(--mut);font-size:12px;font-style:italic">Click Refresh to load OTP quota data</div></div></div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -6779,6 +6781,70 @@ async function tpRefreshApyHub(p,acctIdx){
           <div><span style="color:var(--mut)">AI Atoms:</span> <span style="color:var(--txt)">${fmtK(d.aiAtomsConsumed)} / ${fmtK(d.aiAtomsLimit)}</span></div>
         </div>
       </div>`:''}
+      <div style="margin-top:4px;padding:7px 10px;background:${statusKey==='blocked'?'rgba(239,68,68,.08)':statusKey==='critical'?'rgba(249,115,22,.08)':statusKey==='warning'?'rgba(245,158,11,.06)':'rgba(16,185,129,.06)'};border-radius:7px;border-left:3px solid ${barColor}">
+        <span style="font-size:11px;color:var(--txt)">${escH(d.message||'')}</span>
+      </div>`;
+  }catch(e){
+    bodyEl.innerHTML=`<div style="color:var(--fail);font-size:12px;padding:8px 0">✕ Error: ${escH(e.message)}</div>`;
+  }
+}
+// Firebase OTP quota refresh
+async function tpRefreshFirebaseOtp(p,acctIdx){
+  const bodyEl=document.getElementById(`firebase-otp-body-${p}-${acctIdx}`);
+  if(!bodyEl)return;
+  bodyEl.innerHTML='<div style="color:var(--mut);font-size:12px">⏳ Loading Firebase OTP quota…</div>';
+  try{
+    const resp=await fetch('/api/firebase/otp-status',{headers:{'Authorization':'Bearer '+_getToken()}});
+    const json=await resp.json();
+    if(!json.success){
+      bodyEl.innerHTML=`<div style="padding:10px 0">
+        <div style="color:var(--fail);font-size:12px;font-weight:600;margin-bottom:6px">✕ ${escH(json.message||json.error||'Failed to load')}</div>
+        ${json.fix?`<div style="padding:8px 12px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.25);border-radius:8px;font-size:11px;color:var(--txt);line-height:1.6">
+          <strong style="color:#f59e0b">How to fix:</strong> ${escH(json.fix)}<br>
+          Required: <code style="background:var(--card2);padding:1px 5px;border-radius:4px">GOOGLE_APPLICATION_CREDENTIALS_JSON</code>
+          <code style="background:var(--card2);padding:1px 5px;border-radius:4px">FIREBASE_PROJECT_ID</code>
+          <code style="background:var(--card2);padding:1px 5px;border-radius:4px">FIREBASE_PROJECT_NUMBER</code>
+        </div>`:''}
+      </div>`;
+      return;
+    }
+    const d=json.data;
+    const pct=d.usagePercentage||0;
+    const statusKey=(d.status||'Normal').toLowerCase();
+    const barColor=statusKey==='blocked'?'#ef4444':statusKey==='critical'?'#f97316':statusKey==='warning'?'#f59e0b':'#10b981';
+    const statusBadgeMap={
+      normal:`<span style="background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">✓ Normal</span>`,
+      warning:`<span style="background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">⚠ Warning</span>`,
+      critical:`<span style="background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.3);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">🔴 Critical</span>`,
+      blocked:`<span style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">✕ Blocked</span>`,
+    };
+    const statusBadge=statusBadgeMap[statusKey]||`<span style="font-size:11px;color:var(--mut)">${escH(d.status)}</span>`;
+    const fmt=n=>typeof n==='number'?n.toLocaleString():String(n??'—');
+    const fmtK=n=>{if(typeof n!=='number')return'—';return n>=1000?(n/1000).toFixed(2)+'K':String(n);};
+    bodyEl.innerHTML=`
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        ${statusBadge}
+        <span style="font-size:11px;color:var(--mut)">${escH(d.feature||'Dashboard User OTP')}</span>
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--mut);margin-bottom:5px">
+          <span>OTP Sent Today: <strong style="color:var(--txt);font-size:13px">${fmtK(d.currentUsage)}</strong> / ${fmtK(d.dailyLimit)}</span>
+          <span style="font-weight:800;font-size:13px;color:${barColor}">${pct.toFixed(2)}%</span>
+        </div>
+        <div style="height:10px;background:var(--card);border-radius:5px;overflow:hidden;border:1px solid var(--border)">
+          <div style="height:100%;width:${Math.min(pct,100).toFixed(2)}%;background:${barColor};border-radius:5px;transition:width .5s ease"></div>
+        </div>
+        <div style="font-size:10px;color:var(--mut);margin-top:4px">Remaining: <strong style="color:var(--txt)">${fmtK(d.remainingQuota)}</strong> verifications today</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px 20px;font-size:11px;margin-bottom:10px">
+        <div><span style="color:var(--mut)">Project ID:</span> <strong style="color:var(--txt)">${escH(d.projectId||'—')}</strong></div>
+        <div><span style="color:var(--mut)">Service:</span> <span style="color:var(--txt);font-size:10px">${escH(d.serviceName||'—')}</span></div>
+        <div style="grid-column:1/-1"><span style="color:var(--mut)">Quota Name:</span> <span style="color:var(--txt)">${escH(d.quotaName||'—')}</span></div>
+        <div><span style="color:var(--mut)">Daily Limit:</span> <span style="color:var(--txt)">${fmt(d.dailyLimit)}</span></div>
+        <div><span style="color:var(--mut)">Current Usage:</span> <span style="color:var(--txt)">${fmt(d.currentUsage)}</span></div>
+        <div><span style="color:var(--mut)">Warning at:</span> <span style="color:#f59e0b">${d.warningThreshold||75}%</span></div>
+        <div><span style="color:var(--mut)">Critical at:</span> <span style="color:#f97316">${d.criticalThreshold||90}%</span></div>
+      </div>
       <div style="margin-top:4px;padding:7px 10px;background:${statusKey==='blocked'?'rgba(239,68,68,.08)':statusKey==='critical'?'rgba(249,115,22,.08)':statusKey==='warning'?'rgba(245,158,11,.06)':'rgba(16,185,129,.06)'};border-radius:7px;border-left:3px solid ${barColor}">
         <span style="font-size:11px;color:var(--txt)">${escH(d.message||'')}</span>
       </div>`;
