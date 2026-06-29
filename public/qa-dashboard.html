@@ -6924,8 +6924,9 @@ async function tpRefreshMessageMedia(p,acctIdx){
     const mkAvailBadge=(s)=>{
       const sl=(s||'').toLowerCase();
       if(sl==='available')return`<span style="color:#10b981;font-weight:700">✓ Available</span>`;
-      if(sl==='not applicable')return`<span style="color:var(--mut)">— N/A</span>`;
-      return`<span style="color:var(--mut)">✕ Not Available</span>`;
+      if(sl==='not applicable')return`<span style="color:var(--mut)">— Not Applicable</span>`;
+      if(sl.startsWith('available in'))return`<span style="color:#6366f1;font-weight:600">↗ ${escH(s)}</span>`;
+      return`<span style="color:var(--mut)">— Not Available</span>`;
     };
     const fmtDate=s=>{if(!s)return'—';try{return new Date(s).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e2){return s;}};
     // Credential chip
@@ -6964,8 +6965,7 @@ async function tpRefreshMessageMedia(p,acctIdx){
         <div><span style="color:var(--mut)">Portal:</span> <a href="${escH(d.portal||'#')}" target="_blank" style="color:var(--link);font-size:11px">${escH((d.portal||'').replace(/^https?:\/\//,''))}</a></div>
         <div><span style="color:var(--mut)">Source Number:</span> <strong style="color:var(--txt)">${escH(d.sourceNumber||'—')}</strong></div>
         <div><span style="color:var(--mut)">Source Status:</span> <span style="color:${d.sourceNumberStatus==='Configured'?'#10b981':'#ef4444'}">${escH(d.sourceNumberStatus||'—')}</span></div>
-        <div><span style="color:var(--mut)">Credit Status:</span> ${mkAvailBadge(d.creditStatus)}</div>
-        <div><span style="color:var(--mut)">Credit Balance:</span> <strong style="color:var(--txt)">${typeof d.creditBalance==='number'?d.creditBalance.toLocaleString():'—'}</strong></div>
+        <div><span style="color:var(--mut)">Credit Balance:</span> ${typeof d.creditBalance==='number'?`<strong style="color:var(--txt)">${d.creditBalance.toLocaleString()}</strong>`:mkAvailBadge(d.creditStatus)}</div>
         <div><span style="color:var(--mut)">Credit Expiry:</span> ${d.creditExpiryDate?`<strong style="color:var(--txt)">${escH(fmtDate(d.creditExpiryDate))}</strong>`:mkAvailBadge(d.creditExpiryStatus)}</div>
         <div><span style="color:var(--mut)">Next Payment:</span> ${d.nextPaymentDate?`<strong style="color:var(--txt)">${escH(fmtDate(d.nextPaymentDate))}</strong>`:mkAvailBadge(d.nextPaymentStatus)}</div>
         <div style="grid-column:1/-1"><span style="color:var(--mut)">Last Checked:</span> <span style="color:var(--txt)">${fmtDate(d.lastCheckedTime)}</span></div>
