@@ -6714,22 +6714,31 @@ async function tpRefreshApyHub(p,acctIdx){
     const pct=d.usagePercentage||0;
     const statusKey=(d.status||'Normal').toLowerCase();
     const barColor=statusKey==='blocked'?'#ef4444':statusKey==='critical'?'#f97316':statusKey==='warning'?'#f59e0b':'#10b981';
-    const statusBadge={
+    const statusBadgeMap={
       normal:`<span style="background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">✓ Normal</span>`,
       warning:`<span style="background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">⚠ Warning</span>`,
       critical:`<span style="background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.3);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">🔴 Critical</span>`,
       blocked:`<span style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">✕ Blocked</span>`,
-    }[statusKey]||`<span style="font-size:11px;color:var(--mut)">${escH(d.status)}</span>`;
+    };
+    const statusBadge=statusBadgeMap[statusKey]||`<span style="font-size:11px;color:var(--mut)">${escH(d.status)}</span>`;
     const subStatusColor=d.subscriptionStatus==='Expired'?'var(--fail)':d.subscriptionStatus==='Expiring Soon'?'#f59e0b':'var(--pass)';
     const fmt=n=>typeof n==='number'?n.toLocaleString():String(n??'—');
     const fmtK=n=>{if(typeof n!=='number')return'—';return n>=1000?(n/1000).toFixed(2)+'K':String(n);};
     const fmtDate=s=>{if(!s)return'—';try{return new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}catch(e2){return s;}};
+    // Alert banners for approaching_limits and expiry warnings
+    const alertBanners=[
+      d.approachingLimits?`<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;font-size:11px;color:#f59e0b"><strong>⚠ Approaching Limits</strong> — ApyHub subscription is close to its usage limits. Plan recharge soon.</div>`:'',
+      d.subscriptionStatus==='Expiring Soon'?`<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;font-size:11px;color:#f59e0b"><strong>⏰ Expiring Soon</strong> — Billing cycle ends in <strong>${d.daysUntilExpiry} day${d.daysUntilExpiry===1?'':'s'}</strong>. Renew before ${fmtDate(d.billingCycleEnd)}.</div>`:'',
+      d.subscriptionStatus==='Expired'?`<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:8px;font-size:11px;color:#ef4444"><strong>✕ Subscription Expired</strong> — GIF generation is blocked. Renew your ApyHub subscription immediately.</div>`:'',
+      d.overdue?`<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:8px;font-size:11px;color:#ef4444"><strong>✕ Payment Overdue</strong> — GIF generation is blocked. Complete payment to restore access.</div>`:'',
+    ].filter(Boolean).join('');
     bodyEl.innerHTML=`
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:${alertBanners?'8px':'12px'}">
         ${statusBadge}
         <span style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:600;color:${subStatusColor}">${escH(d.subscriptionStatus||'—')}</span>
         ${d.daysUntilExpiry!=null?`<span style="font-size:11px;color:var(--mut)">${d.daysUntilExpiry>0?d.daysUntilExpiry+'d until expiry':'Expired'}</span>`:''}
       </div>
+      ${alertBanners?`<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">${alertBanners}</div>`:''}
       <div style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--mut);margin-bottom:5px">
           <span>Atoms Used: <strong style="color:var(--txt);font-size:13px">${fmtK(d.atomsConsumed)}</strong> / ${fmtK(d.atomsLimit)}</span>
@@ -6750,14 +6759,14 @@ async function tpRefreshApyHub(p,acctIdx){
         <div><span style="color:var(--mut)">Billing End:</span> <span style="color:var(--txt)">${fmtDate(d.billingCycleEnd)}</span></div>
         <div><span style="color:var(--mut)">API Keys:</span> <span style="color:var(--txt)">${fmt(d.apiKeysUsed)} / ${fmt(d.apiKeysLimit)}</span></div>
         <div><span style="color:var(--mut)">Users:</span> <span style="color:var(--txt)">${fmt(d.usersUsed)} / ${fmt(d.usersLimit)}</span></div>
-        <div><span style="color:var(--mut)">Throttling:</span> <span style="color:var(--txt)">${escH(d.throttling||'—')}</span></div>
-        <div><span style="color:var(--mut)">Approaching Limit:</span> <span style="color:${d.approachingLimits?'#f59e0b':'var(--pass)'}">${d.approachingLimits?'Yes':'No'}</span></div>
-        <div><span style="color:var(--mut)">Overdue:</span> <span style="color:${d.overdue?'var(--fail)':'var(--pass)'}">${d.overdue?'Yes':'No'}</span></div>
+        <div><span style="color:var(--mut)">GIF Throttle:</span> <span style="color:var(--txt);font-weight:600">${escH(d.throttling||'—')}</span> <span style="color:var(--mut);font-size:10px">(max ${fmt(d.throttleLimit??5)} req/sec)</span></div>
+        <div><span style="color:var(--mut)">Approaching Limit:</span> <span style="color:${d.approachingLimits?'#f59e0b':'var(--pass)'}"><strong>${d.approachingLimits?'Yes':'No'}</strong></span></div>
+        <div><span style="color:var(--mut)">Overdue:</span> <span style="color:${d.overdue?'var(--fail)':'var(--pass)'}"><strong>${d.overdue?'Yes':'No'}</strong></span></div>
       </div>
       ${(d.aiCallsMade||0)>0?`
       <div style="padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:8px">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-bottom:6px">AI Usage</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:11px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px">
           <div><span style="color:var(--mut)">AI Calls:</span> <span style="color:var(--txt)">${fmt(d.aiCallsMade)}</span></div>
           <div><span style="color:var(--mut)">AI Atoms:</span> <span style="color:var(--txt)">${fmtK(d.aiAtomsConsumed)} / ${fmtK(d.aiAtomsLimit)}</span></div>
         </div>
