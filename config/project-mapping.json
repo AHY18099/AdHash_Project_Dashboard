@@ -725,7 +725,7 @@
           "url": "https://ebaydev.autochecker.com/",
           "type": "api",
           "expectedStatus": 200
-        },
+        }
       ],
       "domains": [
         "autochecker.com",
