@@ -48,6 +48,7 @@ router.get('/env-check', requireAuth, (req, res) => {
     TAVUS_WARNING_PERCENTAGE:             !!process.env.TAVUS_WARNING_PERCENTAGE,
     TAVUS_CRITICAL_PERCENTAGE:            !!process.env.TAVUS_CRITICAL_PERCENTAGE,
     TAVUS_PLAN_NAME:                      !!process.env.TAVUS_PLAN_NAME,
+    TAVUS_LIMIT_TYPE:                     !!process.env.TAVUS_LIMIT_TYPE,
     TAVUS_CONVERSATION_MINUTES_LIMIT:     !!process.env.TAVUS_CONVERSATION_MINUTES_LIMIT,
     TAVUS_VIDEO_GENERATION_MINUTES_LIMIT: !!process.env.TAVUS_VIDEO_GENERATION_MINUTES_LIMIT,
     TAVUS_CONCURRENT_STREAM_LIMIT:        !!process.env.TAVUS_CONCURRENT_STREAM_LIMIT,

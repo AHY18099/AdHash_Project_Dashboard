@@ -269,6 +269,21 @@ function determineStatus(credentialStatus, apiHealth, usageStatus, usageAuthFail
   return { status: 'Normal', message: 'Tavus API service is normal.' };
 }
 
+// ── Enterprise plan status message ───────────────────────────────────────────
+
+function determineStatusEnterprise(credentialStatus, apiHealth, usageAuthFailed) {
+  if (credentialStatus === 'Invalid' || usageAuthFailed) {
+    return { status: 'Blocked', message: 'Tavus usage limit is fully consumed or API key is invalid.' };
+  }
+  if (apiHealth === 'Failed') {
+    return { status: 'Critical', message: 'Tavus API server is unreachable or returning server errors.' };
+  }
+  if (apiHealth === 'Rate Limited') {
+    return { status: 'Critical', message: 'Tavus API rate limit reached. Retry later.' };
+  }
+  return { status: 'Normal', message: 'Enterprise plan detected. Tavus API is healthy. Usage data is not available via configured usage endpoint.' };
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 async function fetchTavusStatus() {
@@ -286,9 +301,11 @@ async function fetchTavusStatus() {
 
   // Manual plan limits from env — shown when usage endpoint is absent
   const envPlanName        = process.env.TAVUS_PLAN_NAME || null;
+  const envLimitType       = process.env.TAVUS_LIMIT_TYPE || null;
   const envConvLimit       = toNum(process.env.TAVUS_CONVERSATION_MINUTES_LIMIT);
   const envVideoLimit      = toNum(process.env.TAVUS_VIDEO_GENERATION_MINUTES_LIMIT);
   const envConcurrentLimit = toNum(process.env.TAVUS_CONCURRENT_STREAM_LIMIT);
+  const isEnterprise       = (envPlanName || '').toLowerCase() === 'enterprise';
 
   const [healthResult, usageResult] = await Promise.all([
     checkApiHealth(baseUrl, apiKey),
@@ -301,21 +318,37 @@ async function fetchTavusStatus() {
     throw err;
   }
 
-  const { status, message } = determineStatus(
-    healthResult.credentialStatus,
-    healthResult.apiHealth,
-    usageResult.usageStatus,
-    !!usageResult.usageAuthFailed,
-    usageResult.overallUsagePercentage,
-    warningPct,
-    criticalPct
-  );
+  const { status, message } = isEnterprise
+    ? determineStatusEnterprise(healthResult.credentialStatus, healthResult.apiHealth, !!usageResult.usageAuthFailed)
+    : determineStatus(
+        healthResult.credentialStatus,
+        healthResult.apiHealth,
+        usageResult.usageStatus,
+        !!usageResult.usageAuthFailed,
+        usageResult.overallUsagePercentage,
+        warningPct,
+        criticalPct
+      );
 
   // Merge usage-endpoint results with env-based manual limits as fallbacks
   const planName              = usageResult.planName              ?? envPlanName        ?? 'Unknown';
+  const limitType             = envLimitType || (isEnterprise ? 'Custom Enterprise' : null);
   const convLimit             = usageResult.conversationMinutesLimit   ?? envConvLimit;
   const videoLimit            = usageResult.videoGenerationMinutesLimit ?? envVideoLimit;
   const concurrentStreamLimit = usageResult.concurrentStreamLimit  ?? envConcurrentLimit;
+
+  // For Enterprise with no numeric limits set, use sentinel so UI shows "Custom / Enterprise"
+  const convLimitDisplay        = convLimit        ?? (isEnterprise ? 'Custom / Enterprise' : null);
+  const videoLimitDisplay       = videoLimit       ?? (isEnterprise ? 'Custom / Enterprise' : null);
+  const concurrentLimitDisplay  = concurrentStreamLimit ?? (isEnterprise ? 'Custom / Enterprise' : null);
+
+  // Enterprise: usage not available via API is expected — show informative status, not error
+  const usageStatus  = isEnterprise && usageResult.usageStatus === 'Not Available'
+    ? 'Not Available via API'
+    : usageResult.usageStatus;
+  const usageMessage = isEnterprise && usageResult.usageStatus === 'Not Available'
+    ? 'Enterprise plan detected. Usage data is not available via API. Limits shown below reflect your plan configuration.'
+    : (usageResult.usageMessage || null);
 
   return {
     provider:         'Tavus',
@@ -325,18 +358,20 @@ async function fetchTavusStatus() {
     apiHealth:        healthResult.apiHealth,
     apiError:         healthResult.apiError || null,
     planName,
-    usageStatus:      usageResult.usageStatus,
-    usageMessage:     usageResult.usageMessage || null,
+    limitType,
+    enterprisePlan:   isEnterprise,
+    usageStatus,
+    usageMessage,
     conversationMinutesUsed:         usageResult.conversationMinutesUsed,
-    conversationMinutesLimit:        convLimit,
+    conversationMinutesLimit:        convLimitDisplay,
     conversationMinutesRemaining:    usageResult.conversationMinutesRemaining,
     conversationUsagePercentage:     usageResult.conversationUsagePercentage,
     videoGenerationMinutesUsed:      usageResult.videoGenerationMinutesUsed,
-    videoGenerationMinutesLimit:     videoLimit,
+    videoGenerationMinutesLimit:     videoLimitDisplay,
     videoGenerationMinutesRemaining: usageResult.videoGenerationMinutesRemaining,
     videoGenerationUsagePercentage:  usageResult.videoGenerationUsagePercentage,
     overallUsagePercentage:          usageResult.overallUsagePercentage,
-    concurrentStreamLimit,
+    concurrentStreamLimit:           concurrentLimitDisplay,
     warningPercentage:  warningPct,
     criticalPercentage: criticalPct,
     lastCheckedTime:    new Date().toISOString(),
