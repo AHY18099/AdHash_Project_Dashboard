@@ -12,7 +12,11 @@ router.get('/subscription-status', requireAuth, async (req, res) => {
     return res.json({ success: true, data });
   } catch (err) {
     if (err.configError) {
-      return res.status(503).json({ success: false, message: err.message });
+      return res.status(503).json({
+        success: false,
+        message: err.message,
+        fix: 'In Railway → your service → Variables, add the missing env var directly or reference it as ${{VAR_NAME}} from Shared Variables.',
+      });
     }
     if (err.authError) {
       return res.status(502).json({ success: false, message: err.message });
@@ -24,6 +28,15 @@ router.get('/subscription-status', requireAuth, async (req, res) => {
       error: err.message,
     });
   }
+});
+
+// GET /api/apyhub/env-check  — confirms which vars are present (no values exposed)
+router.get('/env-check', requireAuth, (req, res) => {
+  res.json({
+    APYHUB_SUBSCRIPTION_USAGE_ENDPOINT: !!process.env.APYHUB_SUBSCRIPTION_USAGE_ENDPOINT,
+    APYHUB_AUTH_TOKEN:                  !!process.env.APYHUB_AUTH_TOKEN,
+    APYHUB_WORKSPACE:                   !!process.env.APYHUB_WORKSPACE,
+  });
 });
 
 module.exports = router;

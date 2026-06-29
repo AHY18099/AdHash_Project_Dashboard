@@ -6707,7 +6707,15 @@ async function tpRefreshApyHub(p,acctIdx){
     const resp=await fetch('/api/apyhub/subscription-status',{headers:{'Authorization':'Bearer '+_getToken()}});
     const json=await resp.json();
     if(!json.success){
-      bodyEl.innerHTML=`<div style="color:var(--fail);font-size:12px;padding:8px 0">✕ ${escH(json.message||json.error||'Failed to load')}</div>`;
+      bodyEl.innerHTML=`<div style="padding:10px 0">
+        <div style="color:var(--fail);font-size:12px;font-weight:600;margin-bottom:6px">✕ ${escH(json.message||json.error||'Failed to load')}</div>
+        ${json.fix?`<div style="padding:8px 12px;background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.25);border-radius:8px;font-size:11px;color:var(--txt);line-height:1.6">
+          <strong style="color:#6366f1">How to fix:</strong> In Railway, go to your <strong>service → Variables</strong> and add each missing variable directly, or reference it from Shared Variables using <code style="background:var(--card2);padding:1px 5px;border-radius:4px">\${{VAR_NAME}}</code> syntax.<br>
+          Required: <code style="background:var(--card2);padding:1px 5px;border-radius:4px">APYHUB_SUBSCRIPTION_USAGE_ENDPOINT</code> &nbsp;
+          <code style="background:var(--card2);padding:1px 5px;border-radius:4px">APYHUB_AUTH_TOKEN</code> &nbsp;
+          <code style="background:var(--card2);padding:1px 5px;border-radius:4px">APYHUB_WORKSPACE</code>
+        </div>`:''}
+      </div>`;
       return;
     }
     const d=json.data;
