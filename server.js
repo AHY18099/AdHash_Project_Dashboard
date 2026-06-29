@@ -253,6 +253,11 @@ try {
     app.use('/api/qa-state', require('./routes/qaState'));
     app.use('/api/apyhub', require('./routes/apyhub'));
     console.log('[startup] ✅ Mongoose route modules mounted (/api/projects, /api/qa-state, /api/apyhub)');
+    console.log('[startup] ApyHub env vars present:',
+        'ENDPOINT=' + !!process.env.APYHUB_SUBSCRIPTION_USAGE_ENDPOINT,
+        'TOKEN=' + !!process.env.APYHUB_AUTH_TOKEN,
+        'WORKSPACE=' + !!process.env.APYHUB_WORKSPACE
+    );
 } catch (e) {
     console.warn('[startup] ⚠️  Mongoose route modules failed to load:', e.message, '— falling back to legacy routes');
 }
