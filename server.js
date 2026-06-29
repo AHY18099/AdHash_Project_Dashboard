@@ -251,7 +251,8 @@ async function backupProject(projectId, reason = 'pre-update') {
 try {
     app.use('/api/projects', require('./routes/projects'));
     app.use('/api/qa-state', require('./routes/qaState'));
-    console.log('[startup] ✅ Mongoose route modules mounted (/api/projects, /api/qa-state)');
+    app.use('/api/apyhub', require('./routes/apyhub'));
+    console.log('[startup] ✅ Mongoose route modules mounted (/api/projects, /api/qa-state, /api/apyhub)');
 } catch (e) {
     console.warn('[startup] ⚠️  Mongoose route modules failed to load:', e.message, '— falling back to legacy routes');
 }

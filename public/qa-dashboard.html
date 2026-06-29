@@ -1296,6 +1296,7 @@ body.dark .tt-task-card:hover{box-shadow:0 8px 28px rgba(0,0,0,0.5),0 0 0 1px rg
 .tp-note-list{margin:0;padding-left:18px;list-style:disc}
 .tp-note-list li{padding:2px 0;line-height:1.5}
 .tp-apis-section{margin-top:14px;padding-top:12px;border-top:1.5px solid var(--border)}
+.apyhub-usage-card{margin-top:14px;padding:14px 16px;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;border-top:3px solid #6366f1}
 .tp-apis-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .tp-apis-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
 .tp-api-modal-row{background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:6px}
@@ -5880,6 +5881,7 @@ function renderThirdPartyTab(p){
         ${fields.length?`<div class="tp-field-row">${fields.join('')}</div>`:''}
         ${acct.note?`<div class="tp-note-box"><span class="tp-note-lbl">📝 Note</span><ul class="tp-note-list">${acct.note.split(' | ').map(s=>s.trim()).filter(Boolean).map(s=>`<li>${escH(s)}</li>`).join('')}</ul></div>`:''}
         ${apisHtml}
+        ${acct.name&&acct.name.toLowerCase().includes('apyhub')?`<div id="apyhub-usage-${p}-${i}" class="apyhub-usage-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:12px;font-weight:700;color:var(--txt);letter-spacing:.4px">📊 SUBSCRIPTION USAGE</span><button class="tp-api-run-btn" style="font-size:11px;padding:3px 10px" onclick="tpRefreshApyHub('${p}',${i})">↻ Refresh</button></div><div id="apyhub-usage-body-${p}-${i}"><div style="color:var(--mut);font-size:12px;font-style:italic">Click Refresh to load usage data</div></div></div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -6695,6 +6697,54 @@ async function tpRunAllFromTab(p,acctIdx,btnEl){
     return tpRunApiFromTab(p,acctIdx,apiIdx,btn||btnEl);
   }));
   btnEl.disabled=false;btnEl.textContent='▶ Run All';
+}
+// ApyHub subscription usage refresh
+async function tpRefreshApyHub(p,acctIdx){
+  const bodyEl=document.getElementById(`apyhub-usage-body-${p}-${acctIdx}`);
+  if(!bodyEl)return;
+  bodyEl.innerHTML='<div style="color:var(--mut);font-size:12px">⏳ Loading…</div>';
+  try{
+    const resp=await fetch('/api/apyhub/subscription-status',{headers:{'Authorization':'Bearer '+_getToken()}});
+    const json=await resp.json();
+    if(!json.success){bodyEl.innerHTML=`<div style="color:var(--fail);font-size:12px">✕ ${escH(json.error||'Failed to load')}</div>`;return;}
+    const d=json.data;
+    const pct=d.usagePercentage||0;
+    const barColor=d.status==='blocked'?'#ef4444':d.status==='critical'?'#f97316':d.status==='warning'?'#f59e0b':'#10b981';
+    const statusBadge={
+      normal:`<span style="background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">✓ Normal</span>`,
+      warning:`<span style="background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">⚠ Warning</span>`,
+      critical:`<span style="background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.3);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">🔴 Critical</span>`,
+      blocked:`<span style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">✕ Blocked</span>`,
+    }[d.status]||'';
+    const fmt=n=>typeof n==='number'?n.toLocaleString():n??'—';
+    const fmtDate=s=>{if(!s)return'—';try{return new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}catch(_){return s;}};
+    bodyEl.innerHTML=`
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        ${statusBadge}
+        ${d.isMock?'<span style="font-size:10px;color:var(--mut);font-style:italic">(mock data — set env vars in Railway)</span>':''}
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-bottom:4px">
+          <span>Atoms Used: <strong style="color:var(--txt)">${fmt(d.atomsConsumed)}</strong> / ${fmt(d.atomsLimit)}</span>
+          <span style="font-weight:700;color:${barColor}">${pct.toFixed(1)}%</span>
+        </div>
+        <div style="height:8px;background:var(--card2);border-radius:4px;overflow:hidden;border:1px solid var(--border)">
+          <div style="height:100%;width:${Math.min(pct,100).toFixed(1)}%;background:${barColor};border-radius:4px;transition:width .4s"></div>
+        </div>
+        <div style="font-size:10px;color:var(--mut);margin-top:4px">Remaining: ${fmt(d.remainingAtoms)} atoms</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:11px">
+        <div><span style="color:var(--mut)">Plan:</span> <span style="color:var(--txt);font-weight:600">${escH(d.planName||'—')}</span></div>
+        <div><span style="color:var(--mut)">Workspace:</span> <span style="color:var(--txt)">${escH(d.workspace||'—')}</span></div>
+        <div><span style="color:var(--mut)">Billing Start:</span> <span style="color:var(--txt)">${fmtDate(d.billingCycleStart)}</span></div>
+        <div><span style="color:var(--mut)">Billing End:</span> <span style="color:var(--txt)">${fmtDate(d.billingCycleEnd)}</span></div>
+        <div><span style="color:var(--mut)">API Keys:</span> <span style="color:var(--txt)">${fmt(d.apiKeysUsed)} / ${fmt(d.apiKeysLimit)}</span></div>
+        <div><span style="color:var(--mut)">Throttling:</span> <span style="color:${d.throttling?'var(--fail)':'var(--pass)'}">${d.throttling?'Yes':'No'}</span></div>
+      </div>
+      ${d.message?`<div style="margin-top:8px;font-size:11px;color:var(--mut);font-style:italic">${escH(d.message)}</div>`:''}`;
+  }catch(e){
+    bodyEl.innerHTML=`<div style="color:var(--fail);font-size:12px">✕ Error: ${escH(e.message)}</div>`;
+  }
 }
 
 // ══════════════════════════════════════════════════════
