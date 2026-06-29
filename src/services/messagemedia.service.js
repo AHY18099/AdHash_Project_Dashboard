@@ -43,14 +43,15 @@ function httpsGetBasic(endpoint, apiKey, apiSecret) {
 
 // ── Status badge logic ────────────────────────────────────────────────────────
 
-function determineStatus(credentialStatus, sourceNumberConfigured, accountType, creditBalance, warningCredits, criticalCredits) {
+function determineStatus(credentialStatus, sourceNumberConfigured, billingType, creditBalance, creditStatus, warningCredits, criticalCredits) {
   if (credentialStatus === 'Invalid') {
     return { status: 'Blocked', message: 'MessageMedia API credentials are invalid. Please verify API key and secret.' };
   }
   if (!sourceNumberConfigured) {
     return { status: 'Blocked', message: 'MessageMedia source number is missing.' };
   }
-  if (accountType === 'Prepaid' && typeof creditBalance === 'number') {
+  // Only apply credit rules when we actually have a confirmed Prepaid balance
+  if (billingType === 'Prepaid' && creditStatus === 'Available' && typeof creditBalance === 'number') {
     if (creditBalance <= 0) {
       return { status: 'Blocked', message: 'MessageMedia prepaid SMS credits are exhausted. Please recharge.' };
     }
@@ -61,61 +62,111 @@ function determineStatus(credentialStatus, sourceNumberConfigured, accountType, 
       return { status: 'Warning', message: 'MessageMedia SMS credits are low. Please plan recharge.' };
     }
   }
+  // Postpaid / Unknown credit — credentials valid, source configured → Normal
   return { status: 'Normal', message: 'MessageMedia SMS service is normal.' };
 }
 
 // ── Credential + credit check ─────────────────────────────────────────────────
 
 async function fetchCredentialAndCredit(apiKey, apiSecret, creditEndpoint) {
-  const endpoint = creditEndpoint || 'https://api.messagemedia.com/v1/messages/credits';
-
-  let credentialStatus = 'Unknown';
-  let accountType      = 'Postpaid / Unknown';
-  let creditBalance    = null;
-  let credentialError  = null;
+  let credentialStatus  = 'Unknown';
+  let billingType       = 'Unknown';
+  let creditStatus      = 'Not Available';
+  let creditBalance     = null;
+  let creditExpiryDate  = null;
+  let creditExpiryStatus= 'Not Available';
+  let nextPaymentDate   = null;
+  let nextPaymentStatus = 'Not Available';
+  let billingMessage    = 'Credit balance is not available for this account type or API endpoint.';
+  let credentialError   = null;
 
   try {
-    const { statusCode, body } = await httpsGetBasic(endpoint, apiKey, apiSecret);
+    const { statusCode, body } = await httpsGetBasic(creditEndpoint, apiKey, apiSecret);
 
     if (statusCode === 401 || statusCode === 403) {
       credentialStatus = 'Invalid';
       credentialError  = `API returned HTTP ${statusCode} — credentials rejected.`;
-      return { credentialStatus, accountType, creditBalance, credentialError };
+      billingMessage   = 'Credentials are invalid. Unable to retrieve billing information.';
+      return { credentialStatus, billingType, creditStatus, creditBalance, creditExpiryDate, creditExpiryStatus, nextPaymentDate, nextPaymentStatus, billingMessage, credentialError };
     }
 
-    // Credentials are accepted
+    // Credentials confirmed valid
     credentialStatus = 'Valid';
 
     if (statusCode === 200) {
       let raw;
       try { raw = JSON.parse(body); } catch (_) { raw = null; }
+
       if (raw !== null) {
-        // Try common credit-balance field names
+        // Probe common field names for credit balance
         const balance =
           raw.creditBalance  ??
           raw.credit_balance ??
           raw.credits        ??
           raw.balance        ??
+          (raw.data ? (raw.data.creditBalance ?? raw.data.credit_balance ?? raw.data.credits ?? raw.data.balance ?? null) : null) ??
           null;
 
         if (typeof balance === 'number' || (typeof balance === 'string' && !isNaN(Number(balance)))) {
-          creditBalance = Number(balance);
-          accountType   = 'Prepaid';
+          creditBalance  = Number(balance);
+          billingType    = 'Prepaid';
+          creditStatus   = 'Available';
+          billingMessage = `Prepaid credit balance: ${creditBalance}.`;
+
+          // Probe optional expiry fields — never invent
+          const expiry =
+            raw.expiryDate    ??
+            raw.expiry_date   ??
+            raw.creditExpiry  ??
+            raw.credit_expiry ??
+            (raw.data ? (raw.data.expiryDate ?? raw.data.expiry_date ?? null) : null) ??
+            null;
+          if (expiry) {
+            creditExpiryDate   = String(expiry);
+            creditExpiryStatus = 'Available';
+          } else {
+            creditExpiryStatus = 'Not Available';
+            billingMessage += ' Credit expiry is not available via SMS API.';
+          }
+
+          // Probe optional next-payment fields — never invent
+          const nextPay =
+            raw.nextPaymentDate   ??
+            raw.next_payment_date ??
+            raw.nextPayment       ??
+            raw.next_payment      ??
+            (raw.data ? (raw.data.nextPaymentDate ?? raw.data.next_payment_date ?? null) : null) ??
+            null;
+          if (nextPay) {
+            nextPaymentDate   = String(nextPay);
+            nextPaymentStatus = 'Available';
+          } else {
+            nextPaymentStatus = 'Not Available';
+            billingMessage += ' Next payment is not available via SMS API.';
+          }
+        } else {
+          // 200 but no recognisable balance field
+          billingType    = 'Postpaid / Unknown';
+          creditStatus   = 'Not Available';
+          billingMessage = 'Credit balance not available. Account may be postpaid or endpoint may not be supported.';
+          creditExpiryStatus = 'Not Applicable';
         }
       }
-    } else if (statusCode === 404) {
-      // Endpoint exists but credit route not supported — postpaid or different plan
-      accountType = 'Postpaid / Unknown';
     } else {
-      // Any other 2xx/3xx/5xx — credentials may be valid but endpoint is unexpected
-      accountType = 'Postpaid / Unknown';
+      // 404, 5xx, or any non-200/non-401/non-403 — credentials may be valid, endpoint unsupported
+      billingType    = 'Postpaid / Unknown';
+      creditStatus   = 'Not Available';
+      billingMessage = `Credit balance not available. Account may be postpaid or endpoint may not be supported. (HTTP ${statusCode})`;
+      creditExpiryStatus = 'Not Applicable';
+      nextPaymentStatus  = 'Not Available';
     }
   } catch (e) {
     credentialError = e.message && e.message.length < 200 ? e.message : 'Network error contacting MessageMedia API.';
-    console.warn('[MessageMedia] Credential check error:', credentialError);
+    billingMessage  = `Could not reach MessageMedia API: ${credentialError}`;
+    console.warn('[MessageMedia] Credential/credit check error:', credentialError);
   }
 
-  return { credentialStatus, accountType, creditBalance, credentialError };
+  return { credentialStatus, billingType, creditStatus, creditBalance, creditExpiryDate, creditExpiryStatus, nextPaymentDate, nextPaymentStatus, billingMessage, credentialError };
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -128,7 +179,6 @@ async function fetchMessageMediaStatus() {
   const warningCredits = parseInt(process.env.MESSAGEMEDIA_WARNING_CREDITS  || '500', 10);
   const criticalCredits= parseInt(process.env.MESSAGEMEDIA_CRITICAL_CREDITS || '100', 10);
 
-  // Missing credential checks — short-circuit immediately
   if (!apiKey) {
     const err = new Error('MESSAGEMEDIA_API_KEY is not configured.');
     err.configError = true;
@@ -145,8 +195,11 @@ async function fetchMessageMediaStatus() {
     throw err;
   }
 
-  const { credentialStatus, accountType, creditBalance, credentialError } =
-    await fetchCredentialAndCredit(apiKey, apiSecret, creditEndpoint);
+  const {
+    credentialStatus, billingType, creditStatus, creditBalance,
+    creditExpiryDate, creditExpiryStatus, nextPaymentDate, nextPaymentStatus,
+    billingMessage, credentialError,
+  } = await fetchCredentialAndCredit(apiKey, apiSecret, creditEndpoint);
 
   if (credentialStatus === 'Invalid') {
     const err = new Error('MessageMedia API credentials are invalid. Verify MESSAGEMEDIA_API_KEY and MESSAGEMEDIA_API_SECRET.');
@@ -155,7 +208,7 @@ async function fetchMessageMediaStatus() {
   }
 
   const { status, message } = determineStatus(
-    credentialStatus, !!sourceNumber, accountType, creditBalance, warningCredits, criticalCredits
+    credentialStatus, !!sourceNumber, billingType, creditBalance, creditStatus, warningCredits, criticalCredits
   );
 
   return {
@@ -165,8 +218,15 @@ async function fetchMessageMediaStatus() {
     credentialStatus,
     credentialError:     credentialError || null,
     sourceNumberStatus:  'Configured',
-    accountType,
+    // Billing / credit fields
+    billingType,
+    creditStatus,
     creditBalance,
+    creditExpiryDate,
+    creditExpiryStatus,
+    nextPaymentDate,
+    nextPaymentStatus,
+    billingMessage,
     warningCredits,
     criticalCredits,
     lastCheckedTime:     new Date().toISOString(),
