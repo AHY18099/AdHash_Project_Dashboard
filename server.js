@@ -209,7 +209,8 @@ app.use('/api', (req, res, next) => {
 });
 
 // Routes that don't require authentication
-const PUBLIC_API_ROUTES = new Set(['/api/auth/login', '/api/auth/session', '/api/auth/logout', '/api/health', '/api/db-diag']);
+// POST /api/status-reports is authenticated via x-api-key header (GitHub Action), not JWT
+const PUBLIC_API_ROUTES = new Set(['/api/auth/login', '/api/auth/session', '/api/auth/logout', '/api/health', '/api/db-diag', '/api/status-reports']);
 
 // Guard all non-public API routes
 app.use('/api', (req, res, next) => {
@@ -255,7 +256,8 @@ try {
     app.use('/api/firebase', require('./routes/firebase'));
     app.use('/api/messagemedia', require('./routes/messagemedia'));
     app.use('/api/tavus', require('./routes/tavus'));
-    console.log('[startup] ✅ Mongoose route modules mounted (/api/projects, /api/qa-state, /api/apyhub, /api/firebase, /api/messagemedia, /api/tavus)');
+    app.use('/api/status-reports', require('./routes/status-reports'));
+    console.log('[startup] ✅ Mongoose route modules mounted (/api/projects, /api/qa-state, /api/apyhub, /api/firebase, /api/messagemedia, /api/tavus, /api/status-reports)');
     console.log('[startup] ApyHub env vars present:',
         'ENDPOINT=' + !!process.env.APYHUB_SUBSCRIPTION_USAGE_ENDPOINT,
         'TOKEN=' + !!process.env.APYHUB_AUTH_TOKEN,
@@ -340,7 +342,10 @@ function verifyJwt(token) {
 }
 function getBearerToken(req) {
     const auth = req.headers.authorization || '';
-    return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+    if (auth.startsWith('Bearer ')) return auth.slice(7);
+    // Also accept ?token= query param for browser file downloads
+    if (req.query && req.query.token) return req.query.token;
+    return null;
 }
 // requireAdmin middleware — returns 403 if not super_admin
 function requireAdmin(req, res, next) {

@@ -1506,6 +1506,57 @@ body.dark .rl-past-badge{background:rgba(100,116,139,.2);color:#94a3b8}
 
 /* ── TODAY CHIP PREMIUM ── */
 .dt-today-badge,.today-badge{background:var(--brand-solid,#6366f1);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:var(--r-full,9999px);text-transform:uppercase;letter-spacing:0.5px}
+
+/* ══ STATUS REPORTS PAGE ══════════════════════════════════════════════════ */
+.sr-page{max-width:1200px;margin:0 auto;padding:24px 20px 48px}
+.sr-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+.sr-title{font-size:22px;font-weight:800;color:var(--txt);margin:4px 0 2px;letter-spacing:-.4px}
+.sr-subtitle{font-size:12px;color:var(--mut);margin:0}
+.sr-summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.sr-stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center;box-shadow:var(--sh-sm)}
+.sr-stat-val{font-size:26px;font-weight:800;color:var(--txt);line-height:1.1;margin-bottom:4px}
+.sr-stat-lbl{font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
+.sr-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.sr-input{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:12px;color:var(--txt);font-family:inherit;outline:none;transition:border-color .18s}
+.sr-input:focus{border-color:var(--grad-a)}
+.sr-table-wrap{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--sh-sm);overflow-x:auto}
+.sr-table{width:100%;border-collapse:collapse;min-width:700px}
+.sr-table thead tr{background:var(--card2);border-bottom:1px solid var(--border)}
+.sr-table th{padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);text-align:left;white-space:nowrap}
+.sr-row{border-bottom:1px solid var(--border);transition:background .15s}
+.sr-row:hover{background:var(--card2)}
+.sr-row:last-child{border-bottom:none}
+.sr-row td{padding:12px 14px;font-size:12px;vertical-align:middle}
+.sr-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:50px;font-size:11px;font-weight:700;white-space:nowrap}
+.sr-badge-pass{background:rgba(16,185,129,.12);color:#059669;border:1px solid rgba(16,185,129,.3)}
+.sr-badge-fail{background:rgba(239,68,68,.1);color:#dc2626;border:1px solid rgba(239,68,68,.25)}
+.sr-badge-warn{background:rgba(245,158,11,.1);color:#d97706;border:1px solid rgba(245,158,11,.3)}
+.sr-badge-morning{background:rgba(251,191,36,.12);color:#d97706;border:1px solid rgba(251,191,36,.3)}
+.sr-badge-evening{background:rgba(139,92,246,.1);color:#7c3aed;border:1px solid rgba(139,92,246,.25)}
+.sr-badge-manual{background:rgba(59,130,246,.1);color:#2563eb;border:1px solid rgba(59,130,246,.25)}
+.sr-badge-info{background:var(--card2);color:var(--mut);border:1px solid var(--border)}
+.sr-act-btn{display:inline-flex;align-items:center;gap:3px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--card2);color:var(--txt2);cursor:pointer;transition:all .15s;font-family:inherit}
+.sr-act-view:hover{border-color:#3b82f6;color:#2563eb;background:rgba(59,130,246,.08)}
+.sr-act-dl:hover{border-color:#10b981;color:#059669;background:rgba(16,185,129,.08)}
+.sr-act-del:hover{border-color:#ef4444;color:#dc2626;background:rgba(239,68,68,.08)}
+.sr-pagination{display:flex;align-items:center;justify-content:space-between;padding:16px 4px;flex-wrap:wrap;gap:8px}
+.sr-pg-btn{padding:5px 11px;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.sr-pg-btn:hover:not(:disabled){border-color:var(--grad-a);color:var(--grad-a)}
+.sr-pg-btn:disabled{opacity:.4;cursor:default}
+.sr-pg-active{background:var(--grad-a)!important;color:#fff!important;border-color:var(--grad-a)!important}
+.sr-modal{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px}
+.sr-modal-inner{width:100%;max-width:1100px;height:90vh;background:var(--card);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.35)}
+.sr-modal-hdr{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--card2);flex-shrink:0}
+.sr-modal-btn{padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--txt2);font-size:13px;cursor:pointer;transition:all .15s;font-family:inherit}
+.sr-modal-btn:hover{border-color:var(--grad-a);color:var(--grad-a)}
+.sr-modal-close:hover{border-color:#ef4444;color:#dc2626}
+.sr-view-frame{width:100%;flex:1;border:none;background:#fff}
+@media(max-width:640px){
+  .sr-table-wrap{border-radius:10px}
+  .sr-summary-grid{grid-template-columns:repeat(2,1fr)}
+  .sr-filters{flex-direction:column}
+  .sr-filters .sr-input{width:100%}
+}
 </style>
 </head>
 <body>
@@ -2368,6 +2419,7 @@ function renderProjectGrid(){
         <button class="pj-add-btn" style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);box-shadow:0 4px 16px rgba(16,185,129,.3);position:relative" onclick="showTodayReleases()">🚀 Today Releases${(()=>{const c=rlTodayCount();return c>0?`<span style="position:absolute;top:-7px;right:-7px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid #fff;line-height:1">${c}</span>`:''})()}</button>
         <button class="pj-add-btn" style="background:linear-gradient(135deg,#8b5cf6 0%,#6d28d9 100%);box-shadow:0 4px 16px rgba(139,92,246,.3)" onclick="showNextReleases()">📆 Next Releases</button>
         <button class="pj-add-btn" style="background:linear-gradient(135deg,#64748b 0%,#475569 100%);box-shadow:0 4px 16px rgba(100,116,139,.3)" onclick="showPastReleases()">📁 Past Releases</button>
+        <button class="pj-add-btn" style="background:linear-gradient(135deg,#0ea5e9 0%,#6366f1 100%);box-shadow:0 4px 16px rgba(14,165,233,.3)" onclick="showStatusReports()">📊 Status Reports</button>
         ${isAdmin()?`<button class="pj-add-btn" onclick="openAddProject()">＋ New Project</button>`:''}
         ${isAdmin()?`<button class="pj-users-btn" onclick="showUsers()">👥 Manage Users</button>`:''}
       </div>
@@ -2393,6 +2445,7 @@ function renderProject(p){
   if(curView==='todayreleases'){renderReleasesPage('today');return;}
   if(curView==='nextreleases'){renderReleasesPage('next');return;}
   if(curView==='pastreleases'){renderReleasesPage('past');return;}
+  if(curView==='statusreports'){renderStatusReportsPage();return;}
   const proj=PROJECTS.find(x=>x.id===p);
   const pend=(STORE[p].pending||[]).filter(x=>x.status==='pending').length;
   const s=calcStats(p);
@@ -9762,6 +9815,288 @@ if(typeof _qaStateAutoLoad==='undefined'){
   window._qaStateAutoLoad=true;
   // Delay slightly to let renderProjectGrid() finish first
   document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>loadQaState(),1500));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STATUS REPORTS PAGE
+// ══════════════════════════════════════════════════════════════════════════════
+let _srPage=1, _srLimit=20, _srStatus='', _srRunType='', _srSearch='', _srFromDate='', _srToDate='';
+let _srData={reports:[],total:0,pages:1,page:1};
+let _srSummary={total:0,latest:null,statusCounts:{}};
+let _srViewingId=null;
+
+function showStatusReports(){
+  curView='statusreports';
+  _srPage=1;
+  renderStatusReportsPage();
+  window.scrollTo({top:0,behavior:'instant'});
+  _srLoadSummary();
+  _srLoadReports();
+}
+
+async function _srLoadSummary(){
+  try{
+    const r=await fetch('/api/status-reports/summary',{headers:{'Authorization':'Bearer '+_getToken()}});
+    if(!r.ok)return;
+    const d=await r.json();
+    _srSummary={total:d.total||0,latest:d.latest||null,statusCounts:d.statusCounts||{}};
+    _srRenderSummaryCards();
+  }catch(e){console.warn('[sr] summary load failed',e);}
+}
+
+async function _srLoadReports(){
+  const params=new URLSearchParams({page:_srPage,limit:_srLimit});
+  if(_srStatus)   params.set('status',_srStatus);
+  if(_srRunType)  params.set('runType',_srRunType);
+  if(_srSearch)   params.set('search',_srSearch);
+  if(_srFromDate) params.set('fromDate',_srFromDate);
+  if(_srToDate)   params.set('toDate',_srToDate);
+  try{
+    const r=await fetch('/api/status-reports?'+params,{headers:{'Authorization':'Bearer '+_getToken()}});
+    if(!r.ok)return;
+    const d=await r.json();
+    _srData={reports:d.reports||[],total:d.total||0,pages:d.pages||1,page:d.page||1};
+    _srRenderTable();
+    _srRenderPagination();
+  }catch(e){console.warn('[sr] load failed',e);}
+}
+
+function _getToken(){return localStorage.getItem('qa_jwt_token')||localStorage.getItem('qa_token')||'';}
+
+function _srStatusBadge(s){
+  s=(s||'').toLowerCase();
+  if(s==='passed'||s==='success') return`<span class="sr-badge sr-badge-pass">✓ Success</span>`;
+  if(s==='failed'||s==='fail')    return`<span class="sr-badge sr-badge-fail">✗ Failed</span>`;
+  if(s==='warning')               return`<span class="sr-badge sr-badge-warn">⚠ Warning</span>`;
+  return`<span class="sr-badge sr-badge-info">${escH(s||'Unknown')}</span>`;
+}
+
+function _srRunBadge(r){
+  r=(r||'').toLowerCase();
+  if(r==='morning') return`<span class="sr-badge sr-badge-morning">🌅 Morning</span>`;
+  if(r==='evening') return`<span class="sr-badge sr-badge-evening">🌆 Evening</span>`;
+  if(r==='manual')  return`<span class="sr-badge sr-badge-manual">🔧 Manual</span>`;
+  return`<span class="sr-badge sr-badge-info">${escH(r||'—')}</span>`;
+}
+
+function _srFmtDate(iso){
+  if(!iso)return'—';
+  try{
+    const d=new Date(iso);
+    return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+
+      ' '+d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+  }catch{return iso;}
+}
+
+function _srRenderSummaryCards(){
+  const el=document.getElementById('sr-summary-cards');
+  if(!el)return;
+  const sc=_srSummary.statusCounts||{};
+  const latestStatus=_srSummary.latest?.overallStatus||'—';
+  const latestTime=_srSummary.latest?_srFmtDate(_srSummary.latest.reportDateTime):'Never';
+  el.innerHTML=`
+    <div class="sr-stat-card"><div class="sr-stat-val">${_srSummary.total}</div><div class="sr-stat-lbl">Total Reports</div></div>
+    <div class="sr-stat-card">${_srStatusBadge(latestStatus)}<div class="sr-stat-lbl" style="margin-top:6px">Latest Status</div></div>
+    <div class="sr-stat-card sr-stat-pass"><div class="sr-stat-val" style="color:var(--c-pass)">${sc.passed||sc.success||0}</div><div class="sr-stat-lbl">Passed Runs</div></div>
+    <div class="sr-stat-card sr-stat-warn"><div class="sr-stat-val" style="color:var(--c-warn)">${sc.warning||0}</div><div class="sr-stat-lbl">Warning Runs</div></div>
+    <div class="sr-stat-card sr-stat-fail"><div class="sr-stat-val" style="color:var(--c-fail)">${sc.failed||sc.fail||0}</div><div class="sr-stat-lbl">Failed Runs</div></div>
+    <div class="sr-stat-card"><div class="sr-stat-val" style="font-size:11px;font-weight:600;color:var(--mut)">${latestTime}</div><div class="sr-stat-lbl">Last Run</div></div>`;
+}
+
+function _srRenderTable(){
+  const el=document.getElementById('sr-table-body');
+  if(!el)return;
+  if(!_srData.reports.length){
+    el.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:48px;color:var(--mut)">
+      <div style="font-size:36px;margin-bottom:10px">📊</div>
+      <div style="font-weight:600;font-size:14px">No reports found</div>
+      <div style="font-size:12px;margin-top:4px">GitHub Action reports will appear here after the next run</div>
+    </td></tr>`;
+    return;
+  }
+  el.innerHTML=_srData.reports.map(r=>`
+    <tr class="sr-row">
+      <td style="max-width:220px">
+        <div style="font-weight:600;font-size:12px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escH(r.title||'')}">${escH(r.title||'—')}</div>
+        <div style="font-size:11px;color:var(--mut);margin-top:2px">${_srFmtDate(r.reportDateTime)}</div>
+      </td>
+      <td>${_srRunBadge(r.runType)}</td>
+      <td>${_srStatusBadge(r.overallStatus)}</td>
+      <td style="text-align:center;font-weight:700;font-size:13px">${r.totalProjects||0}</td>
+      <td style="text-align:center;font-weight:700;color:var(--c-pass)">${r.passedCount||0}</td>
+      <td style="text-align:center;font-weight:700;color:var(--c-fail)">${r.failedCount||0}</td>
+      <td style="text-align:center;font-weight:700;color:var(--c-warn)">${r.warningCount||0}</td>
+      <td style="font-size:11px;color:var(--mut)">${escH(r.duration||'—')}</td>
+      <td>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="sr-act-btn sr-act-view" onclick="srViewReport('${escH(r.id)}')">👁 View</button>
+          <button class="sr-act-btn sr-act-dl"   onclick="srDownloadReport('${escH(r.id)}','${escH(r.reportDateTime||'')}')">⬇ Download</button>
+          ${isAdmin()?`<button class="sr-act-btn sr-act-del" onclick="srDeleteReport('${escH(r.id)}')">🗑</button>`:''}
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function _srRenderPagination(){
+  const el=document.getElementById('sr-pagination');
+  if(!el)return;
+  const {page,pages,total}=_srData;
+  if(pages<=1){el.innerHTML='';return;}
+  const btns=[];
+  btns.push(`<button class="sr-pg-btn" ${page<=1?'disabled':''} onclick="_srGoPage(${page-1})">‹ Prev</button>`);
+  for(let i=1;i<=pages;i++){
+    if(i===1||i===pages||Math.abs(i-page)<=1)btns.push(`<button class="sr-pg-btn${i===page?' sr-pg-active':''}" onclick="_srGoPage(${i})">${i}</button>`);
+    else if(Math.abs(i-page)===2)btns.push(`<span style="color:var(--mut);padding:0 4px">…</span>`);
+  }
+  btns.push(`<button class="sr-pg-btn" ${page>=pages?'disabled':''} onclick="_srGoPage(${page+1})">Next ›</button>`);
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">${btns.join('')}</div>
+    <div style="font-size:11px;color:var(--mut)">Showing ${((page-1)*_srLimit)+1}–${Math.min(page*_srLimit,total)} of ${total}</div>`;
+}
+
+function _srGoPage(p){_srPage=p;_srLoadReports();}
+
+async function srViewReport(id){
+  _srViewingId=id;
+  const modal=document.getElementById('sr-view-modal');
+  const frame=document.getElementById('sr-view-frame');
+  const title=document.getElementById('sr-view-title');
+  if(!modal||!frame)return;
+  title.textContent='Loading report…';
+  modal.style.display='flex';
+  document.body.style.overflow='hidden';
+  try{
+    const r=await fetch('/api/status-reports/'+encodeURIComponent(id),{headers:{'Authorization':'Bearer '+_getToken()}});
+    const d=await r.json();
+    if(!d.success||!d.report)throw new Error(d.error||'Not found');
+    const rpt=d.report;
+    title.textContent=rpt.title||'Status Report';
+    // Use srcdoc to safely render HTML without a separate origin
+    frame.srcdoc=rpt.htmlContent||'<p>No content</p>';
+  }catch(e){
+    frame.srcdoc=`<html><body style="font-family:sans-serif;padding:40px;color:#ef4444"><h2>Failed to load report</h2><p>${e.message}</p></body></html>`;
+    title.textContent='Error loading report';
+  }
+}
+
+function srCloseModal(){
+  const modal=document.getElementById('sr-view-modal');
+  const frame=document.getElementById('sr-view-frame');
+  if(modal)modal.style.display='none';
+  if(frame)frame.srcdoc='';
+  document.body.style.overflow='';
+  _srViewingId=null;
+}
+
+function srFullScreen(){
+  const frame=document.getElementById('sr-view-frame');
+  if(frame&&frame.requestFullscreen)frame.requestFullscreen();
+  else if(frame&&frame.webkitRequestFullscreen)frame.webkitRequestFullscreen();
+}
+
+function srDownloadReport(id,dt){
+  const a=document.createElement('a');
+  a.href='/api/status-reports/'+encodeURIComponent(id)+'/download';
+  // Token must go as query param for file downloads (browser navigation, not fetch)
+  a.href+='?token='+encodeURIComponent(_getToken());
+  a.target='_blank';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+
+async function srDownloadCurrent(){
+  if(_srViewingId)srDownloadReport(_srViewingId,'');
+}
+
+async function srDeleteReport(id){
+  if(!confirm('Delete this report? This cannot be undone.'))return;
+  try{
+    const r=await fetch('/api/status-reports/'+encodeURIComponent(id),{method:'DELETE',headers:{'Authorization':'Bearer '+_getToken()}});
+    const d=await r.json();
+    if(!d.success)throw new Error(d.error||'Delete failed');
+    await _srLoadReports();
+    await _srLoadSummary();
+  }catch(e){alert('Delete failed: '+e.message);}
+}
+
+function srApplyFilters(){
+  _srPage=1;
+  _srStatus  =document.getElementById('sr-filter-status')?.value||'';
+  _srRunType =document.getElementById('sr-filter-runtype')?.value||'';
+  _srSearch  =document.getElementById('sr-filter-search')?.value||'';
+  _srFromDate=document.getElementById('sr-filter-from')?.value||'';
+  _srToDate  =document.getElementById('sr-filter-to')?.value||'';
+  _srLoadReports();
+}
+
+function renderStatusReportsPage(){
+  document.getElementById('app').innerHTML=`
+  <div class="sr-page">
+    <div class="sr-header">
+      <div>
+        <button class="back-btn" onclick="goHome()">← All Projects</button>
+        <h2 class="sr-title">📊 Status Reports</h2>
+        <p class="sr-subtitle">AdHash All Projects Working Status — GitHub Action Reports</p>
+      </div>
+      <button class="pj-add-btn" style="background:linear-gradient(135deg,#0ea5e9,#6366f1)" onclick="_srLoadReports();_srLoadSummary()">↺ Refresh</button>
+    </div>
+
+    <!-- Summary cards -->
+    <div id="sr-summary-cards" class="sr-summary-grid">
+      <div class="sr-stat-card"><div class="sr-stat-val">—</div><div class="sr-stat-lbl">Loading…</div></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="sr-filters">
+      <input  id="sr-filter-search"  class="sr-input" placeholder="🔍 Search by title…" value="${escH(_srSearch)}" oninput="srApplyFilters()">
+      <select id="sr-filter-status"  class="sr-input" onchange="srApplyFilters()">
+        <option value="" ${!_srStatus?'selected':''}>All Status</option>
+        <option value="passed" ${_srStatus==='passed'?'selected':''}>✓ Success</option>
+        <option value="warning" ${_srStatus==='warning'?'selected':''}>⚠ Warning</option>
+        <option value="failed" ${_srStatus==='failed'?'selected':''}>✗ Failed</option>
+      </select>
+      <select id="sr-filter-runtype" class="sr-input" onchange="srApplyFilters()">
+        <option value="" ${!_srRunType?'selected':''}>All Run Types</option>
+        <option value="morning" ${_srRunType==='morning'?'selected':''}>🌅 Morning</option>
+        <option value="evening" ${_srRunType==='evening'?'selected':''}>🌆 Evening</option>
+        <option value="manual"  ${_srRunType==='manual'?'selected':''}>🔧 Manual</option>
+      </select>
+      <input  id="sr-filter-from" class="sr-input" type="date" value="${escH(_srFromDate)}" onchange="srApplyFilters()" title="From date">
+      <input  id="sr-filter-to"   class="sr-input" type="date" value="${escH(_srToDate)}"   onchange="srApplyFilters()" title="To date">
+    </div>
+
+    <!-- Table -->
+    <div class="sr-table-wrap">
+      <table class="sr-table">
+        <thead>
+          <tr>
+            <th>Report</th><th>Run Type</th><th>Status</th>
+            <th style="text-align:center">Total</th>
+            <th style="text-align:center">✓ Pass</th>
+            <th style="text-align:center">✗ Fail</th>
+            <th style="text-align:center">⚠ Warn</th>
+            <th>Duration</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="sr-table-body">
+          <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--mut)">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="sr-pagination" class="sr-pagination"></div>
+  </div>
+
+  <!-- View Report Modal -->
+  <div id="sr-view-modal" class="sr-modal" style="display:none" onclick="if(event.target===this)srCloseModal()">
+    <div class="sr-modal-inner">
+      <div class="sr-modal-hdr">
+        <span id="sr-view-title" style="font-weight:700;font-size:14px;color:var(--txt);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+        <button class="sr-modal-btn" onclick="srFullScreen()" title="Full screen">⛶</button>
+        <button class="sr-modal-btn" onclick="srDownloadCurrent()" title="Download">⬇</button>
+        <button class="sr-modal-btn sr-modal-close" onclick="srCloseModal()" title="Close">✕</button>
+      </div>
+      <iframe id="sr-view-frame" class="sr-view-frame" sandbox="allow-same-origin allow-scripts" title="Status Report"></iframe>
+    </div>
+  </div>`;
 }
 
 </script>

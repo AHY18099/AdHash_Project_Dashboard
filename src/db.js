@@ -37,6 +37,7 @@ const ALL_COLLECTIONS = [
     'third_party', 'client_feedback', 'workflow_docs', 'api_tests',
     'pending_tasks', 'saved_reports', 'release_notes', 'test_data',
     'env_details', 'daily_tasks', 'team_tasks', 'releases', 'users', 'projects',
+    'status_reports',
 ];
 
 async function _ensureIndexes(db) {
@@ -68,6 +69,15 @@ async function _ensureIndexes(db) {
             // _savedAt index for merge functions that filter by timestamp
             if (['daily_tasks', 'team_tasks', 'smoke_tests', 'prod_checklist'].includes(col)) {
                 await db.collection(col).createIndex({ _savedAt: 1 }, { background: true, sparse: true, name: '_savedAt_1' });
+            }
+            // status_reports: index by reportDateTime descending for list queries
+            if (col === 'status_reports') {
+                await db.collection(col).dropIndex('id_projectId_unique').catch(() => {});
+                await db.collection(col).createIndex({ id: 1 }, { unique: true, sparse: true, background: true, name: 'sr_id_unique' });
+                await db.collection(col).createIndex({ reportDateTime: -1 }, { background: true, name: 'sr_reportDateTime' });
+                await db.collection(col).createIndex({ overallStatus: 1 }, { background: true, name: 'sr_status' });
+                await db.collection(col).createIndex({ runType: 1 }, { background: true, name: 'sr_runType' });
+                continue;
             }
         } catch (e) {
             console.warn('[mongodb] Index ensure failed for', col, ':', e.message);
@@ -436,8 +446,91 @@ async function pingDB() {
     await getDB().command({ ping: 1 });
 }
 
+// ── Status Reports CRUD ───────────────────────────────────────────────────────
+async function createStatusReport(data) {
+    const db = getDB();
+    const doc = {
+        id:              `sr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        title:           data.title           || 'AdHash Projects Status Dashboard',
+        runType:         (data.runType        || 'manual').toLowerCase(),
+        overallStatus:   (data.overallStatus  || 'unknown').toLowerCase(),
+        reportDateTime:  data.reportDateTime  || new Date().toISOString(),
+        totalProjects:   Number(data.totalProjects  || 0),
+        passedCount:     Number(data.passedCount    || 0),
+        failedCount:     Number(data.failedCount    || 0),
+        warningCount:    Number(data.warningCount   || 0),
+        skippedCount:    Number(data.skippedCount   || 0),
+        duration:        data.duration        || '',
+        htmlContent:     data.htmlContent     || '',
+        source:          data.source          || 'github-action',
+        createdAt:       new Date(),
+        updatedAt:       new Date(),
+    };
+    await db.collection('status_reports').insertOne(doc);
+    const { htmlContent, _id, ...meta } = doc;
+    return meta;
+}
+
+async function listStatusReports({ page = 1, limit = 20, status, runType, fromDate, toDate, search } = {}) {
+    const db = getDB();
+    const filter = {};
+    if (status)   filter.overallStatus = status.toLowerCase();
+    if (runType)  filter.runType = runType.toLowerCase();
+    if (fromDate || toDate) {
+        filter.reportDateTime = {};
+        if (fromDate) filter.reportDateTime.$gte = fromDate;
+        if (toDate)   filter.reportDateTime.$lte = toDate;
+    }
+    if (search) filter.title = { $regex: search, $options: 'i' };
+
+    const skip = (Math.max(1, page) - 1) * limit;
+    const total = await db.collection('status_reports').countDocuments(filter);
+    const docs  = await db.collection('status_reports')
+        .find(filter, { projection: { htmlContent: 0 } })
+        .sort({ reportDateTime: -1 })
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+
+    return {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        pages: Math.ceil(total / limit),
+        reports: docs.map(({ _id, ...d }) => d),
+    };
+}
+
+async function getStatusReport(id) {
+    const db = getDB();
+    const doc = await db.collection('status_reports').findOne({ id });
+    if (!doc) return null;
+    const { _id, ...clean } = doc;
+    return clean;
+}
+
+async function deleteStatusReport(id) {
+    const db = getDB();
+    const result = await db.collection('status_reports').deleteOne({ id });
+    return result.deletedCount > 0;
+}
+
+async function getStatusReportSummary() {
+    const db = getDB();
+    const total = await db.collection('status_reports').countDocuments();
+    const latest = await db.collection('status_reports')
+        .findOne({}, { sort: { reportDateTime: -1 }, projection: { htmlContent: 0 } });
+    const counts = await db.collection('status_reports').aggregate([
+        { $group: { _id: '$overallStatus', count: { $sum: 1 } } }
+    ]).toArray();
+    const statusCounts = {};
+    counts.forEach(c => { statusCounts[c._id] = c.count; });
+    return { total, latest: latest ? (({ _id, ...d }) => d)(latest) : null, statusCounts };
+}
+
 module.exports = {
     connectDB, getDB, closeDB, pingDB,
     readKey, writeKey, deleteKey, readAllData,
     writeProject, SECTION_MAP,
+    createStatusReport, listStatusReports, getStatusReport, deleteStatusReport, getStatusReportSummary,
 };
