@@ -487,27 +487,42 @@ body.dark .pj-today-tasks-empty{background:rgba(255,255,255,.03);border-color:rg
 .pj-today-tasks-label.has-tasks::before{animation:none;opacity:1;transform:scale(1.1)}
 .pj-today-none{font-size:11.5px;color:var(--mut);font-style:italic}
 
-/* ── Client Feedback card on project grid ── */
-.pj-feedback-card{margin-top:8px;border-radius:10px;border:1px solid var(--border);padding:8px 10px;background:rgba(100,116,139,.05);transition:all .2s}
-.pj-feedback-active{border-color:rgba(20,184,166,.25);background:rgba(20,184,166,.04)}
-body.dark .pj-feedback-active{background:rgba(20,184,166,.06);border-color:rgba(20,184,166,.2)}
-.pj-feedback-hdr{display:flex;align-items:center;gap:5px;margin-bottom:6px}
-.pj-feedback-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mut)}
-.pj-feedback-label.has-fb{color:#0d9488}
-.pj-feedback-total-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:50px;font-size:9.5px;font-weight:800;background:rgba(20,184,166,.15);color:#0d9488;border:1px solid rgba(20,184,166,.3)}
-.pj-fb-empty{display:flex;align-items:center;justify-content:center;padding:4px 0}
-.pj-fb-empty-txt{font-size:11px;color:var(--mut);font-style:italic}
-.pj-fb-rows{display:flex;flex-direction:column;gap:5px}
-.pj-fb-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
-.pj-fb-icon{font-size:12px;flex-shrink:0}
-.pj-fb-type{font-size:11px;font-weight:700;color:var(--txt);min-width:80px}
-.pj-fb-total{font-size:12px;font-weight:800;color:var(--txt);min-width:18px;text-align:center;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:0 5px;line-height:18px}
-.pj-fb-chips{display:flex;gap:3px;flex-wrap:wrap;margin-left:auto}
-.pj-fb-chip{display:inline-flex;align-items:center;padding:1px 7px;border-radius:50px;font-size:9.5px;font-weight:700;white-space:nowrap}
-.pj-fb-chip.open{background:rgba(245,158,11,.12);color:#d97706;border:1px solid rgba(245,158,11,.3)}
-.pj-fb-chip.inp{background:rgba(59,130,246,.12);color:#3b82f6;border:1px solid rgba(59,130,246,.3)}
-.pj-fb-chip.done{background:rgba(16,185,129,.12);color:#059669;border:1px solid rgba(16,185,129,.3)}
-.pj-fb-chip.crit{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
+/* ── Metric chips row (replaces Client Feedback) ── */
+.pj-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
+.pj-metric{display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:7px 4px 6px;text-align:center;gap:2px;transition:border-color .2s}
+.pj-metric:hover{border-color:var(--border2)}
+body.dark .pj-metric{background:rgba(255,255,255,.04)}
+.pj-metric-val{font-size:16px;font-weight:800;letter-spacing:-.5px;color:var(--txt);line-height:1}
+.pj-metric-lbl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);line-height:1.2}
+.pj-metric-icon{font-size:11px;margin-bottom:1px}
+/* Release readiness progress */
+.pj-readiness{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:12px}
+.pj-readiness-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.pj-readiness-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mut)}
+.pj-readiness-pct{font-size:13px;font-weight:800;letter-spacing:-.3px}
+.pj-readiness-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.pj-readiness-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(.16,1,.3,1)}
+/* Action buttons row */
+.pj-actions{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
+.pj-act-btn{display:inline-flex;align-items:center;gap:4px;padding:5px 9px;border-radius:7px;font-size:10.5px;font-weight:600;border:1px solid var(--border);background:var(--card2);color:var(--txt2);cursor:pointer;transition:all .18s;white-space:nowrap;font-family:inherit}
+.pj-act-btn:hover{border-color:var(--grad-a);color:var(--grad-a);background:rgba(59,130,246,.05)}
+body.dark .pj-act-btn:hover{background:rgba(96,165,250,.08)}
+/* Status badge (top-right of card header) */
+.pj-status-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:50px;font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0}
+.pj-status-badge.ready{background:rgba(16,185,129,.12);color:#059669;border:1px solid rgba(16,185,129,.3)}
+.pj-status-badge.active{background:rgba(59,130,246,.1);color:#2563eb;border:1px solid rgba(59,130,246,.25)}
+.pj-status-badge.warn{background:rgba(245,158,11,.1);color:#d97706;border:1px solid rgba(245,158,11,.3)}
+.pj-status-badge.fail{background:rgba(239,68,68,.1);color:#dc2626;border:1px solid rgba(239,68,68,.25)}
+.pj-status-badge.notest{background:rgba(100,116,139,.1);color:var(--mut);border:1px solid rgba(100,116,139,.2)}
+body.dark .pj-status-badge.ready{box-shadow:0 0 10px rgba(16,185,129,.15)}
+body.dark .pj-status-badge.active{box-shadow:0 0 10px rgba(96,165,250,.12)}
+/* Last updated footer */
+.pj-last-updated{font-size:10px;color:var(--mut);display:flex;align-items:center;gap:4px}
+.pj-health-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.pj-health-dot.good{background:#10b981;box-shadow:0 0 6px rgba(16,185,129,.5)}
+.pj-health-dot.warn{background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,.4)}
+.pj-health-dot.bad{background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.4)}
+.pj-health-dot.none{background:var(--mut)}
 
 /* Section card stat rows — label left, value right */
 .pj-statlist{display:flex;flex-direction:column;gap:5px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
@@ -2216,36 +2231,33 @@ function renderProjectGrid(){
           ${ttHold>0?`<span class="pj-today-chip hold">⊘ ${ttHold} Hold</span>`:''}
           ${ttSkip>0?`<span class="pj-today-chip skip">↷ ${ttSkip} Skipped</span>`:''}
         </div>`;
-    // Client feedback counts for this project
-    const _allFb=(STORE[p.id]?.feedback||[]);
-    const _fbReqs=_allFb.filter(f=>f.type==='req');
-    const _fbBugs=_allFb.filter(f=>f.type==='bug');
-    // Status label map — must match fb-status-badge CSS classes
-    const _fbStatusLabel={open:'Open',inprogress:'In Progress',clarification:'Clarification Required',resolved:'Resolved',closed:'Closed',wontfix:"Won't Fix",deferred:'Deferred'};
-    const _fbStatusClass={open:'open',inprogress:'inp',clarification:'inp',resolved:'done',closed:'done',wontfix:'done',deferred:'inp'};
-    // Build per-status chips from actual data (shows exact status, not grouped label)
-    const _fbChips=(items)=>{
-      const counts={};
-      items.forEach(f=>{const s=f.status||'open';counts[s]=(counts[s]||0)+1;});
-      return Object.entries(counts).map(([s,n])=>`<span class="pj-fb-chip ${_fbStatusClass[s]||'open'}" style="white-space:nowrap">${n} ${_fbStatusLabel[s]||s}</span>`).join('');
-    };
-    const hasFeedback=_allFb.length>0;
-    const fbCardHtml=!hasFeedback
-      ?`<div class="pj-fb-row pj-fb-empty"><span class="pj-fb-empty-txt">No feedback yet</span></div>`
-      :`<div class="pj-fb-rows">
-          <div class="pj-fb-row">
-            <span class="pj-fb-icon req">📋</span>
-            <span class="pj-fb-type">Requirements</span>
-            <span class="pj-fb-total">${_fbReqs.length}</span>
-            <span class="pj-fb-chips">${_fbChips(_fbReqs)}</span>
-          </div>
-          <div class="pj-fb-row">
-            <span class="pj-fb-icon bug">🐛</span>
-            <span class="pj-fb-type">Bugs</span>
-            <span class="pj-fb-total">${_fbBugs.length}</span>
-            <span class="pj-fb-chips">${_fbChips(_fbBugs)}</span>
-          </div>
-        </div>`;
+    // ── Metrics ──────────────────────────────────────────────────────────────
+    // Open bugs from the most recent team task entry for this project
+    const _lastTaskWithBugs=(TEAM_TASKS||[]).filter(t=>t.projectId===p.id&&t.openBugs?.total).slice(-1)[0];
+    const openBugs=_lastTaskWithBugs?.openBugs?.total||0;
+    // Automation coverage: smoke tests pass rate (smoke = automated proxy)
+    const smokeTests=STORE[p.id]?.smoke?.filter(r=>!r._pending)||[];
+    const smokePass=smokeTests.filter(r=>r.status==='Pass').length;
+    const autoCoverage=smokeTests.length?Math.round(smokePass/smokeTests.length*100):0;
+    // Release readiness %: pass / total across smoke + prod
+    const releaseReadiness=s.total?pct:0;
+    // Progress bar color
+    const rrColor=releaseReadiness>=80?'#10b981':releaseReadiness>=50?'#f97316':'#ef4444';
+    // Status badge
+    let sbCls,sbTxt,sbDot;
+    if(s.total===0){sbCls='notest';sbTxt='No Tests';sbDot='none';}
+    else if(ready){sbCls='ready';sbTxt='✓ Release Ready';sbDot='good';}
+    else if(s.fail>0){sbCls='fail';sbTxt=`✗ ${s.fail} Failed`;sbDot='bad';}
+    else if(hasTodayTasks){sbCls='active';sbTxt='Active';sbDot='good';}
+    else if(hasStarted){sbCls='active';sbTxt=`${pct}% In Progress`;sbDot='warn';}
+    else{sbCls='notest';sbTxt='Not Started';sbDot='none';}
+    // Last updated — most recent team task date for this project, fallback today
+    const _lastTask=(TEAM_TASKS||[]).filter(t=>t.projectId===p.id).slice(-1)[0];
+    const _lastUpdRaw=_lastTask?.date||_todayStr;
+    const _lastUpdLabel=(()=>{
+      if(_lastUpdRaw===_todayStr)return'Today';
+      try{return new Date(_lastUpdRaw).toLocaleDateString('en-GB',{day:'2-digit',month:'short'});}catch(e){return _lastUpdRaw;}
+    })();
     // Card highlight styles when tasks exist today
     const cardHighlight=hasTodayTasks
       ?`border-color:${taskHighlightColor}55;box-shadow:0 0 0 1.5px ${taskHighlightColor}33,0 4px 20px ${taskHighlightColor}18`
@@ -2253,30 +2265,91 @@ function renderProjectGrid(){
     return`<div class="pj-card${hasTodayTasks?' pj-card-active':''}" style="${cardHighlight}" onclick="switchProj('${p.id}')">
       <div class="pj-card-top" style="background:linear-gradient(90deg,${hasTodayTasks?taskHighlightColor:p.color},${hasTodayTasks?taskHighlightColor+'99':p.color+'88'});height:${hasTodayTasks?'5px':'4px'}"></div>
       <div class="pj-card-body">
-        <div class="pj-name-row">
+
+        <!-- ① Header: logo + name + status badge -->
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px">
           <div class="pj-icon" style="background:${iconBg};border:1.5px solid ${p.color}44">${faviconHtml}</div>
           <div style="flex:1;min-width:0">
-            <div class="pj-name">${p.name}${pend>0?`<span style="display:inline-flex;margin-left:6px;padding:1px 7px;border-radius:50px;font-size:9px;font-weight:800;background:rgba(239,68,68,.12);color:var(--fail);border:1px solid rgba(239,68,68,.3)">${pend} pending</span>`:''}</div>
-            <div class="pj-sub">${PROJ_DESC[p.id]||''}</div>
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">
+              <div class="pj-name" style="flex:1;min-width:0">${p.name}${pend>0?`<span style="display:inline-flex;margin-left:6px;padding:1px 7px;border-radius:50px;font-size:9px;font-weight:800;background:rgba(239,68,68,.12);color:var(--fail);border:1px solid rgba(239,68,68,.3)">${pend}</span>`:''}</div>
+              <span class="pj-status-badge ${sbCls}">${sbTxt}</span>
+            </div>
+            <div class="pj-sub" style="margin-top:3px">${PROJ_DESC[p.id]||''}</div>
           </div>
         </div>
-        <div class="pj-today-tasks${hasTodayTasks?' pj-today-tasks-active':' pj-today-tasks-empty'}">
+
+        <!-- ② Metrics grid: Today Tasks / Test Cases / Open Bugs / Auto % / Readiness % -->
+        <div class="pj-metrics">
+          <div class="pj-metric">
+            <div class="pj-metric-icon">📅</div>
+            <div class="pj-metric-val" style="${hasTodayTasks?'color:var(--inp)':''}">${todayTasks.length}</div>
+            <div class="pj-metric-lbl">Today Tasks</div>
+          </div>
+          <div class="pj-metric">
+            <div class="pj-metric-icon">🧪</div>
+            <div class="pj-metric-val">${s.total}</div>
+            <div class="pj-metric-lbl">Test Cases</div>
+          </div>
+          <div class="pj-metric">
+            <div class="pj-metric-icon">🐛</div>
+            <div class="pj-metric-val" style="${openBugs>0?'color:var(--fail)':''}">${openBugs}</div>
+            <div class="pj-metric-lbl">Open Bugs</div>
+          </div>
+          <div class="pj-metric">
+            <div class="pj-metric-icon">🤖</div>
+            <div class="pj-metric-val" style="${autoCoverage>0?'color:var(--pass)':''}">${autoCoverage}%</div>
+            <div class="pj-metric-lbl">Auto Cover</div>
+          </div>
+          <div class="pj-metric" style="grid-column:span 2">
+            <div class="pj-metric-icon">🚀</div>
+            <div class="pj-metric-val" style="color:${rrColor}">${releaseReadiness}%</div>
+            <div class="pj-metric-lbl">Release Readiness</div>
+          </div>
+        </div>
+
+        <!-- ③ Release readiness progress bar -->
+        <div class="pj-readiness">
+          <div class="pj-readiness-hdr">
+            <span class="pj-readiness-lbl">Release Readiness</span>
+            <span class="pj-readiness-pct" style="color:${rrColor}">${releaseReadiness}%</span>
+          </div>
+          <div class="pj-readiness-bar">
+            <div class="pj-readiness-fill" style="width:${releaseReadiness}%;background:${rrColor}"></div>
+          </div>
+        </div>
+
+        <!-- ④ Today's tasks section (kept compact, no label header) -->
+        ${hasTodayTasks?`<div class="pj-today-tasks pj-today-tasks-active" style="margin-bottom:12px">
           <div class="pj-today-tasks-hdr">
-            <div class="pj-today-tasks-label${hasTodayTasks?' has-tasks':''}">Today's Tasks</div>
+            <div class="pj-today-tasks-label has-tasks">Today's Tasks</div>
+            <div class="pj-today-count">${todayTasks.length}<span>task${todayTasks.length!==1?'s':''}</span></div>
           </div>
-          ${todayTasksHtml}
-        </div>
-        <div class="pj-feedback-card${hasFeedback?' pj-feedback-active':''}">
-          <div class="pj-feedback-hdr">
-            <span class="pj-feedback-label${hasFeedback?' has-fb':''}">💬 Client Feedback</span>
-            ${hasFeedback?`<span class="pj-feedback-total-badge">${_allFb.length}</span>`:''}
+          <div class="pj-today-chips">
+            ${ttDone>0?`<span class="pj-today-chip done">✓ ${ttDone}</span>`:''}
+            ${ttInProg>0?`<span class="pj-today-chip inprog">⟳ ${ttInProg}</span>`:''}
+            ${ttTodo>0?`<span class="pj-today-chip todo">● ${ttTodo}</span>`:''}
+            ${ttHold>0?`<span class="pj-today-chip hold">⊘ ${ttHold}</span>`:''}
+            ${ttSkip>0?`<span class="pj-today-chip skip">↷ ${ttSkip}</span>`:''}
           </div>
-          ${fbCardHtml}
+        </div>`:''}
+
+        <!-- ⑤ Quick action buttons -->
+        <div class="pj-actions" onclick="event.stopPropagation()">
+          <button class="pj-act-btn" onclick="switchProj('${p.id}')">📊 Dashboard</button>
+          <button class="pj-act-btn" onclick="switchProj('${p.id}');setTimeout(()=>switchTab('${p.id}','smoke'),80)">🧪 Tests</button>
+          <button class="pj-act-btn" onclick="switchProj('${p.id}');setTimeout(()=>switchTab('${p.id}','checklist'),80)">✅ Checklist</button>
+          <button class="pj-act-btn" onclick="switchProj('${p.id}');setTimeout(()=>switchTab('${p.id}','reports'),80)">📈 Reports</button>
         </div>
+
+        <!-- ⑥ Footer -->
         <div class="pj-footer">
-          <span class="pj-status-pill ${pillCls}">${pillTxt}</span>
+          <div class="pj-last-updated">
+            <span class="pj-health-dot ${sbDot}"></span>
+            <span>Updated ${_lastUpdLabel}</span>
+          </div>
           <div class="pj-arrow">→</div>
         </div>
+
       </div>
     </div>`;
   }).join('');
