@@ -6811,7 +6811,7 @@ async function migrateWfDocsToGitHub() {
     try {
         const { runBackupIfNeeded } = require('./src/gitBackup');
         runBackupIfNeeded().catch(e => console.warn('[backup] Startup check failed:', e.message));
-        setInterval(() => runBackupIfNeeded().catch(e => console.warn('[backup]', e.message)), 6 * 60 * 60 * 1000);
+        setInterval(() => runBackupIfNeeded().catch(e => console.warn('[backup]', e.message)), 24 * 60 * 60 * 1000);
     } catch (e) { console.warn('[backup] Could not schedule backup:', e.message); }
 });
 })(); // end startup async IIFE

@@ -126,18 +126,20 @@ async function cleanOldBackups(keepLast = 10) {
     } catch (e) { console.warn('[backup] Cleanup failed:', e.message); }
 }
 
-// ── Main: run backup if MongoDB >= 70% full ──────────────────────────────────
+// ── Main: always backup daily; also warn when storage >= 70% ─────────────────
 async function runBackupIfNeeded() {
     try {
         const usedPct = await getMongoDBUsagePct();
         console.log(`[backup] MongoDB usage: ${usedPct.toFixed(1)}% of 512MB free tier`);
         if (usedPct >= 70) {
             console.log('[backup] ⚠️ Storage >= 70% — starting GitHub backup');
-            const backup   = await exportAllData();
-            const filename = await pushBackupToGitHub(backup);
-            await cleanOldBackups(10);
-            console.log(`[backup] ✅ Backup complete: ${filename} (${usedPct.toFixed(1)}% used)`);
+        } else {
+            console.log('[backup] Scheduled daily backup starting...');
         }
+        const backup   = await exportAllData();
+        const filename = await pushBackupToGitHub(backup);
+        await cleanOldBackups(10);
+        console.log(`[backup] ✅ Backup complete: ${filename} (${usedPct.toFixed(1)}% used)`);
     } catch (e) { console.error('[backup] runBackupIfNeeded failed:', e.message); }
 }
 
