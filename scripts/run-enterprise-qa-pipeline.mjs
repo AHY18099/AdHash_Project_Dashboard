@@ -77,12 +77,6 @@ if (emailEnabled) {
   console.log('[qa:enterprise] Email send blocked because ZOHO_MAIL_ENABLED is not true');
 }
 
-// Post report to dashboard (non-fatal — pipeline must not fail if this fails)
-// The GitHub Action step also runs this after the pipeline, so this is belt-and-suspenders.
-if (process.env.DASHBOARD_URL && process.env.STATUS_REPORT_API_KEY) {
-  runStepAllowFailure('7/7 post report to dashboard', 'node', ['scripts/post-report-to-dashboard.mjs']);
-} else {
-  console.log('[qa:enterprise] Skipping dashboard save — DASHBOARD_URL or STATUS_REPORT_API_KEY not set');
-}
-
 console.log('[qa:enterprise] Enterprise QA pipeline completed');
+// Note: dashboard report is posted by the GitHub Action step (Save report to dashboard),
+// not here — to avoid saving duplicates when both run in the same CI job.
