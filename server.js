@@ -5423,7 +5423,11 @@ app.post('/api/admin/fix-zaptrade', requireAdmin, async (req, res) => {
 });
 
 // POST /api/admin/reload-cache — reload all data from MongoDB into _qaCache and broadcast to all clients
-app.post('/api/admin/reload-cache', requireAdmin, async (req, res) => {
+app.post('/api/admin/reload-cache', (req, res, next) => {
+    const apiKey = process.env.STATUS_REPORT_API_KEY;
+    if (apiKey && req.headers['x-api-key'] === apiKey) return next();
+    return requireAdmin(req, res, next);
+}, async (req, res) => {
     try {
         const { readAllData } = require('./src/db');
         _qaCache = await readAllData();
