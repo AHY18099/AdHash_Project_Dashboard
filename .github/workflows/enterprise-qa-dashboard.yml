@@ -3,8 +3,8 @@ name: Enterprise QA Dashboard
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 2 * * *'
-    - cron: '0 10 * * *'
+    - cron: '0 2 * * *'   # Morning run  (~7:30 AM IST)
+    - cron: '0 10 * * *'  # Evening run  (~3:30 PM IST)
   push:
     branches:
       - main
@@ -16,12 +16,14 @@ jobs:
     timeout-minutes: 90
     env:
       CI: 'true'
-      SUPABASE_API_KEY: ${{ secrets.SUPABASE_API_KEY }}
-      ZOHO_MAIL_ENABLED: ${{ secrets.ZOHO_MAIL_ENABLED }}
-      ZOHO_MAIL_FROM: ${{ secrets.ZOHO_MAIL_FROM }}
-      ZOHO_MAIL_USER: ${{ secrets.ZOHO_MAIL_USER }}
-      ZOHO_MAIL_PASS: ${{ secrets.ZOHO_MAIL_PASS }}
-      ZOHO_MAIL_TO: ${{ secrets.ZOHO_MAIL_TO }}
+      SUPABASE_API_KEY:        ${{ secrets.SUPABASE_API_KEY }}
+      ZOHO_MAIL_ENABLED:       ${{ secrets.ZOHO_MAIL_ENABLED }}
+      ZOHO_MAIL_FROM:          ${{ secrets.ZOHO_MAIL_FROM }}
+      ZOHO_MAIL_USER:          ${{ secrets.ZOHO_MAIL_USER }}
+      ZOHO_MAIL_PASS:          ${{ secrets.ZOHO_MAIL_PASS }}
+      ZOHO_MAIL_TO:            ${{ secrets.ZOHO_MAIL_TO }}
+      DASHBOARD_URL:           ${{ secrets.DASHBOARD_URL }}
+      STATUS_REPORT_API_KEY:   ${{ secrets.STATUS_REPORT_API_KEY }}
 
     steps:
       - name: Checkout repository
@@ -44,6 +46,11 @@ jobs:
 
       - name: Run enterprise QA pipeline
         run: npm run qa:enterprise
+
+      - name: Save report to dashboard
+        if: always()
+        run: node scripts/post-report-to-dashboard.mjs "" "auto"
+        continue-on-error: true
 
       - name: Upload QA dashboard artifacts
         if: always()
