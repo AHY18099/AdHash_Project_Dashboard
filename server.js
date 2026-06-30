@@ -209,14 +209,14 @@ app.use('/api', (req, res, next) => {
 });
 
 // Routes that don't require authentication
-// POST /api/status-reports is authenticated via x-api-key header (GitHub Action), not JWT
-const PUBLIC_API_ROUTES = new Set(['/api/auth/login', '/api/auth/session', '/api/auth/logout', '/api/health', '/api/db-diag', '/api/status-reports']);
+const PUBLIC_API_ROUTES = new Set(['/api/auth/login', '/api/auth/session', '/api/auth/logout', '/api/health', '/api/db-diag']);
 
 // Guard all non-public API routes
 app.use('/api', (req, res, next) => {
-    const route = req.path === '/' ? '/api' : '/api' + req.path;
-    // Allow auth routes through
+    // Allow exact-match public routes through
     if (PUBLIC_API_ROUTES.has('/api' + req.path)) return next();
+    // Allow all /api/status-reports/* — POST uses x-api-key, GET uses JWT or cookie
+    if (req.path.startsWith('/status-reports')) return next();
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     next();
 });
