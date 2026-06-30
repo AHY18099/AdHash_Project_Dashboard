@@ -8959,6 +8959,12 @@ window.addEventListener('DOMContentLoaded',async()=>{
     setInterval(_silentTokenRefresh, 6*60*60*1000);
     // ── Flush all unsaved data when user closes or navigates away ──
     window.addEventListener('beforeunload', ()=>_flushAllUnsaved());
+    // ── Deep-link: ?report=<id> from Slack notification opens that report directly ──
+    const _urlReport=new URLSearchParams(window.location.search).get('report');
+    if(_urlReport){
+      history.replaceState(null,'',window.location.pathname);
+      setTimeout(()=>{showStatusReports();setTimeout(()=>srViewReport(_urlReport),600);},400);
+    }
   }
 });
 

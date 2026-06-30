@@ -176,7 +176,7 @@ async function sendSlackAlert(reportId) {
     const label     = isFailed ? 'QA Run Failed' : 'QA Run Warning';
     const RUN_LABELS = { morning: '🌅 Morning', evening: '🌆 Evening' };
     const runLabel  = RUN_LABELS[runTypeArg] || '🔧 Manual';
-    const reportUrl = reportId ? `${DASHBOARD_URL}/qa-dashboard#status-reports` : DASHBOARD_URL;
+    const reportUrl = reportId ? `${DASHBOARD_URL}/qa-dashboard?report=${encodeURIComponent(reportId)}` : DASHBOARD_URL;
 
     const now = new Date();
     const dateStr = now.toLocaleString('en-IN', {

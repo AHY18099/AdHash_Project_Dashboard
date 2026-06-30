@@ -5458,7 +5458,7 @@ app.post('/api/admin/notify-report', requireAdmin, async (req, res) => {
         const label     = isFailed ? 'QA Run Failed' : 'QA Run Warning';
         const RUN_LABELS = { morning: '🌅 Morning', evening: '🌆 Evening' };
         const runLabel  = RUN_LABELS[report.runType] || '🔧 Manual';
-        const dashUrl   = (process.env.DASHBOARD_URL || 'https://adhashprojectdashboard-production.up.railway.app') + '/qa-dashboard';
+        const dashUrl   = (process.env.DASHBOARD_URL || 'https://adhashprojectdashboard-production.up.railway.app') + '/qa-dashboard?report=' + encodeURIComponent(id);
 
         const dt = new Date(report.reportDateTime || report.createdAt);
         const dateStr = dt.toLocaleString('en-IN', { weekday:'short', year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Kolkata' });
