@@ -303,33 +303,43 @@ async function writeKey(key, value) {
         return;
     }
     if (key === 'qa3_daily_tasks') {
-        // Delete ALL existing daily_tasks (including any stale 'global' rows) then re-insert
-        // using each task's own projectId — daily tasks belong to specific projects, not 'global'
+        const incoming = Array.isArray(value) ? value.filter(t => t && t.projectId && t.projectId !== 'global') : [];
+        // Safety guard: never wipe more rows than we're replacing — prevents empty browser
+        // state on page load from overwriting real data saved by other users / prior sessions.
+        const existingCount = await db.collection('daily_tasks').countDocuments();
+        if (existingCount > 0 && incoming.length < existingCount * 0.5) {
+            console.warn(`[db] qa3_daily_tasks write blocked — incoming ${incoming.length} rows would wipe ${existingCount} existing rows`);
+            return;
+        }
         await db.collection('daily_tasks').deleteMany({});
-        if (Array.isArray(value) && value.length > 0) {
-            const realTasks = value.filter(t => t && t.projectId && t.projectId !== 'global');
-            await Promise.all(realTasks.map(t => _upsertDoc('daily_tasks', t.projectId, t)));
+        if (incoming.length > 0) {
+            await Promise.all(incoming.map(t => _upsertDoc('daily_tasks', t.projectId, t)));
         }
         return;
     }
     if (key === 'qa3_team_tasks') {
-        // Team tasks have their own projectId per task — never use 'global'
+        const incoming = Array.isArray(value) ? value.filter(t => t && t.projectId && t.projectId !== 'global') : [];
+        const existingCount = await db.collection('team_tasks').countDocuments();
+        if (existingCount > 0 && incoming.length < existingCount * 0.5) {
+            console.warn(`[db] qa3_team_tasks write blocked — incoming ${incoming.length} rows would wipe ${existingCount} existing rows`);
+            return;
+        }
         await db.collection('team_tasks').deleteMany({});
-        if (Array.isArray(value) && value.length > 0) {
-            // Skip tasks with no real projectId to prevent global pollution
-            const realTasks = value.filter(t => t && t.projectId && t.projectId !== 'global');
-            if (realTasks.length) await Promise.all(realTasks.map(t => _upsertDoc('team_tasks', t.projectId, t)));
+        if (incoming.length > 0) {
+            await Promise.all(incoming.map(t => _upsertDoc('team_tasks', t.projectId, t)));
         }
         return;
     }
     if (key === 'qa3_releases') {
-        // Delete all releases (both legacy 'global' entries and project-specific ones)
-        // then re-insert each release with its real projectId preserved.
+        const incoming = Array.isArray(value) ? value.filter(r => r && r.id) : [];
+        const existingCount = await db.collection('releases').countDocuments();
+        if (existingCount > 0 && incoming.length < existingCount * 0.5) {
+            console.warn(`[db] qa3_releases write blocked — incoming ${incoming.length} rows would wipe ${existingCount} existing rows`);
+            return;
+        }
         await db.collection('releases').deleteMany({});
-        if (Array.isArray(value) && value.length > 0) {
-            // Each release must keep its own projectId — never force 'global'
-            await Promise.all(value.map(r => {
-                if (!r || !r.id) return Promise.resolve();
+        if (incoming.length > 0) {
+            await Promise.all(incoming.map(r => {
                 const pid = (r.projectId && r.projectId !== 'global') ? r.projectId : (r.projectId || 'global');
                 return _upsertDoc('releases', pid, r);
             }));
