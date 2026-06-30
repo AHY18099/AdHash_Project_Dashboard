@@ -34,7 +34,8 @@ if (!API_KEY) {
 
 // ── Find the HTML report ──────────────────────────────────────────────────────
 const reportPathArg = process.argv[2];
-const runTypeArg    = (process.argv[3] || '').toLowerCase() || detectRunType();
+const _rtArg        = (process.argv[3] || '').toLowerCase();
+const runTypeArg    = (!_rtArg || _rtArg === 'auto') ? detectRunType() : _rtArg;
 
 // Candidate paths — first existing one wins
 const candidates = [
