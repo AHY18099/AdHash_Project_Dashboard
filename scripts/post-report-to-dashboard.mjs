@@ -149,7 +149,93 @@ async function postReport() {
     }
 
     console.log(`[post-report] ✅ Report saved to dashboard: ${data.report?.id}`);
+
+    // Send Slack alert if status is warning or failed
+    if (overallStatus === 'warning' || overallStatus === 'failed') {
+        await sendSlackAlert(data.report?.id).catch(e =>
+            console.warn(`[post-report] ⚠  Slack notify failed (non-fatal): ${e.message}`)
+        );
+    }
+
     return data;
+}
+
+async function sendSlackAlert(reportId) {
+    const token   = process.env.SLACK_BOT_TOKEN;
+    const rawCh   = process.env.SLACK_CHANNEL || 'testing-team';
+    const channel = rawCh.startsWith('#') ? rawCh.slice(1) : rawCh;
+
+    if (!token) {
+        console.warn('[post-report] SLACK_BOT_TOKEN not set — skipping Slack alert');
+        return;
+    }
+
+    const isFailed  = overallStatus === 'failed';
+    const emoji     = isFailed ? ':x:' : ':warning:';
+    const color     = isFailed ? '#ef4444' : '#f59e0b';
+    const label     = isFailed ? 'QA Run Failed' : 'QA Run Warning';
+    const RUN_LABELS = { morning: '🌅 Morning', evening: '🌆 Evening' };
+    const runLabel  = RUN_LABELS[runTypeArg] || '🔧 Manual';
+    const reportUrl = reportId ? `${DASHBOARD_URL}/qa-dashboard#status-reports` : DASHBOARD_URL;
+
+    const now = new Date();
+    const dateStr = now.toLocaleString('en-IN', {
+        weekday:'short', year:'numeric', month:'short', day:'numeric',
+        hour:'2-digit', minute:'2-digit', timeZone:'Asia/Kolkata'
+    });
+
+    const blocks = [
+        {
+            type: 'header',
+            text: { type: 'plain_text', text: `${emoji} ${label}`, emoji: true }
+        },
+        {
+            type: 'context',
+            elements: [
+                { type: 'mrkdwn', text: `🕐 ${dateStr} IST` },
+                { type: 'mrkdwn', text: `🏃 Run type: *${runLabel}*` },
+            ]
+        },
+        { type: 'divider' },
+        {
+            type: 'section',
+            fields: [
+                { type: 'mrkdwn', text: `*Total Projects*\n${totalProjects}` },
+                { type: 'mrkdwn', text: `*✓ Passed*\n${passedCount}` },
+                { type: 'mrkdwn', text: `*✗ Failed*\n${failedCount}` },
+                { type: 'mrkdwn', text: `*⚠ Warnings*\n${warningCount}` },
+                { type: 'mrkdwn', text: `*Duration*\n${duration || '—'}` },
+                { type: 'mrkdwn', text: `*Report*\n${htmlTitle}` },
+            ]
+        },
+        { type: 'divider' },
+        {
+            type: 'actions',
+            elements: [{
+                type: 'button',
+                text: { type: 'plain_text', text: '📊 View Report', emoji: true },
+                url:  reportUrl,
+                style: isFailed ? 'danger' : 'primary'
+            }]
+        }
+    ];
+
+    const slackRes = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type':  'application/json',
+        },
+        body: JSON.stringify({
+            channel,
+            text: `${emoji} *${label}* — ${totalProjects} projects | ✓ ${passedCount} passed · ✗ ${failedCount} failed · ⚠ ${warningCount} warnings`,
+            attachments: [{ color, blocks }],
+        }),
+    });
+
+    const slackData = await slackRes.json();
+    if (!slackData.ok) throw new Error(`Slack API error: ${slackData.error}`);
+    console.log(`[post-report] ✅ Slack alert sent to #${channel}`);
 }
 
 // Never let this script fail the CI pipeline — just warn
