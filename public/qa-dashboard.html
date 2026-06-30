@@ -9834,31 +9834,42 @@ function showStatusReports(){
   _srLoadReports();
 }
 
+async function _srFetch(url,retries){
+  for(let i=0;i<=retries;i++){
+    try{
+      const r=await fetch(url,{headers:{'Authorization':'Bearer '+_getToken()}});
+      if(r.ok)return r.json();
+      console.warn('[sr] fetch',url,'status',r.status);
+      return null;
+    }catch(e){
+      if(i<retries){await new Promise(res=>setTimeout(res,600*(i+1)));}
+      else{console.warn('[sr] fetch failed after retries:',url,e);}
+    }
+  }
+  return null;
+}
+
 async function _srLoadSummary(){
-  try{
-    const r=await fetch('/api/status-reports/summary',{headers:{'Authorization':'Bearer '+_getToken()}});
-    if(!r.ok)return;
-    const d=await r.json();
-    _srSummary={total:d.total||0,latest:d.latest||null,statusCounts:d.statusCounts||{}};
-    _srRenderSummaryCards();
-  }catch(e){console.warn('[sr] summary load failed',e);}
+  const d=await _srFetch('/api/status-reports/summary',2);
+  if(!d)return;
+  _srSummary={total:d.total||0,latest:d.latest||null,statusCounts:d.statusCounts||{}};
+  _srRenderSummaryCards();
 }
 
 async function _srLoadReports(){
+  const el=document.getElementById('sr-table-body');
+  if(el)el.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--mut)"><span style="font-size:22px">⏳</span><div style="margin-top:8px;font-size:13px">Loading reports…</div></td></tr>`;
   const params=new URLSearchParams({page:_srPage,limit:_srLimit});
   if(_srStatus)   params.set('status',_srStatus);
   if(_srRunType)  params.set('runType',_srRunType);
   if(_srSearch)   params.set('search',_srSearch);
   if(_srFromDate) params.set('fromDate',_srFromDate);
   if(_srToDate)   params.set('toDate',_srToDate);
-  try{
-    const r=await fetch('/api/status-reports?'+params,{headers:{'Authorization':'Bearer '+_getToken()}});
-    if(!r.ok)return;
-    const d=await r.json();
-    _srData={reports:d.reports||[],total:d.total||0,pages:d.pages||1,page:d.page||1};
-    _srRenderTable();
-    _srRenderPagination();
-  }catch(e){console.warn('[sr] load failed',e);}
+  const d=await _srFetch('/api/status-reports?'+params,2);
+  if(!d)return;
+  _srData={reports:d.reports||[],total:d.total||0,pages:d.pages||1,page:d.page||1};
+  _srRenderTable();
+  _srRenderPagination();
 }
 
 function _getToken(){return localStorage.getItem('qa_jwt_token')||localStorage.getItem('qa_token')||'';}
@@ -10094,7 +10105,7 @@ function renderStatusReportsPage(){
         <button class="sr-modal-btn" onclick="srDownloadCurrent()" title="Download">⬇</button>
         <button class="sr-modal-btn sr-modal-close" onclick="srCloseModal()" title="Close">✕</button>
       </div>
-      <iframe id="sr-view-frame" class="sr-view-frame" sandbox="allow-same-origin allow-scripts" title="Status Report"></iframe>
+      <iframe id="sr-view-frame" class="sr-view-frame" sandbox="allow-scripts" title="Status Report"></iframe>
     </div>
   </div>`;
 }
