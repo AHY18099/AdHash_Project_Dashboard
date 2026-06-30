@@ -115,6 +115,20 @@ router.get('/:id/download', async (req, res) => {
     }
 });
 
+// GET /api/status-reports/:id/view — render HTML report inline in browser (no login required)
+router.get('/:id/view', async (req, res) => {
+    try {
+        const report = await getStatusReport(req.params.id);
+        if (!report) return res.status(404).send('<h2>Report not found</h2>');
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Content-Disposition', 'inline');
+        res.setHeader('Cache-Control', 'no-cache');
+        return res.send(report.htmlContent || '<p>No content</p>');
+    } catch (e) {
+        return res.status(500).send('<h2>Error loading report</h2><p>' + e.message + '</p>');
+    }
+});
+
 // DELETE /api/status-reports/:id — admin only (checked by server.js requireAdmin middleware)
 router.delete('/:id', async (req, res) => {
     try {
