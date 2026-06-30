@@ -697,12 +697,6 @@
           "expectedStatus": 200
         },
         {
-          "name": "AutoChecker - PartSouq",
-          "url": "http://20.62.109.239:3000/",
-          "type": "service",
-          "expectedStatus": 200
-        },
-        {
           "name": "AutoChecker - Admin",
           "url": "https://manage.autochecker.com/",
           "type": "admin",
