@@ -5438,6 +5438,66 @@ app.post('/api/admin/reload-cache', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/admin/notify-report — send Slack alert for a specific status report by ID
+app.post('/api/admin/notify-report', requireAdmin, async (req, res) => {
+    try {
+        const { getStatusReport } = require('./src/db');
+        const id = req.body?.id;
+        if (!id) return res.status(400).json({ error: 'id required' });
+        const report = await getStatusReport(id);
+        if (!report) return res.status(404).json({ error: 'Report not found' });
+
+        const token  = process.env.SLACK_BOT_TOKEN;
+        const rawCh  = process.env.SLACK_CHANNEL || 'testing-team';
+        const channel = rawCh.startsWith('#') ? rawCh.slice(1) : rawCh;
+        if (!token) return res.status(400).json({ error: 'SLACK_BOT_TOKEN not configured' });
+
+        const isFailed  = report.overallStatus === 'failed';
+        const emoji     = isFailed ? ':x:' : ':warning:';
+        const color     = isFailed ? '#ef4444' : '#f59e0b';
+        const label     = isFailed ? 'QA Run Failed' : 'QA Run Warning';
+        const RUN_LABELS = { morning: '🌅 Morning', evening: '🌆 Evening' };
+        const runLabel  = RUN_LABELS[report.runType] || '🔧 Manual';
+        const dashUrl   = (process.env.DASHBOARD_URL || 'https://adhashprojectdashboard-production.up.railway.app') + '/qa-dashboard';
+
+        const dt = new Date(report.reportDateTime || report.createdAt);
+        const dateStr = dt.toLocaleString('en-IN', { weekday:'short', year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Kolkata' });
+
+        const blocks = [
+            { type:'header', text:{ type:'plain_text', text:`${emoji} ${label}`, emoji:true } },
+            { type:'context', elements:[
+                { type:'mrkdwn', text:`🕐 ${dateStr} IST` },
+                { type:'mrkdwn', text:`🏃 Run type: *${runLabel}*` },
+            ]},
+            { type:'divider' },
+            { type:'section', fields:[
+                { type:'mrkdwn', text:`*Total Projects*\n${report.totalProjects||0}` },
+                { type:'mrkdwn', text:`*✓ Passed*\n${report.passedCount||0}` },
+                { type:'mrkdwn', text:`*✗ Failed*\n${report.failedCount||0}` },
+                { type:'mrkdwn', text:`*⚠ Warnings*\n${report.warningCount||0}` },
+                { type:'mrkdwn', text:`*Duration*\n${report.duration||'—'}` },
+                { type:'mrkdwn', text:`*Report*\n${report.title||'—'}` },
+            ]},
+            { type:'divider' },
+            { type:'actions', elements:[{ type:'button', text:{ type:'plain_text', text:'📊 View Report', emoji:true }, url:dashUrl, style: isFailed ? 'danger' : 'primary' }] }
+        ];
+
+        const axios = require('axios');
+        const slackRes = await axios.post('https://slack.com/api/chat.postMessage', {
+            channel,
+            text: `${emoji} *${label}* — ${report.totalProjects||0} projects | ✓ ${report.passedCount||0} passed · ✗ ${report.failedCount||0} failed · ⚠ ${report.warningCount||0} warnings`,
+            attachments: [{ color, blocks }],
+        }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, timeout: 10000 });
+
+        if (!slackRes.data.ok) throw new Error(`Slack API error: ${slackRes.data.error}`);
+        console.log(`[notify-report] ✅ Slack alert sent for report ${id} to #${channel}`);
+        res.json({ success: true, channel });
+    } catch (e) {
+        console.error('[notify-report] error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // POST /api/admin/sync-default-projects — upsert DEFAULT_PROJ metadata (name/color/defaultAssignee/website)
 // into MongoDB projects collection so all fields survive redeploys without depending on client hardcodes.
 app.post('/api/admin/sync-default-projects', requireAdmin, async (req, res) => {
