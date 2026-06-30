@@ -5417,6 +5417,22 @@ app.post('/api/admin/fix-zaptrade', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/admin/reload-cache — reload all data from MongoDB into _qaCache and broadcast to all clients
+app.post('/api/admin/reload-cache', requireAdmin, async (req, res) => {
+    try {
+        const { readAllData } = require('./src/db');
+        _qaCache = await readAllData();
+        // Broadcast every project key to all connected browsers
+        for (const key of Object.keys(_qaCache)) {
+            if (key.startsWith('qa3_') || key === 'qa_users') {
+                broadcastSseEvent('qa-data-update', { key, value: _qaCache[key] });
+            }
+        }
+        console.log('[reload-cache] ✅ Cache reloaded:', Object.keys(_qaCache).length, 'keys broadcast');
+        res.json({ success: true, keys: Object.keys(_qaCache).length });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /api/admin/sync-default-projects — upsert DEFAULT_PROJ metadata (name/color/defaultAssignee/website)
 // into MongoDB projects collection so all fields survive redeploys without depending on client hardcodes.
 app.post('/api/admin/sync-default-projects', requireAdmin, async (req, res) => {
