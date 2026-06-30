@@ -1,7 +1,7 @@
 'use strict';
 /**
  * src/db.js — MongoDB Atlas connection + data access layer.
- *
+ * Updated: 2026-06-30
  * All QA data is stored in adhash_qa database with one collection per section.
  * The in-memory cache in server.js is populated from here on startup and
  * updated on every write, so all existing synchronous readQaData() calls work.
