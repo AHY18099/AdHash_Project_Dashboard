@@ -229,11 +229,13 @@ async function sendSlackAlert(reportId) {
         body: JSON.stringify({
             channel,
             text: `${emoji} *${label}* — ${totalProjects} projects | ✓ ${passedCount} passed · ✗ ${failedCount} failed · ⚠ ${warningCount} warnings`,
-            attachments: [{ color, blocks }],
+            blocks,
+            attachments: [{ color, fallback: label }],
         }),
     });
 
     const slackData = await slackRes.json();
+    console.log(`[post-report] Slack API response:`, JSON.stringify(slackData));
     if (!slackData.ok) throw new Error(`Slack API error: ${slackData.error}`);
     console.log(`[post-report] ✅ Slack alert sent to #${channel}`);
 }
