@@ -24,6 +24,8 @@ jobs:
       ZOHO_MAIL_TO:            ${{ secrets.ZOHO_MAIL_TO }}
       DASHBOARD_URL:           ${{ secrets.DASHBOARD_URL }}
       STATUS_REPORT_API_KEY:   ${{ secrets.STATUS_REPORT_API_KEY }}
+      SLACK_BOT_TOKEN:         ${{ secrets.SLACK_BOT_TOKEN }}
+      SLACK_CHANNEL:           ${{ secrets.SLACK_CHANNEL }}
 
     steps:
       - name: Checkout repository
