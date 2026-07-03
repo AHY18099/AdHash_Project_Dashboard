@@ -117,10 +117,8 @@ async function sendSlackNotification({ type, projectName, assignedBy, assignedTo
     const payload = {
         channel,
         text: fallbackText,
-        attachments: [{
-            color,
-            blocks
-        }]
+        blocks,
+        attachments: [{ color, fallback: fallbackText }],
     };
 
     const response = await axios.post(SLACK_POST, payload, {
