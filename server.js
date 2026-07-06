@@ -3992,6 +3992,18 @@ app.get('/security-test', (req, res) => {
     return res.sendFile(path.join(__dirname, 'public', 'security-test.html'));
 });
 
+// AI VAPT Intelligence Platform — serve Angular SPA from public/vapt/
+app.use('/vapt', (req, res, next) => {
+    if (!isAuthenticated(req)) return res.redirect('/');
+    next();
+}, express.static(path.join(__dirname, 'public', 'vapt')));
+
+// Angular deep-link fallback — any /vapt/* route returns index.html
+app.get('/vapt/*', (req, res) => {
+    if (!isAuthenticated(req)) return res.redirect('/');
+    return res.sendFile(path.join(__dirname, 'public', 'vapt', 'index.html'));
+});
+
 // QA Dashboard
 app.get('/qa-dashboard', (req, res) => {
     if (!isAuthenticated(req)) {
