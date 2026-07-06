@@ -789,9 +789,9 @@ function closeModal() {
 }
 
 async function confirmStart() {
+    const cfg = _pendingConfig; // save BEFORE closeModal nulls it
     closeModal();
-    if (!_pendingConfig) return;
-    const cfg = _pendingConfig;
+    if (!cfg) return;
     document.getElementById('btn-start').disabled = true;
 
     try {
@@ -803,6 +803,7 @@ async function confirmStart() {
         startPolling();
     } catch (e) {
         showNotif('Failed to start test: ' + e.message, 'error');
+    } finally {
         document.getElementById('btn-start').disabled = false;
     }
 }
