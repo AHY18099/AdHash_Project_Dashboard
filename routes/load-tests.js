@@ -242,12 +242,12 @@ async function _executeRun(runId, cfg, state) {
 
             m.rps        = rps;
             m.avgLatency = avgLat;
-            m.p50        = pct(latAll, 50);
-            m.p90        = pct(latAll, 90);
-            m.p95        = pct(latAll, 95);
-            m.p99        = pct(latAll, 99);
-            m.minLatency = latAll.length ? Math.min(...latAll) : 0;
-            m.maxLatency = latAll.length ? Math.max(...latAll) : 0;
+            m.p50        = Math.round(pct(latAll, 50));
+            m.p90        = Math.round(pct(latAll, 90));
+            m.p95        = Math.round(pct(latAll, 95));
+            m.p99        = Math.round(pct(latAll, 99));
+            m.minLatency = latAll.length ? Math.round(Math.min(...latAll)) : 0;
+            m.maxLatency = latAll.length ? Math.round(Math.max(...latAll)) : 0;
             m.errRate    = errRate;
 
             m.rpsHistory.push(rps);

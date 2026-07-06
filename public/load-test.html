@@ -1061,9 +1061,9 @@ function updateLiveUI(data) {
     document.getElementById('lk-err').textContent   = (m.errReqs   || 0).toLocaleString();
     document.getElementById('lk-sr').textContent    = sr + '%';
     document.getElementById('lk-rps').textContent   = m.rps || 0;
-    document.getElementById('lk-lat').textContent   = (m.avgLatency || 0) + 'ms';
-    document.getElementById('lk-p95').textContent   = (m.p95 || 0) + 'ms';
-    document.getElementById('lk-p99').textContent   = (m.p99 || 0) + 'ms';
+    document.getElementById('lk-lat').textContent   = Math.round(m.avgLatency || 0) + 'ms';
+    document.getElementById('lk-p95').textContent   = Math.round(m.p95 || 0) + 'ms';
+    document.getElementById('lk-p99').textContent   = Math.round(m.p99 || 0) + 'ms';
 
     // Charts
     const ts = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1134,12 +1134,17 @@ async function stopTest() {
     } catch (e) { showNotif('Stop failed: ' + e.message, 'error'); }
 }
 
+function reportUrl(runId, download) {
+    const tk = encodeURIComponent(getToken());
+    return `/api/load-test/report/${runId}${download ? '/download' : ''}?token=${tk}`;
+}
+
 function viewReport() {
-    if (_currentRunId) window.open(`/api/load-test/report/${_currentRunId}`, '_blank');
+    if (_currentRunId) window.open(reportUrl(_currentRunId, false), '_blank');
 }
 
 function downloadReport() {
-    if (_currentRunId) window.open(`/api/load-test/report/${_currentRunId}/download`);
+    if (_currentRunId) window.open(reportUrl(_currentRunId, true));
 }
 
 // ══════════════════════════ RESULTS ══════════════════════════
@@ -1179,13 +1184,13 @@ function renderResults(data) {
     document.getElementById('rk-total').textContent = (m.totalReqs || 0).toLocaleString();
     document.getElementById('rk-sr').textContent    = sr;
     document.getElementById('rk-err').textContent   = err;
-    document.getElementById('rk-avg').textContent   = (m.avgLatency || 0) + 'ms';
-    document.getElementById('rk-p50').textContent   = (m.p50 || 0) + 'ms';
-    document.getElementById('rk-p90').textContent   = (m.p90 || 0) + 'ms';
-    document.getElementById('rk-p95').textContent   = (m.p95 || 0) + 'ms';
-    document.getElementById('rk-p99').textContent   = (m.p99 || 0) + 'ms';
-    document.getElementById('rk-min').textContent   = (m.minLatency || 0) + 'ms';
-    document.getElementById('rk-max').textContent   = (m.maxLatency || 0) + 'ms';
+    document.getElementById('rk-avg').textContent   = Math.round(m.avgLatency || 0) + 'ms';
+    document.getElementById('rk-p50').textContent   = Math.round(m.p50 || 0) + 'ms';
+    document.getElementById('rk-p90').textContent   = Math.round(m.p90 || 0) + 'ms';
+    document.getElementById('rk-p95').textContent   = Math.round(m.p95 || 0) + 'ms';
+    document.getElementById('rk-p99').textContent   = Math.round(m.p99 || 0) + 'ms';
+    document.getElementById('rk-min').textContent   = Math.round(m.minLatency || 0) + 'ms';
+    document.getElementById('rk-max').textContent   = Math.round(m.maxLatency || 0) + 'ms';
     document.getElementById('rk-rps').textContent   = m.rps || 0;
     document.getElementById('rk-dur').textContent   = dur;
 
@@ -1252,8 +1257,8 @@ async function loadHistory() {
     }
 }
 
-function openReport(runId) { window.open(`/api/load-test/report/${runId}`, '_blank'); }
-function downloadRunReport(runId) { window.open(`/api/load-test/report/${runId}/download`); }
+function openReport(runId) { window.open(reportUrl(runId, false), '_blank'); }
+function downloadRunReport(runId) { window.open(reportUrl(runId, true)); }
 
 async function loadAndView(runId) {
     await loadResults(runId);
