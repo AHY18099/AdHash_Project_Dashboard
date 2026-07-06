@@ -373,6 +373,24 @@ body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(24
     </div>
   </div>
 
+  <!-- Load Test card -->
+  <div class="dash-card" style="cursor:pointer;border-color:rgba(239,68,68,.25)" onclick="openLoadTestPanel()">
+    <div class="card-icon" style="background:rgba(239,68,68,.1);border:1.5px solid rgba(239,68,68,.25)">⚡</div>
+    <div class="card-body">
+      <div class="card-label" style="color:#ef4444">Load Testing</div>
+      <div class="card-title">AdHash Load Test Center</div>
+      <div class="card-desc">Run HTTP load tests against all AdHash projects — configure virtual users, duration, ramp-up, and view live RPS, latency, and error rate results.</div>
+    </div>
+    <div class="card-arrow">
+      <div class="card-tags">
+        <span class="tag" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">Virtual Users</span>
+        <span class="tag" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">RPS</span>
+        <span class="tag" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">Latency</span>
+      </div>
+      <div class="arrow-btn">→</div>
+    </div>
+  </div>
+
   <!-- 5th card — Fast-Track QA Workflow -->
   <div class="dash-card" style="grid-column:1/-1;border-color:rgba(99,102,241,.3);background:linear-gradient(135deg,rgba(99,102,241,.04) 0%,rgba(168,85,247,.04) 100%);padding:0;overflow:hidden">
     <div style="padding:18px 22px 12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -568,6 +586,177 @@ body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(24
       <div class="step-header"><div class="step-num">4</div><div class="step-title">Daily Summary</div></div>
       <div id="st-summaryBody"></div>
     </div>
+  </div>
+</div>
+
+<!-- ── LOAD TEST OVERLAY + PANEL ── -->
+<style>
+#lt-overlay{display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
+#lt-panel{position:fixed;top:0;right:0;bottom:0;width:min(960px,100vw);background:#0a0f1e;overflow-y:auto;z-index:9001;box-shadow:-8px 0 48px rgba(0,0,0,.6);transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1)}
+#lt-panel.open{transform:translateX(0)}
+#lt-header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid rgba(239,68,68,.25);background:#0a0f1e;position:sticky;top:0;z-index:2}
+#lt-header h2{font-size:16px;font-weight:700;color:#ef4444;margin:0;display:flex;align-items:center;gap:8px}
+#lt-close{background:none;border:1px solid rgba(255,255,255,.15);color:#94a3b8;border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;font-weight:600}
+#lt-close:hover{background:rgba(255,255,255,.08);color:#e2e8f0}
+#lt-body{padding:24px 28px 48px}
+
+/* ── project selector ── */
+.lt-proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:20px}
+.lt-proj-btn{padding:8px 12px;border-radius:8px;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#94a3b8;font-size:12px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s}
+.lt-proj-btn:hover{border-color:rgba(239,68,68,.4);color:#e2e8f0;background:rgba(239,68,68,.06)}
+.lt-proj-btn.active{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.1)}
+
+/* ── config row ── */
+.lt-cfg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.lt-cfg-item label{display:block;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+.lt-cfg-item input,.lt-cfg-item select{width:100%;background:#0f1829;border:1.5px solid rgba(255,255,255,.1);border-radius:8px;color:#e2e8f0;font-size:13px;padding:8px 11px;outline:none;font-family:inherit;transition:border-color .2s}
+.lt-cfg-item input:focus,.lt-cfg-item select:focus{border-color:#ef4444}
+.lt-cfg-item select option{background:#0f1829}
+
+/* ── run button ── */
+.lt-run-btn{background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;border-radius:12px;padding:13px 32px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:10px;transition:opacity .2s,transform .2s;width:100%}
+.lt-run-btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px)}
+.lt-run-btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+
+/* ── stat cards ── */
+.lt-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:20px 0}
+.lt-stat{background:#0f1829;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px 12px;text-align:center}
+.lt-stat-val{font-size:22px;font-weight:800;line-height:1}
+.lt-stat-lbl{font-size:10px;color:#475569;margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
+.lt-stat-val.green{color:#10b981}.lt-stat-val.red{color:#ef4444}.lt-stat-val.yellow{color:#f59e0b}.lt-stat-val.blue{color:#3b82f6}.lt-stat-val.white{color:#e2e8f0}
+
+/* ── progress bar ── */
+.lt-progress-wrap{background:#0f1829;border:1px solid rgba(255,255,255,.08);border-radius:8px;height:8px;overflow:hidden;margin-bottom:8px}
+.lt-progress-bar{height:100%;background:linear-gradient(90deg,#ef4444,#f97316);border-radius:8px;transition:width .5s linear;width:0%}
+
+/* ── chart area ── */
+.lt-chart-wrap{background:#0f1829;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;margin-bottom:16px}
+.lt-chart-title{font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.lt-chart-canvas{width:100%;height:120px;display:block}
+
+/* ── log box ── */
+.lt-log{background:#020408;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px 16px;font-size:11px;font-family:'Cascadia Code','Consolas',monospace;color:#64748b;height:160px;overflow-y:auto;line-height:1.8}
+.lt-log .ok{color:#10b981}.lt-log .warn{color:#f59e0b}.lt-log .err{color:#ef4444}.lt-log .info{color:#3b82f6}
+
+/* ── result table ── */
+.lt-result-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}
+.lt-result-table th{padding:10px 12px;background:rgba(239,68,68,.12);color:#ef4444;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(239,68,68,.2)}
+.lt-result-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);color:#94a3b8}
+.lt-result-table tr:hover td{background:rgba(255,255,255,.02)}
+.lt-result-table .pass{color:#10b981;font-weight:700}.lt-result-table .fail{color:#ef4444;font-weight:700}
+
+/* ── section heading ── */
+.lt-sh{font-size:13px;font-weight:700;color:#e2e8f0;margin:20px 0 10px;display:flex;align-items:center;gap:6px}
+.lt-sh::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.07)}
+
+/* ── custom URL input ── */
+.lt-url-row{display:flex;gap:8px;margin-bottom:20px}
+.lt-url-row input{flex:1;background:#0f1829;border:1.5px solid rgba(255,255,255,.1);border-radius:8px;color:#e2e8f0;font-size:13px;padding:9px 13px;outline:none;font-family:inherit}
+.lt-url-row input:focus{border-color:#ef4444}
+.lt-url-row input::placeholder{color:#475569}
+</style>
+
+<div id="lt-overlay" onclick="closeLtPanel()"></div>
+<div id="lt-panel">
+  <div id="lt-header">
+    <h2>⚡ Load Test Center</h2>
+    <button id="lt-close" onclick="closeLtPanel()">✕ Close</button>
+  </div>
+  <div id="lt-body">
+
+    <!-- Project selector -->
+    <div class="lt-sh">🎯 Select Target Project</div>
+    <div class="lt-proj-grid" id="lt-proj-grid">
+      <!-- populated by JS -->
+    </div>
+
+    <!-- Custom URL -->
+    <div class="lt-sh">🔗 Or Enter Custom URL</div>
+    <div class="lt-url-row">
+      <input type="url" id="lt-custom-url" placeholder="https://your-api-endpoint.com/path" />
+    </div>
+
+    <!-- Test config -->
+    <div class="lt-sh">⚙ Test Configuration</div>
+    <div class="lt-cfg-grid">
+      <div class="lt-cfg-item">
+        <label>Virtual Users</label>
+        <input type="number" id="lt-vus" value="10" min="1" max="200" />
+      </div>
+      <div class="lt-cfg-item">
+        <label>Duration (sec)</label>
+        <input type="number" id="lt-duration" value="30" min="5" max="300" />
+      </div>
+      <div class="lt-cfg-item">
+        <label>Ramp-up (sec)</label>
+        <input type="number" id="lt-rampup" value="5" min="0" max="60" />
+      </div>
+      <div class="lt-cfg-item">
+        <label>Method</label>
+        <select id="lt-method">
+          <option>GET</option>
+          <option>POST</option>
+          <option>PUT</option>
+          <option>DELETE</option>
+        </select>
+      </div>
+      <div class="lt-cfg-item">
+        <label>Timeout (ms)</label>
+        <input type="number" id="lt-timeout" value="5000" min="500" max="30000" step="500" />
+      </div>
+    </div>
+
+    <!-- Run button -->
+    <button class="lt-run-btn" id="lt-run-btn" onclick="ltRun()">
+      <span id="lt-run-icon">▶</span>
+      <span id="lt-run-label">Start Load Test</span>
+    </button>
+
+    <!-- Progress -->
+    <div id="lt-progress-section" style="display:none;margin-top:20px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:#475569;margin-bottom:4px">
+        <span id="lt-progress-label">Running…</span>
+        <span id="lt-elapsed">0s / 0s</span>
+      </div>
+      <div class="lt-progress-wrap"><div class="lt-progress-bar" id="lt-progress-bar"></div></div>
+    </div>
+
+    <!-- Live stats -->
+    <div class="lt-stats" id="lt-stats" style="display:none">
+      <div class="lt-stat"><div class="lt-stat-val blue" id="lt-s-rps">—</div><div class="lt-stat-lbl">Req/sec</div></div>
+      <div class="lt-stat"><div class="lt-stat-val white" id="lt-s-total">—</div><div class="lt-stat-lbl">Total Req</div></div>
+      <div class="lt-stat"><div class="lt-stat-val green" id="lt-s-ok">—</div><div class="lt-stat-lbl">Success</div></div>
+      <div class="lt-stat"><div class="lt-stat-val red" id="lt-s-err">—</div><div class="lt-stat-lbl">Errors</div></div>
+      <div class="lt-stat"><div class="lt-stat-val yellow" id="lt-s-lat">—</div><div class="lt-stat-lbl">Avg Latency</div></div>
+    </div>
+
+    <!-- Charts -->
+    <div id="lt-charts" style="display:none">
+      <div class="lt-chart-wrap">
+        <div class="lt-chart-title">RPS over time</div>
+        <canvas class="lt-chart-canvas" id="lt-chart-rps"></canvas>
+      </div>
+      <div class="lt-chart-wrap">
+        <div class="lt-chart-title">Latency (ms) over time</div>
+        <canvas class="lt-chart-canvas" id="lt-chart-lat"></canvas>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div id="lt-log-section" style="display:none">
+      <div class="lt-sh">📋 Live Log</div>
+      <div class="lt-log" id="lt-log"></div>
+    </div>
+
+    <!-- Results table -->
+    <div id="lt-results-section" style="display:none">
+      <div class="lt-sh">📊 Final Results</div>
+      <table class="lt-result-table">
+        <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+        <tbody id="lt-results-body"></tbody>
+      </table>
+    </div>
+
   </div>
 </div>
 
@@ -1044,6 +1233,281 @@ function stShowSummary(payload,success){
   const card=document.getElementById('st-summaryCard');card.style.display='block';
   document.getElementById('st-summaryBody').innerHTML=`<p style="font-size:.82rem;color:#8b949e;margin-bottom:10px">Completed at ${new Date().toLocaleString('en-IN')}</p><div style="margin-bottom:10px"><span class="stpill">Symbols <span>${payload.symbols.length}</span></span><span class="stpill">Variant <span>${payload.variant}</span></span><span class="stpill">Status <span style="color:${success?'#3fb950':'#f85149'}">${success?'SUCCESS':'FAILED'}</span></span></div><p style="font-size:.82rem;color:#8b949e">Symbols: <span style="color:#58a6ff">${payload.symbols.join(', ')}</span></p>`;
   card.scrollIntoView({behavior:'smooth'});
+}
+
+// ── LOAD TEST ─────────────────────────────────────────────────────────────────
+const LT_PROJECTS = [
+  {name:'AdHash',        url:'https://adhash.com'},
+  {name:'AlgoMax',       url:'https://algomax.in'},
+  {name:'AutoChecker',   url:'http://20.62.109.239:3000'},
+  {name:'SparkMe',       url:'https://sparkme.app'},
+  {name:'DDP',           url:'https://ddp.adhashtech.com'},
+  {name:'SyncTag',       url:'https://synctag.com'},
+  {name:'Humee',         url:'https://humee.in'},
+  {name:'AiSignPro',     url:'https://aisignpro.com'},
+  {name:'Metcalf',       url:'https://metcalfmowers.com.au'},
+  {name:'SMC',           url:'https://smcpneumatics.com'},
+  {name:'ZapCRM',        url:'https://zapcrm.in'},
+  {name:'ZapTrade',      url:'https://zaptrade.in'},
+  {name:'ZapAI',         url:'https://zapai.in'},
+  {name:'SyncTrade',     url:'https://synctrade.in'},
+  {name:'WaveDin',       url:'https://wavedin.com'},
+];
+
+let _ltSelectedUrl = '';
+let _ltRunning = false;
+let _ltAbort = null;
+let _ltRpsData = [];
+let _ltLatData = [];
+let _ltRpsCtx = null;
+let _ltLatCtx = null;
+
+function openLoadTestPanel(){
+  document.getElementById('lt-overlay').style.display='block';
+  requestAnimationFrame(()=>document.getElementById('lt-panel').classList.add('open'));
+  document.body.style.overflow='hidden';
+  ltRenderProjects();
+}
+function closeLtPanel(){
+  if(_ltRunning){ltAbort();}
+  document.getElementById('lt-panel').classList.remove('open');
+  setTimeout(()=>{document.getElementById('lt-overlay').style.display='none';},300);
+  document.body.style.overflow='';
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLtPanel();});
+
+function ltRenderProjects(){
+  const grid=document.getElementById('lt-proj-grid');
+  grid.innerHTML=LT_PROJECTS.map((p,i)=>
+    `<button class="lt-proj-btn" id="lt-pb-${i}" onclick="ltSelectProject(${i},'${p.url}','${p.name}')">${p.name}</button>`
+  ).join('');
+}
+
+function ltSelectProject(idx,url,name){
+  document.querySelectorAll('.lt-proj-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('lt-pb-'+idx).classList.add('active');
+  _ltSelectedUrl=url;
+  document.getElementById('lt-custom-url').value='';
+  ltLog(`Selected: ${name} → ${url}`,'info');
+}
+
+function ltGetTargetUrl(){
+  const custom=document.getElementById('lt-custom-url').value.trim();
+  return custom||_ltSelectedUrl;
+}
+
+function ltLog(msg,type=''){
+  const box=document.getElementById('lt-log');
+  const ts=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const line=document.createElement('div');
+  line.className=type;
+  line.textContent=`[${ts}] ${msg}`;
+  box.appendChild(line);
+  box.scrollTop=box.scrollHeight;
+}
+
+function ltSetStat(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
+
+// Minimal canvas sparkline — no external lib needed
+function ltDrawChart(canvasId, data, color){
+  const canvas=document.getElementById(canvasId);
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.offsetWidth||canvas.width||600;
+  const H=canvas.offsetHeight||canvas.height||120;
+  canvas.width=W; canvas.height=H;
+  ctx.clearRect(0,0,W,H);
+  if(data.length<2)return;
+  const max=Math.max(...data,1);
+  const min=Math.min(...data,0);
+  const range=max-min||1;
+  const pad=12;
+  const stepX=(W-pad*2)/(data.length-1);
+  // Grid lines
+  ctx.strokeStyle='rgba(255,255,255,.05)';ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=pad+(H-pad*2)*(i/4);
+    ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(W-pad,y);ctx.stroke();
+  }
+  // Area fill
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,color+'55');grad.addColorStop(1,color+'00');
+  ctx.beginPath();
+  data.forEach((v,i)=>{
+    const x=pad+i*stepX;
+    const y=pad+(H-pad*2)*(1-(v-min)/range);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.lineTo(pad+(data.length-1)*stepX,H);ctx.lineTo(pad,H);ctx.closePath();
+  ctx.fillStyle=grad;ctx.fill();
+  // Line
+  ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.lineJoin='round';
+  data.forEach((v,i)=>{
+    const x=pad+i*stepX;
+    const y=pad+(H-pad*2)*(1-(v-min)/range);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+}
+
+async function ltRun(){
+  const url=ltGetTargetUrl();
+  if(!url){alert('Select a project or enter a custom URL first.');return;}
+  const vus=Math.min(200,Math.max(1,parseInt(document.getElementById('lt-vus').value)||10));
+  const duration=Math.min(300,Math.max(5,parseInt(document.getElementById('lt-duration').value)||30));
+  const rampup=Math.min(60,Math.max(0,parseInt(document.getElementById('lt-rampup').value)||5));
+  const method=document.getElementById('lt-method').value||'GET';
+  const timeout=Math.min(30000,Math.max(500,parseInt(document.getElementById('lt-timeout').value)||5000));
+
+  // Reset UI
+  _ltRunning=true;_ltAbort=false;_ltRpsData=[];_ltLatData=[];
+  document.getElementById('lt-progress-section').style.display='block';
+  document.getElementById('lt-stats').style.display='grid';
+  document.getElementById('lt-charts').style.display='block';
+  document.getElementById('lt-log-section').style.display='block';
+  document.getElementById('lt-results-section').style.display='none';
+  document.getElementById('lt-log').innerHTML='';
+  document.getElementById('lt-results-body').innerHTML='';
+  ['lt-s-rps','lt-s-total','lt-s-ok','lt-s-err','lt-s-lat'].forEach(id=>ltSetStat(id,'—'));
+
+  const btn=document.getElementById('lt-run-btn');
+  btn.disabled=true;
+  document.getElementById('lt-run-icon').textContent='⟳';
+  document.getElementById('lt-run-label').textContent='Running — Click to Abort';
+  btn.onclick=ltAbort;btn.disabled=false;
+
+  ltLog(`Starting load test → ${url}`,'info');
+  ltLog(`Config: ${vus} VUs · ${duration}s · ramp ${rampup}s · ${method} · timeout ${timeout}ms`,'info');
+
+  const startTime=Date.now();
+  let totalReqs=0,okReqs=0,errReqs=0,totalLatency=0;
+  let lastSecReqs=0,lastSecTime=Date.now();
+
+  // Ramp-up: compute active VUs at a given elapsed second
+  const activeVUs=(elapsedMs)=>{
+    if(rampup===0)return vus;
+    const frac=Math.min(1,elapsedMs/(rampup*1000));
+    return Math.max(1,Math.round(frac*vus));
+  };
+
+  // Worker: runs one request and resolves with {ok, latency}
+  const doRequest=async()=>{
+    const t0=Date.now();
+    try{
+      const ctrl=new AbortController();
+      const tid=setTimeout(()=>ctrl.abort(),timeout);
+      const res=await fetch(url,{method,mode:'no-cors',signal:ctrl.signal,cache:'no-store'});
+      clearTimeout(tid);
+      const lat=Date.now()-t0;
+      // no-cors always gives opaque response (type=opaque), treat as ok
+      return{ok:true,lat};
+    }catch(e){
+      return{ok:false,lat:Date.now()-t0};
+    }
+  };
+
+  // Tick every second — compute VUs, fire concurrent requests, update stats
+  const tickInterval=setInterval(async()=>{
+    if(_ltAbort){clearInterval(tickInterval);return;}
+    const elapsed=Date.now()-startTime;
+    if(elapsed>=(duration*1000)){
+      clearInterval(tickInterval);
+      ltFinish(startTime,totalReqs,okReqs,errReqs,totalLatency,duration,vus,method,url);
+      return;
+    }
+    const currentVUs=activeVUs(elapsed);
+    const promises=Array.from({length:currentVUs},doRequest);
+    const results=await Promise.allSettled(promises);
+    results.forEach(r=>{
+      const v=r.status==='fulfilled'?r.value:{ok:false,lat:0};
+      totalReqs++;
+      if(v.ok)okReqs++;else errReqs++;
+      totalLatency+=v.lat;
+    });
+
+    // RPS (over last second)
+    const nowMs=Date.now();
+    const secDelta=(nowMs-lastSecTime)/1000||1;
+    const rps=((totalReqs-lastSecReqs)/secDelta).toFixed(1);
+    lastSecReqs=totalReqs;lastSecTime=nowMs;
+    _ltRpsData.push(parseFloat(rps));
+    _ltLatData.push(totalReqs>0?Math.round(totalLatency/totalReqs):0);
+
+    // Update stats
+    ltSetStat('lt-s-rps',rps);
+    ltSetStat('lt-s-total',totalReqs);
+    ltSetStat('lt-s-ok',okReqs);
+    ltSetStat('lt-s-err',errReqs);
+    ltSetStat('lt-s-lat',(totalReqs>0?Math.round(totalLatency/totalReqs):0)+'ms');
+
+    // Progress bar
+    const pct=Math.min(100,Math.round((elapsed/(duration*1000))*100));
+    document.getElementById('lt-progress-bar').style.width=pct+'%';
+    document.getElementById('lt-elapsed').textContent=Math.round(elapsed/1000)+'s / '+duration+'s';
+    document.getElementById('lt-progress-label').textContent=
+      `Running — ${currentVUs} VUs active · ${pct}% complete`;
+
+    // Charts
+    ltDrawChart('lt-chart-rps',_ltRpsData,'#ef4444');
+    ltDrawChart('lt-chart-lat',_ltLatData,'#f59e0b');
+
+    // Log (every 5s to avoid spam)
+    if(Math.round(elapsed/1000)%5===0){
+      const errPct=totalReqs>0?((errReqs/totalReqs)*100).toFixed(1):0;
+      ltLog(`${Math.round(elapsed/1000)}s — RPS:${rps} | OK:${okReqs} | Err:${errReqs}(${errPct}%) | AvgLat:${totalReqs>0?Math.round(totalLatency/totalReqs):0}ms`,'ok');
+    }
+  },1000);
+}
+
+function ltAbort(){
+  _ltAbort=true;_ltRunning=false;
+  ltLog('Test aborted by user.','warn');
+  ltResetBtn();
+}
+
+function ltResetBtn(){
+  const btn=document.getElementById('lt-run-btn');
+  btn.disabled=false;
+  document.getElementById('lt-run-icon').textContent='▶';
+  document.getElementById('lt-run-label').textContent='Start Load Test';
+  btn.onclick=ltRun;
+}
+
+function ltFinish(startTime,total,ok,err,totalLat,duration,vus,method,url){
+  _ltRunning=false;
+  const elapsed=((Date.now()-startTime)/1000).toFixed(1);
+  const avgLat=total>0?Math.round(totalLat/total):0;
+  const rps=(total/elapsed).toFixed(2);
+  const errRate=total>0?((err/total)*100).toFixed(2):0;
+  const p95=_ltLatData.length>0?_ltLatData.sort((a,b)=>a-b)[Math.floor(_ltLatData.length*.95)]||avgLat:0;
+
+  ltLog(`Test complete — ${total} requests in ${elapsed}s`,'ok');
+  ltLog(`RPS: ${rps} | OK: ${ok} | Err: ${err} (${errRate}%) | AvgLat: ${avgLat}ms`,'ok');
+
+  document.getElementById('lt-progress-bar').style.width='100%';
+  document.getElementById('lt-progress-label').textContent='Test Complete ✓';
+
+  const rows=[
+    ['Target URL',url],
+    ['Method',method],
+    ['Virtual Users',vus],
+    ['Duration',elapsed+'s'],
+    ['Total Requests',total],
+    ['Successful Requests',`<span class="pass">${ok}</span>`],
+    ['Failed Requests',err>0?`<span class="fail">${err}</span>`:'0'],
+    ['Error Rate',errRate+'%'],
+    ['Avg Req/sec',rps],
+    ['Avg Latency',avgLat+'ms'],
+    ['P95 Latency',p95+'ms'],
+    ['Status',errRate>20?'<span class="fail">⚠ High Error Rate</span>':avgLat>2000?'<span class="fail">⚠ High Latency</span>':'<span class="pass">✓ Passed</span>'],
+  ];
+  document.getElementById('lt-results-body').innerHTML=rows.map(([k,v])=>`<tr><td style="color:#64748b;font-weight:600">${k}</td><td>${v}</td></tr>`).join('');
+  document.getElementById('lt-results-section').style.display='block';
+  document.getElementById('lt-results-section').scrollIntoView({behavior:'smooth'});
+
+  ltResetBtn();
+  ltDrawChart('lt-chart-rps',_ltRpsData,'#ef4444');
+  ltDrawChart('lt-chart-lat',_ltLatData,'#f59e0b');
 }
 </script>
 </body>
