@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Load Test Center — AdHash</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0f172a; --bg2: #1e293b; --bg3: #334155; --card: #1e293b;
+  --border: #334155; --text: #e2e8f0; --muted: #94a3b8; --accent: #ef4444;
+  --accent2: #3b82f6; --green: #10b981; --amber: #f59e0b; --purple: #8b5cf6;
+  --red: #ef4444; --radius: 10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
+a{color:var(--accent2);text-decoration:none}
+
+/* ── TOP NAV ── */
+.topnav{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;height:56px;gap:16px;position:sticky;top:0;z-index:100}
+.topnav-brand{font-size:18px;font-weight:800;color:#fff;display:flex;align-items:center;gap:8px}
+.topnav-brand span{color:var(--accent)}
+.topnav-back{padding:6px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:6px}
+.topnav-back:hover{background:#475569}
+.topnav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.pill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.pill-red{background:#7f1d1d;color:#fca5a5}
+.pill-green{background:#064e3b;color:#6ee7b7}
+.pill-amber{background:#78350f;color:#fcd34d}
+
+/* ── TABS ── */
+.tab-bar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;display:flex;gap:2px;overflow-x:auto}
+.tab-bar::-webkit-scrollbar{height:3px}.tab-bar::-webkit-scrollbar-thumb{background:var(--border)}
+.tab-btn{padding:14px 20px;font-size:13px;font-weight:600;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;transition:.15s}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-pane{display:none;padding:24px;max-width:1200px;margin:0 auto}
+.tab-pane.active{display:block}
+
+/* ── CARDS & GRIDS ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.col{flex:1;min-width:180px}
+.col2{flex:2;min-width:260px}
+
+/* ── FORM ELEMENTS ── */
+label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px}
+input,select,textarea{width:100%;background:#0f172a;border:1px solid var(--border);border-radius:6px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;transition:.15s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(59,130,246,.15)}
+select option{background:var(--bg2)}
+textarea{resize:vertical;min-height:80px;font-family:monospace}
+.form-hint{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* ── BUTTONS ── */
+.btn{padding:9px 20px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#dc2626}
+.btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border)}.btn-secondary:hover{background:#475569}
+.btn-blue{background:var(--accent2);color:#fff}.btn-blue:hover{background:#2563eb}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:#059669}
+.btn-amber{background:var(--amber);color:#000}.btn-amber:hover{background:#d97706}
+.btn-danger{background:#7f1d1d;color:#fca5a5;border:1px solid #dc2626}.btn-danger:hover{background:var(--red);color:#fff}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-xs{padding:3px 9px;font-size:11px}
+
+/* ── KPI CARDS ── */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:#0f172a;border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}
+.kpi-val{font-size:22px;font-weight:800;line-height:1}
+.kpi-lbl{font-size:10px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.4px}
+.kpi-val.green{color:var(--green)}.kpi-val.red{color:var(--red)}.kpi-val.blue{color:var(--accent2)}.kpi-val.amber{color:var(--amber)}.kpi-val.purple{color:var(--purple)}
+
+/* ── BADGE / VERDICT ── */
+.verdict{display:inline-block;padding:6px 18px;border-radius:8px;font-size:16px;font-weight:900}
+.verdict-PASS{background:#064e3b;color:#6ee7b7;border:1px solid var(--green)}
+.verdict-RISK{background:#78350f;color:#fcd34d;border:1px solid var(--amber)}
+.verdict-FAIL{background:#7f1d1d;color:#fca5a5;border:1px solid var(--red)}
+
+/* ── LIVE LOG ── */
+.log-box{background:#020617;border:1px solid var(--border);border-radius:8px;padding:12px;height:180px;overflow-y:auto;font-family:monospace;font-size:12px}
+.log-entry{padding:2px 0;border-bottom:1px solid #1e293b}
+.log-entry span.phase{color:var(--amber);margin-right:8px}
+.log-entry span.ts{color:var(--muted);margin-right:6px;font-size:10px}
+
+/* ── TIMELINE ── */
+.timeline{position:relative;padding-left:20px}
+.timeline::before{content:'';position:absolute;left:6px;top:0;bottom:0;width:2px;background:var(--border)}
+.tl-item{position:relative;padding:8px 0 8px 20px;font-size:13px}
+.tl-item::before{content:'';position:absolute;left:-14px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--border);border:2px solid var(--bg2)}
+.tl-item.done::before{background:var(--green)}
+.tl-item.active::before{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.tl-phase{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.tl-event{color:var(--text)}
+.tl-ts{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* ── TABLE ── */
+table{width:100%;border-collapse:collapse}
+th{padding:10px 12px;background:#0f172a;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:left;border-bottom:1px solid var(--border)}
+td{padding:10px 12px;border-bottom:1px solid #1e293b;font-size:13px}
+tr:hover td{background:#0f172a55}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+
+/* ── PROGRESS BAR ── */
+.progress-wrap{background:#0f172a;border-radius:20px;height:8px;overflow:hidden;margin-bottom:8px}
+.progress-bar{height:100%;border-radius:20px;transition:width .5s;background:linear-gradient(90deg,var(--accent2),var(--accent))}
+
+/* ── PHASE BADGE ── */
+.phase-badge{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block}
+.phase-Initializing{background:#1e3a5f;color:#93c5fd}
+.phase-Ramp-up{background:#7c2d12;color:#fb923c}
+.phase-Running{background:#064e3b;color:#6ee7b7}
+.phase-Stopped{background:#78350f;color:#fcd34d}
+.phase-Completed{background:#1e293b;color:var(--text)}
+.phase-Failed{background:#7f1d1d;color:#fca5a5}
+.phase-Generating{background:#312e81;color:#c4b5fd}
+
+/* ── SCENARIO STEPS ── */
+.step-card{background:#0f172a;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;position:relative}
+.step-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.step-num{width:24px;height:24px;border-radius:50%;background:var(--accent2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.step-remove{position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px}.step-remove:hover{color:var(--red)}
+
+/* ── NOTIFICATION ── */
+.notif{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:360px}
+.notif-item{padding:12px 16px;border-radius:8px;font-size:13px;font-weight:600;border-left:4px solid;animation:slideIn .2s ease}
+.notif-success{background:#064e3b;border-color:var(--green);color:#6ee7b7}
+.notif-error{background:#7f1d1d;border-color:var(--red);color:#fca5a5}
+.notif-info{background:#1e3a5f;border-color:var(--accent2);color:#93c5fd}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:flex;align-items:center;justify-content:center}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:28px;max-width:480px;width:90%;max-height:80vh;overflow-y:auto}
+.modal h3{font-size:17px;font-weight:800;margin-bottom:8px}
+.modal p{font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.7}
+.modal-warn{background:#7f1d1d33;border:1px solid var(--red);border-radius:8px;padding:12px;font-size:12px;color:#fca5a5;margin-bottom:16px}
+.modal .row{gap:10px;flex-wrap:nowrap;justify-content:flex-end}
+
+/* ── TEMPLATE EDITOR ── */
+.tmpl-section{background:#0f172a;border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:12px}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-lbl{font-size:13px}
+.toggle-sub{font-size:11px;color:var(--muted)}
+.switch{position:relative;display:inline-block;width:36px;height:20px}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;inset:0;background:#334155;transition:.3s;border-radius:20px}
+.slider::before{content:'';position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:#fff;transition:.3s;border-radius:50%}
+input:checked+.slider{background:var(--green)}
+input:checked+.slider::before{transform:translateX(16px)}
+
+/* ── CHART GRID ── */
+.chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;margin-bottom:16px}
+.chart-card{background:#0f172a;border:1px solid var(--border);border-radius:8px;padding:14px}
+.chart-card h4{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-icon{font-size:48px;margin-bottom:12px}
+.empty h3{font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px}
+.empty p{font-size:13px;line-height:1.7}
+
+/* ── STATUS INDICATOR ── */
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.dot-running{background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 1.5s infinite}
+.dot-completed{background:var(--green)}
+.dot-failed{background:var(--red)}
+.dot-stopped{background:var(--amber)}
+.dot-initializing{background:var(--accent2);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+@media(max-width:700px){
+  .tab-btn{padding:12px 14px;font-size:12px}
+  .kpi-row{grid-template-columns:repeat(2,1fr)}
+  .chart-grid{grid-template-columns:1fr}
+  .modal .row{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<div class="topnav">
+  <div class="topnav-brand"><span>⚡</span> Load Test Center</div>
+  <div class="topnav-right">
+    <span id="ltc-role-badge" class="pill pill-red" style="display:none"></span>
+    <span id="ltc-run-badge" class="pill" style="display:none"></span>
+    <a href="/landing" class="topnav-back">← Dashboard</a>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('configure')">⚙ Configure Test</button>
+  <button class="tab-btn" onclick="switchTab('scenario')">🔀 Scenario Builder</button>
+  <button class="tab-btn" onclick="switchTab('live')">🔴 Live Run</button>
+  <button class="tab-btn" onclick="switchTab('results')">📊 Results</button>
+  <button class="tab-btn" onclick="switchTab('reports')">📁 Reports</button>
+  <button class="tab-btn" onclick="switchTab('template')">🎨 Report Template</button>
+</div>
+
+<!-- ══════════════════════════ TAB 1: CONFIGURE ══════════════════════════ -->
+<div id="tab-configure" class="tab-pane active">
+
+  <div class="card">
+    <div class="card-title">🎯 Target & Project</div>
+    <div class="row">
+      <div class="col">
+        <label>Project</label>
+        <select id="cfg-project">
+          <option value="">— Select Project —</option>
+          <option value="Ad-Hash">Ad-Hash (Main Platform)</option>
+          <option value="ClevrAI">ClevrAI</option>
+          <option value="PocketPanda">PocketPanda</option>
+          <option value="Alayna">Alayna</option>
+          <option value="GiftFlick">GiftFlick</option>
+          <option value="FinBotz">FinBotz</option>
+          <option value="Qylis">Qylis</option>
+          <option value="NeatNest">NeatNest</option>
+          <option value="EazyBnB">EazyBnB</option>
+          <option value="Glivo">Glivo</option>
+          <option value="Lumos">Lumos</option>
+          <option value="Mealing">Mealing</option>
+          <option value="Bookie">Bookie</option>
+          <option value="Marrkit">Marrkit</option>
+          <option value="Adash">Adash</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Environment</label>
+        <select id="cfg-env">
+          <option value="Production">Production</option>
+          <option value="QA" selected>QA / Staging</option>
+          <option value="UAT">UAT</option>
+          <option value="Dev">Dev</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>HTTP Method</label>
+        <select id="cfg-method">
+          <option value="GET">GET</option>
+          <option value="POST">POST</option>
+          <option value="PUT">PUT</option>
+          <option value="PATCH">PATCH</option>
+          <option value="DELETE">DELETE</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <label>Target URL</label>
+      <input id="cfg-url" type="url" placeholder="https://your-app.com/api/endpoint" />
+      <div class="form-hint">Tests run server-side — no CORS restrictions. Include full URL with https://</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📊 Load Configuration</div>
+    <div class="row">
+      <div class="col">
+        <label>Virtual Users (VUs) <span id="vu-limit-label" style="color:var(--amber)"></span></label>
+        <input id="cfg-vus" type="number" min="1" max="1000" value="10" />
+      </div>
+      <div class="col">
+        <label>Duration (seconds)</label>
+        <input id="cfg-duration" type="number" min="5" max="300" value="30" />
+      </div>
+      <div class="col">
+        <label>Ramp-up (seconds)</label>
+        <input id="cfg-rampup" type="number" min="0" max="120" value="5" />
+      </div>
+      <div class="col">
+        <label>Request Timeout (ms)</label>
+        <input id="cfg-timeout" type="number" min="1000" max="30000" value="5000" />
+      </div>
+      <div class="col">
+        <label>Target RPS (optional)</label>
+        <input id="cfg-rps" type="number" min="0" placeholder="Unlimited" />
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🧪 Scenario Type</div>
+    <div class="row">
+      <div class="col2">
+        <label>Scenario</label>
+        <select id="cfg-scenario">
+          <option value="Baseline Load Test">Baseline Load Test — steady state validation</option>
+          <option value="Spike Test">Spike Test — sudden traffic burst</option>
+          <option value="Stress Test">Stress Test — push beyond limits</option>
+          <option value="Soak / Endurance Test">Soak / Endurance Test — long-duration stability</option>
+          <option value="Ramp-Up Test">Ramp-Up Test — progressive load increase</option>
+          <option value="Breakpoint Test">Breakpoint Test — find maximum capacity</option>
+          <option value="Smoke Test">Smoke Test — minimal sanity check</option>
+          <option value="Volume Test">Volume Test — high data throughput</option>
+          <option value="API Contract Test">API Contract Test — schema & response validation</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>P95 Threshold (ms)</label>
+        <input id="cfg-p95threshold" type="number" min="100" value="3000" />
+        <div class="form-hint">PASS if P95 ≤ this value</div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div class="col">
+        <label>Auto-stop if Error Rate > (%)</label>
+        <input id="cfg-stoponerr" type="number" min="0" max="100" placeholder="e.g. 20 (disabled if empty)" />
+      </div>
+      <div class="col">
+        <label>Auto-stop if P95 > (ms)</label>
+        <input id="cfg-stoponp95" type="number" min="0" placeholder="e.g. 5000 (disabled if empty)" />
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🔐 Request Headers & Body</div>
+    <div class="row">
+      <div class="col2">
+        <label>Headers (JSON)</label>
+        <textarea id="cfg-headers" rows="3" placeholder='{"Authorization":"Bearer YOUR_TOKEN","Content-Type":"application/json"}'></textarea>
+        <div class="form-hint">Authorization values are masked in reports.</div>
+      </div>
+      <div class="col">
+        <label>Request Body (JSON)</label>
+        <textarea id="cfg-body" rows="3" placeholder='{"key":"value"}'></textarea>
+        <div class="form-hint">Sent as raw JSON body for POST/PUT/PATCH.</div>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <label>Query Parameters (JSON)</label>
+      <input id="cfg-queryparams" type="text" placeholder='{"page":"1","limit":"20"}' />
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">
+    <button class="btn btn-primary" onclick="startTest()" id="btn-start">⚡ Start Load Test</button>
+    <button class="btn btn-secondary" onclick="generateDemo()">🧪 Generate Demo Report</button>
+    <button class="btn btn-secondary" onclick="switchTab('scenario')">🔀 Build Scenario</button>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════ TAB 2: SCENARIO BUILDER ══════════════════════════ -->
+<div id="tab-scenario" class="tab-pane">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <h2 style="font-size:17px;font-weight:800">JMeter-Style Scenario Builder</h2>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary btn-sm" onclick="addStep()">+ Add Step</button>
+      <button class="btn btn-secondary btn-sm" onclick="importScenario()">📥 Import JSON</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportScenario()">📤 Export JSON</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">🔧 Global Variables</div>
+    <div id="global-vars-list"></div>
+    <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addGlobalVar()">+ Add Variable</button>
+    <div class="form-hint" style="margin-top:8px">Use <code style="color:var(--amber)">{{varName}}</code> in URL, headers, or body to reference variables.</div>
+  </div>
+
+  <div id="steps-container"></div>
+
+  <div style="margin-top:16px;display:flex;gap:10px">
+    <button class="btn btn-primary" onclick="applyScenario()">✅ Apply to Configure Tab</button>
+    <button class="btn btn-secondary" onclick="clearScenario()">🗑 Clear All Steps</button>
+  </div>
+  <div class="form-hint" style="margin-top:8px">Multi-step scenarios execute sequentially per virtual user. Each step's response can be captured as a variable for the next step.</div>
+</div>
+
+<!-- ══════════════════════════ TAB 3: LIVE RUN ══════════════════════════ -->
+<div id="tab-live" class="tab-pane">
+  <div id="live-empty" class="empty">
+    <div class="empty-icon">🔴</div>
+    <h3>No Active Test</h3>
+    <p>Start a load test from the <strong>Configure Test</strong> tab.<br>Live metrics, charts, and logs will appear here in real-time.</p>
+    <button class="btn btn-primary" style="margin-top:16px" onclick="switchTab('configure')">⚙ Go to Configure</button>
+  </div>
+
+  <div id="live-content" style="display:none">
+    <!-- Run header -->
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:17px;font-weight:800;display:flex;align-items:center;gap:8px">
+            <span class="status-dot" id="run-status-dot"></span>
+            <span id="run-project-name">—</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px" id="run-url-display">—</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span id="run-phase-badge" class="phase-badge phase-Initializing">Initializing</span>
+          <span id="run-verdict-badge" style="display:none"></span>
+          <button class="btn btn-danger btn-sm" id="btn-stop" onclick="stopTest()" disabled>⏹ Stop</button>
+          <button class="btn btn-secondary btn-sm" onclick="viewReport()" id="btn-view-report" style="display:none">📄 View Report</button>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px">
+          <span id="run-elapsed">0s elapsed</span>
+          <span id="run-remaining">— remaining</span>
+        </div>
+        <div class="progress-wrap"><div class="progress-bar" id="run-progress" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <!-- Live KPIs -->
+    <div class="kpi-row" id="live-kpi-row">
+      <div class="kpi"><div class="kpi-val blue" id="lk-total">0</div><div class="kpi-lbl">Total Requests</div></div>
+      <div class="kpi"><div class="kpi-val green" id="lk-ok">0</div><div class="kpi-lbl">Success</div></div>
+      <div class="kpi"><div class="kpi-val red" id="lk-err">0</div><div class="kpi-lbl">Failures</div></div>
+      <div class="kpi"><div class="kpi-val green" id="lk-sr">0%</div><div class="kpi-lbl">Success Rate</div></div>
+      <div class="kpi"><div class="kpi-val amber" id="lk-rps">0</div><div class="kpi-lbl">RPS</div></div>
+      <div class="kpi"><div class="kpi-val amber" id="lk-lat">0ms</div><div class="kpi-lbl">Avg Latency</div></div>
+      <div class="kpi"><div class="kpi-val blue" id="lk-p95">0ms</div><div class="kpi-lbl">P95</div></div>
+      <div class="kpi"><div class="kpi-val purple" id="lk-p99">0ms</div><div class="kpi-lbl">P99</div></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="chart-grid">
+      <div class="chart-card"><h4>RPS over Time</h4><canvas id="ch-live-rps" height="120"></canvas></div>
+      <div class="chart-card"><h4>Avg Latency (ms)</h4><canvas id="ch-live-lat" height="120"></canvas></div>
+      <div class="chart-card"><h4>Error Rate (%)</h4><canvas id="ch-live-err" height="120"></canvas></div>
+      <div class="chart-card"><h4>Active Users</h4><canvas id="ch-live-vus" height="120"></canvas></div>
+    </div>
+
+    <!-- Timeline + log side by side -->
+    <div class="row" style="align-items:flex-start">
+      <div class="col" style="min-width:260px">
+        <div class="card">
+          <div class="card-title">⏱ Timeline</div>
+          <div class="timeline" id="live-timeline"></div>
+        </div>
+      </div>
+      <div class="col2">
+        <div class="card">
+          <div class="card-title">📋 Live Log</div>
+          <div class="log-box" id="live-log"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ TAB 4: RESULTS ══════════════════════════ -->
+<div id="tab-results" class="tab-pane">
+  <div id="results-empty" class="empty">
+    <div class="empty-icon">📊</div>
+    <h3>No Results Yet</h3>
+    <p>Run a load test to see the final summary here.</p>
+    <button class="btn btn-primary" style="margin-top:16px" onclick="switchTab('configure')">⚙ Start a Test</button>
+  </div>
+  <div id="results-content" style="display:none">
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+        <div id="results-verdict-big" style="font-size:48px;font-weight:900"></div>
+        <div>
+          <div style="font-size:17px;font-weight:700" id="results-project-label">—</div>
+          <div style="font-size:12px;color:var(--muted)" id="results-config-summary">—</div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:10px">
+          <button class="btn btn-secondary" onclick="viewReport()" id="results-btn-report">📄 View Report</button>
+          <button class="btn btn-green" onclick="downloadReport()" id="results-btn-download">⬇ Download</button>
+        </div>
+      </div>
+    </div>
+    <div class="kpi-row" id="results-kpi-row">
+      <div class="kpi"><div class="kpi-val blue" id="rk-total">—</div><div class="kpi-lbl">Total Requests</div></div>
+      <div class="kpi"><div class="kpi-val green" id="rk-sr">—</div><div class="kpi-lbl">Success Rate</div></div>
+      <div class="kpi"><div class="kpi-val red" id="rk-err">—</div><div class="kpi-lbl">Error Rate</div></div>
+      <div class="kpi"><div class="kpi-val amber" id="rk-avg">—</div><div class="kpi-lbl">Avg Latency</div></div>
+      <div class="kpi"><div class="kpi-val amber" id="rk-p50">—</div><div class="kpi-lbl">P50</div></div>
+      <div class="kpi"><div class="kpi-val amber" id="rk-p90">—</div><div class="kpi-lbl">P90</div></div>
+      <div class="kpi"><div class="kpi-val blue" id="rk-p95">—</div><div class="kpi-lbl">P95</div></div>
+      <div class="kpi"><div class="kpi-val purple" id="rk-p99">—</div><div class="kpi-lbl">P99</div></div>
+      <div class="kpi"><div class="kpi-val green" id="rk-min">—</div><div class="kpi-lbl">Min</div></div>
+      <div class="kpi"><div class="kpi-val red" id="rk-max">—</div><div class="kpi-lbl">Max</div></div>
+      <div class="kpi"><div class="kpi-val purple" id="rk-rps">—</div><div class="kpi-lbl">RPS</div></div>
+      <div class="kpi"><div class="kpi-val blue" id="rk-dur">—</div><div class="kpi-lbl">Duration</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">📋 Status Code Distribution</div>
+      <div class="tbl-wrap"><table><thead><tr><th>Status</th><th>Count</th><th>%</th></tr></thead><tbody id="results-sc-tbody"></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ TAB 5: REPORTS ══════════════════════════ -->
+<div id="tab-reports" class="tab-pane">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <h2 style="font-size:17px;font-weight:800">Report History</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <select id="history-filter-verdict" onchange="loadHistory()" style="width:130px">
+        <option value="">All Verdicts</option>
+        <option value="PASS">PASS</option>
+        <option value="RISK">RISK</option>
+        <option value="FAIL">FAIL</option>
+      </select>
+      <select id="history-filter-project" onchange="loadHistory()" style="width:160px">
+        <option value="">All Projects</option>
+      </select>
+      <button class="btn btn-secondary btn-sm" onclick="loadHistory()">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <div id="history-empty" class="empty" style="display:none">
+    <div class="empty-icon">📁</div>
+    <h3>No Reports Found</h3>
+    <p>Run a load test to generate reports.</p>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Project</th><th>Env</th><th>Scenario</th><th>VUs</th><th>Duration</th>
+        <th>Success Rate</th><th>P95</th><th>Verdict</th><th>Executed By</th><th>Date</th><th>Actions</th>
+      </tr></thead>
+      <tbody id="history-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════ TAB 6: TEMPLATE ══════════════════════════ -->
+<div id="tab-template" class="tab-pane">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <h2 style="font-size:17px;font-weight:800">Report Template Customization</h2>
+    <button class="btn btn-green" onclick="saveTemplate()">💾 Save Template</button>
+  </div>
+
+  <div class="row" style="align-items:flex-start">
+    <div class="col2">
+      <div class="card">
+        <div class="card-title">🏢 Branding</div>
+        <div class="row">
+          <div class="col">
+            <label>Company Name</label>
+            <input id="tmpl-company" value="AdHash Technology" />
+          </div>
+          <div class="col">
+            <label>Report Title</label>
+            <input id="tmpl-title" value="Load Test Execution Report" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="col">
+            <label>Header Color</label>
+            <input id="tmpl-headercolor" type="color" value="#1e293b" style="height:40px;padding:4px" />
+          </div>
+          <div class="col">
+            <label>Prepared By</label>
+            <input id="tmpl-preparedby" placeholder="QA Team" />
+          </div>
+          <div class="col">
+            <label>Client Name</label>
+            <input id="tmpl-client" placeholder="—" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="col">
+            <label>Reviewed By</label>
+            <input id="tmpl-reviewedby" placeholder="—" />
+          </div>
+          <div class="col">
+            <label>Approved By</label>
+            <input id="tmpl-approvedby" placeholder="—" />
+          </div>
+          <div class="col">
+            <label>Release Version</label>
+            <input id="tmpl-releaseversion" placeholder="v1.0.0" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="col">
+            <label>Sprint Name</label>
+            <input id="tmpl-sprint" placeholder="Sprint 12" />
+          </div>
+          <div class="col">
+            <label>Build Number</label>
+            <input id="tmpl-build" placeholder="Build #142" />
+          </div>
+        </div>
+        <div style="margin-top:12px">
+          <label>Footer Text</label>
+          <input id="tmpl-footer" value="AdHash Project Control Center · Authorized Personnel Only" />
+        </div>
+        <div style="margin-top:12px">
+          <label>Confidentiality Text</label>
+          <input id="tmpl-confidential" value="CONFIDENTIAL — For authorized review only" />
+        </div>
+        <div style="margin-top:12px">
+          <label>Remarks / Notes</label>
+          <textarea id="tmpl-remarks" rows="3" placeholder="Any additional context for the report..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card">
+        <div class="card-title">👁 Content Sections</div>
+        <div class="tmpl-section">
+          <div class="toggle-row">
+            <div><div class="toggle-lbl">Executive Summary</div><div class="toggle-sub">Narrative overview paragraph</div></div>
+            <label class="switch"><input type="checkbox" id="tmpl-showExec" checked><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-lbl">Metric KPI Cards</div><div class="toggle-sub">All 15 performance metrics</div></div>
+            <label class="switch"><input type="checkbox" id="tmpl-showMetrics" checked><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-lbl">Test Configuration</div><div class="toggle-sub">URL, VUs, duration, scenario</div></div>
+            <label class="switch"><input type="checkbox" id="tmpl-showConfig" checked><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-lbl">Performance Charts</div><div class="toggle-sub">6 inline Chart.js graphs</div></div>
+            <label class="switch"><input type="checkbox" id="tmpl-showCharts" checked><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-lbl">Error Summary</div><div class="toggle-sub">Status code distribution table</div></div>
+            <label class="switch"><input type="checkbox" id="tmpl-showErrors" checked><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-lbl">Timeline & Activity Log</div><div class="toggle-sub">Phase-by-phase execution timeline</div></div>
+            <label class="switch"><input type="checkbox" id="tmpl-showTimeline" checked><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-lbl">Recommendations</div><div class="toggle-sub">QA recommendation and release decision</div></div>
+            <label class="switch"><input type="checkbox" id="tmpl-showRecs" checked><span class="slider"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="card-title">🔍 Preview</div>
+        <p style="font-size:13px;color:var(--muted);line-height:1.7">After saving, the next generated report will use these settings. Generate a demo report to preview the full output.</p>
+        <button class="btn btn-secondary btn-sm" style="margin-top:12px" onclick="generateDemo()">🧪 Preview Demo Report</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRMATION MODAL -->
+<div class="modal-overlay" id="confirm-modal" style="display:none">
+  <div class="modal">
+    <h3>⚡ Confirm Load Test</h3>
+    <p id="confirm-summary">This action will send real traffic to the target URL.</p>
+    <div class="modal-warn" id="confirm-warn">
+      ⚠️ <strong>Production Warning:</strong> You are about to run a load test against a production environment. Ensure that the team is aware and that rate limits / WAF rules will not be triggered.
+    </div>
+    <div class="row">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmStart()">⚡ Confirm &amp; Start</button>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICATIONS -->
+<div class="notif" id="notif-container"></div>
+
+<script>
+// ── State ──
+let _token = null;
+let _currentRunId = null;
+let _pollTimer    = null;
+let _liveCharts   = {};
+let _scenarioSteps = [];
+let _globalVars    = [];
+let _pendingConfig = null;
+let _maxVUs = 50;
+
+// ── Token ──
+function getToken() {
+    return localStorage.getItem('qa_jwt_token') || localStorage.getItem('qa_token') || '';
+}
+
+async function api(method, path, body) {
+    const token = getToken();
+    const opts = {
+        method,
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    };
+    if (body && method !== 'GET') opts.body = JSON.stringify(body);
+    const res = await fetch(path, opts);
+    if (res.status === 401) { showNotif('Session expired. Please log in again.', 'error'); window.location.href = '/'; }
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || res.statusText);
+    }
+    return res.json();
+}
+
+// ── Notifications ──
+function showNotif(msg, type = 'info', dur = 4000) {
+    const c = document.getElementById('notif-container');
+    const el = document.createElement('div');
+    el.className = `notif-item notif-${type}`;
+    el.textContent = msg;
+    c.appendChild(el);
+    setTimeout(() => el.remove(), dur);
+}
+
+// ── Tab navigation ──
+function switchTab(name) {
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name)?.classList.add('active');
+    const btns = document.querySelectorAll('.tab-btn');
+    const names = ['configure','scenario','live','results','reports','template'];
+    const idx = names.indexOf(name);
+    if (btns[idx]) btns[idx].classList.add('active');
+    if (name === 'reports') loadHistory();
+    if (name === 'template') loadTemplate();
+}
+
+// ── Init ──
+window.addEventListener('DOMContentLoaded', () => {
+    _token = getToken();
+    if (!_token) { window.location.href = '/'; return; }
+
+    // Decode role and set VU limit
+    try {
+        const payload = JSON.parse(atob(_token.split('.')[1]));
+        const role = payload.role;
+        _maxVUs = role === 'super_admin' ? 1000 : role === 'admin' ? 200 : 50;
+        const badge = document.getElementById('ltc-role-badge');
+        badge.textContent = role === 'super_admin' ? 'Super Admin · 1000 VU' : role === 'admin' ? 'Admin · 200 VU' : 'Normal · 50 VU';
+        badge.style.display = '';
+        document.getElementById('vu-limit-label').textContent = `(max ${_maxVUs})`;
+        document.getElementById('cfg-vus').max = _maxVUs;
+    } catch {}
+
+    addStep(); // Start with one step
+    loadHistory();
+    loadTemplate();
+});
+
+// ══════════════════════════ CONFIGURE ══════════════════════════
+
+function buildConfig() {
+    const parseJsonSafe = (v, fallback = undefined) => {
+        if (!v || !v.trim()) return fallback;
+        try { return JSON.parse(v); } catch { return fallback; }
+    };
+    return {
+        projectName:    document.getElementById('cfg-project').value || 'Unknown',
+        environment:    document.getElementById('cfg-env').value,
+        url:            document.getElementById('cfg-url').value.trim(),
+        method:         document.getElementById('cfg-method').value,
+        headers:        parseJsonSafe(document.getElementById('cfg-headers').value),
+        body:           parseJsonSafe(document.getElementById('cfg-body').value),
+        queryParams:    parseJsonSafe(document.getElementById('cfg-queryparams').value),
+        vus:            parseInt(document.getElementById('cfg-vus').value) || 10,
+        duration:       parseInt(document.getElementById('cfg-duration').value) || 30,
+        rampup:         parseInt(document.getElementById('cfg-rampup').value) || 0,
+        timeout:        parseInt(document.getElementById('cfg-timeout').value) || 5000,
+        rps:            parseInt(document.getElementById('cfg-rps').value) || undefined,
+        scenarioType:   document.getElementById('cfg-scenario').value,
+        p95Threshold:   parseInt(document.getElementById('cfg-p95threshold').value) || 3000,
+        stopOnErrorRate: parseFloat(document.getElementById('cfg-stoponerr').value) || undefined,
+        stopOnP95:      parseFloat(document.getElementById('cfg-stoponp95').value) || undefined,
+        scenarioSteps:  _scenarioSteps,
+    };
+}
+
+function startTest() {
+    const cfg = buildConfig();
+    if (!cfg.url) { showNotif('Target URL is required.', 'error'); return; }
+    if (!/^https?:\/\//i.test(cfg.url)) { showNotif('URL must start with http:// or https://', 'error'); return; }
+    if (cfg.vus > _maxVUs) { showNotif(`VU limit for your role is ${_maxVUs}.`, 'error'); return; }
+    _pendingConfig = cfg;
+
+    const isProd = cfg.environment === 'Production';
+    const summary = document.getElementById('confirm-summary');
+    summary.innerHTML = `
+      <strong>Project:</strong> ${cfg.projectName} · <strong>Env:</strong> ${cfg.environment}<br>
+      <strong>URL:</strong> ${cfg.url}<br>
+      <strong>VUs:</strong> ${cfg.vus} · <strong>Duration:</strong> ${cfg.duration}s · <strong>Ramp-up:</strong> ${cfg.rampup}s
+    `;
+    document.getElementById('confirm-warn').style.display = isProd ? '' : 'none';
+    document.getElementById('confirm-modal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('confirm-modal').style.display = 'none';
+    _pendingConfig = null;
+}
+
+async function confirmStart() {
+    closeModal();
+    if (!_pendingConfig) return;
+    const cfg = _pendingConfig;
+    document.getElementById('btn-start').disabled = true;
+
+    try {
+        const data = await api('POST', '/api/load-test/start', cfg);
+        _currentRunId = data.runId;
+        showNotif('Test started! Switching to Live Run tab...', 'success');
+        switchTab('live');
+        initLiveView(cfg);
+        startPolling();
+    } catch (e) {
+        showNotif('Failed to start test: ' + e.message, 'error');
+        document.getElementById('btn-start').disabled = false;
+    }
+}
+
+async function generateDemo() {
+    const cfg = buildConfig();
+    try {
+        const data = await api('POST', '/api/load-test/demo-report', {
+            projectName: cfg.projectName || 'Ad-Hash',
+            environment: cfg.environment || 'QA',
+            url: cfg.url || 'https://adhash.com/',
+            scenarioType: cfg.scenarioType || 'Baseline Load Test',
+        });
+        _currentRunId = data.runId;
+        showNotif('Demo report generated! Opening results...', 'success');
+        await loadResults(data.runId);
+        switchTab('results');
+        loadHistory();
+    } catch (e) {
+        showNotif('Demo failed: ' + e.message, 'error');
+    }
+}
+
+// ══════════════════════════ SCENARIO BUILDER ══════════════════════════
+
+function addGlobalVar() {
+    _globalVars.push({ name: '', value: '' });
+    renderGlobalVars();
+}
+
+function renderGlobalVars() {
+    const c = document.getElementById('global-vars-list');
+    if (!_globalVars.length) { c.innerHTML = '<div style="color:var(--muted);font-size:12px">No variables defined.</div>'; return; }
+    c.innerHTML = _globalVars.map((v, i) => `
+      <div class="row" style="margin-bottom:8px;align-items:center">
+        <div class="col"><input placeholder="variableName" value="${_esc(v.name)}" onchange="_globalVars[${i}].name=this.value" /></div>
+        <div style="color:var(--muted);padding:0 4px">=</div>
+        <div class="col2"><input placeholder="value or {{capturedVar}}" value="${_esc(v.value)}" onchange="_globalVars[${i}].value=this.value" /></div>
+        <button class="btn btn-secondary btn-xs" onclick="_globalVars.splice(${i},1);renderGlobalVars()">✕</button>
+      </div>`).join('');
+}
+
+function addStep() {
+    _scenarioSteps.push({
+        name: `Step ${_scenarioSteps.length + 1}`,
+        method: 'GET', url: '', headers: '', body: '',
+        captureVar: '', captureJsonPath: '',
+        assertStatusCode: 200, assertContains: '',
+    });
+    renderSteps();
+}
+
+function renderSteps() {
+    const c = document.getElementById('steps-container');
+    if (!_scenarioSteps.length) {
+        c.innerHTML = '<div class="empty" style="padding:30px"><div class="empty-icon">🔀</div><h3>No Steps</h3><p>Click "+ Add Step" to build a scenario.</p></div>';
+        return;
+    }
+    c.innerHTML = _scenarioSteps.map((s, i) => `
+    <div class="step-card" id="step-${i}">
+      <div class="step-header">
+        <span class="step-num">${i + 1}</span>
+        <input style="flex:1;font-weight:700;background:none;border:none;color:var(--text);font-size:14px;padding:0" value="${_esc(s.name)}" onchange="_scenarioSteps[${i}].name=this.value" />
+        <div style="display:flex;gap:6px">
+          ${i > 0 ? `<button class="btn btn-secondary btn-xs" onclick="moveStep(${i},-1)">↑</button>` : ''}
+          ${i < _scenarioSteps.length - 1 ? `<button class="btn btn-secondary btn-xs" onclick="moveStep(${i},1)">↓</button>` : ''}
+        </div>
+        <button class="step-remove" onclick="_scenarioSteps.splice(${i},1);renderSteps()">✕</button>
+      </div>
+      <div class="row">
+        <div class="col">
+          <label>Method</label>
+          <select onchange="_scenarioSteps[${i}].method=this.value">
+            ${['GET','POST','PUT','PATCH','DELETE'].map(m => `<option ${s.method===m?'selected':''}>${m}</option>`).join('')}
+          </select>
+        </div>
+        <div class="col2">
+          <label>URL</label>
+          <input value="${_esc(s.url)}" placeholder="https://api.example.com/endpoint or use {{baseUrl}}/path" onchange="_scenarioSteps[${i}].url=this.value" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div class="col">
+          <label>Headers (JSON)</label>
+          <textarea rows="2" onchange="_scenarioSteps[${i}].headers=this.value">${_esc(s.headers)}</textarea>
+        </div>
+        <div class="col">
+          <label>Body (JSON)</label>
+          <textarea rows="2" onchange="_scenarioSteps[${i}].body=this.value">${_esc(s.body)}</textarea>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div class="col">
+          <label>Assert Status Code</label>
+          <input type="number" value="${s.assertStatusCode || 200}" onchange="_scenarioSteps[${i}].assertStatusCode=parseInt(this.value)" />
+        </div>
+        <div class="col">
+          <label>Assert Response Contains</label>
+          <input value="${_esc(s.assertContains)}" placeholder="text or JSON path" onchange="_scenarioSteps[${i}].assertContains=this.value" />
+        </div>
+        <div class="col">
+          <label>Capture Variable Name</label>
+          <input value="${_esc(s.captureVar)}" placeholder="myToken" onchange="_scenarioSteps[${i}].captureVar=this.value" />
+        </div>
+        <div class="col">
+          <label>Capture JSON Path</label>
+          <input value="${_esc(s.captureJsonPath)}" placeholder="data.token" onchange="_scenarioSteps[${i}].captureJsonPath=this.value" />
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function moveStep(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= _scenarioSteps.length) return;
+    [_scenarioSteps[i], _scenarioSteps[j]] = [_scenarioSteps[j], _scenarioSteps[i]];
+    renderSteps();
+}
+
+function applyScenario() {
+    showNotif(`${_scenarioSteps.length} step(s) applied to Configure tab.`, 'success');
+    switchTab('configure');
+}
+
+function clearScenario() {
+    _scenarioSteps = [];
+    renderSteps();
+}
+
+function exportScenario() {
+    const data = JSON.stringify({ steps: _scenarioSteps, vars: _globalVars }, null, 2);
+    const a = Object.assign(document.createElement('a'), {
+        href: 'data:application/json;charset=utf-8,' + encodeURIComponent(data),
+        download: 'scenario.json',
+    });
+    a.click();
+}
+
+function importScenario() {
+    const inp = Object.assign(document.createElement('input'), { type: 'file', accept: '.json' });
+    inp.onchange = e => {
+        const f = e.target.files[0]; if (!f) return;
+        const r = new FileReader();
+        r.onload = ev => {
+            try {
+                const d = JSON.parse(ev.target.result);
+                _scenarioSteps = d.steps || [];
+                _globalVars    = d.vars  || [];
+                renderSteps(); renderGlobalVars();
+                showNotif('Scenario imported.', 'success');
+            } catch { showNotif('Invalid JSON file.', 'error'); }
+        };
+        r.readAsText(f);
+    };
+    inp.click();
+}
+
+// ══════════════════════════ LIVE RUN ══════════════════════════
+
+function initLiveView(cfg) {
+    document.getElementById('live-empty').style.display    = 'none';
+    document.getElementById('live-content').style.display  = '';
+    document.getElementById('run-project-name').textContent = `${cfg.projectName} — ${cfg.environment}`;
+    document.getElementById('run-url-display').textContent  = cfg.url;
+    document.getElementById('btn-stop').disabled = false;
+
+    const runBadge = document.getElementById('ltc-run-badge');
+    runBadge.textContent = '🔴 RUNNING';
+    runBadge.className = 'pill pill-red';
+    runBadge.style.display = '';
+
+    destroyCharts();
+    _liveCharts.rps = makeChart('ch-live-rps', 'RPS', '#3b82f6');
+    _liveCharts.lat = makeChart('ch-live-lat', 'Latency', '#f59e0b');
+    _liveCharts.err = makeChart('ch-live-err', 'Error %', '#ef4444');
+    _liveCharts.vus = makeChart('ch-live-vus', 'VUs', '#8b5cf6');
+    document.getElementById('live-timeline').innerHTML = '';
+    document.getElementById('live-log').innerHTML = '';
+    document.getElementById('run-verdict-badge').style.display = 'none';
+    document.getElementById('btn-view-report').style.display = 'none';
+}
+
+function makeChart(id, label, color) {
+    const ctx = document.getElementById(id)?.getContext('2d');
+    if (!ctx) return null;
+    return new Chart(ctx, {
+        type: 'line',
+        data: { labels: [], datasets: [{ label, data: [], borderColor: color, backgroundColor: color + '22', fill: true, tension: .4, pointRadius: 0, borderWidth: 2 }] },
+        options: { responsive: true, animation: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', font: { size: 10 } } } } },
+    });
+}
+
+function pushChart(chart, label, value) {
+    if (!chart) return;
+    const MAX = 60;
+    chart.data.labels.push(label);
+    chart.data.datasets[0].data.push(value);
+    if (chart.data.labels.length > MAX) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
+    chart.update('none');
+}
+
+function destroyCharts() {
+    Object.values(_liveCharts).forEach(c => c?.destroy());
+    _liveCharts = {};
+}
+
+function startPolling() {
+    if (_pollTimer) clearInterval(_pollTimer);
+    _pollTimer = setInterval(pollStatus, 1500);
+}
+
+function stopPolling() {
+    if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+}
+
+async function pollStatus() {
+    if (!_currentRunId) return;
+    try {
+        const data = await api('GET', `/api/load-test/status/${_currentRunId}`);
+        updateLiveUI(data);
+        if (['completed','failed','stopped'].includes(data.status)) {
+            stopPolling();
+            onRunFinished(data);
+        }
+    } catch (e) {
+        console.warn('[poll] error:', e.message);
+    }
+}
+
+function updateLiveUI(data) {
+    const m   = data.metrics || {};
+    const cfg = data.config  || {};
+    const dur = cfg.duration || 30;
+
+    // Progress
+    const pct = Math.min(100, Math.round((data.elapsed / dur) * 100));
+    document.getElementById('run-progress').style.width = pct + '%';
+    document.getElementById('run-elapsed').textContent   = data.elapsed + 's elapsed';
+    document.getElementById('run-remaining').textContent = data.remaining > 0 ? data.remaining + 's remaining' : 'Completing…';
+
+    // Phase badge
+    const phase = data.phase || data.status;
+    const pb = document.getElementById('run-phase-badge');
+    pb.textContent = phase;
+    pb.className = `phase-badge phase-${phase.replace(/\s+/g, '')}`;
+
+    // Status dot
+    const dot = document.getElementById('run-status-dot');
+    dot.className = 'status-dot dot-' + data.status;
+
+    // KPIs
+    const sr = m.totalReqs > 0 ? ((m.okReqs / m.totalReqs) * 100).toFixed(1) : '0.0';
+    document.getElementById('lk-total').textContent = (m.totalReqs || 0).toLocaleString();
+    document.getElementById('lk-ok').textContent    = (m.okReqs    || 0).toLocaleString();
+    document.getElementById('lk-err').textContent   = (m.errReqs   || 0).toLocaleString();
+    document.getElementById('lk-sr').textContent    = sr + '%';
+    document.getElementById('lk-rps').textContent   = m.rps || 0;
+    document.getElementById('lk-lat').textContent   = (m.avgLatency || 0) + 'ms';
+    document.getElementById('lk-p95').textContent   = (m.p95 || 0) + 'ms';
+    document.getElementById('lk-p99').textContent   = (m.p99 || 0) + 'ms';
+
+    // Charts
+    const ts = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    pushChart(_liveCharts.rps, ts, m.rps || 0);
+    pushChart(_liveCharts.lat, ts, m.avgLatency || 0);
+    pushChart(_liveCharts.err, ts, m.errRate || 0);
+    pushChart(_liveCharts.vus, ts, cfg.vus || 0);
+
+    // Timeline
+    renderTimeline(data.timeline || [], data.status);
+
+    // Log
+    renderLog(data.logs || []);
+}
+
+function renderTimeline(tl, status) {
+    const c = document.getElementById('live-timeline');
+    const donePhases = new Set(['Completed','Failed','Stopped']);
+    c.innerHTML = tl.map((e, i) => {
+        const isLast = i === tl.length - 1;
+        const cls = donePhases.has(e.phase) ? 'done' : (isLast ? 'active' : 'done');
+        return `<div class="tl-item ${cls}">
+          <div class="tl-phase">${e.phase}</div>
+          <div class="tl-event">${e.event}</div>
+          <div class="tl-ts">${new Date(e.time).toLocaleTimeString('en-IN')}</div>
+        </div>`;
+    }).join('');
+    c.scrollTop = c.scrollHeight;
+}
+
+let _lastLogLen = 0;
+function renderLog(logs) {
+    if (logs.length === _lastLogLen) return;
+    _lastLogLen = logs.length;
+    const box = document.getElementById('live-log');
+    box.innerHTML = logs.map(l => `
+      <div class="log-entry">
+        <span class="ts">${new Date(l.time).toLocaleTimeString('en-IN')}</span>
+        <span class="phase">[${l.phase}]</span>
+        ${l.warn ? '<span style="color:var(--amber)">⚠ </span>' : ''}${_esc(l.event)}
+      </div>`).join('');
+    box.scrollTop = box.scrollHeight;
+}
+
+async function onRunFinished(data) {
+    const vd = data.verdict || '—';
+    const badge = document.getElementById('run-verdict-badge');
+    badge.innerHTML = `<span class="verdict verdict-${vd}">${vd}</span>`;
+    badge.style.display = '';
+    document.getElementById('btn-stop').disabled = true;
+    document.getElementById('btn-view-report').style.display = '';
+
+    const runBadge = document.getElementById('ltc-run-badge');
+    runBadge.textContent = vd === 'PASS' ? '✅ PASS' : vd === 'RISK' ? '⚠ RISK' : '❌ FAIL';
+    runBadge.className = `pill ${vd === 'PASS' ? 'pill-green' : vd === 'RISK' ? 'pill-amber' : 'pill-red'}`;
+
+    await loadResults(_currentRunId);
+    showNotif(`Test ${data.status}! Verdict: ${vd}`, vd === 'PASS' ? 'success' : 'error');
+    loadHistory();
+}
+
+async function stopTest() {
+    if (!_currentRunId) return;
+    try {
+        await api('POST', `/api/load-test/stop/${_currentRunId}`);
+        stopPolling();
+        showNotif('Test stopped.', 'info');
+    } catch (e) { showNotif('Stop failed: ' + e.message, 'error'); }
+}
+
+function viewReport() {
+    if (_currentRunId) window.open(`/api/load-test/report/${_currentRunId}`, '_blank');
+}
+
+function downloadReport() {
+    if (_currentRunId) window.open(`/api/load-test/report/${_currentRunId}/download`);
+}
+
+// ══════════════════════════ RESULTS ══════════════════════════
+
+async function loadResults(runId) {
+    try {
+        const data = await api('GET', `/api/load-test/results/${runId}`);
+        _currentRunId = runId;
+        renderResults(data);
+    } catch (e) {
+        showNotif('Could not load results: ' + e.message, 'error');
+    }
+}
+
+function renderResults(data) {
+    const m   = data.metrics  || {};
+    const cfg = data.config   || {};
+    const vd  = data.verdict  || '—';
+
+    document.getElementById('results-empty').style.display   = 'none';
+    document.getElementById('results-content').style.display = '';
+
+    const vdEl = document.getElementById('results-verdict-big');
+    vdEl.textContent = vd;
+    vdEl.style.color = vd === 'PASS' ? 'var(--green)' : vd === 'RISK' ? 'var(--amber)' : 'var(--red)';
+
+    document.getElementById('results-project-label').textContent = `${cfg.projectName} — ${cfg.environment}`;
+    document.getElementById('results-config-summary').textContent =
+        `${cfg.scenarioType} · ${cfg.vus} VUs · ${cfg.duration}s · ${cfg.url}`;
+
+    const sr  = m.totalReqs > 0 ? ((m.okReqs  / m.totalReqs) * 100).toFixed(2) + '%' : '—';
+    const err = m.totalReqs > 0 ? ((m.errReqs / m.totalReqs) * 100).toFixed(2) + '%' : '—';
+    const dur = (data.startTime && data.endTime)
+        ? Math.round((new Date(data.endTime) - new Date(data.startTime)) / 1000) + 's'
+        : cfg.duration + 's';
+
+    document.getElementById('rk-total').textContent = (m.totalReqs || 0).toLocaleString();
+    document.getElementById('rk-sr').textContent    = sr;
+    document.getElementById('rk-err').textContent   = err;
+    document.getElementById('rk-avg').textContent   = (m.avgLatency || 0) + 'ms';
+    document.getElementById('rk-p50').textContent   = (m.p50 || 0) + 'ms';
+    document.getElementById('rk-p90').textContent   = (m.p90 || 0) + 'ms';
+    document.getElementById('rk-p95').textContent   = (m.p95 || 0) + 'ms';
+    document.getElementById('rk-p99').textContent   = (m.p99 || 0) + 'ms';
+    document.getElementById('rk-min').textContent   = (m.minLatency || 0) + 'ms';
+    document.getElementById('rk-max').textContent   = (m.maxLatency || 0) + 'ms';
+    document.getElementById('rk-rps').textContent   = m.rps || 0;
+    document.getElementById('rk-dur').textContent   = dur;
+
+    const sc = m.statusCodes || {};
+    const total = m.totalReqs || 1;
+    document.getElementById('results-sc-tbody').innerHTML = Object.entries(sc).map(([code, count]) => {
+        const pct = ((count / total) * 100).toFixed(1);
+        const c = code.startsWith('2') ? 'var(--green)' : code.startsWith('3') ? 'var(--accent2)' : code.startsWith('4') ? 'var(--amber)' : 'var(--red)';
+        return `<tr><td style="color:${c};font-weight:700">${code}</td><td>${count.toLocaleString()}</td><td>${pct}%</td></tr>`;
+    }).join('') || '<tr><td colspan="3" style="color:var(--muted)">No data</td></tr>';
+}
+
+// ══════════════════════════ REPORTS / HISTORY ══════════════════════════
+
+async function loadHistory() {
+    try {
+        const data = await api('GET', '/api/load-test/history');
+        const rows = data.runs || [];
+
+        // Populate project filter
+        const projects = [...new Set(rows.map(r => r.projectName).filter(Boolean))];
+        const pf = document.getElementById('history-filter-project');
+        const cur = pf.value;
+        pf.innerHTML = '<option value="">All Projects</option>' +
+            projects.map(p => `<option value="${_esc(p)}" ${p === cur ? 'selected' : ''}>${_esc(p)}</option>`).join('');
+
+        // Apply filters
+        const fVerdict  = document.getElementById('history-filter-verdict').value;
+        const fProject  = pf.value;
+        const filtered  = rows.filter(r =>
+            (!fVerdict || r.verdict === fVerdict) &&
+            (!fProject || r.projectName === fProject)
+        );
+
+        document.getElementById('history-empty').style.display = filtered.length ? 'none' : '';
+        document.getElementById('history-tbody').innerHTML = filtered.map(r => {
+            const vd    = r.verdict || '—';
+            const color = vd === 'PASS' ? 'var(--green)' : vd === 'RISK' ? 'var(--amber)' : vd === 'FAIL' ? 'var(--red)' : 'var(--muted)';
+            const dt    = r.startTime ? new Date(r.startTime).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+            const dotCls = r.status === 'running' ? 'dot-running' : '';
+            return `<tr>
+              <td><strong>${_esc(r.projectName)}</strong></td>
+              <td><span class="pill" style="background:#1e293b;color:var(--text);font-size:10px">${_esc(r.environment)}</span></td>
+              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(r.scenarioType)}</td>
+              <td>${r.vus}</td>
+              <td>${r.duration}s</td>
+              <td style="color:${r.successRate >= 98 ? 'var(--green)' : r.successRate >= 95 ? 'var(--amber)' : 'var(--red)'}">${r.successRate}%</td>
+              <td style="color:${r.p95 <= 3000 ? 'var(--green)' : r.p95 <= 6000 ? 'var(--amber)' : 'var(--red)'}">${r.p95}ms</td>
+              <td><span style="color:${color};font-weight:800">${vd}</span> <span class="status-dot ${dotCls}"></span></td>
+              <td style="color:var(--muted)">${_esc(r.executedBy)}</td>
+              <td style="color:var(--muted);font-size:11px">${dt}</td>
+              <td>
+                <div style="display:flex;gap:4px">
+                  ${r.hasReport ? `<button class="btn btn-secondary btn-xs" onclick="openReport('${r.runId}')">📄</button>` : ''}
+                  ${r.hasReport ? `<button class="btn btn-secondary btn-xs" onclick="downloadRunReport('${r.runId}')">⬇</button>` : ''}
+                  <button class="btn btn-secondary btn-xs" onclick="loadAndView('${r.runId}')">📊</button>
+                  <button class="btn btn-danger btn-xs" onclick="deleteRun('${r.runId}')">🗑</button>
+                </div>
+              </td>
+            </tr>`;
+        }).join('') || `<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:30px">No reports found</td></tr>`;
+    } catch (e) {
+        showNotif('Failed to load history: ' + e.message, 'error');
+    }
+}
+
+function openReport(runId) { window.open(`/api/load-test/report/${runId}`, '_blank'); }
+function downloadRunReport(runId) { window.open(`/api/load-test/report/${runId}/download`); }
+
+async function loadAndView(runId) {
+    await loadResults(runId);
+    switchTab('results');
+}
+
+async function deleteRun(runId) {
+    if (!confirm('Delete this report permanently?')) return;
+    try {
+        await api('DELETE', `/api/load-test/history/${runId}`);
+        showNotif('Report deleted.', 'info');
+        loadHistory();
+        if (_currentRunId === runId) {
+            _currentRunId = null;
+            document.getElementById('results-empty').style.display = '';
+            document.getElementById('results-content').style.display = 'none';
+        }
+    } catch (e) { showNotif('Delete failed: ' + e.message, 'error'); }
+}
+
+// ══════════════════════════ TEMPLATE ══════════════════════════
+
+async function loadTemplate() {
+    try {
+        const t = await api('GET', '/api/load-test/report-template');
+        if (t.companyName)   document.getElementById('tmpl-company').value       = t.companyName;
+        if (t.reportTitle)   document.getElementById('tmpl-title').value         = t.reportTitle;
+        if (t.headerColor)   document.getElementById('tmpl-headercolor').value   = t.headerColor;
+        if (t.preparedBy)    document.getElementById('tmpl-preparedby').value    = t.preparedBy;
+        if (t.clientName)    document.getElementById('tmpl-client').value        = t.clientName;
+        if (t.reviewedBy)    document.getElementById('tmpl-reviewedby').value    = t.reviewedBy;
+        if (t.approvedBy)    document.getElementById('tmpl-approvedby').value    = t.approvedBy;
+        if (t.releaseVersion)document.getElementById('tmpl-releaseversion').value= t.releaseVersion;
+        if (t.sprintName)    document.getElementById('tmpl-sprint').value        = t.sprintName;
+        if (t.buildNumber)   document.getElementById('tmpl-build').value         = t.buildNumber;
+        if (t.footerText)    document.getElementById('tmpl-footer').value        = t.footerText;
+        if (t.confidentialityText) document.getElementById('tmpl-confidential').value = t.confidentialityText;
+        if (t.remarks)       document.getElementById('tmpl-remarks').value       = t.remarks;
+
+        if (t.showExecutiveSummary !== undefined) document.getElementById('tmpl-showExec').checked    = t.showExecutiveSummary;
+        if (t.showMetricCards      !== undefined) document.getElementById('tmpl-showMetrics').checked = t.showMetricCards;
+        if (t.showTestConfig       !== undefined) document.getElementById('tmpl-showConfig').checked  = t.showTestConfig;
+        if (t.showCharts           !== undefined) document.getElementById('tmpl-showCharts').checked  = t.showCharts;
+        if (t.showErrorSummary     !== undefined) document.getElementById('tmpl-showErrors').checked  = t.showErrorSummary;
+        if (t.showTimeline         !== undefined) document.getElementById('tmpl-showTimeline').checked= t.showTimeline;
+        if (t.showRecommendations  !== undefined) document.getElementById('tmpl-showRecs').checked    = t.showRecommendations;
+    } catch {}
+}
+
+async function saveTemplate() {
+    const tmpl = {
+        companyName:         document.getElementById('tmpl-company').value,
+        reportTitle:         document.getElementById('tmpl-title').value,
+        headerColor:         document.getElementById('tmpl-headercolor').value,
+        preparedBy:          document.getElementById('tmpl-preparedby').value,
+        clientName:          document.getElementById('tmpl-client').value,
+        reviewedBy:          document.getElementById('tmpl-reviewedby').value,
+        approvedBy:          document.getElementById('tmpl-approvedby').value,
+        releaseVersion:      document.getElementById('tmpl-releaseversion').value,
+        sprintName:          document.getElementById('tmpl-sprint').value,
+        buildNumber:         document.getElementById('tmpl-build').value,
+        footerText:          document.getElementById('tmpl-footer').value,
+        confidentialityText: document.getElementById('tmpl-confidential').value,
+        remarks:             document.getElementById('tmpl-remarks').value,
+        showExecutiveSummary: document.getElementById('tmpl-showExec').checked,
+        showMetricCards:      document.getElementById('tmpl-showMetrics').checked,
+        showTestConfig:       document.getElementById('tmpl-showConfig').checked,
+        showCharts:           document.getElementById('tmpl-showCharts').checked,
+        showErrorSummary:     document.getElementById('tmpl-showErrors').checked,
+        showTimeline:         document.getElementById('tmpl-showTimeline').checked,
+        showRecommendations:  document.getElementById('tmpl-showRecs').checked,
+    };
+    try {
+        await api('POST', '/api/load-test/save-template', tmpl);
+        showNotif('Template saved! Future reports will use these settings.', 'success');
+    } catch (e) { showNotif('Save failed: ' + e.message, 'error'); }
+}
+
+// ── Utility ──
+function _esc(s) {
+    if (s === null || s === undefined) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

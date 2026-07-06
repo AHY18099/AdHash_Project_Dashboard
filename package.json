@@ -36,6 +36,7 @@
     "@playwright/test": "^1.41.0",
     "@types/node": "^20.11.0",
     "@types/nodemailer": "^7.0.9",
+    "autocannon": "^8.0.0",
     "axios": "^1.13.4",
     "bcryptjs": "^3.0.3",
     "compression": "^1.8.1",
