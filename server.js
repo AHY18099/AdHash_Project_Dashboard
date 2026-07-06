@@ -258,7 +258,8 @@ try {
     app.use('/api/tavus', require('./routes/tavus'));
     app.use('/api/status-reports', require('./routes/status-reports'));
     app.use('/api/load-test', require('./routes/load-tests'));
-    console.log('[startup] ✅ Mongoose route modules mounted (/api/projects, /api/qa-state, /api/apyhub, /api/firebase, /api/messagemedia, /api/tavus, /api/status-reports, /api/load-test)');
+    app.use('/api/security-test', require('./routes/security-tests'));
+    console.log('[startup] ✅ Mongoose route modules mounted (/api/projects, /api/qa-state, /api/apyhub, /api/firebase, /api/messagemedia, /api/tavus, /api/status-reports, /api/load-test, /api/security-test)');
     console.log('[startup] ApyHub env vars present:',
         'ENDPOINT=' + !!process.env.APYHUB_SUBSCRIPTION_USAGE_ENDPOINT,
         'TOKEN=' + !!process.env.APYHUB_AUTH_TOKEN,
@@ -3981,6 +3982,14 @@ app.get('/load-test', (req, res) => {
         return res.redirect('/');
     }
     return res.sendFile(path.join(__dirname, 'public', 'load-test.html'));
+});
+
+// Security Test Center
+app.get('/security-test', (req, res) => {
+    if (!isAuthenticated(req)) {
+        return res.redirect('/');
+    }
+    return res.sendFile(path.join(__dirname, 'public', 'security-test.html'));
 });
 
 // QA Dashboard

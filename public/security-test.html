@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security Test Center — AdHash</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2310b981'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial Black%2CArial%2Csans-serif' font-size='20' fill='white'%3E%F0%9F%9B%A1%3C/text%3E%3C/svg%3E">
+<style>
+:root {
+  --bg:#0f172a;--bg2:#1e293b;--bg3:#334155;--card:#1e293b;
+  --border:#334155;--text:#e2e8f0;--muted:#94a3b8;
+  --green:#10b981;--amber:#f59e0b;--red:#ef4444;--orange:#f97316;
+  --blue:#3b82f6;--purple:#8b5cf6;--accent:#10b981;--radius:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
+
+/* NAV */
+.topnav{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;height:56px;gap:16px;position:sticky;top:0;z-index:100}
+.topnav-brand{font-size:18px;font-weight:800;color:#fff;display:flex;align-items:center;gap:8px}
+.topnav-brand span{color:var(--green)}
+.topnav-back{padding:6px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:6px}
+.topnav-back:hover{background:#475569}
+.topnav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.pill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.pill-green{background:#064e3b;color:#6ee7b7}
+.pill-red{background:#7f1d1d;color:#fca5a5}
+.pill-amber{background:#78350f;color:#fcd34d}
+
+/* TABS */
+.tab-bar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;display:flex;gap:2px;overflow-x:auto}
+.tab-bar::-webkit-scrollbar{height:3px}.tab-bar::-webkit-scrollbar-thumb{background:var(--border)}
+.tab-btn{padding:14px 20px;font-size:13px;font-weight:600;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;transition:.15s}
+.tab-btn:hover{color:var(--text)}.tab-btn.active{color:var(--green);border-bottom-color:var(--green)}
+.tab-pane{display:none;padding:24px;max-width:1200px;margin:0 auto}.tab-pane.active{display:block}
+
+/* CARDS */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.col{flex:1;min-width:180px}.col2{flex:2;min-width:260px}
+
+/* FORMS */
+label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px}
+input,select{width:100%;background:#0f172a;border:1px solid var(--border);border-radius:6px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;transition:.15s}
+input:focus,select:focus{border-color:var(--green);box-shadow:0 0 0 2px rgba(16,185,129,.15)}
+select option{background:var(--bg2)}
+.form-hint{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* BUTTONS */
+.btn{padding:9px 20px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--green);color:#fff}.btn-primary:hover{background:#059669}
+.btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border)}.btn-secondary:hover{background:#475569}
+.btn-danger{background:#7f1d1d;color:#fca5a5;border:1px solid var(--red)}.btn-danger:hover{background:var(--red);color:#fff}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-sm{padding:5px 12px;font-size:12px}.btn-xs{padding:3px 9px;font-size:11px}
+
+/* CHECK TOGGLES */
+.checks-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.check-item{background:#0f172a;border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;cursor:pointer;transition:.15s}
+.check-item:hover{border-color:var(--green)}
+.check-item.selected{border-color:var(--green);background:#064e3b22}
+.check-item input[type=checkbox]{width:16px;height:16px;accent-color:var(--green);flex-shrink:0;margin-top:2px}
+.check-name{font-size:13px;font-weight:600;color:var(--text)}
+.check-desc{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* KPIs */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:#0f172a;border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}
+.kpi-val{font-size:22px;font-weight:800;line-height:1}
+.kpi-lbl{font-size:10px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.4px}
+
+/* SCORE RING */
+.score-ring{position:relative;width:96px;height:96px;flex-shrink:0}
+.score-ring svg{transform:rotate(-90deg)}
+.score-ring .score-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900}
+
+/* SEVERITY BADGES */
+.sev{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700}
+.sev-CRITICAL{background:#fee2e2;color:#991b1b}
+.sev-HIGH{background:#ffedd5;color:#9a3412}
+.sev-MEDIUM{background:#fef3c7;color:#92400e}
+.sev-LOW{background:#dbeafe;color:#1e40af}
+.sev-INFO{background:#f1f5f9;color:#475569}
+.sev-PASS{background:#d1fae5;color:#065f46}
+
+/* FINDING CARD */
+.finding-card{background:#0f172a;border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:10px;border-left:4px solid}
+.finding-card.sev-c{border-left-color:var(--red)}
+.finding-card.sev-h{border-left-color:var(--orange)}
+.finding-card.sev-m{border-left-color:var(--amber)}
+.finding-card.sev-l{border-left-color:var(--blue)}
+.finding-card.sev-p{border-left-color:var(--green)}
+.finding-title{font-size:14px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.finding-detail{font-size:12px;color:var(--muted);font-family:monospace;background:#020617;padding:8px 10px;border-radius:6px;margin:8px 0;word-break:break-all}
+.finding-rec{font-size:12px;color:#93c5fd;margin-top:6px;padding:8px 10px;background:#1e3a5f;border-radius:6px;border-left:3px solid var(--blue)}
+
+/* PROGRESS */
+.progress-wrap{background:#0f172a;border-radius:20px;height:8px;overflow:hidden;margin-bottom:8px}
+.progress-bar{height:100%;border-radius:20px;transition:width .4s;background:linear-gradient(90deg,var(--green),var(--blue))}
+
+/* LOG */
+.log-box{background:#020617;border:1px solid var(--border);border-radius:8px;padding:12px;height:160px;overflow-y:auto;font-family:monospace;font-size:12px}
+.log-entry{padding:2px 0;border-bottom:1px solid #1e293b;color:var(--muted)}
+.log-entry .ts{color:#334155;margin-right:6px;font-size:10px}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse}
+th{padding:10px 12px;background:#0f172a;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:left;border-bottom:1px solid var(--border)}
+td{padding:10px 12px;border-bottom:1px solid #1e293b;font-size:13px;vertical-align:top}
+tr:hover td{background:#0f172a55}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+
+/* VERDICT */
+.verdict{display:inline-block;padding:6px 18px;border-radius:8px;font-size:16px;font-weight:900}
+.verdict-PASS{background:#064e3b;color:#6ee7b7;border:1px solid var(--green)}
+.verdict-RISK{background:#78350f;color:#fcd34d;border:1px solid var(--amber)}
+.verdict-FAIL{background:#7f1d1d;color:#fca5a5;border:1px solid var(--red)}
+
+/* STATUS DOT */
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.dot-running{background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 1.5s infinite}
+.dot-completed{background:var(--green)}.dot-failed{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* EMPTY */
+.empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-icon{font-size:48px;margin-bottom:12px}
+.empty h3{font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px}
+.empty p{font-size:13px;line-height:1.7}
+
+/* NOTIF */
+.notif{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:360px}
+.notif-item{padding:12px 16px;border-radius:8px;font-size:13px;font-weight:600;border-left:4px solid;animation:slideIn .2s ease}
+.notif-success{background:#064e3b;border-color:var(--green);color:#6ee7b7}
+.notif-error{background:#7f1d1d;border-color:var(--red);color:#fca5a5}
+.notif-info{background:#1e3a5f;border-color:var(--blue);color:#93c5fd}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:flex;align-items:center;justify-content:center}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:28px;max-width:480px;width:90%}
+.modal h3{font-size:17px;font-weight:800;margin-bottom:8px}
+.modal p{font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.7}
+.modal-warn{background:#7f1d1d33;border:1px solid var(--red);border-radius:8px;padding:12px;font-size:12px;color:#fca5a5;margin-bottom:16px}
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<div class="topnav">
+  <div class="topnav-brand"><span>🛡</span> Security Test Center</div>
+  <div class="topnav-right">
+    <span id="stc-run-badge" class="pill" style="display:none"></span>
+    <a href="/landing" class="topnav-back">← Dashboard</a>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('configure')">⚙ Configure Scan</button>
+  <button class="tab-btn" onclick="switchTab('live')">🔴 Live Scan</button>
+  <button class="tab-btn" onclick="switchTab('results')">🛡 Results</button>
+  <button class="tab-btn" onclick="switchTab('history')">📁 History</button>
+</div>
+
+<!-- ══════════ TAB 1: CONFIGURE ══════════ -->
+<div id="tab-configure" class="tab-pane active">
+
+  <div class="card">
+    <div class="card-title">🎯 Target & Project</div>
+    <div class="row">
+      <div class="col">
+        <label>Project</label>
+        <select id="cfg-project">
+          <option value="">— Select Project —</option>
+          <option>Ad-Hash</option><option>Ai Sign Pro</option><option>Algomax</option>
+          <option>Auto Checker</option><option>DDP</option><option>Humee</option>
+          <option>Metcalf</option><option>SMC</option><option>Spark me</option>
+          <option>SyncTag</option><option>SyncTrade</option><option>WavedIn</option>
+          <option>ZapAI</option><option>ZapCRM</option><option>ZapTrade</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Environment</label>
+        <select id="cfg-env">
+          <option value="Production">Production</option>
+          <option value="QA" selected>QA / Staging</option>
+          <option value="UAT">UAT</option>
+          <option value="Dev">Dev</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <label>Target URL</label>
+      <input id="cfg-url" type="url" placeholder="https://your-app.com" />
+      <div class="form-hint">The scanner runs server-side — tests the live URL from Railway's server. Use the root domain or a specific API endpoint.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🔍 Security Checks — Select what to scan</div>
+    <div class="checks-grid" id="checks-grid">
+      <!-- rendered by JS -->
+    </div>
+    <div style="margin-top:14px;display:flex;gap:10px">
+      <button class="btn btn-secondary btn-sm" onclick="selectAll()">✅ Select All</button>
+      <button class="btn btn-secondary btn-sm" onclick="selectNone()">☐ Deselect All</button>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">
+    <button class="btn btn-primary" onclick="startScan()" id="btn-start">🛡 Start Security Scan</button>
+  </div>
+
+</div>
+
+<!-- ══════════ TAB 2: LIVE SCAN ══════════ -->
+<div id="tab-live" class="tab-pane">
+  <div id="live-empty" class="empty">
+    <div class="empty-icon">🛡</div>
+    <h3>No Active Scan</h3>
+    <p>Configure a target URL and click <strong>Start Security Scan</strong>.<br>Real-time progress and findings will appear here.</p>
+    <button class="btn btn-primary" style="margin-top:16px" onclick="switchTab('configure')">⚙ Configure Scan</button>
+  </div>
+
+  <div id="live-content" style="display:none">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:17px;font-weight:800;display:flex;align-items:center;gap:8px">
+            <span class="status-dot" id="run-dot"></span>
+            <span id="run-project">—</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px" id="run-url">—</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="run-status-label" style="font-size:13px;font-weight:700;color:var(--green)">Running</span>
+          <span id="run-verdict-badge" style="display:none"></span>
+          <button class="btn btn-secondary btn-sm" onclick="viewReport()" id="btn-view-report" style="display:none">📄 View Report</button>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px">
+          <span id="run-progress-label">Initializing...</span>
+          <span id="run-progress-pct">0%</span>
+        </div>
+        <div class="progress-wrap"><div class="progress-bar" id="run-progress" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <!-- Live finding counts -->
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-val" style="color:var(--red)" id="lk-crit">0</div><div class="kpi-lbl">Critical</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--orange)" id="lk-high">0</div><div class="kpi-lbl">High</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--amber)" id="lk-med">0</div><div class="kpi-lbl">Medium</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--blue)" id="lk-low">0</div><div class="kpi-lbl">Low</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--green)" id="lk-pass">0</div><div class="kpi-lbl">Passed</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--muted)" id="lk-total">0</div><div class="kpi-lbl">Total Checks</div></div>
+    </div>
+
+    <!-- Live findings -->
+    <div class="card">
+      <div class="card-title">🚨 Live Findings</div>
+      <div id="live-findings">
+        <div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">Scan in progress — findings appear here as checks complete...</div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <div class="card-title">📋 Scan Log</div>
+      <div class="log-box" id="live-log"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ TAB 3: RESULTS ══════════ -->
+<div id="tab-results" class="tab-pane">
+  <div id="results-empty" class="empty">
+    <div class="empty-icon">🛡</div>
+    <h3>No Results Yet</h3>
+    <p>Run a security scan to see the full findings report here.</p>
+    <button class="btn btn-primary" style="margin-top:16px" onclick="switchTab('configure')">⚙ Start a Scan</button>
+  </div>
+  <div id="results-content" style="display:none">
+
+    <!-- Summary header -->
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+        <div class="score-ring">
+          <svg width="96" height="96" viewBox="0 0 96 96">
+            <circle cx="48" cy="48" r="40" fill="none" stroke="#334155" stroke-width="8"/>
+            <circle cx="48" cy="48" r="40" fill="none" id="score-arc"
+              stroke="#10b981" stroke-width="8" stroke-linecap="round"
+              stroke-dasharray="251.2" stroke-dashoffset="251.2"/>
+          </svg>
+          <div class="score-text" id="score-text">—</div>
+        </div>
+        <div>
+          <div style="font-size:17px;font-weight:700" id="results-project">—</div>
+          <div style="font-size:12px;color:var(--muted)" id="results-url">—</div>
+          <div style="margin-top:8px" id="results-verdict-el"></div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-secondary" onclick="viewReport()">📄 View Report</button>
+          <button class="btn btn-primary" onclick="downloadReport()">⬇ Download</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-val" style="color:var(--red)" id="rk-crit">—</div><div class="kpi-lbl">Critical</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--orange)" id="rk-high">—</div><div class="kpi-lbl">High</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--amber)" id="rk-med">—</div><div class="kpi-lbl">Medium</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--blue)" id="rk-low">—</div><div class="kpi-lbl">Low</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--green)" id="rk-pass">—</div><div class="kpi-lbl">Passed</div></div>
+    </div>
+
+    <!-- Findings by severity -->
+    <div id="results-findings"></div>
+  </div>
+</div>
+
+<!-- ══════════ TAB 4: HISTORY ══════════ -->
+<div id="tab-history" class="tab-pane">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <h2 style="font-size:17px;font-weight:800">Scan History</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <select id="hist-filter-verdict" onchange="loadHistory()" style="width:130px">
+        <option value="">All Verdicts</option>
+        <option value="PASS">PASS</option><option value="RISK">RISK</option><option value="FAIL">FAIL</option>
+      </select>
+      <select id="hist-filter-project" onchange="loadHistory()" style="width:160px">
+        <option value="">All Projects</option>
+      </select>
+      <button class="btn btn-secondary btn-sm" onclick="loadHistory()">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <div id="hist-empty" class="empty" style="display:none">
+    <div class="empty-icon">📁</div><h3>No Scans Yet</h3><p>Run a security scan to see history here.</p>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Project</th><th>Env</th><th>URL</th><th>Score</th>
+        <th>Critical</th><th>High</th><th>Medium</th>
+        <th>Verdict</th><th>By</th><th>Date</th><th>Actions</th>
+      </tr></thead>
+      <tbody id="hist-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirm-modal" style="display:none">
+  <div class="modal">
+    <h3>🛡 Confirm Security Scan</h3>
+    <p id="confirm-summary">This will send test requests to the target URL to check for security issues.</p>
+    <div class="modal-warn" id="confirm-warn" style="display:none">
+      ⚠️ <strong>Production Warning:</strong> The scanner sends real HTTP requests to your server, including probing for sensitive paths and headers. Ensure your WAF/rate-limiter won't block the Railway server IP.
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmStart()">🛡 Confirm & Start Scan</button>
+    </div>
+  </div>
+</div>
+
+<div class="notif" id="notif-container"></div>
+
+<script>
+// ── State ──
+let _currentRunId = null;
+let _pollTimer    = null;
+let _pendingCfg   = null;
+const CHECK_DEFS  = [
+  { key:'headers',   name:'Security Headers',    desc:'HSTS, CSP, X-Frame-Options, Referrer-Policy and more', icon:'🔒' },
+  { key:'ssl',       name:'SSL / TLS',            desc:'Certificate validity, expiry, TLS version', icon:'🔑' },
+  { key:'cors',      name:'CORS Configuration',   desc:'Wildcard origins, reflected origins, credentials exposure', icon:'🌐' },
+  { key:'redirect',  name:'Open Redirect',        desc:'Tests common redirect parameters for external redirection', icon:'↪️' },
+  { key:'paths',     name:'Sensitive Paths',      desc:'.env, .git, /admin, phpinfo, actuator and more', icon:'📂' },
+  { key:'methods',   name:'HTTP Methods',         desc:'Dangerous methods: TRACE, TRACK, unneeded PUT/DELETE', icon:'⚡' },
+  { key:'info',      name:'Info Disclosure',      desc:'Server version, X-Powered-By, debug output in body', icon:'🔍' },
+  { key:'ratelimit', name:'Rate Limiting',         desc:'Sends 20 rapid requests to check if 429 is returned', icon:'🚦' },
+  { key:'cookies',   name:'Cookie Security',      desc:'Secure, HttpOnly, SameSite flags on all cookies', icon:'🍪' },
+];
+
+function getToken() {
+    return localStorage.getItem('qa_jwt_token') || localStorage.getItem('qa_token') || '';
+}
+
+async function api(method, path, body) {
+    const opts = { method, headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${getToken()}` } };
+    if (body && method !== 'GET') opts.body = JSON.stringify(body);
+    const res = await fetch(path, opts);
+    if (res.status === 401) { window.location.href = '/'; }
+    if (!res.ok) { const e = await res.json().catch(() => ({ error: res.statusText })); throw new Error(e.error || res.statusText); }
+    return res.json();
+}
+
+function showNotif(msg, type = 'info', dur = 4000) {
+    const c  = document.getElementById('notif-container');
+    const el = document.createElement('div');
+    el.className = `notif-item notif-${type}`;
+    el.textContent = msg;
+    c.appendChild(el);
+    setTimeout(() => el.remove(), dur);
+}
+
+function switchTab(name) {
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name)?.classList.add('active');
+    const names = ['configure','live','results','history'];
+    const btns  = document.querySelectorAll('.tab-btn');
+    const idx   = names.indexOf(name);
+    if (btns[idx]) btns[idx].classList.add('active');
+    if (name === 'history') loadHistory();
+}
+
+// ── Init ──
+window.addEventListener('DOMContentLoaded', () => {
+    if (!getToken()) { window.location.href = '/'; return; }
+    renderChecks();
+    loadHistory();
+});
+
+// ── Render check toggles ──
+function renderChecks() {
+    const c = document.getElementById('checks-grid');
+    c.innerHTML = CHECK_DEFS.map(ch => `
+      <label class="check-item selected" id="ci-${ch.key}">
+        <input type="checkbox" checked id="chk-${ch.key}" onchange="toggleCheck('${ch.key}')">
+        <div>
+          <div class="check-name">${ch.icon} ${ch.name}</div>
+          <div class="check-desc">${ch.desc}</div>
+        </div>
+      </label>`).join('');
+}
+
+function toggleCheck(key) {
+    const sel = document.getElementById('chk-' + key).checked;
+    document.getElementById('ci-' + key).classList.toggle('selected', sel);
+}
+
+function selectAll()  { CHECK_DEFS.forEach(c => { document.getElementById('chk-'+c.key).checked = true;  document.getElementById('ci-'+c.key).classList.add('selected'); }); }
+function selectNone() { CHECK_DEFS.forEach(c => { document.getElementById('chk-'+c.key).checked = false; document.getElementById('ci-'+c.key).classList.remove('selected'); }); }
+
+function getSelectedChecks() {
+    return CHECK_DEFS.filter(c => document.getElementById('chk-'+c.key)?.checked).map(c => c.key);
+}
+
+// ── Start scan ──
+function startScan() {
+    const url     = document.getElementById('cfg-url').value.trim();
+    const project = document.getElementById('cfg-project').value;
+    const env     = document.getElementById('cfg-env').value;
+    const checks  = getSelectedChecks();
+
+    if (!url) { showNotif('Target URL is required.', 'error'); return; }
+    if (!/^https?:\/\//i.test(url)) { showNotif('URL must start with http:// or https://', 'error'); return; }
+    if (!checks.length) { showNotif('Select at least one check.', 'error'); return; }
+
+    _pendingCfg = { url, projectName: project || 'Unknown', environment: env, checks, executedBy: 'Dashboard' };
+
+    const isProd = env === 'Production';
+    document.getElementById('confirm-summary').innerHTML =
+        `<strong>Project:</strong> ${project || '—'} · <strong>Env:</strong> ${env}<br>
+         <strong>URL:</strong> ${url}<br>
+         <strong>Checks:</strong> ${checks.length} selected`;
+    document.getElementById('confirm-warn').style.display = isProd ? '' : 'none';
+    document.getElementById('confirm-modal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('confirm-modal').style.display = 'none';
+    _pendingCfg = null;
+}
+
+async function confirmStart() {
+    const cfg = _pendingCfg;
+    closeModal();
+    if (!cfg) return;
+    document.getElementById('btn-start').disabled = true;
+    try {
+        const data = await api('POST', '/api/security-test/start', cfg);
+        _currentRunId = data.runId;
+        showNotif('Scan started! Switching to Live Scan tab...', 'success');
+        initLiveView(cfg);
+        switchTab('live');
+        startPolling();
+    } catch (e) {
+        showNotif('Failed to start scan: ' + e.message, 'error');
+    } finally {
+        document.getElementById('btn-start').disabled = false;
+    }
+}
+
+// ── Live view ──
+function initLiveView(cfg) {
+    document.getElementById('live-empty').style.display   = 'none';
+    document.getElementById('live-content').style.display = '';
+    document.getElementById('run-project').textContent    = `${cfg.projectName} — ${cfg.environment}`;
+    document.getElementById('run-url').textContent        = cfg.url;
+    document.getElementById('run-dot').className          = 'status-dot dot-running';
+    document.getElementById('run-status-label').textContent = 'Running';
+    document.getElementById('run-verdict-badge').style.display = 'none';
+    document.getElementById('btn-view-report').style.display   = 'none';
+    document.getElementById('live-findings').innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">Scan in progress — findings appear here as checks complete...</div>';
+    document.getElementById('live-log').innerHTML = '';
+    document.getElementById('run-progress').style.width = '0%';
+
+    const badge = document.getElementById('stc-run-badge');
+    badge.textContent = '🔴 SCANNING'; badge.className = 'pill pill-red'; badge.style.display = '';
+}
+
+function startPolling() {
+    if (_pollTimer) clearInterval(_pollTimer);
+    _pollTimer = setInterval(pollStatus, 2000);
+}
+function stopPolling() { if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; } }
+
+async function pollStatus() {
+    if (!_currentRunId) return;
+    try {
+        const data = await api('GET', `/api/security-test/status/${_currentRunId}`);
+        updateLiveUI(data);
+        if (['completed','failed'].includes(data.status)) {
+            stopPolling();
+            onScanFinished(data);
+        }
+    } catch (e) { console.warn('[poll]', e.message); }
+}
+
+let _lastLogLen = 0;
+function updateLiveUI(data) {
+    const findings = data.findings || [];
+    const pct      = data.progress || 0;
+    const checked  = CHECK_DEFS.find(c => c.key === _currentCheckKey(data.logs)) || {};
+
+    document.getElementById('run-progress').style.width      = pct + '%';
+    document.getElementById('run-progress-pct').textContent  = pct + '%';
+    document.getElementById('run-progress-label').textContent = data.logs?.slice(-1)[0]?.msg || 'Scanning...';
+
+    const crit = findings.filter(f => f.severity === 'CRITICAL' && f.status !== 'pass').length;
+    const high = findings.filter(f => f.severity === 'HIGH'     && f.status !== 'pass').length;
+    const med  = findings.filter(f => f.severity === 'MEDIUM'   && f.status !== 'pass').length;
+    const low  = findings.filter(f => f.severity === 'LOW'      && f.status !== 'pass').length;
+    const pass = findings.filter(f => f.status === 'pass').length;
+
+    document.getElementById('lk-crit').textContent  = crit;
+    document.getElementById('lk-high').textContent  = high;
+    document.getElementById('lk-med').textContent   = med;
+    document.getElementById('lk-low').textContent   = low;
+    document.getElementById('lk-pass').textContent  = pass;
+    document.getElementById('lk-total').textContent = findings.length;
+
+    // Render finding cards (non-pass only)
+    const fails = findings.filter(f => f.status !== 'pass' && f.status !== 'info');
+    if (fails.length) {
+        document.getElementById('live-findings').innerHTML = fails.map(f => renderFindingCard(f)).join('');
+    }
+
+    // Log
+    const logs = data.logs || [];
+    if (logs.length !== _lastLogLen) {
+        _lastLogLen = logs.length;
+        const box = document.getElementById('live-log');
+        box.innerHTML = logs.map(l => `<div class="log-entry"><span class="ts">${new Date(l.time).toLocaleTimeString('en-IN')}</span>${_esc(l.msg)}</div>`).join('');
+        box.scrollTop = box.scrollHeight;
+    }
+}
+
+function _currentCheckKey(logs) {
+    if (!logs?.length) return '';
+    const last = logs[logs.length - 1]?.msg || '';
+    for (const c of CHECK_DEFS) { if (last.toLowerCase().includes(c.name.toLowerCase().split(' ')[0].toLowerCase())) return c.key; }
+    return '';
+}
+
+function onScanFinished(data) {
+    const vd = data.verdict || '—';
+    document.getElementById('run-dot').className = 'status-dot dot-completed';
+    document.getElementById('run-status-label').textContent = 'Completed';
+
+    const badge = document.getElementById('run-verdict-badge');
+    badge.innerHTML = `<span class="verdict verdict-${vd}">${vd}</span>`;
+    badge.style.display = '';
+    document.getElementById('btn-view-report').style.display = '';
+
+    const topBadge = document.getElementById('stc-run-badge');
+    topBadge.textContent  = vd === 'PASS' ? '✅ PASS' : vd === 'RISK' ? '⚠ RISK' : '❌ FAIL';
+    topBadge.className    = `pill ${vd === 'PASS' ? 'pill-green' : vd === 'RISK' ? 'pill-amber' : 'pill-red'}`;
+
+    renderResults(data);
+    showNotif(`Scan complete! Verdict: ${vd} · Score: ${data.score}/100`, vd === 'PASS' ? 'success' : 'error', 5000);
+    loadHistory();
+}
+
+// ── Finding card renderer ──
+const SEV_CLASS = { CRITICAL:'sev-c', HIGH:'sev-h', MEDIUM:'sev-m', LOW:'sev-l', PASS:'sev-p', INFO:'sev-p' };
+function renderFindingCard(f) {
+    return `
+    <div class="finding-card ${SEV_CLASS[f.severity] || ''}">
+      <div class="finding-title">
+        <span class="sev sev-${f.severity}">${f.severity}</span>
+        ${_esc(f.title)}
+        <span style="font-size:11px;color:var(--muted);font-weight:400">${_esc(f.category)}</span>
+      </div>
+      ${f.detail ? `<div class="finding-detail">${_esc(f.detail)}</div>` : ''}
+      ${f.recommendation ? `<div class="finding-rec">💡 ${_esc(f.recommendation)}</div>` : ''}
+    </div>`;
+}
+
+// ── Results tab ──
+function renderResults(data) {
+    const findings = data.findings || [];
+    const score    = data.score ?? 0;
+    const vd       = data.verdict || '—';
+
+    document.getElementById('results-empty').style.display   = 'none';
+    document.getElementById('results-content').style.display = '';
+
+    // Score arc
+    const arc = document.getElementById('score-arc');
+    const circumference = 251.2;
+    const offset = circumference - (score / 100) * circumference;
+    arc.style.strokeDashoffset = offset;
+    const scoreColor = score >= 80 ? '#10b981' : score >= 60 ? '#f59e0b' : '#ef4444';
+    arc.style.stroke = scoreColor;
+    document.getElementById('score-text').textContent = score;
+    document.getElementById('score-text').style.color = scoreColor;
+
+    document.getElementById('results-project').textContent = `${data.config?.projectName} — ${data.config?.environment}`;
+    document.getElementById('results-url').textContent     = data.config?.url || '—';
+    document.getElementById('results-verdict-el').innerHTML = `<span class="verdict verdict-${vd}">${vd}</span>`;
+
+    const crit = findings.filter(f => f.severity === 'CRITICAL' && f.status !== 'pass');
+    const high = findings.filter(f => f.severity === 'HIGH'     && f.status !== 'pass');
+    const med  = findings.filter(f => f.severity === 'MEDIUM'   && f.status !== 'pass');
+    const low  = findings.filter(f => f.severity === 'LOW'      && f.status !== 'pass');
+    const pass = findings.filter(f => f.status === 'pass');
+
+    document.getElementById('rk-crit').textContent = crit.length;
+    document.getElementById('rk-high').textContent = high.length;
+    document.getElementById('rk-med').textContent  = med.length;
+    document.getElementById('rk-low').textContent  = low.length;
+    document.getElementById('rk-pass').textContent = pass.length;
+
+    // Grouped findings
+    const groups = [
+        { label: '🔴 Critical', items: crit },
+        { label: '🟠 High', items: high },
+        { label: '🟡 Medium', items: med },
+        { label: '🔵 Low', items: low },
+    ];
+    let html = '';
+    for (const g of groups) {
+        if (!g.items.length) continue;
+        html += `<div class="card"><div class="card-title">${g.label} (${g.items.length})</div>${g.items.map(f => renderFindingCard(f)).join('')}</div>`;
+    }
+    if (pass.length) {
+        html += `<div class="card"><div class="card-title">✅ Passed Checks (${pass.length})</div>`;
+        html += pass.map(f => `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)"><span class="sev sev-PASS">PASS</span><span style="font-size:13px">${_esc(f.title)}</span><span style="font-size:11px;color:var(--muted)">${_esc(f.category)}</span></div>`).join('');
+        html += '</div>';
+    }
+    document.getElementById('results-findings').innerHTML = html || '<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center">No findings to display.</div>';
+}
+
+// ── Report URLs ──
+function reportUrl(runId, download) {
+    const tk = encodeURIComponent(getToken());
+    return `/api/security-test/report/${runId}${download ? '/download' : ''}?token=${tk}`;
+}
+function viewReport()     { if (_currentRunId) window.open(reportUrl(_currentRunId, false), '_blank'); }
+function downloadReport() { if (_currentRunId) window.open(reportUrl(_currentRunId, true)); }
+
+// ── History ──
+async function loadHistory() {
+    try {
+        const data = await api('GET', '/api/security-test/history');
+        const rows = data.runs || [];
+
+        const projects = [...new Set(rows.map(r => r.projectName).filter(Boolean))];
+        const pf = document.getElementById('hist-filter-project');
+        const cur = pf.value;
+        pf.innerHTML = '<option value="">All Projects</option>' + projects.map(p => `<option value="${_esc(p)}" ${p===cur?'selected':''}>${_esc(p)}</option>`).join('');
+
+        const fV = document.getElementById('hist-filter-verdict').value;
+        const fP = pf.value;
+        const filtered = rows.filter(r => (!fV || r.verdict === fV) && (!fP || r.projectName === fP));
+
+        document.getElementById('hist-empty').style.display = filtered.length ? 'none' : '';
+        const vdColor = { PASS:'var(--green)', RISK:'var(--amber)', FAIL:'var(--red)' };
+        document.getElementById('hist-tbody').innerHTML = filtered.map(r => {
+            const vd = r.verdict || '—';
+            const dt = r.startTime ? new Date(r.startTime).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+            const scoreColor = (r.score||0) >= 80 ? 'var(--green)' : (r.score||0) >= 60 ? 'var(--amber)' : 'var(--red)';
+            const shortUrl = r.url?.replace(/^https?:\/\//,'').slice(0,35) + (r.url?.length > 38 ? '…' : '');
+            return `<tr>
+              <td><strong>${_esc(r.projectName)}</strong></td>
+              <td style="font-size:11px;color:var(--muted)">${_esc(r.environment)}</td>
+              <td style="font-size:11px;color:var(--muted);max-width:180px">${_esc(shortUrl)}</td>
+              <td style="color:${scoreColor};font-weight:800">${r.score ?? '—'}/100</td>
+              <td style="color:var(--red);font-weight:700">${r.critical||0}</td>
+              <td style="color:var(--orange);font-weight:700">${r.high||0}</td>
+              <td style="color:var(--amber);font-weight:700">${r.medium||0}</td>
+              <td><span style="color:${vdColor[vd]||'var(--muted)'};font-weight:900">${vd}</span></td>
+              <td style="color:var(--muted);font-size:11px">${_esc(r.executedBy)}</td>
+              <td style="color:var(--muted);font-size:11px">${dt}</td>
+              <td>
+                <div style="display:flex;gap:4px">
+                  ${r.hasReport ? `<button class="btn btn-secondary btn-xs" onclick="openHistReport('${r.runId}')">📄</button>` : ''}
+                  ${r.hasReport ? `<button class="btn btn-secondary btn-xs" onclick="dlHistReport('${r.runId}')">⬇</button>` : ''}
+                  <button class="btn btn-secondary btn-xs" onclick="loadAndViewResults('${r.runId}')">🛡</button>
+                  <button class="btn btn-danger btn-xs" onclick="deleteRun('${r.runId}')">🗑</button>
+                </div>
+              </td>
+            </tr>`;
+        }).join('') || `<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:30px">No scan history found</td></tr>`;
+    } catch (e) { showNotif('History load failed: ' + e.message, 'error'); }
+}
+
+function openHistReport(runId) { window.open(reportUrl(runId, false), '_blank'); }
+function dlHistReport(runId)   { window.open(reportUrl(runId, true)); }
+
+async function loadAndViewResults(runId) {
+    try {
+        const data = await api('GET', `/api/security-test/status/${runId}`);
+        _currentRunId = runId;
+        renderResults(data);
+        switchTab('results');
+    } catch (e) { showNotif('Could not load results: ' + e.message, 'error'); }
+}
+
+async function deleteRun(runId) {
+    if (!confirm('Delete this scan report permanently?')) return;
+    try {
+        await api('DELETE', `/api/security-test/history/${runId}`);
+        showNotif('Deleted.', 'info');
+        loadHistory();
+        if (_currentRunId === runId) {
+            _currentRunId = null;
+            document.getElementById('results-empty').style.display = '';
+            document.getElementById('results-content').style.display = 'none';
+        }
+    } catch (e) { showNotif('Delete failed: ' + e.message, 'error'); }
+}
+
+function _esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
