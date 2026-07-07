@@ -664,7 +664,9 @@ function _scenarioToK6Script(scenario) {
     const enabledSteps = steps.filter(s => s.enabled !== false);
 
     // Build per-VU data array (for dynamic data)
-    const dataArray = _buildK6DataArray(scenario, Math.max(vus, 50));
+    // Generate enough data rows for all iterations: vus × (duration / ~1s per iter) + buffer
+    const iterEstimate = Math.ceil(vus * (scenario.duration || 30) * 1.5);
+    const dataArray = _buildK6DataArray(scenario, Math.max(vus, iterEstimate, 100));
 
     // Build options
     let optionsStr;
@@ -779,7 +781,9 @@ async function _aesDecrypt(b64, keyStr, ivStr) {
 }
 
 export default async function () {
-  const vuIdx = (__VU - 1) % DATA.length;
+  // Use __ITER (global iteration counter across all VUs) so each iteration
+  // gets a unique data row — prevents same email being reused across iterations
+  const vuIdx = __ITER % DATA.length;
   const vuData = DATA[vuIdx];
   const vars = Object.assign({}, GLOBAL_VARS, vuData);
 
