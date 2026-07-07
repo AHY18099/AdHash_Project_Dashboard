@@ -1,0 +1,5 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "k6"]
+
+[start]
+cmd = "node server.js"
