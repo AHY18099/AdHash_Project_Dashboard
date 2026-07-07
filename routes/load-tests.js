@@ -438,7 +438,19 @@ async function _executeRun(runId, cfg, state) {
 
 // ── Multi-step flow execution (full registration: steps 1→2→3→4 per VU) ──
 async function _executeFlowRun(runId, cfg, state, addLog, addTimeline) {
-    const fetch = (...a) => import('node-fetch').then(m => m.default(...a)).catch(() => globalThis.fetch(...a));
+    // Use same fetch pattern as _executeDynamicRun (works on Railway Node 18)
+    let fetchFn;
+    try {
+        const nf = await import('node-fetch');
+        fetchFn = nf.default;
+    } catch (_) {
+        fetchFn = globalThis.fetch.bind(globalThis);
+    }
+    if (!fetchFn) {
+        state.status = 'failed'; state.endTime = new Date().toISOString();
+        addLog('Flow mode requires fetch (node-fetch or Node 18+) — not available', 'Failed');
+        _saveResults(runId, state); return;
+    }
 
     const flowCfg  = cfg.flowConfig;
     const vus      = cfg.vus;
@@ -467,7 +479,7 @@ async function _executeFlowRun(runId, cfg, state, addLog, addTimeline) {
                 encKey:  flowCfg.encKey,
                 encIv:   flowCfg.encIv,
                 otp:     flowCfg.otp || '000000',
-            }, fetch);
+            }, fetchFn);
         } catch (e) {
             result = { ok: false, step: 0, status: 0, error: e.message };
         }
@@ -492,7 +504,11 @@ async function _executeFlowRun(runId, cfg, state, addLog, addTimeline) {
         addLog(`VU${i+1} → step${result.step} ${result.status} ${responseTime}ms ${email} ${result.ok ? '✓' : '✗ ' + (result.error || '').substring(0,60)}`, 'Running');
     });
 
-    await Promise.all(promises);
+    try {
+        await Promise.all(promises);
+    } catch (e) {
+        addLog(`Flow Promise.all error: ${e.message}`, 'Failed');
+    }
 
     const elapsed = (Date.now() - t0) / 1000 || 1;
     m.rps        = parseFloat((m.totalReqs / elapsed).toFixed(2));
