@@ -635,6 +635,22 @@ router.post('/decrypt', (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// POST /api/load-test/encrypt — k6 calls this at runtime to encrypt a request
+// body with runtime variable values (e.g. emailVerificationToken from Step 3).
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/encrypt', (req, res) => {
+    try {
+        const { plaintext, key, iv, outputField } = req.body;
+        if (!plaintext || !key || !iv) return res.status(400).json({ error: 'Missing fields' });
+        const encrypted = aesCbcEncrypt(plaintext, key, iv);
+        const field = outputField || 'encryptedData';
+        res.json({ body: JSON.stringify({ [field]: encrypted }) });
+    } catch (e) {
+        res.status(200).json({ body: '{}' });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // POST /api/load-test/scenario/k6-script — generate downloadable k6 script
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/scenario/k6-script', auth, (req, res) => {
@@ -758,8 +774,10 @@ ${optionsStr}
 const DATA = ${dataStr};
 const GLOBAL_VARS = ${varsStr};
 
-// Server-side decrypt proxy — Node.js AES-CBC (avoids k6 WebCrypto limitations)
-const DECRYPT_URL = '${scenario.dashboardUrl || process.env.DASHBOARD_URL || 'https://adhashprojectdashboard-production.up.railway.app'}/api/load-test/decrypt';
+// Server-side crypto proxies — Node.js AES-CBC (avoids k6 WebCrypto limitations)
+const _BASE_URL = '${process.env.DASHBOARD_URL || 'https://adhashprojectdashboard-production.up.railway.app'}';
+const DECRYPT_URL = _BASE_URL + '/api/load-test/decrypt';
+const ENCRYPT_URL = _BASE_URL + '/api/load-test/encrypt';
 
 function _get(obj, path) {
   return path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj);
@@ -817,8 +835,24 @@ function _generateStepCode(step, idx) {
     let bodyRef  = 'null';
     if (['POST','PUT','PATCH'].includes(method) && step.body) {
         let bodyVal = step.body;
-        if (step.requestEncryption?.enabled) {
-            bodyRef = `vuData._encryptedBody_step${idx+1} || null`;
+        const enc = step.requestEncryption;
+        if (enc?.enabled) {
+            const bodyStr = typeof bodyVal === 'object' ? JSON.stringify(bodyVal) : bodyVal;
+            // Check if body contains {{vars}} that are only known at runtime (captured from prior steps)
+            // These cannot be pre-encrypted — must encrypt at runtime via proxy
+            const hasRuntimeVars = /\{\{[^}]+\}\}/.test(bodyStr);
+            if (hasRuntimeVars) {
+                // Runtime encrypt: resolve vars first, then call /api/load-test/encrypt
+                bodyCode = [
+                    `  const _plainBody${idx+1} = _resolveVars(${JSON.stringify(bodyStr)}, vars);`,
+                    `  const _encResp${idx+1} = http.post(ENCRYPT_URL, JSON.stringify({ plaintext: _plainBody${idx+1}, key: ${JSON.stringify(enc.key)}, iv: ${JSON.stringify(enc.iv || '')}, outputField: ${JSON.stringify(enc.outputField || 'encryptedData')} }), { headers: { 'Content-Type': 'application/json' }, timeout: '5s' });`,
+                    `  const _body${idx+1} = ((_encResp${idx+1}.json() || {}).body) || '{}';`,
+                ].join('\n') + '\n';
+                bodyRef = `_body${idx+1}`;
+            } else {
+                // No runtime vars — use pre-encrypted body from DATA array (faster)
+                bodyRef = `vuData._encryptedBody_step${idx+1} || null`;
+            }
         } else {
             if (typeof bodyVal === 'object') bodyVal = JSON.stringify(bodyVal);
             bodyCode = `  const _body${idx+1} = _resolveVars(${JSON.stringify(bodyVal)}, vars);\n`;
