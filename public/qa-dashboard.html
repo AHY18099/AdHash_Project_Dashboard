@@ -8438,16 +8438,25 @@ tr:last-child td.rtd{border-bottom:none}
 .sw-search2{flex:1;min-width:200px;padding:9px 14px;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;color:var(--txt);font-size:13px;outline:none;font-family:inherit;transition:all .2s}
 .sw-search2:focus{border-color:var(--grad-a);box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
 /* Method filter pills */
-.sw-method-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
-.sw-fpill{padding:5px 13px;border-radius:50px;border:1px solid var(--border);background:var(--card);font-size:11px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .15s;color:var(--txt2)}
-.sw-fpill:hover{transform:translateY(-1px)}
-.sw-fpill.active{background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;border-color:transparent}
-.sw-pcnt{background:rgba(0,0,0,.14);padding:1px 5px;border-radius:99px;font-size:9px}
-.sw-fpill-get.active{background:#1d4ed8;border-color:#1d4ed8}
-.sw-fpill-post.active{background:#15803d;border-color:#15803d}
-.sw-fpill-put.active{background:#854d0e;border-color:#854d0e}
-.sw-fpill-delete.active{background:#b91c1c;border-color:#b91c1c}
-.sw-fpill-patch.active{background:#c2410c;border-color:#c2410c}
+.sw-method-filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:12px}
+.sw-fpill{padding:6px 14px;border-radius:50px;border:1.5px solid var(--border);background:var(--card2);font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .18s;color:var(--txt2);letter-spacing:.3px;text-transform:uppercase}
+.sw-fpill:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(0,0,0,.12)}
+.sw-fpill.active{color:#fff;border-color:transparent;box-shadow:0 3px 12px rgba(0,0,0,.2)}
+.sw-fpill.active .sw-pcnt{background:rgba(255,255,255,.25)}
+.sw-pcnt{background:rgba(0,0,0,.1);padding:2px 7px;border-radius:99px;font-size:10px;font-weight:800;line-height:1.4}
+/* All pill */
+.sw-fpill:not([class*="sw-fpill-"]).active{background:linear-gradient(135deg,#6366f1,#8b5cf6)}
+/* Method pills — colored border+text when inactive, solid when active */
+.sw-fpill-get{color:#2563eb;border-color:#93c5fd;background:rgba(37,99,235,.07)}
+.sw-fpill-get.active{background:linear-gradient(135deg,#2563eb,#3b82f6);border-color:transparent}
+.sw-fpill-post{color:#16a34a;border-color:#86efac;background:rgba(22,163,74,.07)}
+.sw-fpill-post.active{background:linear-gradient(135deg,#16a34a,#22c55e);border-color:transparent}
+.sw-fpill-put{color:#d97706;border-color:#fcd34d;background:rgba(217,119,6,.07)}
+.sw-fpill-put.active{background:linear-gradient(135deg,#d97706,#f59e0b);border-color:transparent}
+.sw-fpill-delete{color:#dc2626;border-color:#fca5a5;background:rgba(220,38,38,.07)}
+.sw-fpill-delete.active{background:linear-gradient(135deg,#dc2626,#ef4444);border-color:transparent}
+.sw-fpill-patch{color:#ea580c;border-color:#fdba74;background:rgba(234,88,12,.07)}
+.sw-fpill-patch.active{background:linear-gradient(135deg,#ea580c,#f97316);border-color:transparent}
 /* Tag groups */
 .sw-ep-list{display:flex;flex-direction:column;gap:12px}
 .sw-grp{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)}
