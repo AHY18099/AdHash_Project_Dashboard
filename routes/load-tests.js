@@ -45,7 +45,7 @@ function buildDynPayloads(dynCfg, vus) {
     const templateStr = dynCfg.template || '{}';
     // Pre-parse template once with sentinels so we have a safe JSON structure
     const templateParsed = JSON.parse(
-        templateStr.replace(/\{\{(\w+)\}\}/g, (_, k) => `"__VAR:${k}__"`)
+        templateStr.replace(/"?\{\{(\w+)\}\}"?/g, (_, k) => `"__VAR:${k}__"`)
     );
 
     for (let i = 0; i < vus; i++) {
