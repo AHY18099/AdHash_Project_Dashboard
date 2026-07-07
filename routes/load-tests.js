@@ -1,13 +1,11 @@
 'use strict';
 /**
  * routes/load-tests.js
- * Server-side load testing engine using autocannon (static),
- * custom concurrent fetch loop (dynamic payloads), and k6 (scenario mode).
+ * Server-side load testing engine — k6 only.
  */
 
-const router     = require('express').Router();
-const autocannon = require('autocannon');
-const fs         = require('fs');
+const router = require('express').Router();
+const fs     = require('fs');
 const path       = require('path');
 const crypto     = require('crypto');
 
@@ -179,10 +177,23 @@ function _saveScenarios(list) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// POST /api/load-test/start
+// POST /api/load-test/start  — k6 only
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/start', auth, async (req, res) => {
-    // ── New scenario mode (k6) ──
+    // ── Validate k6 binary before starting ──
+    const { spawn: spawnCheck } = require('child_process');
+    const k6PathCheck = process.env.K6_PATH || 'k6';
+    try {
+        await new Promise((resolve, reject) => {
+            const check = spawnCheck(k6PathCheck, ['version'], { timeout: 5000 });
+            check.on('close', code => code === 0 ? resolve() : reject(new Error('k6 check failed')));
+            check.on('error', reject);
+        });
+    } catch {
+        return res.status(500).json({ error: 'k6 is not installed or not found. Install k6 from https://k6.io or set the K6_PATH environment variable.' });
+    }
+
+    // ── If caller sends full scenario (steps array), use it directly ──
     if (req.body.steps || req.body.scenario) {
         const scenario = req.body.scenario || req.body;
         const vus      = Math.min(Math.max(1, parseInt(scenario.vus) || 10), maxVUs(req));
@@ -203,325 +214,90 @@ router.post('/start', auth, async (req, res) => {
         return;
     }
 
-    // ── Old autocannon path (backward compat) ──
+    // ── Single-URL mode: convert to single-step k6 scenario ──
     const {
         projectName, environment, url, method = 'GET',
         headers = {}, body: reqBody, queryParams = {},
-        vus = 10, duration = 30, rampup = 5,
+        vus = 10, duration = 30, rampup = 0,
         timeout = 5000, rps,
         scenarioType = 'Baseline Load Test',
-        scenarioSteps = [],
         stopOnErrorRate, stopOnP95,
         p95Threshold = 3000,
         executedBy = 'Dashboard',
-        dynamicMode = false,
         dynamicConfig = null,
     } = req.body || {};
 
-    // ── Validation ──
     if (!url)      return res.status(400).json({ error: 'url is required' });
     if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: 'url must start with http:// or https://' });
-    if (!duration) return res.status(400).json({ error: 'duration is required' });
 
-    const limit = maxVUs(req);
+    const limit     = maxVUs(req);
     const actualVUs = Math.min(Math.max(1, parseInt(vus) || 10), limit);
     const actualDur = Math.min(300, Math.max(5, parseInt(duration) || 30));
 
-    // ── Prevent duplicate runs on same URL ──
     for (const [, run] of _runs) {
         if (run.status === 'running' && run.config.url === url) {
             return res.status(409).json({ error: `A test is already running for ${url}` });
         }
     }
 
-    const runId    = 'lt_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
-    const startTime = new Date().toISOString();
-
     // Build query string
-    const qs = Object.keys(queryParams).length
-        ? '?' + new URLSearchParams(queryParams).toString() : '';
+    const qs      = Object.keys(queryParams).length ? '?' + new URLSearchParams(queryParams).toString() : '';
     const fullUrl = url + qs;
 
-    const cfg = {
-        projectName, environment, url: fullUrl, baseUrl: url,
-        method, headers: maskHeaders(headers), body: reqBody,
-        vus: actualVUs, duration: actualDur, rampup,
-        timeout, rps, scenarioType, scenarioSteps,
-        p95Threshold, stopOnErrorRate, stopOnP95,
-        executedBy, startTime,
-        dynamicMode: !!dynamicMode,
-        dynamicConfig: dynamicMode ? dynamicConfig : null,
+    // Build single-step scenario from Configure Test inputs
+    const singleStep = {
+        id:      'step1',
+        name:    scenarioType,
+        enabled: true,
+        method:  method.toUpperCase(),
+        url:     fullUrl,
+        headers: maskHeaders(headers),
+        body:    reqBody || null,
+        assertions: [],
+        captures: [],
+        requestEncryption: { enabled: false },
+        responseDecryption: { enabled: false },
+        thinkTime: 0,
+        retryCount: 0,
+        timeout,
     };
+
+    // Merge dynamic config into scenario dynamicData if provided
+    const dynamicData = dynamicConfig ? {
+        emailPrefix: dynamicConfig.emailPrefix,
+        emailDomain: dynamicConfig.emailDomain,
+        startIndex:  dynamicConfig.startIndex,
+        phoneBase:   dynamicConfig.phoneBase,
+        namePrefix:  dynamicConfig.namePrefix,
+    } : {};
+
+    const scenario = {
+        scenarioName: `${scenarioType} — ${projectName || 'Project'}`,
+        projectName, environment, mode: 'single',
+        vus: actualVUs, duration: actualDur, rampup,
+        timeout, rps, scenarioType, scenarioMode: true,
+        p95Threshold, stopOnErrorRate, stopOnP95,
+        executedBy, url: fullUrl,
+        steps: [singleStep],
+        globalVars: {},
+        dynamicData,
+    };
+
+    const runId     = 'lt_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+    const startTime = new Date().toISOString();
+    const cfg       = { ...scenario, startTime };
 
     const runState = {
         runId, status: 'initializing', config: cfg,
-        metrics: {
-            totalReqs: 0, okReqs: 0, errReqs: 0, rps: 0,
-            avgLatency: 0, p50: 0, p90: 0, p95: 0, p99: 0,
-            minLatency: 0, maxLatency: 0, errRate: 0,
-            dataSent: 0, dataRecv: 0, statusCodes: {},
-            latencies: [], rpsHistory: [], latHistory: [],
-            errHistory: [], activeUsersHistory: [], tickTimes: [],
-        },
+        metrics: { ...defaultMetrics },
         logs: [], timeline: [{ time: startTime, event: 'Test started', phase: 'Initializing' }],
         startTime, endTime: null, instance: null, verdict: null,
-        reportPath: null, reportJsonPath: null,
-        perRequestResults: [],
+        reportPath: null, reportJsonPath: null, perRequestResults: [],
     };
     _runs.set(runId, runState);
-
     res.json({ runId, status: 'initializing' });
-
-    // ── Run autocannon asynchronously ──
-    setImmediate(() => _executeRun(runId, cfg, runState));
+    setImmediate(() => _executeK6Run(runId, cfg, runState));
 });
-
-async function _executeRun(runId, cfg, state) {
-    const addLog = (event, phase, extra = {}) => {
-        const entry = { time: new Date().toISOString(), event, phase, ...extra };
-        state.logs.push(entry);
-        if (state.logs.length > 500) state.logs.shift();
-    };
-    const addTimeline = (event, phase) => {
-        state.timeline.push({ time: new Date().toISOString(), event, phase });
-    };
-
-    try {
-        state.status = 'running';
-        addLog('Test started', 'Running');
-        addTimeline('Test started', 'Running');
-
-        // ── DYNAMIC MODE: concurrent fetch with unique payloads ──
-        if (cfg.dynamicMode && cfg.dynamicConfig) {
-            return await _executeDynamicRun(runId, cfg, state, addLog, addTimeline);
-        }
-
-        addLog('Ramp-up started', 'Ramp-up');
-        addTimeline('Ramp-up started', 'Ramp-up');
-
-        // Build autocannon options
-        const acOpts = {
-            url:             cfg.url,
-            connections:     cfg.vus,
-            duration:        cfg.duration,
-            timeout:         Math.round((cfg.timeout || 5000) / 1000),
-            method:          (cfg.method || 'GET').toUpperCase(),
-            headers:         cfg.headers || {},
-            ...(cfg.body ? { body: typeof cfg.body === 'string' ? cfg.body : JSON.stringify(cfg.body) } : {}),
-            ...(cfg.rps   ? { amount: undefined, overallRate: cfg.rps } : {}),
-            // Ramp-up via pipelining stages (approximated with connectionRate)
-            ...(cfg.rampup > 0 ? { connectionRate: Math.ceil(cfg.vus / Math.max(1, cfg.rampup)) } : {}),
-        };
-
-        const latAll = [];
-        let tickOkCount = 0, tickErrCount = 0, lastTickTime = Date.now();
-
-        const instance = autocannon(acOpts, (err, result) => {
-            // Final callback — populate metrics from autocannon summary
-            if (err) {
-                state.status  = 'failed';
-                state.endTime = new Date().toISOString();
-                addLog('Test failed: ' + err.message, 'Failed');
-                addTimeline('Test failed: ' + err.message, 'Failed');
-                _saveResults(runId, state);
-                return;
-            }
-
-            const m = state.metrics;
-            m.totalReqs   = result.requests.total;
-            m.okReqs      = result['2xx'] || (result.requests.total - (result.errors || 0) - (result.timeouts || 0));
-            m.errReqs     = (result.errors || 0) + (result.timeouts || 0);
-            m.rps         = parseFloat(result.requests.mean.toFixed(2));
-            m.avgLatency  = parseFloat(result.latency.mean.toFixed(1));
-            m.p50         = result.latency.p50  || 0;
-            m.p90         = result.latency.p90  || 0;
-            m.p95         = result.latency.p95  || 0;
-            m.p99         = result.latency.p99  || 0;
-            m.minLatency  = result.latency.min  || 0;
-            m.maxLatency  = result.latency.max  || 0;
-            m.dataSent    = result.throughput?.total || 0;
-            m.dataRecv    = result.throughput?.total || 0;
-            m.errRate     = m.totalReqs > 0 ? parseFloat(((m.errReqs / m.totalReqs) * 100).toFixed(2)) : 0;
-
-            state.status  = 'completed';
-            state.endTime = new Date().toISOString();
-            state.verdict = verdict(m, cfg);
-
-            addLog(`Test completed — ${m.totalReqs} reqs · RPS ${m.rps} · P95 ${m.p95}ms`, 'Completed');
-            addTimeline('Test completed', 'Completed');
-            addTimeline('Generating report', 'Generating report');
-
-            _saveResults(runId, state);
-            addTimeline('Report generated', 'Completed');
-        });
-
-        state.instance = instance;
-
-        // Intercept per-response events for live metrics
-        instance.on('response', (client, statusCode, resBytes, responseTime) => {
-            const m = state.metrics;
-            m.totalReqs++;
-            if (statusCode >= 200 && statusCode < 400) m.okReqs++;
-            else m.errReqs++;
-            latAll.push(responseTime);
-            tickOkCount  += (statusCode >= 200 && statusCode < 400) ? 1 : 0;
-            tickErrCount += (statusCode >= 200 && statusCode < 400) ? 0 : 1;
-            m.dataRecv   += resBytes;
-            m.statusCodes[statusCode] = (m.statusCodes[statusCode] || 0) + 1;
-        });
-
-        instance.on('tick', () => {
-            const now   = Date.now();
-            const secDelta = (now - lastTickTime) / 1000 || 1;
-            const m     = state.metrics;
-            const rps   = parseFloat((tickOkCount / secDelta).toFixed(1));
-            const avgLat = latAll.length ? parseFloat((latAll.reduce((s, v) => s + v, 0) / latAll.length).toFixed(1)) : 0;
-            const errRate = m.totalReqs > 0 ? parseFloat(((m.errReqs / m.totalReqs) * 100).toFixed(2)) : 0;
-
-            m.rps        = rps;
-            m.avgLatency = avgLat;
-            m.p50        = Math.round(pct(latAll, 50));
-            m.p90        = Math.round(pct(latAll, 90));
-            m.p95        = Math.round(pct(latAll, 95));
-            m.p99        = Math.round(pct(latAll, 99));
-            m.minLatency = latAll.length ? Math.round(Math.min(...latAll)) : 0;
-            m.maxLatency = latAll.length ? Math.round(Math.max(...latAll)) : 0;
-            m.errRate    = errRate;
-
-            m.rpsHistory.push(rps);
-            m.latHistory.push(avgLat);
-            m.errHistory.push(errRate);
-            m.tickTimes.push(new Date().toISOString());
-            m.activeUsersHistory.push(cfg.vus);
-
-            if (m.rpsHistory.length > 300) {
-                m.rpsHistory.shift(); m.latHistory.shift();
-                m.errHistory.shift(); m.tickTimes.shift();
-                m.activeUsersHistory.shift();
-            }
-
-            tickOkCount = 0; tickErrCount = 0; lastTickTime = now;
-
-            // Safety stops
-            if (cfg.stopOnErrorRate && errRate > cfg.stopOnErrorRate) {
-                addLog(`Auto-stop: error rate ${errRate}% > threshold ${cfg.stopOnErrorRate}%`, 'Stopped', { warn: true });
-                addTimeline(`Auto-stopped: error rate threshold breached`, 'Stopped');
-                instance.stop();
-            }
-            if (cfg.stopOnP95 && m.p95 > cfg.stopOnP95) {
-                addLog(`Auto-stop: P95 ${m.p95}ms > threshold ${cfg.stopOnP95}ms`, 'Stopped', { warn: true });
-                addTimeline(`Auto-stopped: P95 latency threshold breached`, 'Stopped');
-                instance.stop();
-            }
-        });
-
-        addTimeline('Peak users reached', 'Running');
-
-    } catch (err) {
-        state.status  = 'failed';
-        state.endTime = new Date().toISOString();
-        state.logs.push({ time: new Date().toISOString(), event: 'Fatal error: ' + err.message, phase: 'Failed' });
-        _saveResults(runId, state);
-    }
-}
-
-// ── Dynamic concurrent execution ──
-async function _executeDynamicRun(runId, cfg, state, addLog, addTimeline) {
-    const fetch = (...a) => import('node-fetch').then(m => m.default(...a)).catch(() => {
-        // fallback to built-in fetch (Node 18+)
-        return globalThis.fetch(...a);
-    });
-
-    const dynCfg = cfg.dynamicConfig;
-    const vus    = cfg.vus;
-    let payloads;
-    try {
-        payloads = buildDynPayloads(dynCfg, vus);
-    } catch (e) {
-        state.status  = 'failed';
-        state.endTime = new Date().toISOString();
-        addLog(`Payload build failed: ${e.message} — check template JSON is valid`, 'Failed');
-        addTimeline('Payload build failed', 'Failed');
-        _saveResults(runId, state);
-        return;
-    }
-
-    addLog(`Dynamic mode: firing ${vus} concurrent requests`, 'Running');
-    addTimeline(`Firing ${vus} concurrent requests`, 'Running');
-
-    const hdrs = { 'Content-Type': 'application/json', ...(cfg.headers || {}) };
-    // Remove masked values
-    Object.keys(hdrs).forEach(k => { if (hdrs[k] === '***masked***') delete hdrs[k]; });
-
-    const m = state.metrics;
-    const latAll = [];
-    const perResults = [];
-
-    const t0 = Date.now();
-    const promises = payloads.map(async (payload, idx) => {
-        const reqStart = Date.now();
-        let status = 0, responseTime = 0, error = null, responsePreview = '';
-        try {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), cfg.timeout || 5000);
-            const res = await fetch(cfg.url, {
-                method: (cfg.method || 'POST').toUpperCase(),
-                headers: hdrs,
-                body: payload.finalBody,
-                signal: controller.signal,
-            });
-            clearTimeout(timer);
-            responseTime = Date.now() - reqStart;
-            status = res.status;
-            const text = await res.text().catch(() => '');
-            responsePreview = text.substring(0, 200);
-        } catch (e) {
-            responseTime = Date.now() - reqStart;
-            error = e.message || 'Request failed';
-            status = 0;
-        }
-
-        const ok = status >= 200 && status < 400;
-        m.totalReqs++;
-        if (ok) m.okReqs++; else m.errReqs++;
-        latAll.push(responseTime);
-        m.statusCodes[status] = (m.statusCodes[status] || 0) + 1;
-
-        perResults[idx] = {
-            index: idx + 1,
-            email: payload.email,
-            phoneNumber: payload.phoneNumber,
-            status,
-            responseTime,
-            ok,
-            error,
-            responsePreview,
-        };
-        addLog(`Request ${idx+1} → ${status} ${responseTime}ms ${payload.email}`, 'Running');
-    });
-
-    await Promise.all(promises);
-
-    const elapsed = (Date.now() - t0) / 1000 || 1;
-    m.rps         = parseFloat((m.totalReqs / elapsed).toFixed(2));
-    m.avgLatency  = latAll.length ? parseFloat((latAll.reduce((s,v)=>s+v,0)/latAll.length).toFixed(1)) : 0;
-    m.p50         = Math.round(pct(latAll, 50));
-    m.p90         = Math.round(pct(latAll, 90));
-    m.p95         = Math.round(pct(latAll, 95));
-    m.p99         = Math.round(pct(latAll, 99));
-    m.minLatency  = latAll.length ? Math.round(Math.min(...latAll)) : 0;
-    m.maxLatency  = latAll.length ? Math.round(Math.max(...latAll)) : 0;
-    m.errRate     = m.totalReqs > 0 ? parseFloat(((m.errReqs / m.totalReqs) * 100).toFixed(2)) : 0;
-
-    state.perRequestResults = perResults;
-    state.status  = 'completed';
-    state.endTime = new Date().toISOString();
-    state.verdict = verdict(m, cfg);
-
-    addLog(`Dynamic test done — ${m.okReqs}/${m.totalReqs} passed · P95 ${m.p95}ms`, 'Completed');
-    addTimeline('Dynamic test completed', 'Completed');
-    _saveResults(runId, state);
-}
 
 // ── Save JSON + HTML report ──
 function _saveResults(runId, state) {
@@ -624,8 +400,7 @@ router.post('/stop/:runId', auth, (req, res) => {
     if (state.status !== 'running') return res.json({ ok: true, status: state.status });
     if (state.instance) {
         try {
-            if (typeof state.instance.stop === 'function') state.instance.stop(); // autocannon
-            else if (typeof state.instance.kill === 'function') state.instance.kill('SIGTERM'); // k6 child process
+            if (typeof state.instance.kill === 'function') state.instance.kill('SIGTERM');
         } catch {}
     }
     state.status  = 'stopped';
@@ -1392,6 +1167,8 @@ footer{text-align:center;padding:24px;color:#94a3b8;font-size:11px;border-top:1p
     <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
       <span class="badge badge-env">${cfg.environment || 'Unknown'}</span>
       <span class="badge badge-type">${cfg.scenarioType || 'Load Test'}</span>
+      <span class="badge" style="background:rgba(245,158,11,.2);color:#fbbf24">⚡ Engine: k6</span>
+      <span class="badge" style="background:rgba(139,92,246,.15);color:#c4b5fd">${cfg.mode === 'single' || !cfg.steps?.length || cfg.steps?.length === 1 ? 'Single API Test' : 'Workflow Scenario'}</span>
     </div>
   </div>
   <div class="rpt-meta">
@@ -1444,6 +1221,7 @@ ${show('showTestConfig') ? `
     <div class="cfg-row"><div class="cfg-lbl">URL</div><div class="cfg-val" style="word-break:break-all">${cfg.url || '—'}</div></div>
     <div class="cfg-row"><div class="cfg-lbl">HTTP Method</div><div class="cfg-val">${cfg.method || 'GET'}</div></div>
     <div class="cfg-row"><div class="cfg-lbl">Scenario Type</div><div class="cfg-val">${cfg.scenarioType || '—'}</div></div>
+    <div class="cfg-row"><div class="cfg-lbl">Engine</div><div class="cfg-val">⚡ k6 (server-side)</div></div>
     <div class="cfg-row"><div class="cfg-lbl">Concurrent Users</div><div class="cfg-val">${cfg.vus}</div></div>
     <div class="cfg-row"><div class="cfg-lbl">Ramp-up</div><div class="cfg-val">${cfg.rampup || 0}s</div></div>
     <div class="cfg-row"><div class="cfg-lbl">Duration</div><div class="cfg-val">${cfg.duration}s</div></div>

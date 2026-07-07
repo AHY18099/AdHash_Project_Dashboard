@@ -213,7 +213,7 @@ input:checked+.slider::before{transform:translateX(16px)}
 
 <!-- TOP NAV -->
 <div class="topnav">
-  <div class="topnav-brand"><span>⚡</span> Load Test Center</div>
+  <div class="topnav-brand"><span>⚡</span> Load Test Center &nbsp;<span style="font-size:11px;font-weight:600;background:rgba(245,158,11,.2);color:#fbbf24;padding:2px 8px;border-radius:6px;vertical-align:middle">k6</span></div>
   <div class="topnav-right">
     <span id="ltc-role-badge" class="pill pill-red" style="display:none"></span>
     <span id="ltc-run-badge" class="pill" style="display:none"></span>
@@ -224,7 +224,7 @@ input:checked+.slider::before{transform:translateX(16px)}
 <!-- TABS -->
 <div class="tab-bar">
   <button class="tab-btn active" onclick="switchTab('configure')">⚙ Configure Test</button>
-  <button class="tab-btn" onclick="switchTab('scenario')">🔀 Scenario Builder</button>
+  <button class="tab-btn" onclick="switchTab('scenario')">🔀 K6 Workflow Builder</button>
   <button class="tab-btn" onclick="switchTab('live')">🔴 Live Run</button>
   <button class="tab-btn" onclick="switchTab('results')">📊 Results</button>
   <button class="tab-btn" onclick="switchTab('reports')">📁 Reports</button>
@@ -234,8 +234,12 @@ input:checked+.slider::before{transform:translateX(16px)}
 <!-- ══════════════════════════ TAB 1: CONFIGURE ══════════════════════════ -->
 <div id="tab-configure" class="tab-pane active">
 
+  <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#fbbf24;display:flex;align-items:center;gap:8px">
+    <span>⚡</span> <span>All load tests are executed server-side using <strong>k6</strong>. No browser-based load generation.</span>
+  </div>
+
   <div class="card">
-    <div class="card-title">🎯 Target & Project</div>
+    <div class="card-title">🎯 K6 Single API Test &nbsp;<span style="font-size:11px;font-weight:600;background:rgba(245,158,11,.2);color:#fbbf24;padding:2px 8px;border-radius:6px">Engine: ⚡ k6</span></div>
     <div class="row">
       <div class="col">
         <label>Project</label>
@@ -280,7 +284,7 @@ input:checked+.slider::before{transform:translateX(16px)}
     <div style="margin-top:12px">
       <label>Target URL</label>
       <input id="cfg-url" type="url" placeholder="https://your-app.com/api/endpoint" />
-      <div class="form-hint">Tests run server-side — no CORS restrictions. Include full URL with https://</div>
+      <div class="form-hint">Tests run server-side via k6 — no CORS restrictions. Include full URL with https://</div>
     </div>
   </div>
 
@@ -445,26 +449,22 @@ input:checked+.slider::before{transform:translateX(16px)}
 
   </div>
 
-  <!-- Active Scenario from Builder -->
+  <!-- Active Scenario from Builder (workflow mode) -->
   <div id="active-scenario-card" class="card" style="display:none;margin-bottom:0;border-color:var(--accent2)">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <div style="font-size:13px;font-weight:700;color:var(--accent2)">🔀 Active Scenario</div>
+      <div style="font-size:13px;font-weight:700;color:var(--accent2)">🔀 Active k6 Workflow Scenario</div>
       <div style="flex:1">
         <div style="font-size:13px;font-weight:700" id="active-scenario-name">—</div>
         <div style="font-size:11px;color:var(--muted)" id="active-scenario-summary">—</div>
       </div>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text)">
-        <input type="checkbox" id="cfg-use-scenario" style="width:15px;height:15px;accent-color:var(--accent2);cursor:pointer">
-        Use Scenario (k6)
-      </label>
       <button class="btn btn-secondary btn-xs" onclick="clearActiveScenario()">✕ Clear</button>
     </div>
   </div>
 
   <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">
-    <button class="btn btn-primary" onclick="startTest()" id="btn-start">⚡ Start Load Test</button>
+    <button class="btn btn-primary" onclick="startTest()" id="btn-start">⚡ Start k6 Load Test</button>
     <button class="btn btn-secondary" onclick="generateDemo()">🧪 Generate Demo Report</button>
-    <button class="btn btn-secondary" onclick="switchTab('scenario')">🔀 Build Scenario</button>
+    <button class="btn btn-secondary" onclick="switchTab('scenario')">🔀 K6 Workflow Builder</button>
   </div>
 
 </div>
@@ -474,7 +474,7 @@ input:checked+.slider::before{transform:translateX(16px)}
 
   <!-- TOOLBAR -->
   <div class="scenario-toolbar">
-    <div style="font-size:14px;font-weight:800;color:var(--text);margin-right:4px">Scenario Builder</div>
+    <div style="font-size:14px;font-weight:800;color:var(--text);margin-right:4px">K6 Workflow Scenario Builder</div>
     <div style="flex:1;min-width:160px">
       <input id="scen-name" placeholder="Scenario name…" style="height:32px;font-size:13px" oninput="_scenarioMeta.name=this.value" />
     </div>
@@ -486,7 +486,7 @@ input:checked+.slider::before{transform:translateX(16px)}
     <button class="btn btn-secondary btn-sm" onclick="exportScenario()" title="Export JSON">📤 JSON</button>
     <button class="btn btn-secondary btn-sm" onclick="importScenario()" title="Import JSON">📥 Import</button>
     <div style="width:1px;height:22px;background:var(--border);margin:0 2px"></div>
-    <button class="btn btn-amber btn-sm" onclick="dryRun()" title="Dry Run with 1 VU">🧪 Dry Run</button>
+    <button class="btn btn-amber btn-sm" onclick="dryRun()" title="Dry Run with k6 — 1 VU, 30s">🧪 k6 Dry Run</button>
   </div>
 
   <!-- META ROW -->
@@ -570,11 +570,11 @@ input:checked+.slider::before{transform:translateX(16px)}
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;align-items:center">
     <button class="btn btn-secondary" onclick="addStep()">+ Add Step</button>
     <button class="btn btn-secondary" onclick="previewScenario()">👁 Preview Scenario</button>
-    <button class="btn btn-amber" onclick="dryRun()">🧪 Dry Run 1 User</button>
+    <button class="btn btn-amber" onclick="dryRun()">🧪 k6 Dry Run (1 VU)</button>
     <button class="btn btn-primary" onclick="applyScenario()">✅ Apply to Configure Tab</button>
     <button class="btn btn-secondary" onclick="clearScenario()" style="margin-left:auto">🗑 Clear All</button>
   </div>
-  <div class="form-hint" style="margin-top:8px">Each step runs sequentially per VU. Captured variables from one step (e.g. authToken) are available in all subsequent steps.</div>
+  <div class="form-hint" style="margin-top:8px">Each step runs sequentially per VU via k6. Captured variables from one step (e.g. authToken) are available in all subsequent steps.</div>
 
   <!-- PREVIEW MODAL -->
   <div id="scenario-preview-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:600;display:none;align-items:center;justify-content:center;padding:16px">
@@ -993,17 +993,15 @@ function insertDefaultTemplate() {
 function clearActiveScenario() {
     _activeScenario = null;
     document.getElementById('active-scenario-card').style.display = 'none';
-    document.getElementById('cfg-use-scenario').checked = false;
 }
 
 function _showActiveScenario(scenario) {
     _activeScenario = scenario;
-    const card = document.getElementById('active-scenario-card');
+    const card  = document.getElementById('active-scenario-card');
     const steps = scenario.steps || [];
     card.style.display = '';
     document.getElementById('active-scenario-name').textContent = scenario.scenarioName || scenario.name || 'Unnamed Scenario';
     document.getElementById('active-scenario-summary').textContent = `${steps.length} step(s) · ${scenario.projectName || ''} ${scenario.environment || ''}`.trim();
-    document.getElementById('cfg-use-scenario').checked = true;
 }
 
 function _buildDynRecord(index, cfg) {
@@ -1131,7 +1129,6 @@ function buildConfig() {
         try { return JSON.parse(v); } catch { return fallback; }
     };
     const dynamicEnabled = document.getElementById('cfg-dynamic-enable')?.checked || false;
-    const useScenario    = document.getElementById('cfg-use-scenario')?.checked || false;
 
     const base = {
         projectName:    document.getElementById('cfg-project').value || 'Unknown',
@@ -1150,13 +1147,11 @@ function buildConfig() {
         p95Threshold:   parseInt(document.getElementById('cfg-p95threshold').value) || 3000,
         stopOnErrorRate: parseFloat(document.getElementById('cfg-stoponerr').value) || undefined,
         stopOnP95:      parseFloat(document.getElementById('cfg-stoponp95').value) || undefined,
-        scenarioSteps:  _scenarioSteps,
     };
 
-    // ── Scenario mode (k6) ──
-    if (useScenario && _activeScenario) {
-        // Merge UI params into the scenario and send as scenario object
-        const scenarioCfg = {
+    // ── If an active workflow scenario is loaded, send it as a full k6 scenario ──
+    if (_activeScenario) {
+        return {
             ..._activeScenario,
             projectName:    base.projectName,
             environment:    base.environment,
@@ -1170,18 +1165,17 @@ function buildConfig() {
             stopOnP95:      base.stopOnP95,
             executedBy:     'Dashboard',
         };
-        return scenarioCfg; // backend detects .steps → k6 path
     }
 
-    // ── URL is required for single-endpoint modes ──
-    if (!base.url) { showNotif('Target URL is required (or use a Scenario from Scenario Builder).', 'error'); return null; }
+    // ── Single API mode — URL required ──
+    if (!base.url) { showNotif('Target URL is required.', 'error'); return null; }
+    if (!/^https?:\/\//i.test(base.url)) { showNotif('URL must start with http:// or https://', 'error'); return null; }
 
     if (dynamicEnabled) {
         const d = _getDynConfig();
         if (!d.template.trim()) { showNotif('Dynamic mode is on but body template is empty.', 'error'); return null; }
         try { JSON.parse(d.template.replace(/"?\{\{(\w+)\}\}"?/g, (_, k) => `"__VAR:${k}__"`)); } catch { showNotif('Dynamic body template is not valid JSON.', 'error'); return null; }
         if (d.encrypt && !d.encKey.trim()) { showNotif('Encryption is enabled but no encryption key provided.', 'error'); return null; }
-        base.dynamicMode = true;
         base.dynamicConfig = d;
     }
     return base;
@@ -1189,24 +1183,18 @@ function buildConfig() {
 
 function startTest() {
     const cfg = buildConfig();
-    if (!cfg) return; // validation already showed error
-    // Scenario mode has no top-level url; single-URL modes require it
-    const isScenarioMode = !!(cfg.steps && cfg.steps.length > 0);
-    if (!isScenarioMode) {
-        if (!cfg.url) { showNotif('Target URL is required.', 'error'); return; }
-        if (!/^https?:\/\//i.test(cfg.url)) { showNotif('URL must start with http:// or https://', 'error'); return; }
-    }
+    if (!cfg) return;
     if (cfg.vus > _maxVUs) { showNotif(`VU limit for your role is ${_maxVUs}.`, 'error'); return; }
     _pendingConfig = cfg;
 
-    const isProd = cfg.environment === 'Production';
-    const summary = document.getElementById('confirm-summary');
-    const isScenarioMode = !!(cfg.steps && cfg.steps.length > 0);
+    const isProd         = cfg.environment === 'Production';
+    const isWorkflow     = !!(cfg.steps && cfg.steps.length > 1);
+    const summary        = document.getElementById('confirm-summary');
     summary.innerHTML = `
-      <strong>Project:</strong> ${_esc(cfg.projectName)} · <strong>Env:</strong> ${_esc(cfg.environment)}<br>
-      ${isScenarioMode
-        ? `<strong>Scenario:</strong> ${_esc(cfg.scenarioName || 'Unnamed')} · <strong>Steps:</strong> ${cfg.steps.length} (k6 mode)<br>`
-        : `<strong>URL:</strong> ${_esc(cfg.url)}<br>`}
+      <strong>Project:</strong> ${_esc(cfg.projectName)} · <strong>Env:</strong> ${_esc(cfg.environment)} · <strong>Engine:</strong> ⚡ k6<br>
+      ${isWorkflow
+        ? `<strong>Scenario:</strong> ${_esc(cfg.scenarioName || 'Unnamed')} · <strong>Steps:</strong> ${cfg.steps.length}<br>`
+        : `<strong>URL:</strong> ${_esc(cfg.url || cfg.steps?.[0]?.url || '—')}<br>`}
       <strong>VUs:</strong> ${cfg.vus} · <strong>Duration:</strong> ${cfg.duration}s · <strong>Ramp-up:</strong> ${cfg.rampup || 0}s
     `;
     document.getElementById('confirm-warn').style.display = isProd ? '' : 'none';
@@ -1891,7 +1879,7 @@ function applyScenario() {
     const scenario = _buildScenarioObject();
     if (!scenario.steps || !scenario.steps.length) { showNotif('Add at least one step first.', 'error'); return; }
     _showActiveScenario(scenario);
-    showNotif(`Scenario "${scenario.scenarioName}" applied. Switch to Configure tab and click "Use Scenario" then Start.`, 'success', 6000);
+    showNotif(`Scenario "${scenario.scenarioName}" applied. Switch to Configure tab and click "Start k6 Load Test".`, 'success', 6000);
     switchTab('configure');
 }
 
@@ -1909,8 +1897,9 @@ function clearScenario() {
 function initLiveView(cfg) {
     document.getElementById('live-empty').style.display    = 'none';
     document.getElementById('live-content').style.display  = '';
+    const isWorkflow = !!(cfg.steps && cfg.steps.length > 1);
     document.getElementById('run-project-name').textContent = `${cfg.projectName} — ${cfg.environment}`;
-    document.getElementById('run-url-display').textContent  = cfg.url;
+    document.getElementById('run-url-display').textContent  = isWorkflow ? `Workflow: ${cfg.scenarioName || 'Unnamed'} (${cfg.steps.length} steps)` : (cfg.url || cfg.steps?.[0]?.url || '—');
     document.getElementById('btn-stop').disabled = false;
 
     const runBadge = document.getElementById('ltc-run-badge');
