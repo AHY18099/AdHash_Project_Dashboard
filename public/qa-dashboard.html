@@ -8410,9 +8410,14 @@ tr:last-child td.rtd{border-bottom:none}
 .sw-run-close-btn{padding:5px 13px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:var(--card2);color:var(--txt2);cursor:pointer}
 .sw-run-export-btn{padding:5px 13px;font-size:11px;border-radius:6px;border:1px solid var(--grad-a);color:var(--grad-a);background:transparent;cursor:pointer;font-weight:600}
 /* URL tab strip */
-.sw-url-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
-.sw-url-tab{padding:6px 14px;border-radius:50px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:6px;transition:all .15s;color:var(--txt2)}
-.sw-url-tab.active{background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;border-color:transparent}
+.sw-url-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.sw-url-tab{padding:7px 14px 7px 12px;border-radius:50px;border:1.5px solid var(--border);background:var(--card2);cursor:pointer;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:7px;transition:all .18s;color:var(--txt2);position:relative}
+.sw-url-tab:hover{border-color:var(--grad-a);color:var(--txt)}
+.sw-url-tab.active{background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:#fff;border-color:transparent;box-shadow:0 3px 12px rgba(99,102,241,.35)}
+.sw-tab-del{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.15);color:inherit;font-size:10px;line-height:1;cursor:pointer;transition:background .15s;flex-shrink:0;margin-left:2px}
+.sw-tab-del:hover{background:rgba(239,68,68,.7);color:#fff}
+.sw-url-tab.active .sw-tab-del{background:rgba(255,255,255,.25)}
+.sw-url-tab.active .sw-tab-del:hover{background:rgba(239,68,68,.8)}
 .sw-env-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .sw-env-production{background:#10b981}.sw-env-staging{background:#f59e0b}.sw-env-local{background:#6366f1}.sw-env-development{background:#3b82f6}
 /* Info card */
@@ -8438,25 +8443,30 @@ tr:last-child td.rtd{border-bottom:none}
 .sw-search2{flex:1;min-width:200px;padding:9px 14px;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;color:var(--txt);font-size:13px;outline:none;font-family:inherit;transition:all .2s}
 .sw-search2:focus{border-color:var(--grad-a);box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
 /* Method filter pills */
-.sw-method-filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:12px}
-.sw-fpill{padding:6px 14px;border-radius:50px;border:1.5px solid var(--border);background:var(--card2);font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .18s;color:var(--txt2);letter-spacing:.3px;text-transform:uppercase}
+.sw-method-filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-radius:12px}
+.sw-fpill{padding:5px 14px;border-radius:50px;border:1.5px solid var(--border);background:var(--card2);font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .18s;color:var(--txt2);letter-spacing:.4px;text-transform:uppercase;white-space:nowrap}
 .sw-fpill:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(0,0,0,.12)}
-.sw-fpill.active{color:#fff;border-color:transparent;box-shadow:0 3px 12px rgba(0,0,0,.2)}
-.sw-fpill.active .sw-pcnt{background:rgba(255,255,255,.25)}
-.sw-pcnt{background:rgba(0,0,0,.1);padding:2px 7px;border-radius:99px;font-size:10px;font-weight:800;line-height:1.4}
+.sw-fpill.active{color:#fff !important;border-color:transparent !important;box-shadow:0 3px 12px rgba(0,0,0,.18)}
+.sw-fpill.active .sw-pcnt{background:rgba(255,255,255,.3) !important;color:#fff}
+.sw-pcnt{padding:2px 7px;border-radius:99px;font-size:10px;font-weight:800;line-height:1.4;background:rgba(0,0,0,.1)}
 /* All pill */
-.sw-fpill:not([class*="sw-fpill-"]).active{background:linear-gradient(135deg,#6366f1,#8b5cf6)}
-/* Method pills — colored border+text when inactive, solid when active */
+.sw-fpill-all{color:#6366f1;border-color:#a5b4fc;background:rgba(99,102,241,.08)}
+.sw-fpill-all.active{background:linear-gradient(135deg,#6366f1,#8b5cf6) !important}
+/* GET */
 .sw-fpill-get{color:#2563eb;border-color:#93c5fd;background:rgba(37,99,235,.07)}
-.sw-fpill-get.active{background:linear-gradient(135deg,#2563eb,#3b82f6);border-color:transparent}
+.sw-fpill-get.active{background:linear-gradient(135deg,#2563eb,#3b82f6) !important}
+/* POST */
 .sw-fpill-post{color:#16a34a;border-color:#86efac;background:rgba(22,163,74,.07)}
-.sw-fpill-post.active{background:linear-gradient(135deg,#16a34a,#22c55e);border-color:transparent}
+.sw-fpill-post.active{background:linear-gradient(135deg,#16a34a,#22c55e) !important}
+/* PUT */
 .sw-fpill-put{color:#d97706;border-color:#fcd34d;background:rgba(217,119,6,.07)}
-.sw-fpill-put.active{background:linear-gradient(135deg,#d97706,#f59e0b);border-color:transparent}
+.sw-fpill-put.active{background:linear-gradient(135deg,#d97706,#f59e0b) !important}
+/* DELETE */
 .sw-fpill-delete{color:#dc2626;border-color:#fca5a5;background:rgba(220,38,38,.07)}
-.sw-fpill-delete.active{background:linear-gradient(135deg,#dc2626,#ef4444);border-color:transparent}
+.sw-fpill-delete.active{background:linear-gradient(135deg,#dc2626,#ef4444) !important}
+/* PATCH */
 .sw-fpill-patch{color:#ea580c;border-color:#fdba74;background:rgba(234,88,12,.07)}
-.sw-fpill-patch.active{background:linear-gradient(135deg,#ea580c,#f97316);border-color:transparent}
+.sw-fpill-patch.active{background:linear-gradient(135deg,#ea580c,#f97316) !important}
 /* Tag groups */
 .sw-ep-list{display:flex;flex-direction:column;gap:12px}
 .sw-grp{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)}
@@ -9058,7 +9068,7 @@ async function _loadSwaggerConfigs(p){
 }
 
 function _renderSwaggerShell(p,configs,el){
-  const urlTabsHtml=configs.map((c,i)=>`<button class="sw-url-tab${i===0?' active':''}" onclick="_swSelectConfig('${c.id}','${escH(c.url)}',this,'${p}')" data-cfg-id="${c.id}"><span class="sw-env-dot sw-env-${c.environment||'production'}"></span>${escH(c.name)}<button class="btn-icon del" onclick="event.stopPropagation();_swDeleteConfig('${c.id}','${p}')" title="Remove" style="padding:1px 5px;font-size:10px;margin-left:4px">✕</button></button>`).join('');
+  const urlTabsHtml=configs.map((c,i)=>`<button class="sw-url-tab${i===0?' active':''}" onclick="_swSelectConfig('${c.id}','${escH(c.url)}',this,'${p}')" data-cfg-id="${c.id}"><span class="sw-env-dot sw-env-${c.environment||'production'}"></span><span>${escH(c.name)}</span><span class="sw-tab-del" onclick="event.stopPropagation();_swDeleteConfig('${c.id}','${p}')" title="Remove">✕</span></button>`).join('');
   el.innerHTML=`
 <div class="sw-hdr">
   <div><h3 style="font-size:16px;font-weight:800;color:var(--txt);display:flex;align-items:center;gap:7px">⚡ Swagger API Explorer</h3><p style="color:var(--mut);font-size:12px;margin-top:3px">Fetch and run APIs from any Swagger/OpenAPI URL</p></div>
@@ -9111,7 +9121,7 @@ function _renderSwaggerExplorer(spec,container,p){
   }
   const total=Object.values(groups).reduce((s,a)=>s+a.length,0);
   const _swStatColors={get:'#60a5fa',post:'#34d399',put:'#fbbf24',patch:'#fb923c',delete:'#f87171',head:'#c4b5fd',options:'#94a3b8'};
-  const pillsHtml=`<button class="sw-fpill active" onclick="_swFilterMethod('all',this)">All <span class="sw-pcnt">${total}</span></button>`+
+  const pillsHtml=`<button class="sw-fpill sw-fpill-all active" onclick="_swFilterMethod('all',this)">All <span class="sw-pcnt">${total}</span></button>`+
     Object.entries(methodCounts).map(([m,c])=>`<button class="sw-fpill sw-fpill-${m}" onclick="_swFilterMethod('${m}',this)">${m.toUpperCase()} <span class="sw-pcnt">${c}</span></button>`).join('');
   // Render group shells immediately (no endpoint HTML yet) — fast paint
   const groupEntries=Object.entries(groups);
