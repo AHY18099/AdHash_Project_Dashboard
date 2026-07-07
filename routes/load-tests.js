@@ -881,7 +881,7 @@ function _generateStepCode(step, idx) {
     }
 
     const code = [
-        `  // ── Step ${idx+1}: ${step.name || 'Step'} ──`,
+        `  // ── Step ${idx+1}: ${step.name || 'Step'} ──\n`,
         urlCode,
         headersCode,
         bodyCode,
