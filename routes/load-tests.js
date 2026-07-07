@@ -615,6 +615,26 @@ router.delete('/scenarios/:id', auth, async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// POST /api/load-test/decrypt — k6 calls this at runtime to decrypt a response
+// body server-side (Node crypto), avoiding k6 WebCrypto API issues entirely.
+// No auth required — only accepts base64 ciphertext, returns decrypted JSON field.
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/decrypt', (req, res) => {
+    try {
+        const { ciphertext, key, iv, jsonPath } = req.body;
+        if (!ciphertext || !key || !iv) return res.status(400).json({ error: 'Missing fields' });
+        const plaintext = aesCbcDecrypt(ciphertext, key, iv);
+        const parsed = JSON.parse(plaintext);
+        const value = jsonPath
+            ? jsonPath.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : '', parsed)
+            : parsed;
+        res.json({ value: value !== undefined ? value : '' });
+    } catch (e) {
+        res.status(200).json({ value: '' }); // never crash k6 run on decrypt failure
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // POST /api/load-test/scenario/k6-script — generate downloadable k6 script
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/scenario/k6-script', auth, (req, res) => {
@@ -738,6 +758,9 @@ ${optionsStr}
 const DATA = ${dataStr};
 const GLOBAL_VARS = ${varsStr};
 
+// Server-side decrypt proxy — Node.js AES-CBC (avoids k6 WebCrypto limitations)
+const DECRYPT_URL = '${scenario.dashboardUrl || process.env.DASHBOARD_URL || 'https://adhashprojectdashboard-production.up.railway.app'}/api/load-test/decrypt';
+
 function _get(obj, path) {
   return path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj);
 }
@@ -758,50 +781,7 @@ function _resolveObj(obj, vars) {
   return obj;
 }
 
-// AES-128-CBC decrypt using k6 global crypto.subtle (Web Crypto API, async)
-// atob/TextEncoder not available in k6 — manual base64 decode + char loops
-function _b64Decode(b64) {
-  const tab = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const lut = new Uint8Array(256);
-  for (let i = 0; i < 64; i++) lut[tab.charCodeAt(i)] = i;
-  // Pad to multiple of 4
-  let s = b64.replace(/[^A-Za-z0-9+/]/g, '');
-  while (s.length % 4) s += 'A'; // pad with 'A' (=0) so groups of 4 always complete
-  const byteLen = (s.length * 3) >> 2;
-  const out = new Uint8Array(byteLen);
-  let p = 0;
-  for (let i = 0; i < s.length; i += 4) {
-    const n = (lut[s.charCodeAt(i)] << 18) | (lut[s.charCodeAt(i+1)] << 12) |
-              (lut[s.charCodeAt(i+2)] << 6)  |  lut[s.charCodeAt(i+3)];
-    if (p < byteLen) out[p++] = (n >> 16) & 0xff;
-    if (p < byteLen) out[p++] = (n >>  8) & 0xff;
-    if (p < byteLen) out[p++] =  n        & 0xff;
-  }
-  return out;
-}
-
-async function _aesDecrypt(b64, keyStr, ivStr) {
-  try {
-    if (!b64 || b64.length < 24) return '';
-    const keyBytes = new Uint8Array(16);
-    const ivBytes  = new Uint8Array(16);
-    for (let i = 0; i < 16; i++) {
-      keyBytes[i] = i < keyStr.length ? keyStr.charCodeAt(i) : 0;
-      ivBytes[i]  = i < ivStr.length  ? ivStr.charCodeAt(i)  : 0;
-    }
-    const cipherBuf = _b64Decode(b64);
-    // AES-CBC ciphertext must be a multiple of 16 bytes
-    if (cipherBuf.length === 0 || cipherBuf.length % 16 !== 0) return '';
-    const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-CBC' }, false, ['decrypt']);
-    const decrypted = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: ivBytes }, cryptoKey, cipherBuf);
-    const bytes = new Uint8Array(decrypted);
-    let str = '';
-    for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
-    return str;
-  } catch(e) { return ''; }
-}
-
-export default async function () {
+export default function () {
   // Use __ITER (global iteration counter across all VUs) so each iteration
   // gets a unique data row — prevents same email being reused across iterations
   const vuIdx = __ITER % DATA.length;
@@ -875,21 +855,24 @@ function _generateStepCode(step, idx) {
         assertCode = `  check(${varName}, { '${step.name || 'step'} ok': r => r.status >= 200 && r.status < 400 });\n`;
     }
 
-    // Captures — if responseDecryption is enabled, decrypt the encryptedData field first
+    // Captures — if responseDecryption is enabled, call server-side decrypt proxy
     let captureCode = '';
     if (step.captures && step.captures.length > 0) {
         const dec = step.responseDecryption;
         if (dec?.enabled && dec.key && dec.iv) {
-            // Decrypt response body server-side and embed decrypted JSON path extractor in k6
+            // Call /api/load-test/decrypt (Node.js AES-CBC) — avoids k6 WebCrypto issues
             captureCode = step.captures.map(cap => {
                 if (!cap.varName || !cap.jsonPath) return '';
                 return [
                     `  try {`,
                     `    const _raw${idx+1} = ${varName}.json();`,
-                    `    const _encField${idx+1} = _raw${idx+1}['${dec.inputField || 'encryptedData'}'] || '';`,
-                    `    const _dec${idx+1} = await _aesDecrypt(_encField${idx+1}, ${JSON.stringify(dec.key)}, ${JSON.stringify(dec.iv)});`,
-                    `    const _decJ${idx+1} = JSON.parse(_dec${idx+1});`,
-                    `    vars['${cap.varName}'] = _get(_decJ${idx+1}, '${cap.jsonPath}');`,
+                    `    const _encField${idx+1} = (_raw${idx+1} && _raw${idx+1}['${dec.inputField || 'encryptedData'}']) || '';`,
+                    `    const _decResp${idx+1} = http.post(`,
+                    `      DECRYPT_URL,`,
+                    `      JSON.stringify({ ciphertext: _encField${idx+1}, key: ${JSON.stringify(dec.key)}, iv: ${JSON.stringify(dec.iv)}, jsonPath: '${cap.jsonPath}' }),`,
+                    `      { headers: { 'Content-Type': 'application/json' }, timeout: '5s' }`,
+                    `    );`,
+                    `    vars['${cap.varName}'] = (_decResp${idx+1}.json() || {}).value || '';`,
                     `  } catch(e) { vars['${cap.varName}'] = ''; }`,
                 ].join('\n');
             }).filter(Boolean).join('\n') + '\n';
