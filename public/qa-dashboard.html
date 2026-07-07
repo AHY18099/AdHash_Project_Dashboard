@@ -9075,7 +9075,7 @@ async function _loadSwaggerSpec(cfgId,url,tabEl,p){
     const r=await fetch('/api/swagger-proxy?url='+encodeURIComponent(url),{headers:{Authorization:'Bearer '+_getToken()},cache:'no-store'});
     if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||'HTTP '+r.status);}
     const spec=await r.json();
-    _swSpec=spec;_swBaseUrl=_swBuildBase(spec,url);_swMethodFilter='all';
+    _swSpec=spec;_swBaseUrl=_swBuildBase(spec,url);_swMethodFilter='all';_swProjId=p;
     _renderSwaggerExplorer(spec,ex,p);
   }catch(e){ex.innerHTML=`<div class="sw-empty"><div class="sw-empty-icon">⚠️</div><div style="color:var(--fail);font-weight:600">Failed to load spec</div><div style="color:var(--mut);font-size:12px;margin-top:6px">${escH(e.message)}</div></div>`;}
   finally{_swLoading=false;}
@@ -9104,11 +9104,13 @@ function _renderSwaggerExplorer(spec,container,p){
   const _swStatColors={get:'#60a5fa',post:'#34d399',put:'#fbbf24',patch:'#fb923c',delete:'#f87171',head:'#c4b5fd',options:'#94a3b8'};
   const pillsHtml=`<button class="sw-fpill active" onclick="_swFilterMethod('all',this)">All <span class="sw-pcnt">${total}</span></button>`+
     Object.entries(methodCounts).map(([m,c])=>`<button class="sw-fpill sw-fpill-${m}" onclick="_swFilterMethod('${m}',this)">${m.toUpperCase()} <span class="sw-pcnt">${c}</span></button>`).join('');
-  const groupsHtml=Object.entries(groups).map(([tag,eps],gi)=>{
+  // Render group shells immediately (no endpoint HTML yet) — fast paint
+  const groupEntries=Object.entries(groups);
+  const groupsHtml=groupEntries.map(([tag,eps],gi)=>{
     const mb={};eps.forEach(e=>{mb[e.method]=(mb[e.method]||0)+1;});
     const mbHtml=Object.entries(mb).map(([m,c])=>{const mc2=_SW_MC[m]||_SW_MC.options;return`<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:3px 9px;border-radius:4px;background:${mc2.solid};color:#fff;font-weight:700;font-family:monospace;letter-spacing:.3px">${c} ${m.toUpperCase()}</span>`;}).join('');
     return`
-<div class="sw-grp" data-group="${escH(tag)}" style="background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+<div class="sw-grp" data-group="${escH(tag)}" data-grp-idx="${gi}" style="background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)">
   <div class="sw-grp-hdr${gi===0?' open':''}" onclick="_swToggleGrp(this)" style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;cursor:pointer;user-select:none;background:var(--card);transition:background .15s">
     <div class="sw-grp-left" style="display:flex;align-items:center;gap:10px">
       <span class="sw-grp-chev" style="font-size:11px;color:var(--mut);font-weight:700;transition:transform .2s">${gi===0?'▼':'▶'}</span>
@@ -9117,7 +9119,7 @@ function _renderSwaggerExplorer(spec,container,p){
     </div>
     <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">${mbHtml}</div>
   </div>
-  <div class="sw-grp-body" style="${gi===0?'':'display:none'};padding:8px 12px 12px">${eps.map(e=>_swEpRow(e.path,e.method,e.op,p)).join('')}</div>
+  <div class="sw-grp-body" data-grp-rendered="0" style="${gi===0?'':'display:none'};padding:8px 12px 12px"><div style="color:var(--mut);font-size:12px;padding:8px 0">⏳ Loading…</div></div>
 </div>`; }).join('');
   container.innerHTML=`
 <div style="background:#1b1b1b;border-radius:14px;padding:22px 26px;margin-bottom:18px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap">
@@ -9166,6 +9168,18 @@ function _renderSwaggerExplorer(spec,container,p){
 </div>
 <div class="sw-method-filters">${pillsHtml}</div>
 <div class="sw-ep-list" id="sw-endpoints-${p}">${groupsHtml}</div>`;
+  // Lazily render endpoint rows group-by-group so the UI paints immediately
+  const _lazyRenderGroups=(entries,proj,idx)=>{
+    if(idx>=entries.length)return;
+    const[tag,eps]=entries[idx];
+    const grpEl=container.querySelector(`.sw-grp[data-grp-idx="${idx}"] .sw-grp-body`);
+    if(grpEl&&grpEl.dataset.grpRendered==='0'){
+      grpEl.innerHTML=eps.map(e=>_swEpRow(e.path,e.method,e.op,proj)).join('');
+      grpEl.dataset.grpRendered='1';
+    }
+    setTimeout(()=>_lazyRenderGroups(entries,proj,idx+1),0);
+  };
+  setTimeout(()=>_lazyRenderGroups(groupEntries,p,0),0);
 }
 
 function _swEpRow(path,method,op,p){
@@ -9444,6 +9458,23 @@ function _swToggleGrp(hdr){
   body.style.display=open?'none':'block';
   if(chev)chev.textContent=open?'▶':'▼';
   hdr.classList.toggle('open',!open);
+  // If endpoints haven't been lazily rendered yet, render now on first open
+  if(!open&&body.dataset.grpRendered==='0'&&_swSpec&&_swProjId){
+    const grp=hdr.closest('.sw-grp');
+    const gi=parseInt(grp?.dataset.grpIdx||'0',10);
+    const tag=grp?.dataset.group||'';
+    const paths=_swSpec.paths||{};
+    const eps=[];
+    for(const[path,methods]of Object.entries(paths)){
+      for(const[method,op]of Object.entries(methods)){
+        if(!['get','post','put','patch','delete','head','options'].includes(method))continue;
+        const tags=op.tags?.length?op.tags:['General'];
+        if(tags.includes(tag))eps.push({path,method,op});
+      }
+    }
+    body.innerHTML=eps.map(e=>_swEpRow(e.path,e.method,e.op,_swProjId)).join('');
+    body.dataset.grpRendered='1';
+  }
 }
 
 function _swToggleEp(eid){
