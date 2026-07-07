@@ -1511,7 +1511,7 @@ function renderSteps() {
               <input value="${_esc(s.responseDecryption.inputField||'encryptedData')}" oninput="_scenarioSteps[${i}].responseDecryption.inputField=this.value" style="height:32px;font-size:12px" />
             </div>
           </div>
-          <div class="form-hint" style="margin-top:6px;color:var(--amber)">Note: Runtime decryption in k6 is not supported. The raw encrypted field will be captured.</div>
+          <div class="form-hint" style="margin-top:6px;color:var(--green)">✓ Response will be AES-128-CBC decrypted at runtime in k6 and the captured variable will contain the decrypted value.</div>
           ` : ''}
         </div>
 
