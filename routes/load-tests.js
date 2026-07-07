@@ -669,8 +669,29 @@ function _scenarioToK6Script(scenario) {
     const dataArray = _buildK6DataArray(scenario, Math.max(vus, iterEstimate, 100));
 
     // Build options
+    // Workflow scenarios use shared-iterations: N VUs each run the full flow once simultaneously.
+    // Single-step tests use duration-based execution.
+    const isWorkflow = enabledSteps.length > 1;
     let optionsStr;
-    if (rampup > 0) {
+    if (isWorkflow) {
+        // shared-iterations: exactly vus iterations total, spread across vus VUs
+        // Each VU runs the full Step1→Step2→Step3→Step4 flow exactly once
+        const graceTime = Math.max(30, duration);
+        optionsStr = `export const options = {
+  scenarios: {
+    registration_flow: {
+      executor: 'shared-iterations',
+      vus: ${vus},
+      iterations: ${vus},
+      maxDuration: '${graceTime}s',
+    },
+  },
+  thresholds: {
+    http_req_duration: ['p(95)<${p95Threshold}'],
+    ${stopOnErrorRate ? `'http_req_failed': ['rate<${stopOnErrorRate / 100}'],` : ''}
+  },
+};`;
+    } else if (rampup > 0) {
         optionsStr = `export const options = {
   stages: [
     { duration: '${rampup}s', target: ${vus} },
