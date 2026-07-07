@@ -11,6 +11,8 @@ const fs       = require('fs');
 const path     = require('path');
 const crypto   = require('crypto');
 
+const DEFAULT_EMAIL_VERIFICATION_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImxvYWR0ZXN0MUBtYWlsaW5hdG9yLmNvbSIsInB1cnBvc2UiOiJlbWFpbC12ZXJpZmllZCIsImlhdCI6MTc4MzQwODc4OSwiZXhwIjoxNzgzNDA5Njg5fQ.90EgVLbTeJh-8orjPXivCIH3tNLkB1CN7CZwPoiTbok';
+
 // ── AES-128-ECB encryption (PKCS7 padding via Node crypto) ──
 function aesEncrypt(plaintext, key) {
     const keyBuf = Buffer.from(key, 'utf8').slice(0, 16); // 16 bytes = AES-128
@@ -55,6 +57,7 @@ function buildDynPayloads(dynCfg, vus) {
             index: String(idx), email, phoneNumber: phone, name,
             timestamp: String(Date.now()), random: String(Math.floor(Math.random() * 1e9)),
             uuid: crypto.randomUUID(),
+            emailVerificationToken: DEFAULT_EMAIL_VERIFICATION_TOKEN,
         };
         if (dynCfg.extraKey) vars[dynCfg.extraKey] = dynCfg.extraVal || '';
 
