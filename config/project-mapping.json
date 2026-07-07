@@ -1027,29 +1027,6 @@
       ]
     },
     {
-      "id": "zapai",
-      "name": "ZapAI",
-      "description": "ZapAI platform",
-      "color": "#10b981",
-      "apps": [],
-      "servers": [
-        {
-          "name": "Zapai - Web",
-          "url": "https://www.zapai.us/",
-          "type": "web",
-          "expectedStatus": 200
-        }
-      ],
-      "domains": [
-        "zapai.us",
-        "www.zapai.us"
-      ],
-      "sslCerts": [
-        "www.zapai.us"
-      ],
-      "apis": []
-    },
-    {
       "id": "sparkme",
       "name": "Spark me",
       "description": "Spark Analytics",

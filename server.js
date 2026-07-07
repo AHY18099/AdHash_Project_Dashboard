@@ -5568,7 +5568,7 @@ app.post('/api/admin/clear-default-smoke-prod', requireAdmin, async (req, res) =
         const { getDB } = require('./src/db');
         const db = getDB();
         // Projects that must NOT have pre-filled smoke/prod (not in dedicated suite list)
-        const targets = req.body.projectIds || ['adhash','sparkme','zapai','zapcrm','zaptrade_mpv6v89b','algomax','autochecker','metcalf','smc','synctrade'];
+        const targets = req.body.projectIds || ['adhash','sparkme','zapcrm','zaptrade_mpv6v89b','algomax','autochecker','metcalf','smc','synctrade'];
         const results = {};
         for (const pid of targets) {
             const key = 'qa3_' + pid;
@@ -6238,7 +6238,7 @@ app.post('/api/qa-data/:key', async (req, res) => {
     // If an old browser tab tries to heartbeat-save default Humee cases for these projects,
     // strip smoke/prod from the incoming value before merging — keeps them permanently empty.
     const NO_DEFAULT_SMOKE_PROD = new Set([
-        'adhash','sparkme','zapai','zapcrm','zaptrade_mpv6v89b',
+        'adhash','sparkme','zapcrm','zaptrade_mpv6v89b',
         'algomax','autochecker','metcalf','smc','synctrade'
     ]);
     if (key.startsWith('qa3_') && value && typeof value === 'object' && !Array.isArray(value)) {
