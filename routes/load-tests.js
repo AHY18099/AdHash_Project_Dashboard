@@ -736,34 +736,40 @@ function _resolveObj(obj, vars) {
 }
 
 // AES-128-CBC decrypt using k6 global crypto.subtle (Web Crypto API, async)
-// atob and TextEncoder are NOT available in k6 — use manual char loops
+// atob/TextEncoder not available in k6 — manual base64 decode + char loops
 function _b64Decode(b64) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const lookup = new Uint8Array(256);
-  for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i;
-  const s = b64.replace(/=+$/, '');
-  const out = new Uint8Array(Math.floor(s.length * 3 / 4));
+  const tab = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const lut = new Uint8Array(256);
+  for (let i = 0; i < 64; i++) lut[tab.charCodeAt(i)] = i;
+  // Pad to multiple of 4
+  let s = b64.replace(/[^A-Za-z0-9+/]/g, '');
+  while (s.length % 4) s += 'A'; // pad with 'A' (=0) so groups of 4 always complete
+  const byteLen = (s.length * 3) >> 2;
+  const out = new Uint8Array(byteLen);
   let p = 0;
   for (let i = 0; i < s.length; i += 4) {
-    const a = lookup[s.charCodeAt(i)], b = lookup[s.charCodeAt(i+1)];
-    const c = lookup[s.charCodeAt(i+2)], d = lookup[s.charCodeAt(i+3)];
-    out[p++] = (a << 2) | (b >> 4);
-    if (i+2 < s.length) out[p++] = ((b & 0xf) << 4) | (c >> 2);
-    if (i+3 < s.length) out[p++] = ((c & 0x3) << 6) | d;
+    const n = (lut[s.charCodeAt(i)] << 18) | (lut[s.charCodeAt(i+1)] << 12) |
+              (lut[s.charCodeAt(i+2)] << 6)  |  lut[s.charCodeAt(i+3)];
+    if (p < byteLen) out[p++] = (n >> 16) & 0xff;
+    if (p < byteLen) out[p++] = (n >>  8) & 0xff;
+    if (p < byteLen) out[p++] =  n        & 0xff;
   }
-  return out.slice(0, p);
+  return out;
 }
 
 async function _aesDecrypt(b64, keyStr, ivStr) {
   try {
+    if (!b64 || b64.length < 24) return '';
     const keyBytes = new Uint8Array(16);
     const ivBytes  = new Uint8Array(16);
     for (let i = 0; i < 16; i++) {
       keyBytes[i] = i < keyStr.length ? keyStr.charCodeAt(i) : 0;
       ivBytes[i]  = i < ivStr.length  ? ivStr.charCodeAt(i)  : 0;
     }
-    const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-CBC' }, false, ['decrypt']);
     const cipherBuf = _b64Decode(b64);
+    // AES-CBC ciphertext must be a multiple of 16 bytes
+    if (cipherBuf.length === 0 || cipherBuf.length % 16 !== 0) return '';
+    const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-CBC' }, false, ['decrypt']);
     const decrypted = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: ivBytes }, cryptoKey, cipherBuf);
     const bytes = new Uint8Array(decrypted);
     let str = '';
