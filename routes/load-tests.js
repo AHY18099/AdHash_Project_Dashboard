@@ -991,7 +991,7 @@ function _buildK6DataArray(scenario, count) {
                         encrypted = aesEncrypt(bodyStr, enc.key || '');
                     }
                     const field = enc.outputField || 'encryptedData';
-                    vuData[`_encryptedBody_${step.id || ('step' + (steps.indexOf(step) + 1))}`] = JSON.stringify({ [field]: encrypted });
+                    vuData[`_encryptedBody_step${steps.indexOf(step) + 1}`] = JSON.stringify({ [field]: encrypted });
                 } catch {}
             }
         }
