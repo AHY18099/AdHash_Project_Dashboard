@@ -165,15 +165,30 @@ const defaultMetrics = {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Scenario persistence helpers
+// Scenario persistence helpers — MongoDB (collection: load_test_scenarios)
 // ══════════════════════════════════════════════════════════════════════════════
-const SCENARIOS_FILE = path.join(REPORTS_DIR, '_scenarios.json');
+const { getDB } = require('../src/db');
 
-function _loadScenarios() {
-    try { return JSON.parse(fs.readFileSync(SCENARIOS_FILE, 'utf8')); } catch { return []; }
+function _scenariosCol() {
+    return getDB().collection('load_test_scenarios');
 }
-function _saveScenarios(list) {
-    fs.writeFileSync(SCENARIOS_FILE, JSON.stringify(list, null, 2));
+
+async function _dbLoadScenarios() {
+    const docs = await _scenariosCol().find({}).sort({ updatedAt: -1 }).toArray();
+    return docs.map(({ _id, ...d }) => d);
+}
+
+async function _dbSaveScenario(scenario) {
+    await _scenariosCol().updateOne(
+        { id: scenario.id },
+        { $set: scenario },
+        { upsert: true }
+    );
+}
+
+async function _dbDeleteScenario(id) {
+    const result = await _scenariosCol().deleteOne({ id });
+    return result.deletedCount > 0;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -544,44 +559,59 @@ router.get('/report-template', auth, (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // GET /api/load-test/scenarios — list all
-router.get('/scenarios', auth, (req, res) => {
-    res.json(_loadScenarios());
+router.get('/scenarios', auth, async (req, res) => {
+    try {
+        const scenarios = await _dbLoadScenarios();
+        res.json({ scenarios });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to load scenarios: ' + e.message });
+    }
 });
 
 // POST /api/load-test/scenarios — create
-router.post('/scenarios', auth, (req, res) => {
-    const list = _loadScenarios();
-    const scenario = { ...req.body, id: crypto.randomUUID(), updatedAt: new Date().toISOString() };
-    list.push(scenario);
-    _saveScenarios(list);
-    res.status(201).json(scenario);
+router.post('/scenarios', auth, async (req, res) => {
+    try {
+        const scenario = { ...req.body, id: crypto.randomUUID(), updatedAt: new Date().toISOString() };
+        await _dbSaveScenario(scenario);
+        res.status(201).json(scenario);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to save scenario: ' + e.message });
+    }
 });
 
 // GET /api/load-test/scenarios/:id — get one
-router.get('/scenarios/:id', auth, (req, res) => {
-    const list = _loadScenarios();
-    const scenario = list.find(s => s.id === req.params.id);
-    if (!scenario) return res.status(404).json({ error: 'Scenario not found' });
-    res.json(scenario);
+router.get('/scenarios/:id', auth, async (req, res) => {
+    try {
+        const col = _scenariosCol();
+        const doc = await col.findOne({ id: req.params.id });
+        if (!doc) return res.status(404).json({ error: 'Scenario not found' });
+        const { _id, ...scenario } = doc;
+        res.json(scenario);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to get scenario: ' + e.message });
+    }
 });
 
 // PUT /api/load-test/scenarios/:id — update
-router.put('/scenarios/:id', auth, (req, res) => {
-    const list = _loadScenarios();
-    const idx  = list.findIndex(s => s.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: 'Scenario not found' });
-    list[idx] = { ...req.body, id: req.params.id, updatedAt: new Date().toISOString() };
-    _saveScenarios(list);
-    res.json(list[idx]);
+router.put('/scenarios/:id', auth, async (req, res) => {
+    try {
+        const scenario = { ...req.body, id: req.params.id, updatedAt: new Date().toISOString() };
+        await _dbSaveScenario(scenario);
+        res.json(scenario);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to update scenario: ' + e.message });
+    }
 });
 
 // DELETE /api/load-test/scenarios/:id — delete
-router.delete('/scenarios/:id', auth, (req, res) => {
-    const list    = _loadScenarios();
-    const filtered = list.filter(s => s.id !== req.params.id);
-    if (filtered.length === list.length) return res.status(404).json({ error: 'Scenario not found' });
-    _saveScenarios(filtered);
-    res.json({ ok: true });
+router.delete('/scenarios/:id', auth, async (req, res) => {
+    try {
+        const deleted = await _dbDeleteScenario(req.params.id);
+        if (!deleted) return res.status(404).json({ error: 'Scenario not found' });
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to delete scenario: ' + e.message });
+    }
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
