@@ -9706,7 +9706,7 @@ function _swExportRunResults(p){
 function openSwaggerAddModal(p){
   openModal('⚡ Add Swagger URL',`
 <div class="fg"><label>Name *</label><input id="sw-name" class="finp" placeholder="e.g. Production API, Staging"></div>
-<div class="fg"><label>Swagger / OpenAPI URL *</label><input type="url" id="sw-url" class="finp" placeholder="https://api.example.com/swagger.json"><div style="font-size:11px;color:var(--mut);margin-top:4px">Supports Swagger 2.0 and OpenAPI 3.x (JSON or YAML)</div></div>
+<div class="fg"><label>Swagger / OpenAPI URL *</label><input type="url" id="sw-url" class="finp" placeholder="https://api.example.com/docs-json"><div style="font-size:11px;color:var(--mut);margin-top:4px">Supports Swagger 2.0 and OpenAPI 3.x (JSON or YAML). Use the raw spec URL, e.g. <code>/docs-json</code>, <code>/swagger.json</code> — not the browser UI page (<code>/docs</code>).</div></div>
 <div class="fg"><label>Environment</label><select id="sw-env" class="finp"><option value="production">Production</option><option value="staging">Staging</option><option value="local">Local</option><option value="development">Development</option></select></div>
 <div id="sw-test-res" style="margin-top:10px;display:none"></div>
 <button class="btn btn-secondary" style="margin-top:8px;font-size:12px" onclick="_swTestUrl()">🔍 Test URL</button>`,
@@ -9734,10 +9734,20 @@ async function _swTestUrl(){
   res.style.display='block';res.innerHTML='<span style="color:var(--mut);font-size:12px">⏳ Testing…</span>';
   try{
     const r=await fetch('/api/swagger-proxy?url='+encodeURIComponent(url),{headers:{Authorization:'Bearer '+_getToken()}});
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    const spec=await r.json();
-    const cnt=Object.keys(spec.paths||{}).length;
-    res.innerHTML=`<div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:10px 14px;font-size:12px"><div style="color:var(--pass);font-weight:700">✅ Valid spec found!</div><div style="color:var(--mut);margin-top:3px">📘 ${escH(spec.info?.title||'API')} · ⚡ ${cnt} paths</div></div>`;
+    const data=await r.json();
+    if(!r.ok){
+      const hint=data.hint?`<div style="margin-top:5px;color:var(--mut)">${escH(data.hint)}</div>`:'';
+      let suggestHtml='';
+      if(data.suggestedUrl){
+        suggestHtml=`<div style="margin-top:8px;padding:6px 10px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:6px;font-size:11px">
+          💡 Try this URL instead: <a href="#" style="color:#3b82f6;word-break:break-all" onclick="event.preventDefault();document.getElementById('sw-url').value=${JSON.stringify(data.suggestedUrl)};_swTestUrl()">${escH(data.suggestedUrl)}</a>
+        </div>`;
+      }
+      res.innerHTML=`<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--fail)">❌ HTTP ${r.status}${hint}${suggestHtml}</div>`;
+      return;
+    }
+    const cnt=Object.keys(data.paths||{}).length;
+    res.innerHTML=`<div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:10px 14px;font-size:12px"><div style="color:var(--pass);font-weight:700">✅ Valid spec found!</div><div style="color:var(--mut);margin-top:3px">📘 ${escH(data.info?.title||'API')} · ⚡ ${cnt} paths</div></div>`;
   }catch(e){res.innerHTML=`<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--fail)">❌ ${escH(e.message)}</div>`;}
 }
 

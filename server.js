@@ -4497,6 +4497,18 @@ app.get('/api/swagger-proxy', async (req, res) => {
         const response = await fetch(url, { headers: { Accept: 'application/json, application/yaml, text/yaml, */*' }, timeout: 15000 });
         if (!response.ok) return res.status(response.status).json({ error: `Upstream returned ${response.status}: ${response.statusText}` });
         const ct = response.headers.get('content-type') || '';
+        // Reject HTML responses — Swagger UI HTML page, not a spec
+        if (ct.includes('text/html')) {
+            const suggestedUrl = url.replace(/\/docs\/?$/, '/docs-json')
+                                    .replace(/\/swagger-ui\/?$/, '/swagger.json')
+                                    .replace(/\/swagger\/?$/, '/swagger.json');
+            return res.status(422).json({
+                error: 'URL returned an HTML page, not a Swagger/OpenAPI spec.',
+                hint: 'This URL points to the Swagger UI browser page. You need the raw JSON or YAML spec URL.',
+                suggestedUrl: suggestedUrl !== url ? suggestedUrl : null,
+                examples: [url.replace(/\/docs\/?$/, '/docs-json'), url.replace(/\/docs\/?$/, '/api-json'), url.replace(/\/docs\/?$/, '/swagger.json')]
+            });
+        }
         let spec;
         if (ct.includes('yaml') || url.endsWith('.yaml') || url.endsWith('.yml')) {
             const yaml = require('js-yaml');
