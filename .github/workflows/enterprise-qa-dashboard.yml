@@ -5,11 +5,6 @@ on:
   schedule:
     - cron: '0 2 * * *'   # Morning run  (~7:30 AM IST)
     - cron: '0 10 * * *'  # Evening run  (~3:30 PM IST)
-  push:
-    branches:
-      - master
-      - main
-  pull_request:
 
 jobs:
   qa-enterprise:
