@@ -424,6 +424,68 @@ input:checked+.slider::before{transform:translateX(16px)}
         <button class="btn btn-secondary" onclick="previewDynamicPayloads()" style="font-size:12px;padding:8px 16px">👁 Preview Payloads (first 5)</button>
       </div>
     </div>
+
+    <!-- Flow Mode toggle -->
+    <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;font-size:13px;font-weight:600;color:var(--text);letter-spacing:0">
+        <input type="checkbox" id="cfg-flow-enable" onchange="toggleFlowMode()" style="width:16px;height:16px;accent-color:var(--purple);cursor:pointer">
+        🔗 Enable Multi-Step Flow <span style="font-size:11px;color:var(--muted);font-weight:400">— auto register: check email → send OTP → verify OTP → register</span>
+      </label>
+    </div>
+
+    <div id="flow-panel" style="display:none;margin-top:16px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:18px">
+      <div style="font-size:12px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">🔗 Multi-Step Registration Flow</div>
+      <div style="background:#1e1b4b;border:1px solid #4338ca;border-radius:6px;padding:10px 14px;font-size:11px;color:#a5b4fc;margin-bottom:16px">
+        Each VU runs 4 steps automatically:<br>
+        <strong>Step 1</strong> → userExistsByEmail &nbsp;|&nbsp;
+        <strong>Step 2</strong> → email-otp/send &nbsp;|&nbsp;
+        <strong>Step 3</strong> → email-otp/verify (OTP: 000000) &nbsp;|&nbsp;
+        <strong>Step 4</strong> → auth/register
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <label class="form-label">BASE URL</label>
+          <input type="text" id="flow-base-url" class="form-control" value="https://devextsnapi.synctag.com" placeholder="https://api.example.com">
+        </div>
+        <div>
+          <label class="form-label">EMAIL PREFIX</label>
+          <input type="text" id="flow-email-prefix" class="form-control" value="loadtest">
+        </div>
+        <div>
+          <label class="form-label">EMAIL DOMAIN</label>
+          <input type="text" id="flow-email-domain" class="form-control" value="mailinator.com">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <label class="form-label">START INDEX</label>
+          <input type="number" id="flow-start-index" class="form-control" value="1">
+        </div>
+        <div>
+          <label class="form-label">PHONE BASE</label>
+          <input type="text" id="flow-phone-base" class="form-control" value="7110000000">
+        </div>
+        <div>
+          <label class="form-label">NAME PREFIX</label>
+          <input type="text" id="flow-name-prefix" class="form-control" value="Load Testing">
+        </div>
+        <div>
+          <label class="form-label">OTP (QA fixed)</label>
+          <input type="text" id="flow-otp" class="form-control" value="000000">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <label class="form-label">ENCRYPTION KEY (AES-128-CBC)</label>
+          <input type="password" id="flow-enc-key" class="form-control" value="xfnr3PVyckouBZxW">
+        </div>
+        <div>
+          <label class="form-label">ENCRYPTION IV</label>
+          <input type="password" id="flow-enc-iv" class="form-control" value="xfnr3PVyckouBZxW">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted)">The dashboard will auto-generate unique email/phone per VU, run all 4 steps, and report pass/fail per registration.</div>
+    </div>
   </div>
 
   <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">
@@ -577,9 +639,9 @@ input:checked+.slider::before{transform:translateX(16px)}
       <div class="tbl-wrap"><table><thead><tr><th>Status</th><th>Count</th><th>%</th></tr></thead><tbody id="results-sc-tbody"></tbody></table></div>
     </div>
     <div id="req-results-card" class="card" style="display:none">
-      <div class="card-title">🧾 Per-Request Results (Dynamic Mode)</div>
+      <div class="card-title" id="req-results-title">🧾 Per-Request Results (Dynamic Mode)</div>
       <div class="tbl-wrap"><table class="req-result-table">
-        <thead><tr><th>#</th><th>Email</th><th>Phone</th><th>Status</th><th>Time (ms)</th><th>Result</th><th>Error / Response</th></tr></thead>
+        <thead><tr><th>#</th><th>Email</th><th>Phone</th><th>Status</th><th>Time (ms)</th><th>Step</th><th>Result</th><th>Error / Response</th></tr></thead>
         <tbody id="req-results-tbody"></tbody>
       </table></div>
     </div>
@@ -841,6 +903,28 @@ function toggleDynamicMode() {
     const on = document.getElementById('cfg-dynamic-enable').checked;
     document.getElementById('dynamic-panel').style.display = on ? '' : 'none';
 }
+function toggleFlowMode() {
+    const on = document.getElementById('cfg-flow-enable').checked;
+    document.getElementById('flow-panel').style.display = on ? '' : 'none';
+    // Disable dynamic mode when flow mode is on (they are mutually exclusive)
+    if (on) {
+        document.getElementById('cfg-dynamic-enable').checked = false;
+        document.getElementById('dynamic-panel').style.display = 'none';
+    }
+}
+function _getFlowConfig() {
+    return {
+        baseUrl:     (document.getElementById('flow-base-url')?.value || '').trim(),
+        emailPrefix: document.getElementById('flow-email-prefix')?.value || 'loadtest',
+        emailDomain: document.getElementById('flow-email-domain')?.value || 'mailinator.com',
+        startIndex:  document.getElementById('flow-start-index')?.value || '1',
+        phoneBase:   document.getElementById('flow-phone-base')?.value || '7110000000',
+        namePrefix:  document.getElementById('flow-name-prefix')?.value || 'Load Testing',
+        otp:         document.getElementById('flow-otp')?.value || '000000',
+        encKey:      document.getElementById('flow-enc-key')?.value || '',
+        encIv:       document.getElementById('flow-enc-iv')?.value || '',
+    };
+}
 function toggleEncrypt() {
     const on = document.getElementById('cfg-encrypt-enable').checked;
     document.getElementById('encrypt-config').style.display = on ? '' : 'none';
@@ -984,6 +1068,7 @@ function buildConfig() {
         try { return JSON.parse(v); } catch { return fallback; }
     };
     const dynamicEnabled = document.getElementById('cfg-dynamic-enable')?.checked || false;
+    const flowEnabled    = document.getElementById('cfg-flow-enable')?.checked || false;
     const base = {
         projectName:    document.getElementById('cfg-project').value || 'Unknown',
         environment:    document.getElementById('cfg-env').value,
@@ -1003,7 +1088,16 @@ function buildConfig() {
         stopOnP95:      parseFloat(document.getElementById('cfg-stoponp95').value) || undefined,
         scenarioSteps:  _scenarioSteps,
     };
-    if (dynamicEnabled) {
+    if (flowEnabled) {
+        const f = _getFlowConfig();
+        if (!f.baseUrl) { showNotif('Flow mode: Base URL is required.', 'error'); return null; }
+        if (!f.encKey.trim()) { showNotif('Flow mode: Encryption key is required.', 'error'); return null; }
+        if (!f.encIv.trim()) { showNotif('Flow mode: Encryption IV is required.', 'error'); return null; }
+        base.flowMode = true;
+        base.flowConfig = f;
+        // Flow mode uses the base URL from flow config for the test URL too
+        if (!base.url) base.url = f.baseUrl + '/api/auth/register';
+    } else if (dynamicEnabled) {
         const d = _getDynConfig();
         if (!d.template.trim()) { showNotif('Dynamic mode is on but body template is empty.', 'error'); return null; }
         try { JSON.parse(d.template.replace(/"?\{\{(\w+)\}\}"?/g, (_, k) => `"__VAR:${k}__"`)); } catch { showNotif('Dynamic body template is not valid JSON.', 'error'); return null; }
@@ -1452,22 +1546,29 @@ function renderResults(data) {
         return `<tr><td style="color:${c};font-weight:700">${code}</td><td>${count.toLocaleString()}</td><td>${pct}%</td></tr>`;
     }).join('') || '<tr><td colspan="3" style="color:var(--muted)">No data</td></tr>';
 
-    // Per-request results (dynamic mode only)
-    const perReq = data.perRequestResults || [];
-    const reqCard = document.getElementById('req-results-card');
+    // Per-request results (dynamic / flow mode)
+    const perReq   = data.perRequestResults || [];
+    const isFlow   = cfg.flowMode;
+    const reqCard  = document.getElementById('req-results-card');
+    const reqTitle = document.getElementById('req-results-title');
     if (perReq.length > 0) {
         reqCard.style.display = '';
+        if (reqTitle) reqTitle.textContent = isFlow
+            ? '🔗 Per-VU Registration Results (Flow Mode)'
+            : '🧾 Per-Request Results (Dynamic Mode)';
         document.getElementById('req-results-tbody').innerHTML = perReq.map((r,i) => {
-            const pass = r.status >= 200 && r.status < 400;
+            const pass = r.ok !== undefined ? r.ok : (r.status >= 200 && r.status < 400);
             const statusCol = pass ? 'var(--green)' : 'var(--red)';
-            const err = r.error ? `<span style="color:var(--red)">${r.error}</span>` :
-                (r.responsePreview ? `<span style="color:var(--muted);font-family:monospace">${r.responsePreview.substring(0,100)}</span>` : '—');
+            const stepBadge = r.step ? `<span style="font-size:10px;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:2px 6px">Step ${r.step}</span>` : '—';
+            const err = r.error ? `<span style="color:var(--red)">${_esc(r.error.substring(0,120))}</span>` :
+                (r.responsePreview ? `<span style="color:var(--muted);font-family:monospace">${_esc(r.responsePreview.substring(0,100))}</span>` : '—');
             return `<tr>
                 <td>${i+1}</td>
-                <td style="font-family:monospace">${r.email||'—'}</td>
-                <td style="font-family:monospace">${r.phoneNumber||'—'}</td>
+                <td style="font-family:monospace">${_esc(r.email||'—')}</td>
+                <td style="font-family:monospace">${_esc(String(r.phoneNumber||'—'))}</td>
                 <td style="color:${statusCol};font-weight:700">${r.status||'—'}</td>
                 <td>${r.responseTime||'—'}ms</td>
+                <td>${stepBadge}</td>
                 <td><span class="${pass?'badge-pass':'badge-fail'}">${pass?'PASS':'FAIL'}</span></td>
                 <td style="max-width:240px;word-break:break-word">${err}</td>
             </tr>`;

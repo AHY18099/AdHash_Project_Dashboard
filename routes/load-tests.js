@@ -15,10 +15,70 @@ const DEFAULT_EMAIL_VERIFICATION_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e
 
 // ── AES-128-ECB encryption (PKCS7 padding via Node crypto) ──
 function aesEncrypt(plaintext, key) {
-    const keyBuf = Buffer.from(key, 'utf8').slice(0, 16); // 16 bytes = AES-128
+    const keyBuf = Buffer.from(key, 'utf8').slice(0, 16);
     const cipher = crypto.createCipheriv('aes-128-ecb', keyBuf, null);
-    cipher.setAutoPadding(true); // PKCS7
+    cipher.setAutoPadding(true);
     return Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]).toString('base64');
+}
+
+// ── AES-128-CBC encryption/decryption ──
+function aesCbcEncrypt(plaintext, key, iv) {
+    const keyBuf = Buffer.from(key, 'utf8').slice(0, 16);
+    const ivBuf  = Buffer.from(iv,  'utf8').slice(0, 16);
+    const cipher = crypto.createCipheriv('aes-128-cbc', keyBuf, ivBuf);
+    cipher.setAutoPadding(true);
+    return Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]).toString('base64');
+}
+function aesCbcDecrypt(b64, key, iv) {
+    const keyBuf = Buffer.from(key, 'utf8').slice(0, 16);
+    const ivBuf  = Buffer.from(iv,  'utf8').slice(0, 16);
+    const decipher = crypto.createDecipheriv('aes-128-cbc', keyBuf, ivBuf);
+    decipher.setAutoPadding(true);
+    return Buffer.concat([decipher.update(Buffer.from(b64, 'base64')), decipher.final()]).toString('utf8');
+}
+
+// ── Multi-step flow: per-VU automated registration (OTP fixed to 000000 in QA) ──
+async function _runRegistrationFlow(email, phone, name, flowCfg, fetchFn) {
+    const { baseUrl, encKey, encIv, otp } = flowCfg;
+
+    const enc  = (obj) => JSON.stringify({ encryptedData: aesCbcEncrypt(JSON.stringify(obj), encKey, encIv) });
+    const dec  = (body) => {
+        try { return JSON.parse(aesCbcDecrypt(JSON.parse(body).encryptedData, encKey, encIv)); }
+        catch { return null; }
+    };
+    const post = async (path, obj) => {
+        const r = await fetchFn(`${baseUrl}${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: enc(obj),
+        });
+        const text = await r.text();
+        return { status: r.status, body: text, parsed: dec(text) };
+    };
+
+    // Step 1: check email exists
+    const s1 = await post('/api/users/userExistsByEmail', { email });
+    if (s1.status !== 200) return { ok: false, step: 1, status: s1.status, error: `userExistsByEmail failed: ${s1.body.substring(0,100)}` };
+
+    // Step 2: send OTP
+    const s2 = await post('/api/auth/email-otp/send', { email, purpose: 'signup' });
+    if (s2.status !== 200) return { ok: false, step: 2, status: s2.status, error: `email-otp/send failed: ${s2.body.substring(0,100)}` };
+
+    // Step 3: verify OTP (fixed 000000 in QA)
+    const s3 = await post('/api/auth/email-otp/verify', { email, otp: otp || '000000', purpose: 'signup' });
+    if (s3.status !== 200 || !s3.parsed?.emailVerificationToken)
+        return { ok: false, step: 3, status: s3.status, error: `email-otp/verify failed: ${s3.body.substring(0,100)}` };
+    const emailVerificationToken = s3.parsed.emailVerificationToken;
+
+    // Step 4: register
+    const s4 = await post('/api/auth/register', {
+        email, countryCode: '+91', phoneNumber: phone, name,
+        authProvider: 'email', isgoogleSignUp: false, emailVerificationToken,
+    });
+    const ok = s4.status >= 200 && s4.status < 400;
+    return { ok, step: 4, status: s4.status, emailVerificationToken,
+        accessToken: s4.parsed?.accessToken || null,
+        error: ok ? null : s4.body.substring(0, 200) };
 }
 
 // ── Walk a parsed JSON value, replacing "__VAR:key__" sentinels with vars[key] ──
@@ -159,6 +219,8 @@ router.post('/start', auth, async (req, res) => {
         executedBy = 'Dashboard',
         dynamicMode = false,
         dynamicConfig = null,
+        flowMode = false,
+        flowConfig = null,
     } = req.body || {};
 
     // ── Validation ──
@@ -194,6 +256,8 @@ router.post('/start', auth, async (req, res) => {
         executedBy, startTime,
         dynamicMode: !!dynamicMode,
         dynamicConfig: dynamicMode ? dynamicConfig : null,
+        flowMode: !!flowMode,
+        flowConfig: flowMode ? flowConfig : null,
     };
 
     const runState = {
@@ -232,6 +296,11 @@ async function _executeRun(runId, cfg, state) {
         state.status = 'running';
         addLog('Test started', 'Running');
         addTimeline('Test started', 'Running');
+
+        // ── MULTI-STEP FLOW MODE (e.g. full registration flow) ──
+        if (cfg.flowMode && cfg.flowConfig) {
+            return await _executeFlowRun(runId, cfg, state, addLog, addTimeline);
+        }
 
         // ── DYNAMIC MODE: concurrent fetch with unique payloads ──
         if (cfg.dynamicMode && cfg.dynamicConfig) {
@@ -365,6 +434,85 @@ async function _executeRun(runId, cfg, state) {
         state.logs.push({ time: new Date().toISOString(), event: 'Fatal error: ' + err.message, phase: 'Failed' });
         _saveResults(runId, state);
     }
+}
+
+// ── Multi-step flow execution (full registration: steps 1→2→3→4 per VU) ──
+async function _executeFlowRun(runId, cfg, state, addLog, addTimeline) {
+    const fetch = (...a) => import('node-fetch').then(m => m.default(...a)).catch(() => globalThis.fetch(...a));
+
+    const flowCfg  = cfg.flowConfig;
+    const vus      = cfg.vus;
+    const startIdx = parseInt(flowCfg.startIndex) || 1;
+    const phoneBase = BigInt(flowCfg.phoneBase || '7100000000');
+
+    addLog(`Flow mode: running ${vus} concurrent registration flows`, 'Running');
+    addTimeline(`Firing ${vus} concurrent registration flows`, 'Running');
+
+    const m = state.metrics;
+    const latAll = [];
+    const perResults = [];
+    const t0 = Date.now();
+
+    const promises = Array.from({ length: vus }, async (_, i) => {
+        const idx   = startIdx + i;
+        const phone = String(phoneBase + BigInt(i));
+        const email = `${flowCfg.emailPrefix}${idx}@${flowCfg.emailDomain}`;
+        const name  = `${flowCfg.namePrefix}${idx}`;
+
+        const reqStart = Date.now();
+        let result;
+        try {
+            result = await _runRegistrationFlow(email, phone, name, {
+                baseUrl: flowCfg.baseUrl,
+                encKey:  flowCfg.encKey,
+                encIv:   flowCfg.encIv,
+                otp:     flowCfg.otp || '000000',
+            }, fetch);
+        } catch (e) {
+            result = { ok: false, step: 0, status: 0, error: e.message };
+        }
+        const responseTime = Date.now() - reqStart;
+
+        m.totalReqs++;
+        if (result.ok) m.okReqs++; else m.errReqs++;
+        latAll.push(responseTime);
+        m.statusCodes[result.status] = (m.statusCodes[result.status] || 0) + 1;
+
+        perResults[i] = {
+            index: i + 1,
+            email,
+            phoneNumber: phone,
+            status: result.status,
+            responseTime,
+            ok: result.ok,
+            step: result.step,
+            error: result.error || null,
+            responsePreview: result.accessToken ? 'Registration successful' : (result.error || ''),
+        };
+        addLog(`VU${i+1} → step${result.step} ${result.status} ${responseTime}ms ${email} ${result.ok ? '✓' : '✗ ' + (result.error || '').substring(0,60)}`, 'Running');
+    });
+
+    await Promise.all(promises);
+
+    const elapsed = (Date.now() - t0) / 1000 || 1;
+    m.rps        = parseFloat((m.totalReqs / elapsed).toFixed(2));
+    m.avgLatency = latAll.length ? parseFloat((latAll.reduce((s,v)=>s+v,0)/latAll.length).toFixed(1)) : 0;
+    m.p50        = Math.round(pct(latAll, 50));
+    m.p90        = Math.round(pct(latAll, 90));
+    m.p95        = Math.round(pct(latAll, 95));
+    m.p99        = Math.round(pct(latAll, 99));
+    m.minLatency = latAll.length ? Math.round(Math.min(...latAll)) : 0;
+    m.maxLatency = latAll.length ? Math.round(Math.max(...latAll)) : 0;
+    m.errRate    = m.totalReqs > 0 ? parseFloat(((m.errReqs / m.totalReqs) * 100).toFixed(2)) : 0;
+
+    state.perRequestResults = perResults;
+    state.status  = 'completed';
+    state.endTime = new Date().toISOString();
+    state.verdict = verdict(m, cfg);
+
+    addLog(`Flow test done — ${m.okReqs}/${m.totalReqs} registered · P95 ${m.p95}ms`, 'Completed');
+    addTimeline('Flow test completed', 'Completed');
+    _saveResults(runId, state);
 }
 
 // ── Dynamic concurrent execution ──
