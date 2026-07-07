@@ -909,7 +909,7 @@ function previewDynamicPayloads() {
         <thead><tr><th>#</th><th>Email</th><th>Phone</th><th>Name</th><th>Body (truncated)</th></tr></thead>
         <tbody>${rows.map((r,i)=>`<tr>
             <td>${i+1}</td><td>${r.email}</td><td>${r.phoneNumber}</td><td>${r.name}</td>
-            <td style="max-width:300px;white-space:pre-wrap;word-break:break-all">${r.bodyPreview.substring(0,200)}${r.bodyPreview.length>200?'…':''}</td>
+            <td style="max-width:300px;white-space:pre-wrap;word-break:break-all;font-family:monospace;font-size:11px">${_esc(r.bodyPreview.substring(0,200))}${r.bodyPreview.length>200?'…':''}</td>
         </tr>`).join('')}</tbody>
     </table></div>
     ${dynCfg.encrypt ? `<div style="margin-top:12px;padding:10px;background:#1e293b;border-radius:6px;font-size:11px;color:var(--muted)">🔒 Encryption enabled — each body will be AES-128-ECB encrypted and wrapped as <code style="color:var(--purple)">${dynCfg.encField}</code></div>` : ''}
