@@ -130,9 +130,27 @@ tr:hover td{background:#0f172a55}
 
 /* ── SCENARIO STEPS ── */
 .step-card{background:#0f172a;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;position:relative}
-.step-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.step-card.disabled-step{opacity:.55}
+.step-header{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
 .step-num{width:24px;height:24px;border-radius:50%;background:var(--accent2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
-.step-remove{position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px}.step-remove:hover{color:var(--red)}
+.step-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 4px}.step-remove:hover{color:var(--red)}
+.step-body{margin-top:12px}
+.step-body.collapsed{display:none}
+.method-badge{padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;text-transform:uppercase}
+.method-GET{background:#1e3a5f;color:#93c5fd}
+.method-POST{background:#064e3b;color:#6ee7b7}
+.method-PUT{background:#78350f;color:#fcd34d}
+.method-PATCH{background:#3b0764;color:#d8b4fe}
+.method-DELETE{background:#7f1d1d;color:#fca5a5}
+.step-section{background:#1e293b;border:1px solid var(--border);border-radius:6px;padding:12px;margin-top:10px}
+.step-section-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.capture-row,.assertion-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+/* ── SCENARIO TOOLBAR ── */
+.scenario-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:14px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px}
+/* ── SCENARIOS PANEL ── */
+.scenarios-panel{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px}
+/* ── PREVIEW MODAL ── */
+.preview-modal{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:800px;width:95%;max-height:85vh;overflow-y:auto}
 
 /* ── NOTIFICATION ── */
 .notif{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:360px}
@@ -425,66 +443,21 @@ input:checked+.slider::before{transform:translateX(16px)}
       </div>
     </div>
 
-    <!-- Flow Mode toggle -->
-    <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;font-size:13px;font-weight:600;color:var(--text);letter-spacing:0">
-        <input type="checkbox" id="cfg-flow-enable" onchange="toggleFlowMode()" style="width:16px;height:16px;accent-color:var(--purple);cursor:pointer">
-        🔗 Enable Multi-Step Flow <span style="font-size:11px;color:var(--muted);font-weight:400">— auto register: check email → send OTP → verify OTP → register</span>
-      </label>
-    </div>
+  </div>
 
-    <div id="flow-panel" style="display:none;margin-top:16px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:18px">
-      <div style="font-size:12px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">🔗 Multi-Step Registration Flow</div>
-      <div style="background:#1e1b4b;border:1px solid #4338ca;border-radius:6px;padding:10px 14px;font-size:11px;color:#a5b4fc;margin-bottom:16px">
-        Each VU runs 4 steps automatically:<br>
-        <strong>Step 1</strong> → userExistsByEmail &nbsp;|&nbsp;
-        <strong>Step 2</strong> → email-otp/send &nbsp;|&nbsp;
-        <strong>Step 3</strong> → email-otp/verify (OTP: 000000) &nbsp;|&nbsp;
-        <strong>Step 4</strong> → auth/register
+  <!-- Active Scenario from Builder -->
+  <div id="active-scenario-card" class="card" style="display:none;margin-bottom:0;border-color:var(--accent2)">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:700;color:var(--accent2)">🔀 Active Scenario</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700" id="active-scenario-name">—</div>
+        <div style="font-size:11px;color:var(--muted)" id="active-scenario-summary">—</div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
-        <div>
-          <label class="form-label">BASE URL</label>
-          <input type="text" id="flow-base-url" class="form-control" value="https://devextsnapi.synctag.com" placeholder="https://api.example.com">
-        </div>
-        <div>
-          <label class="form-label">EMAIL PREFIX</label>
-          <input type="text" id="flow-email-prefix" class="form-control" value="loadtest">
-        </div>
-        <div>
-          <label class="form-label">EMAIL DOMAIN</label>
-          <input type="text" id="flow-email-domain" class="form-control" value="mailinator.com">
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px">
-        <div>
-          <label class="form-label">START INDEX</label>
-          <input type="number" id="flow-start-index" class="form-control" value="1">
-        </div>
-        <div>
-          <label class="form-label">PHONE BASE</label>
-          <input type="text" id="flow-phone-base" class="form-control" value="7110000000">
-        </div>
-        <div>
-          <label class="form-label">NAME PREFIX</label>
-          <input type="text" id="flow-name-prefix" class="form-control" value="Load Testing">
-        </div>
-        <div>
-          <label class="form-label">OTP (QA fixed)</label>
-          <input type="text" id="flow-otp" class="form-control" value="000000">
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-        <div>
-          <label class="form-label">ENCRYPTION KEY (AES-128-CBC)</label>
-          <input type="password" id="flow-enc-key" class="form-control" value="xfnr3PVyckouBZxW">
-        </div>
-        <div>
-          <label class="form-label">ENCRYPTION IV</label>
-          <input type="password" id="flow-enc-iv" class="form-control" value="xfnr3PVyckouBZxW">
-        </div>
-      </div>
-      <div style="font-size:11px;color:var(--muted)">The dashboard will auto-generate unique email/phone per VU, run all 4 steps, and report pass/fail per registration.</div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text)">
+        <input type="checkbox" id="cfg-use-scenario" style="width:15px;height:15px;accent-color:var(--accent2);cursor:pointer">
+        Use Scenario (k6)
+      </label>
+      <button class="btn btn-secondary btn-xs" onclick="clearActiveScenario()">✕ Clear</button>
     </div>
   </div>
 
@@ -499,29 +472,121 @@ input:checked+.slider::before{transform:translateX(16px)}
 <!-- ══════════════════════════ TAB 2: SCENARIO BUILDER ══════════════════════════ -->
 <div id="tab-scenario" class="tab-pane">
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
-    <h2 style="font-size:17px;font-weight:800">JMeter-Style Scenario Builder</h2>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-secondary btn-sm" onclick="addStep()">+ Add Step</button>
-      <button class="btn btn-secondary btn-sm" onclick="importScenario()">📥 Import JSON</button>
-      <button class="btn btn-secondary btn-sm" onclick="exportScenario()">📤 Export JSON</button>
+  <!-- TOOLBAR -->
+  <div class="scenario-toolbar">
+    <div style="font-size:14px;font-weight:800;color:var(--text);margin-right:4px">Scenario Builder</div>
+    <div style="flex:1;min-width:160px">
+      <input id="scen-name" placeholder="Scenario name…" style="height:32px;font-size:13px" oninput="_scenarioMeta.name=this.value" />
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="saveScenario()" title="Save Scenario">💾 Save</button>
+    <button class="btn btn-secondary btn-sm" onclick="loadScenariosPanel()" title="Load Scenario">📂 Load</button>
+    <button class="btn btn-secondary btn-sm" onclick="newScenario()" title="New Scenario">➕ New</button>
+    <div style="width:1px;height:22px;background:var(--border);margin:0 2px"></div>
+    <button class="btn btn-secondary btn-sm" onclick="exportK6Script()" title="Export k6 Script">📜 k6 Script</button>
+    <button class="btn btn-secondary btn-sm" onclick="exportScenario()" title="Export JSON">📤 JSON</button>
+    <button class="btn btn-secondary btn-sm" onclick="importScenario()" title="Import JSON">📥 Import</button>
+    <div style="width:1px;height:22px;background:var(--border);margin:0 2px"></div>
+    <button class="btn btn-amber btn-sm" onclick="dryRun()" title="Dry Run with 1 VU">🧪 Dry Run</button>
+  </div>
+
+  <!-- META ROW -->
+  <div class="card" style="margin-bottom:12px;padding:12px 16px">
+    <div class="row" style="gap:10px">
+      <div class="col">
+        <label>Description</label>
+        <input id="scen-desc" placeholder="Optional description…" oninput="_scenarioMeta.description=this.value" />
+      </div>
+      <div class="col">
+        <label>Tags (comma separated)</label>
+        <input id="scen-tags" placeholder="login, regression, smoke…" oninput="_scenarioMeta.tags=this.value" />
+      </div>
     </div>
   </div>
 
-  <div class="card" style="margin-bottom:14px">
-    <div class="card-title">🔧 Global Variables</div>
-    <div id="global-vars-list"></div>
-    <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addGlobalVar()">+ Add Variable</button>
-    <div class="form-hint" style="margin-top:8px">Use <code style="color:var(--amber)">{{varName}}</code> in URL, headers, or body to reference variables.</div>
+  <!-- SAVED SCENARIOS PANEL (hidden by default) -->
+  <div id="saved-scenarios-panel" class="scenarios-panel" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700">📂 Saved Scenarios</div>
+      <button class="btn btn-secondary btn-xs" onclick="document.getElementById('saved-scenarios-panel').style.display='none'">✕ Close</button>
+    </div>
+    <div id="saved-scenarios-list"><div style="color:var(--muted);font-size:12px">Loading…</div></div>
   </div>
 
+  <!-- GLOBAL VARIABLES -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">🔧 Global Variables
+      <span style="font-size:10px;font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">— available in all steps as {{varName}}</span>
+    </div>
+    <div id="global-vars-list"></div>
+    <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+      <button class="btn btn-secondary btn-sm" onclick="addGlobalVar()">+ Add Variable</button>
+      <span style="font-size:11px;color:var(--muted)">Built-in: <code style="color:var(--amber)">{{index}}</code> <code style="color:var(--amber)">{{email}}</code> <code style="color:var(--amber)">{{phoneNumber}}</code> <code style="color:var(--amber)">{{name}}</code> <code style="color:var(--amber)">{{timestamp}}</code> <code style="color:var(--amber)">{{random}}</code> <code style="color:var(--amber)">{{uuid}}</code></span>
+    </div>
+  </div>
+
+  <!-- DYNAMIC TEST DATA -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">
+      <span>⚡ Dynamic Test Data</span>
+      <label class="switch" style="margin-left:auto">
+        <input type="checkbox" id="scen-dyn-enable" onchange="toggleScenDynamic()">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div id="scen-dyn-panel" style="display:none">
+      <div class="row" style="margin-bottom:10px">
+        <div class="col">
+          <label>Data Source</label>
+          <select id="scen-dyn-source" onchange="toggleScenDynSource()">
+            <option value="generate">Auto-generate per VU</option>
+            <option value="json">Paste JSON array</option>
+          </select>
+        </div>
+      </div>
+      <div id="scen-dyn-generate">
+        <div class="row" style="margin-bottom:8px">
+          <div class="col"><label>Email Prefix</label><input id="scen-dyn-email-prefix" value="loadtest" /></div>
+          <div class="col"><label>Email Domain</label><input id="scen-dyn-email-domain" value="mailinator.com" /></div>
+          <div class="col"><label>Start Index</label><input id="scen-dyn-start-index" type="number" value="1" min="1" /></div>
+        </div>
+        <div class="row">
+          <div class="col"><label>Phone Base</label><input id="scen-dyn-phone-base" value="7100000000" /></div>
+          <div class="col"><label>Name Prefix</label><input id="scen-dyn-name-prefix" value="Load Test" /></div>
+          <div class="col"></div>
+        </div>
+      </div>
+      <div id="scen-dyn-json" style="display:none">
+        <label>JSON Array (one object per VU)</label>
+        <textarea id="scen-dyn-custom-data" rows="5" placeholder='[{"email":"user1@test.com","token":"abc"},{"email":"user2@test.com","token":"def"}]'></textarea>
+        <div class="form-hint">Each object's fields are available as {{fieldName}} in step URLs, headers, and bodies.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEPS CONTAINER -->
   <div id="steps-container"></div>
 
-  <div style="margin-top:16px;display:flex;gap:10px">
+  <!-- BOTTOM ACTION BAR -->
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;align-items:center">
+    <button class="btn btn-secondary" onclick="addStep()">+ Add Step</button>
+    <button class="btn btn-secondary" onclick="previewScenario()">👁 Preview Scenario</button>
+    <button class="btn btn-amber" onclick="dryRun()">🧪 Dry Run 1 User</button>
     <button class="btn btn-primary" onclick="applyScenario()">✅ Apply to Configure Tab</button>
-    <button class="btn btn-secondary" onclick="clearScenario()">🗑 Clear All Steps</button>
+    <button class="btn btn-secondary" onclick="clearScenario()" style="margin-left:auto">🗑 Clear All</button>
   </div>
-  <div class="form-hint" style="margin-top:8px">Multi-step scenarios execute sequentially per virtual user. Each step's response can be captured as a variable for the next step.</div>
+  <div class="form-hint" style="margin-top:8px">Each step runs sequentially per VU. Captured variables from one step (e.g. authToken) are available in all subsequent steps.</div>
+
+  <!-- PREVIEW MODAL -->
+  <div id="scenario-preview-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:600;display:none;align-items:center;justify-content:center;padding:16px">
+    <div class="preview-modal">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="font-size:15px;font-weight:800">👁 Scenario Preview (VU 1–3 simulated)</div>
+        <button onclick="document.getElementById('scenario-preview-overlay').style.display='none'" class="btn btn-secondary btn-sm">✕ Close</button>
+      </div>
+      <div id="scenario-preview-body"></div>
+    </div>
+  </div>
+
 </div>
 
 <!-- ══════════════════════════ TAB 3: LIVE RUN ══════════════════════════ -->
@@ -829,6 +894,10 @@ let _scenarioSteps = [];
 let _globalVars    = [];
 let _pendingConfig = null;
 let _maxVUs = 50;
+let _activeScenario = null;
+let _currentScenarioId = null;
+let _savedScenarios = [];
+let _scenarioMeta = { name: '', description: '', tags: '' };
 
 // ── Token ──
 function getToken() {
@@ -891,7 +960,8 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('cfg-vus').max = _maxVUs;
     } catch {}
 
-    addStep(); // Start with one step
+    addStep(); // Start with one step in scenario builder
+    renderGlobalVars();
     loadHistory();
     loadTemplate();
 });
@@ -903,33 +973,10 @@ function toggleDynamicMode() {
     const on = document.getElementById('cfg-dynamic-enable').checked;
     document.getElementById('dynamic-panel').style.display = on ? '' : 'none';
 }
-function toggleFlowMode() {
-    const on = document.getElementById('cfg-flow-enable').checked;
-    document.getElementById('flow-panel').style.display = on ? '' : 'none';
-    // Disable dynamic mode when flow mode is on (they are mutually exclusive)
-    if (on) {
-        document.getElementById('cfg-dynamic-enable').checked = false;
-        document.getElementById('dynamic-panel').style.display = 'none';
-    }
-}
-function _getFlowConfig() {
-    return {
-        baseUrl:     (document.getElementById('flow-base-url')?.value || '').trim(),
-        emailPrefix: document.getElementById('flow-email-prefix')?.value || 'loadtest',
-        emailDomain: document.getElementById('flow-email-domain')?.value || 'mailinator.com',
-        startIndex:  document.getElementById('flow-start-index')?.value || '1',
-        phoneBase:   document.getElementById('flow-phone-base')?.value || '7110000000',
-        namePrefix:  document.getElementById('flow-name-prefix')?.value || 'Load Testing',
-        otp:         document.getElementById('flow-otp')?.value || '000000',
-        encKey:      document.getElementById('flow-enc-key')?.value || '',
-        encIv:       document.getElementById('flow-enc-iv')?.value || '',
-    };
-}
 function toggleEncrypt() {
     const on = document.getElementById('cfg-encrypt-enable').checked;
     document.getElementById('encrypt-config').style.display = on ? '' : 'none';
 }
-const _DEFAULT_EMAIL_VERIFICATION_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImxvYWR0ZXN0MUBtYWlsaW5hdG9yLmNvbSIsInB1cnBvc2UiOiJlbWFpbC12ZXJpZmllZCIsImlhdCI6MTc4MzQwODc4OSwiZXhwIjoxNzgzNDA5Njg5fQ.90EgVLbTeJh-8orjPXivCIH3tNLkB1CN7CZwPoiTbok';
 
 function insertDefaultTemplate() {
     document.getElementById('dyn-body-template').value = JSON.stringify({
@@ -939,8 +986,24 @@ function insertDefaultTemplate() {
         name: '{{name}}',
         authProvider: 'email',
         isgoogleSignUp: false,
-        emailVerificationToken: '{{emailVerificationToken}}',
     }, null, 2);
+}
+
+// ── Active scenario management ──
+function clearActiveScenario() {
+    _activeScenario = null;
+    document.getElementById('active-scenario-card').style.display = 'none';
+    document.getElementById('cfg-use-scenario').checked = false;
+}
+
+function _showActiveScenario(scenario) {
+    _activeScenario = scenario;
+    const card = document.getElementById('active-scenario-card');
+    const steps = scenario.steps || [];
+    card.style.display = '';
+    document.getElementById('active-scenario-name').textContent = scenario.scenarioName || scenario.name || 'Unnamed Scenario';
+    document.getElementById('active-scenario-summary').textContent = `${steps.length} step(s) · ${scenario.projectName || ''} ${scenario.environment || ''}`.trim();
+    document.getElementById('cfg-use-scenario').checked = true;
 }
 
 function _buildDynRecord(index, cfg) {
@@ -1068,7 +1131,8 @@ function buildConfig() {
         try { return JSON.parse(v); } catch { return fallback; }
     };
     const dynamicEnabled = document.getElementById('cfg-dynamic-enable')?.checked || false;
-    const flowEnabled    = document.getElementById('cfg-flow-enable')?.checked || false;
+    const useScenario    = document.getElementById('cfg-use-scenario')?.checked || false;
+
     const base = {
         projectName:    document.getElementById('cfg-project').value || 'Unknown',
         environment:    document.getElementById('cfg-env').value,
@@ -1088,16 +1152,31 @@ function buildConfig() {
         stopOnP95:      parseFloat(document.getElementById('cfg-stoponp95').value) || undefined,
         scenarioSteps:  _scenarioSteps,
     };
-    if (flowEnabled) {
-        const f = _getFlowConfig();
-        if (!f.baseUrl) { showNotif('Flow mode: Base URL is required.', 'error'); return null; }
-        if (!f.encKey.trim()) { showNotif('Flow mode: Encryption key is required.', 'error'); return null; }
-        if (!f.encIv.trim()) { showNotif('Flow mode: Encryption IV is required.', 'error'); return null; }
-        base.flowMode = true;
-        base.flowConfig = f;
-        // Flow mode uses the base URL from flow config for the test URL too
-        if (!base.url) base.url = f.baseUrl + '/api/auth/register';
-    } else if (dynamicEnabled) {
+
+    // ── Scenario mode (k6) ──
+    if (useScenario && _activeScenario) {
+        // Merge UI params into the scenario and send as scenario object
+        const scenarioCfg = {
+            ..._activeScenario,
+            projectName:    base.projectName,
+            environment:    base.environment,
+            vus:            base.vus,
+            duration:       base.duration,
+            rampup:         base.rampup,
+            timeout:        base.timeout,
+            scenarioType:   base.scenarioType,
+            p95Threshold:   base.p95Threshold,
+            stopOnErrorRate: base.stopOnErrorRate,
+            stopOnP95:      base.stopOnP95,
+            executedBy:     'Dashboard',
+        };
+        return scenarioCfg; // backend detects .steps → k6 path
+    }
+
+    // ── URL is required for single-endpoint modes ──
+    if (!base.url) { showNotif('Target URL is required (or use a Scenario from Scenario Builder).', 'error'); return null; }
+
+    if (dynamicEnabled) {
         const d = _getDynConfig();
         if (!d.template.trim()) { showNotif('Dynamic mode is on but body template is empty.', 'error'); return null; }
         try { JSON.parse(d.template.replace(/"?\{\{(\w+)\}\}"?/g, (_, k) => `"__VAR:${k}__"`)); } catch { showNotif('Dynamic body template is not valid JSON.', 'error'); return null; }
@@ -1111,17 +1190,24 @@ function buildConfig() {
 function startTest() {
     const cfg = buildConfig();
     if (!cfg) return; // validation already showed error
-    if (!cfg.url) { showNotif('Target URL is required.', 'error'); return; }
-    if (!/^https?:\/\//i.test(cfg.url)) { showNotif('URL must start with http:// or https://', 'error'); return; }
+    // Scenario mode has no top-level url; single-URL modes require it
+    const isScenarioMode = !!(cfg.steps && cfg.steps.length > 0);
+    if (!isScenarioMode) {
+        if (!cfg.url) { showNotif('Target URL is required.', 'error'); return; }
+        if (!/^https?:\/\//i.test(cfg.url)) { showNotif('URL must start with http:// or https://', 'error'); return; }
+    }
     if (cfg.vus > _maxVUs) { showNotif(`VU limit for your role is ${_maxVUs}.`, 'error'); return; }
     _pendingConfig = cfg;
 
     const isProd = cfg.environment === 'Production';
     const summary = document.getElementById('confirm-summary');
+    const isScenarioMode = !!(cfg.steps && cfg.steps.length > 0);
     summary.innerHTML = `
-      <strong>Project:</strong> ${cfg.projectName} · <strong>Env:</strong> ${cfg.environment}<br>
-      <strong>URL:</strong> ${cfg.url}<br>
-      <strong>VUs:</strong> ${cfg.vus} · <strong>Duration:</strong> ${cfg.duration}s · <strong>Ramp-up:</strong> ${cfg.rampup}s
+      <strong>Project:</strong> ${_esc(cfg.projectName)} · <strong>Env:</strong> ${_esc(cfg.environment)}<br>
+      ${isScenarioMode
+        ? `<strong>Scenario:</strong> ${_esc(cfg.scenarioName || 'Unnamed')} · <strong>Steps:</strong> ${cfg.steps.length} (k6 mode)<br>`
+        : `<strong>URL:</strong> ${_esc(cfg.url)}<br>`}
+      <strong>VUs:</strong> ${cfg.vus} · <strong>Duration:</strong> ${cfg.duration}s · <strong>Ramp-up:</strong> ${cfg.rampup || 0}s
     `;
     document.getElementById('confirm-warn').style.display = isProd ? '' : 'none';
     document.getElementById('confirm-modal').style.display = 'flex';
@@ -1173,91 +1259,61 @@ async function generateDemo() {
 
 // ══════════════════════════ SCENARIO BUILDER ══════════════════════════
 
+// ── Global Vars ──
 function addGlobalVar() {
-    _globalVars.push({ name: '', value: '' });
+    _globalVars.push({ name: '', value: '', secret: false });
     renderGlobalVars();
 }
 
 function renderGlobalVars() {
     const c = document.getElementById('global-vars-list');
-    if (!_globalVars.length) { c.innerHTML = '<div style="color:var(--muted);font-size:12px">No variables defined.</div>'; return; }
+    if (!_globalVars.length) {
+        c.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:4px 0">No global variables. Click "+ Add Variable" to define reusable values.</div>';
+        return;
+    }
     c.innerHTML = _globalVars.map((v, i) => `
-      <div class="row" style="margin-bottom:8px;align-items:center">
-        <div class="col"><input placeholder="variableName" value="${_esc(v.name)}" onchange="_globalVars[${i}].name=this.value" /></div>
-        <div style="color:var(--muted);padding:0 4px">=</div>
-        <div class="col2"><input placeholder="value or {{capturedVar}}" value="${_esc(v.value)}" onchange="_globalVars[${i}].value=this.value" /></div>
-        <button class="btn btn-secondary btn-xs" onclick="_globalVars.splice(${i},1);renderGlobalVars()">✕</button>
+      <div class="row" style="margin-bottom:8px;align-items:center;flex-wrap:nowrap;gap:6px">
+        <div style="flex:1;min-width:100px"><input placeholder="varName" value="${_esc(v.name)}" oninput="_globalVars[${i}].name=this.value" style="height:32px" /></div>
+        <div style="color:var(--muted);padding:0 2px;font-size:13px">=</div>
+        <div style="flex:2;min-width:140px"><input placeholder="value" ${v.secret ? 'type="password"' : ''} value="${_esc(v.value)}" oninput="_globalVars[${i}].value=this.value" style="height:32px" /></div>
+        <label title="Secret (masked in UI)" style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;text-transform:none;letter-spacing:0">
+          <input type="checkbox" ${v.secret?'checked':''} onchange="_globalVars[${i}].secret=this.checked;renderGlobalVars()" style="width:13px;height:13px" /> 🔒
+        </label>
+        <button class="step-remove" onclick="_globalVars.splice(${i},1);renderGlobalVars()" title="Remove">✕</button>
       </div>`).join('');
 }
 
-function addStep() {
-    _scenarioSteps.push({
+// ── Steps ──
+function _newStep() {
+    return {
+        id: 'step_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
         name: `Step ${_scenarioSteps.length + 1}`,
-        method: 'GET', url: '', headers: '', body: '',
-        captureVar: '', captureJsonPath: '',
-        assertStatusCode: 200, assertContains: '',
-    });
+        enabled: true,
+        method: 'GET', url: '',
+        headers: {}, queryParams: {}, body: null,
+        assertions: [{ type: 'status', expected: 200 }],
+        captures: [],
+        requestEncryption: { enabled: false, algorithm: 'AES-128-CBC', key: '', iv: '', outputField: 'encryptedData' },
+        responseDecryption: { enabled: false, algorithm: 'AES-128-CBC', key: '', iv: '', inputField: 'encryptedData' },
+        continueOnFailure: false,
+        retryCount: 0, retryDelay: 500,
+        thinkTime: 0,
+        maskInReport: false,
+        _collapsed: false,
+    };
+}
+
+function addStep() {
+    _scenarioSteps.push(_newStep());
     renderSteps();
 }
 
-function renderSteps() {
-    const c = document.getElementById('steps-container');
-    if (!_scenarioSteps.length) {
-        c.innerHTML = '<div class="empty" style="padding:30px"><div class="empty-icon">🔀</div><h3>No Steps</h3><p>Click "+ Add Step" to build a scenario.</p></div>';
-        return;
-    }
-    c.innerHTML = _scenarioSteps.map((s, i) => `
-    <div class="step-card" id="step-${i}">
-      <div class="step-header">
-        <span class="step-num">${i + 1}</span>
-        <input style="flex:1;font-weight:700;background:none;border:none;color:var(--text);font-size:14px;padding:0" value="${_esc(s.name)}" onchange="_scenarioSteps[${i}].name=this.value" />
-        <div style="display:flex;gap:6px">
-          ${i > 0 ? `<button class="btn btn-secondary btn-xs" onclick="moveStep(${i},-1)">↑</button>` : ''}
-          ${i < _scenarioSteps.length - 1 ? `<button class="btn btn-secondary btn-xs" onclick="moveStep(${i},1)">↓</button>` : ''}
-        </div>
-        <button class="step-remove" onclick="_scenarioSteps.splice(${i},1);renderSteps()">✕</button>
-      </div>
-      <div class="row">
-        <div class="col">
-          <label>Method</label>
-          <select onchange="_scenarioSteps[${i}].method=this.value">
-            ${['GET','POST','PUT','PATCH','DELETE'].map(m => `<option ${s.method===m?'selected':''}>${m}</option>`).join('')}
-          </select>
-        </div>
-        <div class="col2">
-          <label>URL</label>
-          <input value="${_esc(s.url)}" placeholder="https://api.example.com/endpoint or use {{baseUrl}}/path" onchange="_scenarioSteps[${i}].url=this.value" />
-        </div>
-      </div>
-      <div class="row" style="margin-top:10px">
-        <div class="col">
-          <label>Headers (JSON)</label>
-          <textarea rows="2" onchange="_scenarioSteps[${i}].headers=this.value">${_esc(s.headers)}</textarea>
-        </div>
-        <div class="col">
-          <label>Body (JSON)</label>
-          <textarea rows="2" onchange="_scenarioSteps[${i}].body=this.value">${_esc(s.body)}</textarea>
-        </div>
-      </div>
-      <div class="row" style="margin-top:10px">
-        <div class="col">
-          <label>Assert Status Code</label>
-          <input type="number" value="${s.assertStatusCode || 200}" onchange="_scenarioSteps[${i}].assertStatusCode=parseInt(this.value)" />
-        </div>
-        <div class="col">
-          <label>Assert Response Contains</label>
-          <input value="${_esc(s.assertContains)}" placeholder="text or JSON path" onchange="_scenarioSteps[${i}].assertContains=this.value" />
-        </div>
-        <div class="col">
-          <label>Capture Variable Name</label>
-          <input value="${_esc(s.captureVar)}" placeholder="myToken" onchange="_scenarioSteps[${i}].captureVar=this.value" />
-        </div>
-        <div class="col">
-          <label>Capture JSON Path</label>
-          <input value="${_esc(s.captureJsonPath)}" placeholder="data.token" onchange="_scenarioSteps[${i}].captureJsonPath=this.value" />
-        </div>
-      </div>
-    </div>`).join('');
+function duplicateStep(i) {
+    const clone = JSON.parse(JSON.stringify(_scenarioSteps[i]));
+    clone.id = 'step_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+    clone.name = clone.name + ' (copy)';
+    _scenarioSteps.splice(i + 1, 0, clone);
+    renderSteps();
 }
 
 function moveStep(i, dir) {
@@ -1267,21 +1323,460 @@ function moveStep(i, dir) {
     renderSteps();
 }
 
-function applyScenario() {
-    showNotif(`${_scenarioSteps.length} step(s) applied to Configure tab.`, 'success');
-    switchTab('configure');
-}
-
-function clearScenario() {
-    _scenarioSteps = [];
+function toggleStepCollapse(i) {
+    _scenarioSteps[i]._collapsed = !_scenarioSteps[i]._collapsed;
     renderSteps();
 }
 
+function addCapture(i) {
+    if (!_scenarioSteps[i].captures) _scenarioSteps[i].captures = [];
+    _scenarioSteps[i].captures.push({ varName: '', jsonPath: '' });
+    renderSteps();
+}
+function removeCapture(si, ci) {
+    _scenarioSteps[si].captures.splice(ci, 1);
+    renderSteps();
+}
+function addAssertion(i) {
+    if (!_scenarioSteps[i].assertions) _scenarioSteps[i].assertions = [];
+    _scenarioSteps[i].assertions.push({ type: 'status', expected: 200 });
+    renderSteps();
+}
+function removeAssertion(si, ai) {
+    _scenarioSteps[si].assertions.splice(ai, 1);
+    renderSteps();
+}
+
+function _methodBadgeClass(m) {
+    return 'method-badge method-' + (m || 'GET').toUpperCase();
+}
+
+function renderSteps() {
+    const c = document.getElementById('steps-container');
+    if (!_scenarioSteps.length) {
+        c.innerHTML = '<div class="empty" style="padding:30px"><div class="empty-icon">🔀</div><h3>No Steps Yet</h3><p>Click "+ Add Step" below to build your test scenario.</p></div>';
+        return;
+    }
+    c.innerHTML = _scenarioSteps.map((s, i) => {
+        const isCollapsed = !!s._collapsed;
+        const method = (s.method || 'GET').toUpperCase();
+        const hasBody = ['POST','PUT','PATCH'].includes(method);
+        const bodyStr = s.body ? (typeof s.body === 'string' ? s.body : JSON.stringify(s.body, null, 2)) : '';
+        const headersStr = s.headers ? (typeof s.headers === 'string' ? s.headers : JSON.stringify(s.headers, null, 2)) : '';
+        const queryStr = s.queryParams ? (typeof s.queryParams === 'string' ? s.queryParams : JSON.stringify(s.queryParams, null, 2)) : '';
+
+        // Assertions HTML
+        const assertHtml = (s.assertions || []).map((a, ai) => `
+          <div class="assertion-row">
+            <select style="width:110px;height:30px;font-size:12px" onchange="_scenarioSteps[${i}].assertions[${ai}].type=this.value;renderSteps()">
+              <option ${a.type==='status'?'selected':''} value="status">Status =</option>
+              <option ${a.type==='jsonPath'?'selected':''} value="jsonPath">JSON path exists</option>
+              <option ${a.type==='contains'?'selected':''} value="contains">Body contains</option>
+            </select>
+            ${a.type === 'status' ? `<input type="number" style="width:80px;height:30px;font-size:12px" value="${a.expected||200}" oninput="_scenarioSteps[${i}].assertions[${ai}].expected=parseInt(this.value)" />` : ''}
+            ${a.type === 'jsonPath' ? `<input placeholder="data.token" style="flex:1;height:30px;font-size:12px" value="${_esc(a.path||'')}" oninput="_scenarioSteps[${i}].assertions[${ai}].path=this.value" />` : ''}
+            ${a.type === 'contains' ? `<input placeholder="expected text" style="flex:1;height:30px;font-size:12px" value="${_esc(a.value||'')}" oninput="_scenarioSteps[${i}].assertions[${ai}].value=this.value" />` : ''}
+            <button class="step-remove" onclick="removeAssertion(${i},${ai})" title="Remove assertion">✕</button>
+          </div>`).join('');
+
+        // Captures HTML
+        const capHtml = (s.captures || []).map((cap, ci) => `
+          <div class="capture-row">
+            <input placeholder="varName" style="width:120px;height:30px;font-size:12px" value="${_esc(cap.varName||'')}" oninput="_scenarioSteps[${i}].captures[${ci}].varName=this.value" />
+            <span style="color:var(--muted);font-size:12px">←</span>
+            <input placeholder="data.token" style="flex:1;height:30px;font-size:12px" value="${_esc(cap.jsonPath||'')}" oninput="_scenarioSteps[${i}].captures[${ci}].jsonPath=this.value" />
+            <button class="step-remove" onclick="removeCapture(${i},${ci})" title="Remove capture">✕</button>
+          </div>`).join('');
+
+        return `
+    <div class="step-card ${s.enabled===false?'disabled-step':''}" id="step-card-${i}">
+      <!-- STEP HEADER -->
+      <div class="step-header" onclick="toggleStepCollapse(${i})" style="margin-bottom:${isCollapsed?'0':'12px'}">
+        <span class="step-num">${i + 1}</span>
+        <span class="${_methodBadgeClass(method)}">${method}</span>
+        <input style="flex:1;font-weight:700;background:none;border:none;color:var(--text);font-size:13px;padding:0 4px;cursor:text" value="${_esc(s.name)}" onclick="event.stopPropagation()" oninput="_scenarioSteps[${i}].name=this.value" placeholder="Step name" />
+        <span style="font-size:11px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(s.url || '—')}</span>
+        <label class="switch" style="flex-shrink:0" onclick="event.stopPropagation()" title="${s.enabled===false?'Disabled':'Enabled'}">
+          <input type="checkbox" ${s.enabled!==false?'checked':''} onchange="_scenarioSteps[${i}].enabled=this.checked;renderSteps()">
+          <span class="slider"></span>
+        </label>
+        <button class="btn btn-secondary btn-xs" onclick="event.stopPropagation();duplicateStep(${i})" title="Duplicate step">⧉</button>
+        ${i > 0 ? `<button class="btn btn-secondary btn-xs" onclick="event.stopPropagation();moveStep(${i},-1)" title="Move up">↑</button>` : ''}
+        ${i < _scenarioSteps.length-1 ? `<button class="btn btn-secondary btn-xs" onclick="event.stopPropagation();moveStep(${i},1)" title="Move down">↓</button>` : ''}
+        <button class="step-remove" onclick="event.stopPropagation();_scenarioSteps.splice(${i},1);renderSteps()" title="Delete step">🗑</button>
+        <span style="color:var(--muted);font-size:13px">${isCollapsed?'▼':'▲'}</span>
+      </div>
+
+      <!-- STEP BODY -->
+      <div class="step-body ${isCollapsed?'collapsed':''}">
+        <!-- Row 1: Method + URL -->
+        <div class="row" style="gap:8px;margin-bottom:10px">
+          <div style="width:100px;flex-shrink:0">
+            <label>Method</label>
+            <select style="height:36px" onchange="_scenarioSteps[${i}].method=this.value;renderSteps()">
+              ${['GET','POST','PUT','PATCH','DELETE'].map(m=>`<option ${method===m?'selected':''}>${m}</option>`).join('')}
+            </select>
+          </div>
+          <div style="flex:1;min-width:200px">
+            <label>URL</label>
+            <input value="${_esc(s.url||'')}" placeholder="https://api.example.com/endpoint or {{baseUrl}}/path" oninput="_scenarioSteps[${i}].url=this.value" style="height:36px" />
+          </div>
+        </div>
+
+        <!-- Row 2: Headers + Query Params -->
+        <div class="row" style="gap:8px;margin-bottom:10px">
+          <div class="col">
+            <label>Headers (JSON)</label>
+            <textarea rows="3" style="font-size:12px;font-family:monospace" placeholder='{"Content-Type":"application/json"}' oninput="_scenarioSteps[${i}].headers=_tryParseJSON(this.value,{})">${_esc(headersStr)}</textarea>
+          </div>
+          <div class="col">
+            <label>Query Params (JSON)</label>
+            <textarea rows="3" style="font-size:12px;font-family:monospace" placeholder='{"page":"1"}' oninput="_scenarioSteps[${i}].queryParams=_tryParseJSON(this.value,{})">${_esc(queryStr)}</textarea>
+          </div>
+        </div>
+
+        <!-- Row 3: Body -->
+        ${hasBody ? `
+        <div style="margin-bottom:10px">
+          <label>Body (JSON)</label>
+          <textarea rows="4" style="font-size:12px;font-family:monospace" placeholder='{"email":"{{email}}","password":"test123"}' oninput="_scenarioSteps[${i}].body=_tryParseJSON(this.value,this.value)">${_esc(bodyStr)}</textarea>
+        </div>` : ''}
+
+        <!-- Row 4: Assertions -->
+        <div class="step-section" style="margin-bottom:8px">
+          <div class="step-section-title">
+            <span>✅ Assertions</span>
+            <button class="btn btn-secondary btn-xs" onclick="addAssertion(${i})">+ Add</button>
+          </div>
+          <div id="assert-${i}">${assertHtml || '<div style="color:var(--muted);font-size:11px">No assertions — 2xx status is checked by default.</div>'}</div>
+        </div>
+
+        <!-- Row 5: Captures -->
+        <div class="step-section" style="margin-bottom:8px">
+          <div class="step-section-title">
+            <span>📌 Captures (for next steps)</span>
+            <button class="btn btn-secondary btn-xs" onclick="addCapture(${i})">+ Add</button>
+          </div>
+          <div id="capture-${i}">${capHtml || '<div style="color:var(--muted);font-size:11px">No captures defined.</div>'}</div>
+        </div>
+
+        <!-- Row 6: Request Encryption -->
+        <div class="step-section" style="margin-bottom:8px">
+          <div class="step-section-title">
+            <span>🔒 Request Encryption</span>
+            <label class="switch"><input type="checkbox" ${s.requestEncryption?.enabled?'checked':''} onchange="_scenarioSteps[${i}].requestEncryption.enabled=this.checked;renderSteps()"><span class="slider"></span></label>
+          </div>
+          ${s.requestEncryption?.enabled ? `
+          <div class="row" style="gap:8px;margin-top:8px">
+            <div class="col">
+              <label>Algorithm</label>
+              <select style="height:32px;font-size:12px" onchange="_scenarioSteps[${i}].requestEncryption.algorithm=this.value;renderSteps()">
+                <option ${(s.requestEncryption.algorithm||'AES-128-CBC')==='AES-128-CBC'?'selected':''}>AES-128-CBC</option>
+                <option ${s.requestEncryption.algorithm==='AES-128-ECB'?'selected':''}>AES-128-ECB</option>
+              </select>
+            </div>
+            <div class="col">
+              <label>Key (or {{varName}})</label>
+              <input type="password" value="${_esc(s.requestEncryption.key||'')}" oninput="_scenarioSteps[${i}].requestEncryption.key=this.value" style="height:32px;font-size:12px" />
+            </div>
+            ${s.requestEncryption.algorithm!=='AES-128-ECB' ? `
+            <div class="col">
+              <label>IV (or {{varName}})</label>
+              <input type="password" value="${_esc(s.requestEncryption.iv||'')}" oninput="_scenarioSteps[${i}].requestEncryption.iv=this.value" style="height:32px;font-size:12px" />
+            </div>` : ''}
+            <div class="col">
+              <label>Output Field</label>
+              <input value="${_esc(s.requestEncryption.outputField||'encryptedData')}" oninput="_scenarioSteps[${i}].requestEncryption.outputField=this.value" style="height:32px;font-size:12px" />
+            </div>
+          </div>
+          <div class="form-hint" style="margin-top:6px">Body will be AES-encrypted on server before embedding in k6 script.</div>
+          ` : ''}
+        </div>
+
+        <!-- Row 7: Response Decryption -->
+        <div class="step-section" style="margin-bottom:8px">
+          <div class="step-section-title">
+            <span>🔓 Response Decryption</span>
+            <label class="switch"><input type="checkbox" ${s.responseDecryption?.enabled?'checked':''} onchange="_scenarioSteps[${i}].responseDecryption.enabled=this.checked;renderSteps()"><span class="slider"></span></label>
+          </div>
+          ${s.responseDecryption?.enabled ? `
+          <div class="row" style="gap:8px;margin-top:8px">
+            <div class="col">
+              <label>Algorithm</label>
+              <select style="height:32px;font-size:12px" onchange="_scenarioSteps[${i}].responseDecryption.algorithm=this.value;renderSteps()">
+                <option ${(s.responseDecryption.algorithm||'AES-128-CBC')==='AES-128-CBC'?'selected':''}>AES-128-CBC</option>
+                <option ${s.responseDecryption.algorithm==='AES-128-ECB'?'selected':''}>AES-128-ECB</option>
+              </select>
+            </div>
+            <div class="col">
+              <label>Key (or {{varName}})</label>
+              <input type="password" value="${_esc(s.responseDecryption.key||'')}" oninput="_scenarioSteps[${i}].responseDecryption.key=this.value" style="height:32px;font-size:12px" />
+            </div>
+            ${s.responseDecryption.algorithm!=='AES-128-ECB' ? `
+            <div class="col">
+              <label>IV (or {{varName}})</label>
+              <input type="password" value="${_esc(s.responseDecryption.iv||'')}" oninput="_scenarioSteps[${i}].responseDecryption.iv=this.value" style="height:32px;font-size:12px" />
+            </div>` : ''}
+            <div class="col">
+              <label>Encrypted Field Name</label>
+              <input value="${_esc(s.responseDecryption.inputField||'encryptedData')}" oninput="_scenarioSteps[${i}].responseDecryption.inputField=this.value" style="height:32px;font-size:12px" />
+            </div>
+          </div>
+          <div class="form-hint" style="margin-top:6px;color:var(--amber)">Note: Runtime decryption in k6 is not supported. The raw encrypted field will be captured.</div>
+          ` : ''}
+        </div>
+
+        <!-- Row 8: Advanced Options -->
+        <details style="margin-top:4px">
+          <summary style="font-size:11px;color:var(--muted);cursor:pointer;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:4px 0">⚙ Advanced Options</summary>
+          <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
+            <div style="min-width:140px">
+              <label>Continue on Failure</label>
+              <label class="switch"><input type="checkbox" ${s.continueOnFailure?'checked':''} onchange="_scenarioSteps[${i}].continueOnFailure=this.checked"><span class="slider"></span></label>
+            </div>
+            <div style="min-width:110px">
+              <label>Retry Count</label>
+              <input type="number" min="0" max="5" value="${s.retryCount||0}" oninput="_scenarioSteps[${i}].retryCount=parseInt(this.value)||0" style="height:32px;font-size:12px" />
+            </div>
+            <div style="min-width:130px">
+              <label>Retry Delay (ms)</label>
+              <input type="number" min="0" value="${s.retryDelay||500}" oninput="_scenarioSteps[${i}].retryDelay=parseInt(this.value)||500" style="height:32px;font-size:12px" />
+            </div>
+            <div style="min-width:140px">
+              <label>Think Time After (ms)</label>
+              <input type="number" min="0" value="${s.thinkTime||0}" oninput="_scenarioSteps[${i}].thinkTime=parseInt(this.value)||0" style="height:32px;font-size:12px" />
+            </div>
+            <div style="min-width:130px">
+              <label>Mask in Report</label>
+              <label class="switch"><input type="checkbox" ${s.maskInReport?'checked':''} onchange="_scenarioSteps[${i}].maskInReport=this.checked"><span class="slider"></span></label>
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>`;
+    }).join('');
+}
+
+function _tryParseJSON(str, fallback) {
+    if (!str || !str.trim()) return fallback;
+    try { return JSON.parse(str); } catch { return str; }
+}
+
+// ── Scenario CRUD ──
+function _buildScenarioObject() {
+    // Collect dynamic data config from the builder panel
+    const dynEnabled = document.getElementById('scen-dyn-enable')?.checked || false;
+    const dynSource  = document.getElementById('scen-dyn-source')?.value || 'generate';
+    let dynamicData = { enabled: false };
+    if (dynEnabled) {
+        dynamicData = {
+            enabled: true,
+            source: dynSource,
+            emailPrefix: document.getElementById('scen-dyn-email-prefix')?.value || 'loadtest',
+            emailDomain: document.getElementById('scen-dyn-email-domain')?.value || 'mailinator.com',
+            startIndex:  parseInt(document.getElementById('scen-dyn-start-index')?.value) || 1,
+            phoneBase:   document.getElementById('scen-dyn-phone-base')?.value || '7100000000',
+            namePrefix:  document.getElementById('scen-dyn-name-prefix')?.value || 'Load Test',
+            customData:  [],
+        };
+        if (dynSource === 'json') {
+            try { dynamicData.customData = JSON.parse(document.getElementById('scen-dyn-custom-data')?.value || '[]'); } catch {}
+        }
+    }
+
+    // Build globalVars object
+    const globalVarsObj = {};
+    for (const v of _globalVars) { if (v.name) globalVarsObj[v.name] = v.value; }
+
+    return {
+        scenarioName:  _scenarioMeta.name || document.getElementById('scen-name')?.value || 'Unnamed Scenario',
+        description:   _scenarioMeta.description || document.getElementById('scen-desc')?.value || '',
+        tags:          _scenarioMeta.tags || document.getElementById('scen-tags')?.value || '',
+        projectName:   document.getElementById('cfg-project')?.value || '',
+        environment:   document.getElementById('cfg-env')?.value || 'QA',
+        vus:           parseInt(document.getElementById('cfg-vus')?.value) || 10,
+        duration:      parseInt(document.getElementById('cfg-duration')?.value) || 30,
+        rampup:        parseInt(document.getElementById('cfg-rampup')?.value) || 0,
+        timeout:       parseInt(document.getElementById('cfg-timeout')?.value) || 5000,
+        scenarioType:  document.getElementById('cfg-scenario')?.value || 'Baseline Load Test',
+        p95Threshold:  parseInt(document.getElementById('cfg-p95threshold')?.value) || 3000,
+        executedBy:    'Dashboard',
+        globalVars:    globalVarsObj,
+        dynamicData,
+        steps: _scenarioSteps,
+    };
+}
+
+async function saveScenario() {
+    const scenario = _buildScenarioObject();
+    if (!scenario.scenarioName || scenario.scenarioName === 'Unnamed Scenario') {
+        const name = prompt('Enter a name for this scenario:');
+        if (!name) return;
+        scenario.scenarioName = name;
+        document.getElementById('scen-name').value = name;
+        _scenarioMeta.name = name;
+    }
+    try {
+        let saved;
+        if (_currentScenarioId) {
+            saved = await api('PUT', `/api/load-test/scenarios/${_currentScenarioId}`, scenario);
+            showNotif('Scenario updated!', 'success');
+        } else {
+            saved = await api('POST', '/api/load-test/scenarios', scenario);
+            _currentScenarioId = saved.id;
+            showNotif('Scenario saved!', 'success');
+        }
+    } catch (e) { showNotif('Save failed: ' + e.message, 'error'); }
+}
+
+async function loadScenariosPanel() {
+    const panel = document.getElementById('saved-scenarios-panel');
+    panel.style.display = '';
+    document.getElementById('saved-scenarios-list').innerHTML = '<div style="color:var(--muted);font-size:12px">Loading…</div>';
+    try {
+        const data = await api('GET', '/api/load-test/scenarios');
+        _savedScenarios = data.scenarios || [];
+        if (!_savedScenarios.length) {
+            document.getElementById('saved-scenarios-list').innerHTML = '<div style="color:var(--muted);font-size:12px">No saved scenarios yet.</div>';
+            return;
+        }
+        document.getElementById('saved-scenarios-list').innerHTML = `
+          <div style="overflow-x:auto">
+          <table style="font-size:12px">
+            <thead><tr><th>Name</th><th>Steps</th><th>Project</th><th>Updated</th><th>Actions</th></tr></thead>
+            <tbody>${_savedScenarios.map(s => `
+              <tr>
+                <td style="font-weight:700">${_esc(s.scenarioName || s.name || '—')}</td>
+                <td>${(s.steps||[]).length}</td>
+                <td>${_esc(s.projectName||'—')}</td>
+                <td style="color:var(--muted);font-size:11px">${s.updatedAt ? new Date(s.updatedAt).toLocaleDateString('en-IN') : '—'}</td>
+                <td>
+                  <div style="display:flex;gap:4px">
+                    <button class="btn btn-blue btn-xs" onclick="loadScenario('${s.id}')">Load</button>
+                    <button class="btn btn-secondary btn-xs" onclick="duplicateSavedScenario('${s.id}')">⧉</button>
+                    <button class="btn btn-danger btn-xs" onclick="deleteScenario('${s.id}')">🗑</button>
+                  </div>
+                </td>
+              </tr>`).join('')}
+            </tbody>
+          </table></div>`;
+    } catch (e) { document.getElementById('saved-scenarios-list').innerHTML = `<div style="color:var(--red);font-size:12px">Error: ${_esc(e.message)}</div>`; }
+}
+
+async function loadScenario(id) {
+    const s = _savedScenarios.find(x => x.id === id);
+    if (!s) return;
+    _currentScenarioId = s.id;
+    _scenarioMeta = { name: s.scenarioName || '', description: s.description || '', tags: s.tags || '' };
+    _scenarioSteps = s.steps || [];
+    _globalVars = [];
+    const gv = s.globalVars || {};
+    for (const [k, v] of Object.entries(gv)) _globalVars.push({ name: k, value: v, secret: false });
+
+    document.getElementById('scen-name').value = _scenarioMeta.name;
+    document.getElementById('scen-desc').value = _scenarioMeta.description;
+    document.getElementById('scen-tags').value = _scenarioMeta.tags;
+
+    // Restore dynamic data
+    const dyn = s.dynamicData || {};
+    if (dyn.enabled) {
+        document.getElementById('scen-dyn-enable').checked = true;
+        document.getElementById('scen-dyn-panel').style.display = '';
+        document.getElementById('scen-dyn-source').value = dyn.source || 'generate';
+        toggleScenDynSource();
+        if (dyn.emailPrefix) document.getElementById('scen-dyn-email-prefix').value = dyn.emailPrefix;
+        if (dyn.emailDomain) document.getElementById('scen-dyn-email-domain').value = dyn.emailDomain;
+        if (dyn.startIndex)  document.getElementById('scen-dyn-start-index').value = dyn.startIndex;
+        if (dyn.phoneBase)   document.getElementById('scen-dyn-phone-base').value = dyn.phoneBase;
+        if (dyn.namePrefix)  document.getElementById('scen-dyn-name-prefix').value = dyn.namePrefix;
+        if (dyn.customData)  document.getElementById('scen-dyn-custom-data').value = JSON.stringify(dyn.customData, null, 2);
+    }
+
+    renderSteps();
+    renderGlobalVars();
+    document.getElementById('saved-scenarios-panel').style.display = 'none';
+    showNotif(`Scenario "${_scenarioMeta.name}" loaded.`, 'success');
+}
+
+async function duplicateSavedScenario(id) {
+    const s = _savedScenarios.find(x => x.id === id);
+    if (!s) return;
+    const clone = JSON.parse(JSON.stringify(s));
+    delete clone.id;
+    clone.scenarioName = (clone.scenarioName || clone.name || 'Scenario') + ' (copy)';
+    clone.updatedAt = new Date().toISOString();
+    try {
+        await api('POST', '/api/load-test/scenarios', clone);
+        showNotif('Scenario duplicated.', 'success');
+        loadScenariosPanel();
+    } catch (e) { showNotif('Duplicate failed: ' + e.message, 'error'); }
+}
+
+async function deleteScenario(id) {
+    if (!confirm('Delete this scenario permanently?')) return;
+    try {
+        await api('DELETE', `/api/load-test/scenarios/${id}`);
+        showNotif('Scenario deleted.', 'info');
+        _savedScenarios = _savedScenarios.filter(s => s.id !== id);
+        if (_currentScenarioId === id) _currentScenarioId = null;
+        loadScenariosPanel();
+    } catch (e) { showNotif('Delete failed: ' + e.message, 'error'); }
+}
+
+function newScenario() {
+    _currentScenarioId = null;
+    _scenarioMeta = { name: '', description: '', tags: '' };
+    _scenarioSteps = [];
+    _globalVars = [];
+    document.getElementById('scen-name').value = '';
+    document.getElementById('scen-desc').value = '';
+    document.getElementById('scen-tags').value = '';
+    document.getElementById('scen-dyn-enable').checked = false;
+    document.getElementById('scen-dyn-panel').style.display = 'none';
+    renderSteps();
+    renderGlobalVars();
+    showNotif('New scenario started.', 'info');
+}
+
+// ── Dynamic data toggles (Scenario Builder) ──
+function toggleScenDynamic() {
+    const on = document.getElementById('scen-dyn-enable').checked;
+    document.getElementById('scen-dyn-panel').style.display = on ? '' : 'none';
+}
+function toggleScenDynSource() {
+    const v = document.getElementById('scen-dyn-source').value;
+    document.getElementById('scen-dyn-generate').style.display = v === 'generate' ? '' : 'none';
+    document.getElementById('scen-dyn-json').style.display = v === 'json' ? '' : 'none';
+}
+
+// ── Export ──
+async function exportK6Script() {
+    const scenario = _buildScenarioObject();
+    try {
+        const token = getToken();
+        const res = await fetch('/api/load-test/scenario/k6-script', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(scenario),
+        });
+        if (!res.ok) { const e = await res.json().catch(()=>({error:'Error'})); showNotif('k6 export failed: ' + e.error, 'error'); return; }
+        const blob = await res.blob();
+        const name = (scenario.scenarioName || 'scenario').replace(/\s+/g, '-');
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `k6-${name}.js`;
+        a.click();
+        showNotif('k6 script downloaded!', 'success');
+    } catch (e) { showNotif('Export failed: ' + e.message, 'error'); }
+}
+
 function exportScenario() {
-    const data = JSON.stringify({ steps: _scenarioSteps, vars: _globalVars }, null, 2);
+    const scenario = _buildScenarioObject();
+    const data = JSON.stringify(scenario, null, 2);
+    const name = (scenario.scenarioName || 'scenario').replace(/\s+/g, '-');
     const a = Object.assign(document.createElement('a'), {
         href: 'data:application/json;charset=utf-8,' + encodeURIComponent(data),
-        download: 'scenario.json',
+        download: `scenario-${name}.json`,
     });
     a.click();
 }
@@ -1294,15 +1789,119 @@ function importScenario() {
         r.onload = ev => {
             try {
                 const d = JSON.parse(ev.target.result);
-                _scenarioSteps = d.steps || [];
-                _globalVars    = d.vars  || [];
+                // Support both old format {steps, vars} and new full scenario format
+                if (d.steps) {
+                    _scenarioSteps = d.steps;
+                    _globalVars    = d.vars || (d.globalVars ? Object.entries(d.globalVars).map(([name, value]) => ({ name, value, secret: false })) : []);
+                    _scenarioMeta.name = d.scenarioName || d.name || '';
+                    if (_scenarioMeta.name) document.getElementById('scen-name').value = _scenarioMeta.name;
+                } else {
+                    showNotif('JSON has no steps array.', 'error'); return;
+                }
                 renderSteps(); renderGlobalVars();
-                showNotif('Scenario imported.', 'success');
+                showNotif('Scenario imported successfully.', 'success');
             } catch { showNotif('Invalid JSON file.', 'error'); }
         };
         r.readAsText(f);
     };
     inp.click();
+}
+
+// ── Dry Run ──
+async function dryRun() {
+    const scenario = _buildScenarioObject();
+    if (!scenario.steps || !scenario.steps.length) { showNotif('Add at least one step first.', 'error'); return; }
+    scenario.vus = 1;
+    scenario.duration = 30;
+    showNotif('Starting dry run (1 VU)…', 'info');
+    try {
+        const data = await api('POST', '/api/load-test/scenario/dry-run', scenario);
+        _currentRunId = data.runId;
+        switchTab('live');
+        initLiveView({ projectName: scenario.projectName || 'Dry Run', environment: scenario.environment || 'QA', url: `Scenario: ${scenario.scenarioName}`, vus: 1, duration: 30 });
+        startPolling();
+    } catch (e) { showNotif('Dry run failed: ' + e.message, 'error'); }
+}
+
+// ── Preview ──
+function previewScenario() {
+    const scenario = _buildScenarioObject();
+    const steps = scenario.steps || [];
+    if (!steps.length) { showNotif('Add at least one step first.', 'error'); return; }
+
+    const dynData = scenario.dynamicData || {};
+    const gv = scenario.globalVars || {};
+
+    // Simulate VU 1, 2, 3 data
+    function getVUData(vuNum) {
+        const i = parseInt(dynData.startIndex || 1) + vuNum - 1;
+        return Object.assign({}, gv, {
+            index: String(i),
+            email: `${dynData.emailPrefix||'loadtest'}${i}@${dynData.emailDomain||'mailinator.com'}`,
+            phoneNumber: String(BigInt(dynData.phoneBase||'7100000000') + BigInt(vuNum - 1)),
+            name: `${dynData.namePrefix||'Load Test'} ${i}`,
+            timestamp: String(Date.now()),
+            random: String(Math.floor(Math.random()*1e9)),
+            uuid: crypto.randomUUID ? crypto.randomUUID() : `xxxxxxxx-${Date.now()}`,
+        });
+    }
+
+    function resolveVars(str, vars) {
+        if (!str) return str;
+        return String(str).replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] !== undefined ? vars[k] : `{{${k}}}`);
+    }
+
+    function resolveObj(obj, vars) {
+        if (!obj) return obj;
+        const str = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+        return resolveVars(str, vars);
+    }
+
+    let html = '';
+    for (let vu = 1; vu <= Math.min(3, scenario.vus || 1); vu++) {
+        const vars = getVUData(vu);
+        html += `<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;margin-bottom:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:10px">VU #${vu}</div>`;
+        for (let si = 0; si < steps.length; si++) {
+            const s = steps[si];
+            if (s.enabled === false) { html += `<div style="color:var(--muted);font-size:11px;padding:4px 0">Step ${si+1}: ${_esc(s.name)} — DISABLED</div>`; continue; }
+            const resolvedUrl = resolveVars(s.url || '', vars);
+            const bodyStr = s.body ? resolveObj(s.body, vars) : null;
+            const captureds = (s.captures || []).map(c => `<code style="color:var(--green);font-size:10px">captures: {{${c.varName}}} ← ${c.jsonPath}</code>`).join(' ');
+            html += `<div style="padding:8px 0;border-bottom:1px solid #1e293b">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                <span class="${_methodBadgeClass(s.method)}" style="font-size:10px">${(s.method||'GET').toUpperCase()}</span>
+                <span style="font-size:12px;font-weight:700;color:var(--text)">${_esc(s.name)}</span>
+              </div>
+              <div style="font-family:monospace;font-size:11px;color:var(--accent2);word-break:break-all">${_esc(resolvedUrl)}</div>
+              ${bodyStr ? `<pre style="margin:4px 0 0;font-size:10px;color:var(--muted);background:#1e293b;padding:6px;border-radius:4px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${_esc(bodyStr.substring(0,300))}</pre>` : ''}
+              ${captureds ? `<div style="margin-top:4px">${captureds}</div>` : ''}
+            </div>`;
+        }
+        html += '</div>';
+    }
+
+    document.getElementById('scenario-preview-body').innerHTML = html || '<div style="color:var(--muted)">No enabled steps to preview.</div>';
+    const ov = document.getElementById('scenario-preview-overlay');
+    ov.style.display = 'flex';
+}
+
+// ── Apply to Configure Tab ──
+function applyScenario() {
+    const scenario = _buildScenarioObject();
+    if (!scenario.steps || !scenario.steps.length) { showNotif('Add at least one step first.', 'error'); return; }
+    _showActiveScenario(scenario);
+    showNotif(`Scenario "${scenario.scenarioName}" applied. Switch to Configure tab and click "Use Scenario" then Start.`, 'success', 6000);
+    switchTab('configure');
+}
+
+function clearScenario() {
+    if (!confirm('Clear all steps and variables?')) return;
+    _scenarioSteps = [];
+    _globalVars = [];
+    _currentScenarioId = null;
+    renderSteps();
+    renderGlobalVars();
 }
 
 // ══════════════════════════ LIVE RUN ══════════════════════════

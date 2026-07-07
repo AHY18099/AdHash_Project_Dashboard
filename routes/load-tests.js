@@ -1,17 +1,15 @@
 'use strict';
 /**
  * routes/load-tests.js
- * Server-side load testing engine using autocannon (static) and
- * custom concurrent fetch loop (dynamic payloads).
+ * Server-side load testing engine using autocannon (static),
+ * custom concurrent fetch loop (dynamic payloads), and k6 (scenario mode).
  */
 
-const router   = require('express').Router();
+const router     = require('express').Router();
 const autocannon = require('autocannon');
-const fs       = require('fs');
-const path     = require('path');
-const crypto   = require('crypto');
-
-const DEFAULT_EMAIL_VERIFICATION_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImxvYWR0ZXN0MUBtYWlsaW5hdG9yLmNvbSIsInB1cnBvc2UiOiJlbWFpbC12ZXJpZmllZCIsImlhdCI6MTc4MzQwODc4OSwiZXhwIjoxNzgzNDA5Njg5fQ.90EgVLbTeJh-8orjPXivCIH3tNLkB1CN7CZwPoiTbok';
+const fs         = require('fs');
+const path       = require('path');
+const crypto     = require('crypto');
 
 // ── AES-128-ECB encryption (PKCS7 padding via Node crypto) ──
 function aesEncrypt(plaintext, key) {
@@ -37,50 +35,6 @@ function aesCbcDecrypt(b64, key, iv) {
     return Buffer.concat([decipher.update(Buffer.from(b64, 'base64')), decipher.final()]).toString('utf8');
 }
 
-// ── Multi-step flow: per-VU automated registration (OTP fixed to 000000 in QA) ──
-async function _runRegistrationFlow(email, phone, name, flowCfg, fetchFn) {
-    const { baseUrl, encKey, encIv, otp } = flowCfg;
-
-    const enc  = (obj) => JSON.stringify({ encryptedData: aesCbcEncrypt(JSON.stringify(obj), encKey, encIv) });
-    const dec  = (body) => {
-        try { return JSON.parse(aesCbcDecrypt(JSON.parse(body).encryptedData, encKey, encIv)); }
-        catch { return null; }
-    };
-    const post = async (path, obj) => {
-        const r = await fetchFn(`${baseUrl}${path}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: enc(obj),
-        });
-        const text = await r.text();
-        return { status: r.status, body: text, parsed: dec(text) };
-    };
-
-    // Step 1: check email exists
-    const s1 = await post('/api/users/userExistsByEmail', { email });
-    if (s1.status !== 200) return { ok: false, step: 1, status: s1.status, error: `userExistsByEmail failed: ${s1.body.substring(0,100)}` };
-
-    // Step 2: send OTP
-    const s2 = await post('/api/auth/email-otp/send', { email, purpose: 'signup' });
-    if (s2.status !== 200) return { ok: false, step: 2, status: s2.status, error: `email-otp/send failed: ${s2.body.substring(0,100)}` };
-
-    // Step 3: verify OTP (fixed 000000 in QA)
-    const s3 = await post('/api/auth/email-otp/verify', { email, otp: otp || '000000', purpose: 'signup' });
-    if (s3.status !== 200 || !s3.parsed?.emailVerificationToken)
-        return { ok: false, step: 3, status: s3.status, error: `email-otp/verify failed: ${s3.body.substring(0,100)}` };
-    const emailVerificationToken = s3.parsed.emailVerificationToken;
-
-    // Step 4: register
-    const s4 = await post('/api/auth/register', {
-        email, countryCode: '+91', phoneNumber: phone, name,
-        authProvider: 'email', isgoogleSignUp: false, emailVerificationToken,
-    });
-    const ok = s4.status >= 200 && s4.status < 400;
-    return { ok, step: 4, status: s4.status, emailVerificationToken,
-        accessToken: s4.parsed?.accessToken || null,
-        error: ok ? null : s4.body.substring(0, 200) };
-}
-
 // ── Walk a parsed JSON value, replacing "__VAR:key__" sentinels with vars[key] ──
 function _applyVarsToObj(obj, vars) {
     if (typeof obj === 'string') {
@@ -103,12 +57,9 @@ function buildDynPayloads(dynCfg, vus) {
     const startIdx  = parseInt(dynCfg.startIndex) || 1;
     const phoneBase = BigInt(dynCfg.phoneBase || '7100000000');
     const templateStr = dynCfg.template || '{}';
-    // Normalize: if template contains raw DEFAULT_EMAIL_VERIFICATION_TOKEN, replace with placeholder
-    const normalizedTemplate = templateStr
-        .replace(DEFAULT_EMAIL_VERIFICATION_TOKEN, '{{emailVerificationToken}}');
     // Pre-parse template once with sentinels so we have a safe JSON structure
     const templateParsed = JSON.parse(
-        normalizedTemplate.replace(/"?\{\{(\w+)\}\}"?/g, (_, k) => `"__VAR:${k}__"`)
+        templateStr.replace(/"?\{\{(\w+)\}\}"?/g, (_, k) => `"__VAR:${k}__"`)
     );
 
     for (let i = 0; i < vus; i++) {
@@ -120,7 +71,6 @@ function buildDynPayloads(dynCfg, vus) {
             index: String(idx), email, phoneNumber: phone, name,
             timestamp: String(Date.now()), random: String(Math.floor(Math.random() * 1e9)),
             uuid: crypto.randomUUID(),
-            emailVerificationToken: DEFAULT_EMAIL_VERIFICATION_TOKEN,
         };
         if (dynCfg.extraKey) vars[dynCfg.extraKey] = dynCfg.extraVal || '';
 
@@ -140,6 +90,9 @@ function buildDynPayloads(dynCfg, vus) {
 
 const REPORTS_DIR = path.join(__dirname, '..', 'reports', 'load-tests');
 if (!fs.existsSync(REPORTS_DIR)) fs.mkdirSync(REPORTS_DIR, { recursive: true });
+
+const RUNS_DIR = path.join(REPORTS_DIR, 'runs');
+if (!fs.existsSync(RUNS_DIR)) fs.mkdirSync(RUNS_DIR, { recursive: true });
 
 // ── In-memory run registry (survives across requests, cleared on restart) ──
 const _runs = new Map(); // runId → { status, config, metrics, instance, startTime, logs, timeline }
@@ -203,10 +156,54 @@ function verdict(metrics, cfg) {
     return 'RISK';
 }
 
+// ── Default metrics object shape ──
+const defaultMetrics = {
+    totalReqs: 0, okReqs: 0, errReqs: 0, rps: 0,
+    avgLatency: 0, p50: 0, p90: 0, p95: 0, p99: 0,
+    minLatency: 0, maxLatency: 0, errRate: 0,
+    dataSent: 0, dataRecv: 0, statusCodes: {},
+    latencies: [], rpsHistory: [], latHistory: [],
+    errHistory: [], activeUsersHistory: [], tickTimes: [],
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Scenario persistence helpers
+// ══════════════════════════════════════════════════════════════════════════════
+const SCENARIOS_FILE = path.join(REPORTS_DIR, '_scenarios.json');
+
+function _loadScenarios() {
+    try { return JSON.parse(fs.readFileSync(SCENARIOS_FILE, 'utf8')); } catch { return []; }
+}
+function _saveScenarios(list) {
+    fs.writeFileSync(SCENARIOS_FILE, JSON.stringify(list, null, 2));
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/load-test/start
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/start', auth, async (req, res) => {
+    // ── New scenario mode (k6) ──
+    if (req.body.steps || req.body.scenario) {
+        const scenario = req.body.scenario || req.body;
+        const vus      = Math.min(Math.max(1, parseInt(scenario.vus) || 10), maxVUs(req));
+        const duration = Math.min(300, Math.max(5, parseInt(scenario.duration) || 30));
+        const runId    = 'lt_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+        const startTime = new Date().toISOString();
+        const cfg = { ...scenario, vus, duration, startTime, scenarioMode: true };
+        const runState = {
+            runId, status: 'initializing', config: cfg,
+            metrics: { ...defaultMetrics },
+            logs: [], timeline: [{ time: startTime, event: 'Test started', phase: 'Initializing' }],
+            startTime, endTime: null, instance: null, verdict: null,
+            reportPath: null, reportJsonPath: null, perRequestResults: [],
+        };
+        _runs.set(runId, runState);
+        res.json({ runId, status: 'initializing' });
+        setImmediate(() => _executeK6Run(runId, cfg, runState));
+        return;
+    }
+
+    // ── Old autocannon path (backward compat) ──
     const {
         projectName, environment, url, method = 'GET',
         headers = {}, body: reqBody, queryParams = {},
@@ -219,8 +216,6 @@ router.post('/start', auth, async (req, res) => {
         executedBy = 'Dashboard',
         dynamicMode = false,
         dynamicConfig = null,
-        flowMode = false,
-        flowConfig = null,
     } = req.body || {};
 
     // ── Validation ──
@@ -256,13 +251,12 @@ router.post('/start', auth, async (req, res) => {
         executedBy, startTime,
         dynamicMode: !!dynamicMode,
         dynamicConfig: dynamicMode ? dynamicConfig : null,
-        flowMode: !!flowMode,
-        flowConfig: flowMode ? flowConfig : null,
     };
 
     const runState = {
         runId, status: 'initializing', config: cfg,
-        metrics: { totalReqs: 0, okReqs: 0, errReqs: 0, rps: 0,
+        metrics: {
+            totalReqs: 0, okReqs: 0, errReqs: 0, rps: 0,
             avgLatency: 0, p50: 0, p90: 0, p95: 0, p99: 0,
             minLatency: 0, maxLatency: 0, errRate: 0,
             dataSent: 0, dataRecv: 0, statusCodes: {},
@@ -296,11 +290,6 @@ async function _executeRun(runId, cfg, state) {
         state.status = 'running';
         addLog('Test started', 'Running');
         addTimeline('Test started', 'Running');
-
-        // ── MULTI-STEP FLOW MODE (e.g. full registration flow) ──
-        if (cfg.flowMode && cfg.flowConfig) {
-            return await _executeFlowRun(runId, cfg, state, addLog, addTimeline);
-        }
 
         // ── DYNAMIC MODE: concurrent fetch with unique payloads ──
         if (cfg.dynamicMode && cfg.dynamicConfig) {
@@ -434,101 +423,6 @@ async function _executeRun(runId, cfg, state) {
         state.logs.push({ time: new Date().toISOString(), event: 'Fatal error: ' + err.message, phase: 'Failed' });
         _saveResults(runId, state);
     }
-}
-
-// ── Multi-step flow execution (full registration: steps 1→2→3→4 per VU) ──
-async function _executeFlowRun(runId, cfg, state, addLog, addTimeline) {
-    // Use same fetch pattern as _executeDynamicRun (works on Railway Node 18)
-    let fetchFn;
-    try {
-        const nf = await import('node-fetch');
-        fetchFn = nf.default;
-    } catch (_) {
-        fetchFn = globalThis.fetch.bind(globalThis);
-    }
-    if (!fetchFn) {
-        state.status = 'failed'; state.endTime = new Date().toISOString();
-        addLog('Flow mode requires fetch (node-fetch or Node 18+) — not available', 'Failed');
-        _saveResults(runId, state); return;
-    }
-
-    const flowCfg  = cfg.flowConfig;
-    const vus      = cfg.vus;
-    const startIdx = parseInt(flowCfg.startIndex) || 1;
-    const phoneBase = BigInt(flowCfg.phoneBase || '7100000000');
-
-    addLog(`Flow mode: running ${vus} concurrent registration flows`, 'Running');
-    addTimeline(`Firing ${vus} concurrent registration flows`, 'Running');
-
-    const m = state.metrics;
-    const latAll = [];
-    const perResults = [];
-    const t0 = Date.now();
-
-    const promises = Array.from({ length: vus }, async (_, i) => {
-        const idx   = startIdx + i;
-        const phone = String(phoneBase + BigInt(i));
-        const email = `${flowCfg.emailPrefix}${idx}@${flowCfg.emailDomain}`;
-        const name  = `${flowCfg.namePrefix}${idx}`;
-
-        const reqStart = Date.now();
-        let result;
-        try {
-            result = await _runRegistrationFlow(email, phone, name, {
-                baseUrl: flowCfg.baseUrl,
-                encKey:  flowCfg.encKey,
-                encIv:   flowCfg.encIv,
-                otp:     flowCfg.otp || '000000',
-            }, fetchFn);
-        } catch (e) {
-            result = { ok: false, step: 0, status: 0, error: e.message };
-        }
-        const responseTime = Date.now() - reqStart;
-
-        m.totalReqs++;
-        if (result.ok) m.okReqs++; else m.errReqs++;
-        latAll.push(responseTime);
-        m.statusCodes[result.status] = (m.statusCodes[result.status] || 0) + 1;
-
-        perResults[i] = {
-            index: i + 1,
-            email,
-            phoneNumber: phone,
-            status: result.status,
-            responseTime,
-            ok: result.ok,
-            step: result.step,
-            error: result.error || null,
-            responsePreview: result.accessToken ? 'Registration successful' : (result.error || ''),
-        };
-        addLog(`VU${i+1} → step${result.step} ${result.status} ${responseTime}ms ${email} ${result.ok ? '✓' : '✗ ' + (result.error || '').substring(0,60)}`, 'Running');
-    });
-
-    try {
-        await Promise.all(promises);
-    } catch (e) {
-        addLog(`Flow Promise.all error: ${e.message}`, 'Failed');
-    }
-
-    const elapsed = (Date.now() - t0) / 1000 || 1;
-    m.rps        = parseFloat((m.totalReqs / elapsed).toFixed(2));
-    m.avgLatency = latAll.length ? parseFloat((latAll.reduce((s,v)=>s+v,0)/latAll.length).toFixed(1)) : 0;
-    m.p50        = Math.round(pct(latAll, 50));
-    m.p90        = Math.round(pct(latAll, 90));
-    m.p95        = Math.round(pct(latAll, 95));
-    m.p99        = Math.round(pct(latAll, 99));
-    m.minLatency = latAll.length ? Math.round(Math.min(...latAll)) : 0;
-    m.maxLatency = latAll.length ? Math.round(Math.max(...latAll)) : 0;
-    m.errRate    = m.totalReqs > 0 ? parseFloat(((m.errReqs / m.totalReqs) * 100).toFixed(2)) : 0;
-
-    state.perRequestResults = perResults;
-    state.status  = 'completed';
-    state.endTime = new Date().toISOString();
-    state.verdict = verdict(m, cfg);
-
-    addLog(`Flow test done — ${m.okReqs}/${m.totalReqs} registered · P95 ${m.p95}ms`, 'Completed');
-    addTimeline('Flow test completed', 'Completed');
-    _saveResults(runId, state);
 }
 
 // ── Dynamic concurrent execution ──
@@ -729,7 +623,10 @@ router.post('/stop/:runId', auth, (req, res) => {
     if (!state) return res.status(404).json({ error: 'Run not found' });
     if (state.status !== 'running') return res.json({ ok: true, status: state.status });
     if (state.instance) {
-        try { state.instance.stop(); } catch {}
+        try {
+            if (typeof state.instance.stop === 'function') state.instance.stop(); // autocannon
+            else if (typeof state.instance.kill === 'function') state.instance.kill('SIGTERM'); // k6 child process
+        } catch {}
     }
     state.status  = 'stopped';
     state.endTime = new Date().toISOString();
@@ -866,6 +763,486 @@ router.post('/save-template', auth, (req, res) => {
 router.get('/report-template', auth, (req, res) => {
     res.json(_loadTemplate());
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SCENARIO CRUD  /api/load-test/scenarios
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/load-test/scenarios — list all
+router.get('/scenarios', auth, (req, res) => {
+    res.json(_loadScenarios());
+});
+
+// POST /api/load-test/scenarios — create
+router.post('/scenarios', auth, (req, res) => {
+    const list = _loadScenarios();
+    const scenario = { ...req.body, id: crypto.randomUUID(), updatedAt: new Date().toISOString() };
+    list.push(scenario);
+    _saveScenarios(list);
+    res.status(201).json(scenario);
+});
+
+// GET /api/load-test/scenarios/:id — get one
+router.get('/scenarios/:id', auth, (req, res) => {
+    const list = _loadScenarios();
+    const scenario = list.find(s => s.id === req.params.id);
+    if (!scenario) return res.status(404).json({ error: 'Scenario not found' });
+    res.json(scenario);
+});
+
+// PUT /api/load-test/scenarios/:id — update
+router.put('/scenarios/:id', auth, (req, res) => {
+    const list = _loadScenarios();
+    const idx  = list.findIndex(s => s.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Scenario not found' });
+    list[idx] = { ...req.body, id: req.params.id, updatedAt: new Date().toISOString() };
+    _saveScenarios(list);
+    res.json(list[idx]);
+});
+
+// DELETE /api/load-test/scenarios/:id — delete
+router.delete('/scenarios/:id', auth, (req, res) => {
+    const list    = _loadScenarios();
+    const filtered = list.filter(s => s.id !== req.params.id);
+    if (filtered.length === list.length) return res.status(404).json({ error: 'Scenario not found' });
+    _saveScenarios(filtered);
+    res.json({ ok: true });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/load-test/scenario/k6-script — generate downloadable k6 script
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/scenario/k6-script', auth, (req, res) => {
+    const scenario = req.body;
+    try {
+        const script = _scenarioToK6Script(scenario);
+        res.setHeader('Content-Type', 'application/javascript');
+        res.setHeader('Content-Disposition', `attachment; filename="k6-${(scenario.scenarioName || 'scenario').replace(/\s+/g, '-')}.js"`);
+        res.send(script);
+    } catch (e) {
+        res.status(400).json({ error: 'Script generation failed: ' + e.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/load-test/scenario/dry-run — run with vus=1, duration=30
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/scenario/dry-run', auth, async (req, res) => {
+    const scenario = { ...req.body, vus: 1, duration: 30 };
+    const runId    = 'lt_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+    const startTime = new Date().toISOString();
+    const cfg = { ...scenario, startTime, scenarioMode: true };
+    const runState = {
+        runId, status: 'initializing', config: cfg,
+        metrics: { ...defaultMetrics },
+        logs: [], timeline: [{ time: startTime, event: 'Dry-run started', phase: 'Initializing' }],
+        startTime, endTime: null, instance: null, verdict: null,
+        reportPath: null, reportJsonPath: null, perRequestResults: [],
+    };
+    _runs.set(runId, runState);
+    res.json({ runId, status: 'initializing' });
+    setImmediate(() => _executeK6Run(runId, cfg, runState));
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// k6 scenario helpers
+// ══════════════════════════════════════════════════════════════════════════════
+
+function _scenarioToK6Script(scenario) {
+    const {
+        vus = 10, duration = 30, rampup = 0, timeout = 5000,
+        p95Threshold = 3000, stopOnErrorRate, stopOnP95,
+        globalVars = {}, dynamicData = {}, steps = [],
+        scenarioName = 'Load Test',
+    } = scenario;
+
+    const enabledSteps = steps.filter(s => s.enabled !== false);
+
+    // Build per-VU data array (for dynamic data)
+    const dataArray = _buildK6DataArray(scenario, Math.max(vus, 50));
+
+    // Build options
+    let optionsStr;
+    if (rampup > 0) {
+        optionsStr = `export const options = {
+  stages: [
+    { duration: '${rampup}s', target: ${vus} },
+    { duration: '${Math.max(1, duration - rampup)}s', target: ${vus} },
+  ],
+  thresholds: {
+    http_req_duration: ['p(95)<${p95Threshold}'],
+    ${stopOnErrorRate ? `'http_req_failed': ['rate<${stopOnErrorRate / 100}'],` : ''}
+  },
+};`;
+    } else {
+        optionsStr = `export const options = {
+  vus: ${vus},
+  duration: '${duration}s',
+  thresholds: {
+    http_req_duration: ['p(95)<${p95Threshold}'],
+    ${stopOnErrorRate ? `'http_req_failed': ['rate<${stopOnErrorRate / 100}'],` : ''}
+  },
+};`;
+    }
+
+    // Build data array string
+    const dataStr = JSON.stringify(dataArray, null, 2);
+
+    // Build global vars
+    const varsStr = JSON.stringify(globalVars, null, 2);
+
+    // Build steps code
+    const stepsCode = enabledSteps.map((step, idx) => _generateStepCode(step, idx)).join('\n\n');
+
+    return `import http from 'k6/http';
+import { sleep, check } from 'k6';
+import { Rate, Counter, Trend } from 'k6/metrics';
+
+// ── Generated by AdHash Load Test Center ──
+// Scenario: ${scenarioName}
+// Generated: ${new Date().toISOString()}
+
+${optionsStr}
+
+const DATA = ${dataStr};
+const GLOBAL_VARS = ${varsStr};
+
+function _get(obj, path) {
+  return path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj);
+}
+
+function _resolveVars(str, vars) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/\\{\\{(\\w+)\\}\\}/g, (_, k) => vars[k] !== undefined ? vars[k] : '{{' + k + '}}');
+}
+
+function _resolveObj(obj, vars) {
+  if (typeof obj === 'string') return _resolveVars(obj, vars);
+  if (Array.isArray(obj)) return obj.map(v => _resolveObj(v, vars));
+  if (obj !== null && typeof obj === 'object') {
+    const out = {};
+    for (const k of Object.keys(obj)) out[k] = _resolveObj(obj[k], vars);
+    return out;
+  }
+  return obj;
+}
+
+export default function () {
+  const vuIdx = (__VU - 1) % DATA.length;
+  const vuData = DATA[vuIdx];
+  const vars = Object.assign({}, GLOBAL_VARS, vuData);
+
+${stepsCode}
+}
+`;
+}
+
+function _generateStepCode(step, idx) {
+    const varName = `resp${idx + 1}`;
+    const method  = (step.method || 'GET').toUpperCase();
+    const retryCount = step.retryCount || 0;
+    const thinkTime  = step.thinkTime  || 0;
+
+    // Build params
+    const paramsObj = {
+        tags:    { step: step.name || `Step${idx+1}`, stepId: step.id || `step${idx+1}` },
+        timeout: Math.round((step.timeout || 5000) / 1000) + 's',
+    };
+
+    // Build headers resolution
+    let headersCode = '';
+    if (step.headers && Object.keys(step.headers).length > 0) {
+        headersCode = `  const _headers${idx+1} = _resolveObj(${JSON.stringify(step.headers)}, vars);\n`;
+        paramsObj.headers = `__HEADERS_REF_${idx+1}__`;
+    }
+
+    // Build body resolution
+    let bodyCode = '';
+    let bodyRef  = 'null';
+    if (['POST','PUT','PATCH'].includes(method) && step.body) {
+        let bodyVal = step.body;
+        if (step.requestEncryption?.enabled) {
+            bodyRef = `vuData._encryptedBody_step${idx+1} || null`;
+        } else {
+            if (typeof bodyVal === 'object') bodyVal = JSON.stringify(bodyVal);
+            bodyCode = `  const _body${idx+1} = _resolveVars(${JSON.stringify(bodyVal)}, vars);\n`;
+            bodyRef  = `_body${idx+1}`;
+        }
+    }
+
+    // Build params string (replace header reference placeholder)
+    const paramsStr = JSON.stringify(paramsObj)
+        .replace(`"__HEADERS_REF_${idx+1}__"`, `_headers${idx+1}`);
+
+    // Build URL
+    const urlCode = `  const _url${idx+1} = _resolveVars(${JSON.stringify(step.url || '')}, vars);\n`;
+
+    // HTTP call
+    let httpCall;
+    if (method === 'GET' || method === 'DELETE' || method === 'HEAD') {
+        httpCall = `  const ${varName} = http.${method.toLowerCase()}(_url${idx+1}, ${paramsStr});`;
+    } else {
+        httpCall = `  const ${varName} = http.${method.toLowerCase()}(_url${idx+1}, ${bodyRef}, ${paramsStr});`;
+    }
+
+    // Assertions
+    let assertCode = '';
+    if (step.assertions && step.assertions.length > 0) {
+        const checks = step.assertions.map(a => {
+            if (a.type === 'status')   return `    '${step.name || 'step'} status ${a.expected}': r => r.status === ${a.expected}`;
+            if (a.type === 'jsonPath') return `    '${step.name || 'step'} has ${a.path}': r => { try { const j = r.json(); return _get(j, '${a.path}') !== undefined; } catch { return false; } }`;
+            if (a.type === 'contains') return `    '${step.name || 'step'} contains ${a.value}': r => (r.body || '').includes(${JSON.stringify(a.value)})`;
+            return '';
+        }).filter(Boolean).join(',\n');
+        if (checks) assertCode = `  check(${varName}, {\n${checks}\n  });\n`;
+    } else {
+        assertCode = `  check(${varName}, { '${step.name || 'step'} ok': r => r.status >= 200 && r.status < 400 });\n`;
+    }
+
+    // Captures
+    let captureCode = '';
+    if (step.captures && step.captures.length > 0) {
+        captureCode = step.captures.map(cap => {
+            if (!cap.varName || !cap.jsonPath) return '';
+            return `  try { const _j${idx+1} = ${varName}.json(); vars['${cap.varName}'] = _get(_j${idx+1}, '${cap.jsonPath}'); } catch {}`;
+        }).filter(Boolean).join('\n') + '\n';
+    }
+
+    // Think time
+    const thinkCode = thinkTime > 0 ? `  sleep(${(thinkTime / 1000).toFixed(3)});\n` : '';
+
+    // Retry wrapper
+    let retryWrapStart = '', retryWrapEnd = '';
+    if (retryCount > 0) {
+        retryWrapStart = `  let _retries${idx+1} = 0;\n  while (_retries${idx+1} <= ${retryCount}) {\n  _retries${idx+1}++;\n`;
+        retryWrapEnd   = `  if (${varName}.status >= 200 && ${varName}.status < 400) break;\n  if (_retries${idx+1} > ${retryCount}) break;\n  sleep(${((step.retryDelay||500)/1000).toFixed(3)});\n  }\n`;
+    }
+
+    const code = [
+        `  // ── Step ${idx+1}: ${step.name || 'Step'} ──`,
+        urlCode,
+        headersCode,
+        bodyCode,
+        retryWrapStart,
+        httpCall + '\n',
+        assertCode,
+        captureCode,
+        retryWrapEnd,
+        thinkCode,
+    ].join('');
+
+    return code;
+}
+
+function _buildK6DataArray(scenario, count) {
+    const { dynamicData = {}, globalVars = {}, steps = [] } = scenario;
+    const startIdx   = parseInt(dynamicData.startIndex) || 1;
+    const phoneBase  = BigInt(dynamicData.phoneBase || '7100000000');
+    const emailPrefix  = dynamicData.emailPrefix  || 'loadtest';
+    const emailDomain  = dynamicData.emailDomain  || 'mailinator.com';
+    const namePrefix   = dynamicData.namePrefix   || 'Load Test';
+
+    const result = [];
+    for (let i = 0; i < count; i++) {
+        const idx   = startIdx + i;
+        const email = `${emailPrefix}${idx}@${emailDomain}`;
+        const phone = String(phoneBase + BigInt(i));
+        const name  = `${namePrefix} ${idx}`;
+        const vuData = {
+            index:       String(idx),
+            email,
+            phoneNumber: phone,
+            name,
+            timestamp:   String(Date.now() + i),
+            random:      String(Math.floor(Math.random() * 1e9)),
+            uuid:        crypto.randomUUID(),
+        };
+
+        // If customData source, merge that record
+        if (dynamicData.source === 'json' && dynamicData.customData && dynamicData.customData[i]) {
+            Object.assign(vuData, dynamicData.customData[i]);
+        }
+
+        // Pre-encrypt step bodies if requestEncryption is enabled
+        for (const step of steps) {
+            if (step.requestEncryption?.enabled && step.body) {
+                try {
+                    let bodyStr = typeof step.body === 'string' ? step.body : JSON.stringify(step.body);
+                    // Resolve vars in body
+                    bodyStr = bodyStr.replace(/\{\{(\w+)\}\}/g, (_, k) =>
+                        vuData[k] !== undefined ? vuData[k] : (globalVars[k] !== undefined ? globalVars[k] : '')
+                    );
+                    const enc = step.requestEncryption;
+                    let encrypted;
+                    if (enc.algorithm === 'AES-128-CBC') {
+                        encrypted = aesCbcEncrypt(bodyStr, enc.key || '', enc.iv || '');
+                    } else {
+                        encrypted = aesEncrypt(bodyStr, enc.key || '');
+                    }
+                    const field = enc.outputField || 'encryptedData';
+                    vuData[`_encryptedBody_${step.id || ('step' + (steps.indexOf(step) + 1))}`] = JSON.stringify({ [field]: encrypted });
+                } catch {}
+            }
+        }
+
+        result.push(vuData);
+    }
+    return result;
+}
+
+async function _executeK6Run(runId, cfg, state, addLog, addTimeline) {
+    if (!addLog) {
+        addLog = (event, phase, extra = {}) => {
+            const entry = { time: new Date().toISOString(), event, phase, ...extra };
+            state.logs.push(entry);
+            if (state.logs.length > 500) state.logs.shift();
+        };
+        addTimeline = (event, phase) => {
+            state.timeline.push({ time: new Date().toISOString(), event, phase });
+        };
+    }
+
+    const { spawn } = require('child_process');
+    const k6Path    = process.env.K6_PATH || 'k6';
+    const runId_    = runId;
+
+    try {
+        // Generate k6 script
+        const script     = _scenarioToK6Script(cfg);
+        const scriptFile = path.join(RUNS_DIR, `${runId_}.k6.js`);
+        const metricsFile = path.join(RUNS_DIR, `${runId_}.metrics.jsonl`);
+        fs.writeFileSync(scriptFile, script);
+
+        state.status       = 'running';
+        state._metricsFile = metricsFile;
+        addLog('k6 script generated', 'Running');
+        addTimeline('k6 run started', 'Running');
+
+        const k6Args = [
+            'run',
+            '--out', `json=${metricsFile}`,
+            '--no-usage-report',
+            '--log-output', 'stdout',
+        ];
+
+        // Only add vus/duration if no rampup stages (rampup is handled via options in script)
+        if (!cfg.rampup || cfg.rampup === 0) {
+            k6Args.push('--vus',      String(cfg.vus || 10));
+            k6Args.push('--duration', (cfg.duration || 30) + 's');
+        }
+
+        k6Args.push(scriptFile);
+
+        const proc = spawn(k6Path, k6Args, {
+            env:   { ...process.env, K6_NO_SETUP_MESSAGE: '1' },
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        state.instance = proc;
+
+        let stdoutBuf = '';
+        proc.stdout.on('data', chunk => {
+            stdoutBuf += chunk.toString();
+            const lines = stdoutBuf.split('\n');
+            stdoutBuf   = lines.pop();
+            for (const line of lines) {
+                if (line.trim()) addLog(line.trim().substring(0, 200), 'Running');
+            }
+        });
+        proc.stderr.on('data', chunk => {
+            const lines = chunk.toString().split('\n');
+            for (const line of lines) {
+                if (line.trim()) addLog('[k6] ' + line.trim().substring(0, 200), 'Running');
+            }
+        });
+
+        // Live metrics reader — poll metrics file every 2s
+        let metricsFilePos = 0;
+        const latencies    = [];
+        const metricsInterval = setInterval(() => {
+            if (!fs.existsSync(metricsFile)) return;
+            const content    = fs.readFileSync(metricsFile, 'utf8');
+            const newContent = content.slice(metricsFilePos);
+            metricsFilePos   = content.length;
+            const lines      = newContent.split('\n').filter(l => l.trim());
+            _processK6MetricLines(lines, state.metrics, latencies, cfg);
+        }, 2000);
+
+        await new Promise((resolve) => {
+            proc.on('close', (code) => {
+                clearInterval(metricsInterval);
+                resolve(code);
+            });
+        });
+
+        // Final parse of metrics file
+        if (fs.existsSync(metricsFile)) {
+            const allContent  = fs.readFileSync(metricsFile, 'utf8');
+            const allLines    = allContent.split('\n').filter(l => l.trim());
+            const finalLatencies = [];
+            _processK6MetricLines(allLines, state.metrics, finalLatencies, cfg);
+            if (finalLatencies.length > 0) {
+                const m   = state.metrics;
+                m.p50     = Math.round(pct(finalLatencies, 50));
+                m.p90     = Math.round(pct(finalLatencies, 90));
+                m.p95     = Math.round(pct(finalLatencies, 95));
+                m.p99     = Math.round(pct(finalLatencies, 99));
+                m.minLatency = Math.round(Math.min(...finalLatencies));
+                m.maxLatency = Math.round(Math.max(...finalLatencies));
+                m.avgLatency = parseFloat((finalLatencies.reduce((a, b) => a + b, 0) / finalLatencies.length).toFixed(1));
+            }
+        }
+
+        state.status  = 'completed';
+        state.endTime = new Date().toISOString();
+        state.verdict = verdict(state.metrics, cfg);
+        addLog(`k6 test completed — ${state.metrics.totalReqs} reqs · P95 ${state.metrics.p95}ms`, 'Completed');
+        addTimeline('Test completed', 'Completed');
+        _saveResults(runId_, state);
+
+    } catch (err) {
+        state.status  = 'failed';
+        state.endTime = new Date().toISOString();
+        if (err.code === 'ENOENT') {
+            state.logs.push({ time: new Date().toISOString(), event: 'k6 not found. Please install k6 from https://k6.io or set K6_PATH env var.', phase: 'Failed' });
+        } else {
+            state.logs.push({ time: new Date().toISOString(), event: 'k6 run failed: ' + err.message, phase: 'Failed' });
+        }
+        _saveResults(runId_, state);
+    }
+}
+
+function _processK6MetricLines(lines, m, latencies, cfg) {
+    for (const line of lines) {
+        let entry;
+        try { entry = JSON.parse(line); } catch { continue; }
+        if (entry.type !== 'Point') continue;
+
+        const metric = entry.metric;
+        const value  = entry.data?.value;
+        const tags   = entry.data?.tags || {};
+
+        if (metric === 'http_reqs') {
+            m.totalReqs++;
+            const isOk = tags.status && parseInt(tags.status) >= 200 && parseInt(tags.status) < 400;
+            if (isOk) m.okReqs++;
+            else m.errReqs++;
+            const sc = tags.status || '0';
+            m.statusCodes = m.statusCodes || {};
+            m.statusCodes[sc] = (m.statusCodes[sc] || 0) + 1;
+        } else if (metric === 'http_req_duration') {
+            if (value !== undefined) {
+                latencies.push(value);
+                // Update RPS approximately
+                const elapsed = (Date.now() - new Date(m._startTs || Date.now()).getTime()) / 1000 || 1;
+                m.rps = parseFloat((m.totalReqs / Math.max(elapsed, 1)).toFixed(2));
+            }
+        }
+    }
+    if (m.totalReqs > 0) {
+        m.errRate = parseFloat(((m.errReqs / m.totalReqs) * 100).toFixed(2));
+    }
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // HTML REPORT GENERATOR
