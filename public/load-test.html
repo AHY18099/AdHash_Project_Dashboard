@@ -895,7 +895,7 @@ function previewDynamicPayloads() {
     const count  = Math.min(vus, 5);
     if (!dynCfg.template.trim()) { showNotif('Enter a body template first.', 'error'); return; }
     let tpl;
-    try { JSON.parse(dynCfg.template); tpl = dynCfg.template; }
+    try { JSON.parse(dynCfg.template.replace(/\{\{[^}]+\}\}/g, '"__placeholder__"')); tpl = dynCfg.template; }
     catch { showNotif('Template is not valid JSON. Fix it first.', 'error'); return; }
 
     const rows = [];
@@ -962,7 +962,7 @@ function buildConfig() {
     if (dynamicEnabled) {
         const d = _getDynConfig();
         if (!d.template.trim()) { showNotif('Dynamic mode is on but body template is empty.', 'error'); return null; }
-        try { JSON.parse(d.template); } catch { showNotif('Dynamic body template is not valid JSON.', 'error'); return null; }
+        try { JSON.parse(d.template.replace(/\{\{[^}]+\}\}/g, '"__placeholder__"')); } catch { showNotif('Dynamic body template is not valid JSON.', 'error'); return null; }
         if (d.encrypt && !d.encKey.trim()) { showNotif('Encryption is enabled but no encryption key provided.', 'error'); return null; }
         base.dynamicMode = true;
         base.dynamicConfig = d;
