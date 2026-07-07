@@ -43,9 +43,12 @@ function buildDynPayloads(dynCfg, vus) {
     const startIdx  = parseInt(dynCfg.startIndex) || 1;
     const phoneBase = BigInt(dynCfg.phoneBase || '7100000000');
     const templateStr = dynCfg.template || '{}';
+    // Normalize: if template contains raw DEFAULT_EMAIL_VERIFICATION_TOKEN, replace with placeholder
+    const normalizedTemplate = templateStr
+        .replace(DEFAULT_EMAIL_VERIFICATION_TOKEN, '{{emailVerificationToken}}');
     // Pre-parse template once with sentinels so we have a safe JSON structure
     const templateParsed = JSON.parse(
-        templateStr.replace(/"?\{\{(\w+)\}\}"?/g, (_, k) => `"__VAR:${k}__"`)
+        normalizedTemplate.replace(/"?\{\{(\w+)\}\}"?/g, (_, k) => `"__VAR:${k}__"`)
     );
 
     for (let i = 0; i < vus; i++) {
@@ -373,7 +376,17 @@ async function _executeDynamicRun(runId, cfg, state, addLog, addTimeline) {
 
     const dynCfg = cfg.dynamicConfig;
     const vus    = cfg.vus;
-    const payloads = buildDynPayloads(dynCfg, vus);
+    let payloads;
+    try {
+        payloads = buildDynPayloads(dynCfg, vus);
+    } catch (e) {
+        state.status  = 'failed';
+        state.endTime = new Date().toISOString();
+        addLog(`Payload build failed: ${e.message} — check template JSON is valid`, 'Failed');
+        addTimeline('Payload build failed', 'Failed');
+        _saveResults(runId, state);
+        return;
+    }
 
     addLog(`Dynamic mode: firing ${vus} concurrent requests`, 'Running');
     addTimeline(`Firing ${vus} concurrent requests`, 'Running');
