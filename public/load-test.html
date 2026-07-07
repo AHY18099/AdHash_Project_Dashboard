@@ -853,7 +853,6 @@ function insertDefaultTemplate() {
         name: '{{name}}',
         authProvider: 'email',
         isgoogleSignUp: false,
-        emailVerificationToken: '{{emailVerificationToken}}'
     }, null, 2);
 }
 
@@ -864,15 +863,39 @@ function _buildDynRecord(index, cfg) {
     const name  = `${cfg.namePrefix}${i}`;
     const extraKey   = (document.getElementById('dyn-extra-key')?.value || '').trim();
     const extraVal   = (document.getElementById('dyn-extra-val')?.value || '').trim();
-    const vars = { index: i, email, phoneNumber: phone, name,
-        timestamp: Date.now(), random: Math.floor(Math.random()*1e9),
+    const vars = { index: String(i), email, phoneNumber: phone, name,
+        timestamp: String(Date.now()), random: String(Math.floor(Math.random()*1e9)),
         uuid: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${index}` };
     if (extraKey) vars[extraKey] = extraVal;
     return vars;
 }
 
-function _applyTemplate(template, vars) {
-    return template.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] !== undefined ? vars[k] : `{{${k}}}`);
+// Walk a parsed JSON value and replace sentinel strings "__VAR:key__" with vars[key].
+// Preserves booleans, numbers, nulls, and nested structures.
+function _applyTemplateObj(obj, vars) {
+    if (typeof obj === 'string') {
+        // Exact match: the whole string is one variable
+        const exact = obj.match(/^__VAR:(\w+)__$/);
+        if (exact) return vars[exact[1]] !== undefined ? String(vars[exact[1]]) : '';
+        // Partial: variable embedded in a larger string
+        return obj.replace(/__VAR:(\w+)__/g, (_, k) => vars[k] !== undefined ? vars[k] : '');
+    }
+    if (Array.isArray(obj)) return obj.map(v => _applyTemplateObj(v, vars));
+    if (obj !== null && typeof obj === 'object') {
+        const out = {};
+        for (const k of Object.keys(obj)) out[k] = _applyTemplateObj(obj[k], vars);
+        return out;
+    }
+    return obj;
+}
+
+// Returns final JSON string for a VU, or throws if template is invalid JSON structure.
+function _applyTemplate(templateStr, vars) {
+    // Replace {{key}} with a sentinel string that is valid JSON when quoted
+    const sentinelStr = templateStr.replace(/\{\{(\w+)\}\}/g, (_, k) => `__VAR:${k}__`);
+    const parsed = JSON.parse(sentinelStr);
+    const filled = _applyTemplateObj(parsed, vars);
+    return JSON.stringify(filled, null, 2);
 }
 
 function _getDynConfig() {
@@ -895,7 +918,7 @@ function previewDynamicPayloads() {
     const count  = Math.min(vus, 5);
     if (!dynCfg.template.trim()) { showNotif('Enter a body template first.', 'error'); return; }
     let tpl;
-    try { JSON.parse(dynCfg.template.replace(/\{\{[^}]+\}\}/g, '"__placeholder__"')); tpl = dynCfg.template; }
+    try { JSON.parse(dynCfg.template.replace(/\{\{(\w+)\}\}/g, (_, k) => `"__VAR:${k}__"`)); tpl = dynCfg.template; }
     catch { showNotif('Template is not valid JSON. Fix it first.', 'error'); return; }
 
     const rows = [];
@@ -970,7 +993,7 @@ function buildConfig() {
     if (dynamicEnabled) {
         const d = _getDynConfig();
         if (!d.template.trim()) { showNotif('Dynamic mode is on but body template is empty.', 'error'); return null; }
-        try { JSON.parse(d.template.replace(/\{\{[^}]+\}\}/g, '"__placeholder__"')); } catch { showNotif('Dynamic body template is not valid JSON.', 'error'); return null; }
+        try { JSON.parse(d.template.replace(/\{\{(\w+)\}\}/g, (_, k) => `"__VAR:${k}__"`)); } catch { showNotif('Dynamic body template is not valid JSON.', 'error'); return null; }
         if (d.encrypt && !d.encKey.trim()) { showNotif('Encryption is enabled but no encryption key provided.', 'error'); return null; }
         base.dynamicMode = true;
         base.dynamicConfig = d;

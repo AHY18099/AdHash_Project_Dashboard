@@ -19,28 +19,51 @@ function aesEncrypt(plaintext, key) {
     return Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]).toString('base64');
 }
 
+// ── Walk a parsed JSON value, replacing "__VAR:key__" sentinels with vars[key] ──
+function _applyVarsToObj(obj, vars) {
+    if (typeof obj === 'string') {
+        const exact = obj.match(/^__VAR:(\w+)__$/);
+        if (exact) return vars[exact[1]] !== undefined ? String(vars[exact[1]]) : '';
+        return obj.replace(/__VAR:(\w+)__/g, (_, k) => vars[k] !== undefined ? vars[k] : '');
+    }
+    if (Array.isArray(obj)) return obj.map(v => _applyVarsToObj(v, vars));
+    if (obj !== null && typeof obj === 'object') {
+        const out = {};
+        for (const k of Object.keys(obj)) out[k] = _applyVarsToObj(obj[k], vars);
+        return out;
+    }
+    return obj;
+}
+
 // ── Dynamic payload generator ──
 function buildDynPayloads(dynCfg, vus) {
-    const results = [];
+    const results   = [];
     const startIdx  = parseInt(dynCfg.startIndex) || 1;
     const phoneBase = BigInt(dynCfg.phoneBase || '7100000000');
+    const templateStr = dynCfg.template || '{}';
+    // Pre-parse template once with sentinels so we have a safe JSON structure
+    const templateParsed = JSON.parse(
+        templateStr.replace(/\{\{(\w+)\}\}/g, (_, k) => `"__VAR:${k}__"`)
+    );
+
     for (let i = 0; i < vus; i++) {
         const idx   = startIdx + i;
         const phone = String(phoneBase + BigInt(i));
         const email = `${dynCfg.emailPrefix}${idx}@${dynCfg.emailDomain}`;
         const name  = `${dynCfg.namePrefix}${idx}`;
         const vars  = {
-            index: idx, email, phoneNumber: phone, name,
-            timestamp: Date.now(), random: Math.floor(Math.random() * 1e9),
+            index: String(idx), email, phoneNumber: phone, name,
+            timestamp: String(Date.now()), random: String(Math.floor(Math.random() * 1e9)),
             uuid: crypto.randomUUID(),
         };
         if (dynCfg.extraKey) vars[dynCfg.extraKey] = dynCfg.extraVal || '';
-        // Apply template
-        const bodyStr = (dynCfg.template || '{}').replace(/\{\{(\w+)\}\}/g, (_, k) =>
-            vars[k] !== undefined ? vars[k] : `{{${k}}}`);
+
+        const filledObj = _applyVarsToObj(templateParsed, vars);
+        const bodyStr   = JSON.stringify(filledObj);
+
         let finalBody = bodyStr;
         if (dynCfg.encrypt && dynCfg.encKey) {
-            const encField = dynCfg.encField || 'encryptedData';
+            const encField  = dynCfg.encField || 'encryptedData';
             const encrypted = aesEncrypt(bodyStr, dynCfg.encKey);
             finalBody = JSON.stringify({ [encField]: encrypted });
         }
