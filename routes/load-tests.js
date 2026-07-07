@@ -901,6 +901,7 @@ function _generateStepCode(step, idx) {
         bodyCode,
         retryWrapStart,
         httpCall + '\n',
+        `  console.log('Step ${idx+1} [' + ${varName}.status + '] body=' + ${varName}.body.substring(0,200));\n`,
         assertCode,
         captureCode,
         retryWrapEnd,
