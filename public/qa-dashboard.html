@@ -9727,13 +9727,10 @@ function openSwaggerAddModal(p){
   },{saveLabel:'＋ Add URL'});
 }
 
-let _swSuggestedUrl='';
-function _swUseSuggested(){
+async function _swTestUrl(overrideUrl){
   const inp=document.getElementById('sw-url');
-  if(inp&&_swSuggestedUrl){inp.value=_swSuggestedUrl;_swTestUrl();}
-}
-async function _swTestUrl(){
-  const url=document.getElementById('sw-url')?.value.trim();
+  if(overrideUrl&&inp)inp.value=overrideUrl;
+  const url=(inp?.value||'').trim();
   const res=document.getElementById('sw-test-res');if(!res)return;
   if(!url){toast('Enter a URL first','err');return;}
   res.style.display='block';res.innerHTML='<span style="color:var(--mut);font-size:12px">⏳ Testing…</span>';
@@ -9744,9 +9741,9 @@ async function _swTestUrl(){
       const hint=data.hint?`<div style="margin-top:5px;color:var(--mut)">${escH(data.hint)}</div>`:'';
       let suggestHtml='';
       if(data.suggestedUrl){
-        _swSuggestedUrl=data.suggestedUrl;
+        const encSug=encodeURIComponent(data.suggestedUrl);
         suggestHtml=`<div style="margin-top:8px;padding:6px 10px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:6px;font-size:11px">
-          💡 Try this URL instead: <a href="#" style="color:#3b82f6;word-break:break-all" onclick="event.preventDefault();_swUseSuggested()">${escH(data.suggestedUrl)}</a>
+          💡 Try this URL instead:<br><button type="button" class="btn btn-secondary" style="margin-top:6px;font-size:11px;padding:4px 10px;word-break:break-all" onclick="_swTestUrl(decodeURIComponent('${encSug}'))">${escH(data.suggestedUrl)}</button>
         </div>`;
       }
       res.innerHTML=`<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--fail)">❌ HTTP ${r.status}${hint}${suggestHtml}</div>`;
