@@ -908,11 +908,11 @@ function previewDynamicPayloads() {
     const html = `<div style="overflow-x:auto"><table class="dyn-preview-table">
         <thead><tr><th>#</th><th>Email</th><th>Phone</th><th>Name</th><th>Body (truncated)</th></tr></thead>
         <tbody>${rows.map((r,i)=>`<tr>
-            <td>${i+1}</td><td>${r.email}</td><td>${r.phoneNumber}</td><td>${r.name}</td>
-            <td style="max-width:300px;white-space:pre-wrap;word-break:break-all;font-family:monospace;font-size:11px">${_esc(r.bodyPreview.substring(0,200))}${r.bodyPreview.length>200?'…':''}</td>
+            <td>${i+1}</td><td>${_esc(r.email)}</td><td>${_esc(String(r.phoneNumber))}</td><td>${_esc(r.name)}</td>
+            <td><pre data-body="${i}" style="margin:0;max-width:300px;white-space:pre-wrap;word-break:break-all;font-family:monospace;font-size:11px;color:inherit;background:none;border:none;padding:0"></pre></td>
         </tr>`).join('')}</tbody>
     </table></div>
-    ${dynCfg.encrypt ? `<div style="margin-top:12px;padding:10px;background:#1e293b;border-radius:6px;font-size:11px;color:var(--muted)">🔒 Encryption enabled — each body will be AES-128-ECB encrypted and wrapped as <code style="color:var(--purple)">${dynCfg.encField}</code></div>` : ''}
+    ${dynCfg.encrypt ? `<div style="margin-top:12px;padding:10px;background:#1e293b;border-radius:6px;font-size:11px;color:var(--muted)">🔒 Encryption enabled — each body will be AES-128-ECB encrypted and wrapped as <code style="color:var(--purple)">${_esc(dynCfg.encField)}</code></div>` : ''}
     <div style="margin-top:8px;font-size:11px;color:var(--muted)">Showing ${count} of ${vus} total payloads.</div>`;
 
     // Show in a simple overlay
@@ -931,6 +931,14 @@ function previewDynamicPayloads() {
         document.body.appendChild(ov);
     }
     document.getElementById('dyn-preview-body').innerHTML = html;
+    // Use textContent on each <pre> so quotes/special chars are never HTML-parsed
+    rows.forEach((r, i) => {
+        const pre = document.querySelector(`pre[data-body="${i}"]`);
+        if (pre) {
+            const preview = r.bodyPreview.substring(0, 200);
+            pre.textContent = preview + (r.bodyPreview.length > 200 ? '…' : '');
+        }
+    });
     ov.style.display='flex';
 }
 
