@@ -1037,8 +1037,13 @@ async function _executeK6Run(runId, cfg, state, addLog, addTimeline) {
             '--log-output', 'stdout',
         ];
 
-        // Only add vus/duration if no rampup stages (rampup is handled via options in script)
-        if (!cfg.rampup || cfg.rampup === 0) {
+        // For multi-step workflows (shared-iterations) or rampup stages, options are fully
+        // defined in the script — do NOT pass --vus/--duration CLI flags, they override
+        // options.scenarios in the script and switch k6 to duration-based execution,
+        // which breaks shared-iterations (VUs loop instead of running once each).
+        const enabledStepCount = Array.isArray(cfg.steps) ? cfg.steps.filter(s => s.enabled !== false).length : 0;
+        const isWorkflowRun = cfg.scenarioMode && enabledStepCount > 1;
+        if (!isWorkflowRun && (!cfg.rampup || cfg.rampup === 0)) {
             k6Args.push('--vus',      String(cfg.vus || 10));
             k6Args.push('--duration', (cfg.duration || 30) + 's');
         }
