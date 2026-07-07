@@ -723,8 +723,9 @@ function _scenarioToK6Script(scenario) {
     },
   },
   thresholds: {
-    http_req_duration: ['p(95)<${p95Threshold}'],
-    ${stopOnErrorRate ? `'http_req_failed': ['rate<${stopOnErrorRate / 100}'],` : ''}
+    'http_req_duration{isProxy:false}': ['p(95)<${p95Threshold}'],
+    'http_req_failed{isProxy:false}': ['rate<0.10'],
+    ${stopOnErrorRate ? `'http_req_failed{isProxy:false}': ['rate<${stopOnErrorRate / 100}'],` : ''}
   },
 };`;
     } else if (rampup > 0) {
@@ -845,7 +846,7 @@ function _generateStepCode(step, idx) {
                 // Runtime encrypt: resolve vars first, then call /api/load-test/encrypt
                 bodyCode = [
                     `  const _plainBody${idx+1} = _resolveVars(${JSON.stringify(bodyStr)}, vars);`,
-                    `  const _encResp${idx+1} = http.post(ENCRYPT_URL, JSON.stringify({ plaintext: _plainBody${idx+1}, key: ${JSON.stringify(enc.key)}, iv: ${JSON.stringify(enc.iv || '')}, outputField: ${JSON.stringify(enc.outputField || 'encryptedData')} }), { headers: { 'Content-Type': 'application/json' }, timeout: '5s' });`,
+                    `  const _encResp${idx+1} = http.post(ENCRYPT_URL, JSON.stringify({ plaintext: _plainBody${idx+1}, key: ${JSON.stringify(enc.key)}, iv: ${JSON.stringify(enc.iv || '')}, outputField: ${JSON.stringify(enc.outputField || 'encryptedData')} }), { headers: { 'Content-Type': 'application/json' }, tags: { isProxy: 'true' }, timeout: '5s' });`,
                     `  const _body${idx+1} = ((_encResp${idx+1}.json() || {}).body) || '{}';`,
                 ].join('\n') + '\n';
                 bodyRef = `_body${idx+1}`;
@@ -904,7 +905,7 @@ function _generateStepCode(step, idx) {
                     `    const _decResp${idx+1} = http.post(`,
                     `      DECRYPT_URL,`,
                     `      JSON.stringify({ ciphertext: _encField${idx+1}, key: ${JSON.stringify(dec.key)}, iv: ${JSON.stringify(dec.iv)}, jsonPath: '${cap.jsonPath}' }),`,
-                    `      { headers: { 'Content-Type': 'application/json' }, timeout: '5s' }`,
+                    `      { headers: { 'Content-Type': 'application/json' }, tags: { isProxy: 'true' }, timeout: '5s' }`,
                     `    );`,
                     `    vars['${cap.varName}'] = (_decResp${idx+1}.json() || {}).value || '';`,
                     `  } catch(e) { vars['${cap.varName}'] = ''; }`,
@@ -1134,6 +1135,7 @@ function _processK6MetricLines(lines, m, latencies, cfg) {
         const tags   = entry.data?.tags || {};
 
         if (metric === 'http_reqs') {
+            if (tags.isProxy === 'true') continue; // exclude proxy calls from metrics
             m.totalReqs++;
             const isOk = tags.status && parseInt(tags.status) >= 200 && parseInt(tags.status) < 400;
             if (isOk) m.okReqs++;
@@ -1142,7 +1144,7 @@ function _processK6MetricLines(lines, m, latencies, cfg) {
             m.statusCodes = m.statusCodes || {};
             m.statusCodes[sc] = (m.statusCodes[sc] || 0) + 1;
         } else if (metric === 'http_req_duration') {
-            if (value !== undefined) {
+            if (value !== undefined && tags.isProxy !== 'true') {
                 latencies.push(value);
                 // Update RPS approximately
                 const elapsed = (Date.now() - new Date(m._startTs || Date.now()).getTime()) / 1000 || 1;
