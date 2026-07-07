@@ -52,6 +52,18 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent2);box-shadow:0
 select option{background:var(--bg2)}
 textarea{resize:vertical;min-height:80px;font-family:monospace}
 .form-hint{font-size:11px;color:var(--muted);margin-top:4px}
+/* Dynamic panel */
+#dynamic-panel code{background:#1e293b;padding:1px 5px;border-radius:3px;font-size:10px}
+.dyn-preview-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}
+.dyn-preview-table th{background:#1e293b;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.4px;padding:7px 10px;text-align:left;border-bottom:1px solid var(--border)}
+.dyn-preview-table td{padding:7px 10px;border-bottom:1px solid #1e293b;color:var(--text);font-family:monospace;font-size:11px}
+.dyn-preview-table tr:hover td{background:#1e293b}
+.req-result-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
+.req-result-table th{background:#1e293b;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+.req-result-table td{padding:7px 10px;border-bottom:1px solid #0f172a;vertical-align:top;font-size:12px}
+.req-result-table tr:hover td{background:#1e293b}
+.badge-pass{background:#064e3b;color:#6ee7b7;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700}
+.badge-fail{background:#7f1d1d;color:#fca5a5;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700}
 
 /* ── BUTTONS ── */
 .btn{padding:9px 20px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:.15s;display:inline-flex;align-items:center;gap:6px}
@@ -333,6 +345,85 @@ input:checked+.slider::before{transform:translateX(16px)}
       <label>Query Parameters (JSON)</label>
       <input id="cfg-queryparams" type="text" placeholder='{"page":"1","limit":"20"}' />
     </div>
+
+    <!-- ── DYNAMIC TEST DATA ── -->
+    <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;font-size:13px;font-weight:600;color:var(--text);letter-spacing:0">
+        <input type="checkbox" id="cfg-dynamic-enable" onchange="toggleDynamicMode()" style="width:16px;height:16px;accent-color:var(--accent2);cursor:pointer">
+        ⚡ Enable Dynamic Test Data <span style="font-size:11px;color:var(--muted);font-weight:400">— generate unique payloads per virtual user</span>
+      </label>
+    </div>
+
+    <div id="dynamic-panel" style="display:none;margin-top:16px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:18px">
+      <div style="font-size:12px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">Dynamic Payload Configuration</div>
+
+      <div class="row" style="margin-bottom:12px">
+        <div class="col">
+          <label>Email Prefix</label>
+          <input id="dyn-email-prefix" value="loadtest" placeholder="loadtest">
+        </div>
+        <div class="col">
+          <label>Email Domain</label>
+          <input id="dyn-email-domain" value="mailinator.com" placeholder="mailinator.com">
+        </div>
+        <div class="col">
+          <label>Start Index</label>
+          <input id="dyn-start-index" type="number" value="1" min="1">
+        </div>
+      </div>
+      <div class="row" style="margin-bottom:12px">
+        <div class="col">
+          <label>Phone Base Number</label>
+          <input id="dyn-phone-base" value="7100000000" placeholder="7100000000">
+        </div>
+        <div class="col">
+          <label>Name Prefix</label>
+          <input id="dyn-name-prefix" value="Load Test" placeholder="Load Test">
+        </div>
+        <div class="col">
+          <label>Extra Field (key)</label>
+          <input id="dyn-extra-key" placeholder="e.g. emailVerificationToken">
+        </div>
+        <div class="col">
+          <label>Extra Field (value)</label>
+          <input id="dyn-extra-val" placeholder="static value for all requests">
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="display:flex;align-items:center;justify-content:space-between">
+          <span>Request Body Template</span>
+          <span style="color:var(--accent2);font-size:10px;cursor:pointer;font-weight:400;text-transform:none;letter-spacing:0" onclick="insertDefaultTemplate()">Insert default template</span>
+        </label>
+        <textarea id="dyn-body-template" rows="7" style="font-family:monospace;font-size:12px" placeholder='{"email":"{{email}}","phoneNumber":"{{phoneNumber}}","name":"{{name}}"}'></textarea>
+        <div class="form-hint" style="margin-top:6px">Supported variables: <code style="color:var(--accent2)">{{index}}</code> <code style="color:var(--accent2)">{{email}}</code> <code style="color:var(--accent2)">{{phoneNumber}}</code> <code style="color:var(--accent2)">{{name}}</code> <code style="color:var(--accent2)">{{timestamp}}</code> <code style="color:var(--accent2)">{{random}}</code> <code style="color:var(--accent2)">{{uuid}}</code></div>
+      </div>
+
+      <!-- Encryption -->
+      <div style="padding:12px;background:#1e293b;border-radius:8px;margin-bottom:12px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;font-size:13px;font-weight:600;color:var(--text);letter-spacing:0;margin-bottom:0">
+          <input type="checkbox" id="cfg-encrypt-enable" onchange="toggleEncrypt()" style="width:15px;height:15px;accent-color:var(--purple);cursor:pointer">
+          🔒 Encrypt request body before sending
+        </label>
+        <div id="encrypt-config" style="display:none;margin-top:12px">
+          <div class="row">
+            <div class="col2">
+              <label>Encryption Key (AES-128-ECB)</label>
+              <input id="cfg-enc-key" type="password" placeholder="16-char key e.g. xfnr3PVyckouBZxW">
+            </div>
+            <div class="col">
+              <label>Wrapper Field Name</label>
+              <input id="cfg-enc-field" value="encryptedData" placeholder="encryptedData">
+            </div>
+          </div>
+          <div class="form-hint" style="margin-top:6px">Encrypts the generated JSON body with AES-128-ECB (PKCS7 padding), wraps it as: <code style="color:var(--purple)">{"{encryptedData field}": "..."}</code></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-secondary" onclick="previewDynamicPayloads()" style="font-size:12px;padding:8px 16px">👁 Preview Payloads (first 5)</button>
+      </div>
+    </div>
   </div>
 
   <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">
@@ -484,6 +575,13 @@ input:checked+.slider::before{transform:translateX(16px)}
     <div class="card">
       <div class="card-title">📋 Status Code Distribution</div>
       <div class="tbl-wrap"><table><thead><tr><th>Status</th><th>Count</th><th>%</th></tr></thead><tbody id="results-sc-tbody"></tbody></table></div>
+    </div>
+    <div id="req-results-card" class="card" style="display:none">
+      <div class="card-title">🧾 Per-Request Results (Dynamic Mode)</div>
+      <div class="tbl-wrap"><table class="req-result-table">
+        <thead><tr><th>#</th><th>Email</th><th>Phone</th><th>Status</th><th>Time (ms)</th><th>Result</th><th>Error / Response</th></tr></thead>
+        <tbody id="req-results-tbody"></tbody>
+      </table></div>
     </div>
   </div>
 </div>
@@ -738,12 +836,111 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // ══════════════════════════ CONFIGURE ══════════════════════════
 
+// ── Dynamic payload helpers ──
+function toggleDynamicMode() {
+    const on = document.getElementById('cfg-dynamic-enable').checked;
+    document.getElementById('dynamic-panel').style.display = on ? '' : 'none';
+}
+function toggleEncrypt() {
+    const on = document.getElementById('cfg-encrypt-enable').checked;
+    document.getElementById('encrypt-config').style.display = on ? '' : 'none';
+}
+function insertDefaultTemplate() {
+    document.getElementById('dyn-body-template').value = JSON.stringify({
+        email: '{{email}}',
+        countryCode: '+91',
+        phoneNumber: '{{phoneNumber}}',
+        name: '{{name}}',
+        authProvider: 'email',
+        isgoogleSignUp: false,
+        emailVerificationToken: '{{emailVerificationToken}}'
+    }, null, 2);
+}
+
+function _buildDynRecord(index, cfg) {
+    const i     = (parseInt(cfg.startIndex) || 1) + index;
+    const phone = String((BigInt(cfg.phoneBase || '7100000000') + BigInt(index))).padStart(10,'0');
+    const email = `${cfg.emailPrefix}${i}@${cfg.emailDomain}`;
+    const name  = `${cfg.namePrefix}${i}`;
+    const extraKey   = (document.getElementById('dyn-extra-key')?.value || '').trim();
+    const extraVal   = (document.getElementById('dyn-extra-val')?.value || '').trim();
+    const vars = { index: i, email, phoneNumber: phone, name,
+        timestamp: Date.now(), random: Math.floor(Math.random()*1e9),
+        uuid: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${index}` };
+    if (extraKey) vars[extraKey] = extraVal;
+    return vars;
+}
+
+function _applyTemplate(template, vars) {
+    return template.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] !== undefined ? vars[k] : `{{${k}}}`);
+}
+
+function _getDynConfig() {
+    return {
+        emailPrefix:  document.getElementById('dyn-email-prefix')?.value || 'loadtest',
+        emailDomain:  document.getElementById('dyn-email-domain')?.value || 'mailinator.com',
+        startIndex:   document.getElementById('dyn-start-index')?.value || '1',
+        phoneBase:    document.getElementById('dyn-phone-base')?.value || '7100000000',
+        namePrefix:   document.getElementById('dyn-name-prefix')?.value || 'Load Test',
+        template:     document.getElementById('dyn-body-template')?.value || '',
+        encrypt:      document.getElementById('cfg-encrypt-enable')?.checked || false,
+        encKey:       document.getElementById('cfg-enc-key')?.value || '',
+        encField:     document.getElementById('cfg-enc-field')?.value || 'encryptedData',
+    };
+}
+
+function previewDynamicPayloads() {
+    const dynCfg = _getDynConfig();
+    const vus    = parseInt(document.getElementById('cfg-vus').value) || 10;
+    const count  = Math.min(vus, 5);
+    if (!dynCfg.template.trim()) { showNotif('Enter a body template first.', 'error'); return; }
+    let tpl;
+    try { JSON.parse(dynCfg.template); tpl = dynCfg.template; }
+    catch { showNotif('Template is not valid JSON. Fix it first.', 'error'); return; }
+
+    const rows = [];
+    for (let i = 0; i < count; i++) {
+        const vars    = _buildDynRecord(i, dynCfg);
+        const bodyStr = _applyTemplate(tpl, vars);
+        rows.push({ ...vars, bodyPreview: bodyStr });
+    }
+
+    const html = `<div style="overflow-x:auto"><table class="dyn-preview-table">
+        <thead><tr><th>#</th><th>Email</th><th>Phone</th><th>Name</th><th>Body (truncated)</th></tr></thead>
+        <tbody>${rows.map((r,i)=>`<tr>
+            <td>${i+1}</td><td>${r.email}</td><td>${r.phoneNumber}</td><td>${r.name}</td>
+            <td style="max-width:300px;white-space:pre-wrap;word-break:break-all">${r.bodyPreview.substring(0,200)}${r.bodyPreview.length>200?'…':''}</td>
+        </tr>`).join('')}</tbody>
+    </table></div>
+    ${dynCfg.encrypt ? `<div style="margin-top:12px;padding:10px;background:#1e293b;border-radius:6px;font-size:11px;color:var(--muted)">🔒 Encryption enabled — each body will be AES-128-ECB encrypted and wrapped as <code style="color:var(--purple)">${dynCfg.encField}</code></div>` : ''}
+    <div style="margin-top:8px;font-size:11px;color:var(--muted)">Showing ${count} of ${vus} total payloads.</div>`;
+
+    // Show in a simple overlay
+    let ov = document.getElementById('dyn-preview-ov');
+    if (!ov) {
+        ov = document.createElement('div');
+        ov.id = 'dyn-preview-ov';
+        ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+        ov.innerHTML=`<div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:24px;max-width:900px;width:100%;max-height:80vh;overflow-y:auto">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <div style="font-size:15px;font-weight:700;color:#fff">👁 Preview Generated Payloads</div>
+                <button onclick="document.getElementById('dyn-preview-ov').remove()" style="background:#334155;border:none;color:#e2e8f0;padding:4px 12px;border-radius:6px;cursor:pointer">✕ Close</button>
+            </div>
+            <div id="dyn-preview-body"></div>
+        </div>`;
+        document.body.appendChild(ov);
+    }
+    document.getElementById('dyn-preview-body').innerHTML = html;
+    ov.style.display='flex';
+}
+
 function buildConfig() {
     const parseJsonSafe = (v, fallback = undefined) => {
         if (!v || !v.trim()) return fallback;
         try { return JSON.parse(v); } catch { return fallback; }
     };
-    return {
+    const dynamicEnabled = document.getElementById('cfg-dynamic-enable')?.checked || false;
+    const base = {
         projectName:    document.getElementById('cfg-project').value || 'Unknown',
         environment:    document.getElementById('cfg-env').value,
         url:            document.getElementById('cfg-url').value.trim(),
@@ -762,10 +959,20 @@ function buildConfig() {
         stopOnP95:      parseFloat(document.getElementById('cfg-stoponp95').value) || undefined,
         scenarioSteps:  _scenarioSteps,
     };
+    if (dynamicEnabled) {
+        const d = _getDynConfig();
+        if (!d.template.trim()) { showNotif('Dynamic mode is on but body template is empty.', 'error'); return null; }
+        try { JSON.parse(d.template); } catch { showNotif('Dynamic body template is not valid JSON.', 'error'); return null; }
+        if (d.encrypt && !d.encKey.trim()) { showNotif('Encryption is enabled but no encryption key provided.', 'error'); return null; }
+        base.dynamicMode = true;
+        base.dynamicConfig = d;
+    }
+    return base;
 }
 
 function startTest() {
     const cfg = buildConfig();
+    if (!cfg) return; // validation already showed error
     if (!cfg.url) { showNotif('Target URL is required.', 'error'); return; }
     if (!/^https?:\/\//i.test(cfg.url)) { showNotif('URL must start with http:// or https://', 'error'); return; }
     if (cfg.vus > _maxVUs) { showNotif(`VU limit for your role is ${_maxVUs}.`, 'error'); return; }
@@ -1200,6 +1407,30 @@ function renderResults(data) {
         const c = code.startsWith('2') ? 'var(--green)' : code.startsWith('3') ? 'var(--accent2)' : code.startsWith('4') ? 'var(--amber)' : 'var(--red)';
         return `<tr><td style="color:${c};font-weight:700">${code}</td><td>${count.toLocaleString()}</td><td>${pct}%</td></tr>`;
     }).join('') || '<tr><td colspan="3" style="color:var(--muted)">No data</td></tr>';
+
+    // Per-request results (dynamic mode only)
+    const perReq = data.perRequestResults || [];
+    const reqCard = document.getElementById('req-results-card');
+    if (perReq.length > 0) {
+        reqCard.style.display = '';
+        document.getElementById('req-results-tbody').innerHTML = perReq.map((r,i) => {
+            const pass = r.status >= 200 && r.status < 400;
+            const statusCol = pass ? 'var(--green)' : 'var(--red)';
+            const err = r.error ? `<span style="color:var(--red)">${r.error}</span>` :
+                (r.responsePreview ? `<span style="color:var(--muted);font-family:monospace">${r.responsePreview.substring(0,100)}</span>` : '—');
+            return `<tr>
+                <td>${i+1}</td>
+                <td style="font-family:monospace">${r.email||'—'}</td>
+                <td style="font-family:monospace">${r.phoneNumber||'—'}</td>
+                <td style="color:${statusCol};font-weight:700">${r.status||'—'}</td>
+                <td>${r.responseTime||'—'}ms</td>
+                <td><span class="${pass?'badge-pass':'badge-fail'}">${pass?'PASS':'FAIL'}</span></td>
+                <td style="max-width:240px;word-break:break-word">${err}</td>
+            </tr>`;
+        }).join('');
+    } else {
+        reqCard.style.display = 'none';
+    }
 }
 
 // ══════════════════════════ REPORTS / HISTORY ══════════════════════════

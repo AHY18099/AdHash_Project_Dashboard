@@ -1,8 +1,8 @@
 'use strict';
 /**
  * routes/load-tests.js
- * Server-side load testing engine using autocannon.
- * All tests run on the server — no browser fetch/no-cors limitations.
+ * Server-side load testing engine using autocannon (static) and
+ * custom concurrent fetch loop (dynamic payloads).
  */
 
 const router   = require('express').Router();
@@ -10,6 +10,44 @@ const autocannon = require('autocannon');
 const fs       = require('fs');
 const path     = require('path');
 const crypto   = require('crypto');
+
+// ── AES-128-ECB encryption (PKCS7 padding via Node crypto) ──
+function aesEncrypt(plaintext, key) {
+    const keyBuf = Buffer.from(key, 'utf8').slice(0, 16); // 16 bytes = AES-128
+    const cipher = crypto.createCipheriv('aes-128-ecb', keyBuf, null);
+    cipher.setAutoPadding(true); // PKCS7
+    return Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]).toString('base64');
+}
+
+// ── Dynamic payload generator ──
+function buildDynPayloads(dynCfg, vus) {
+    const results = [];
+    const startIdx  = parseInt(dynCfg.startIndex) || 1;
+    const phoneBase = BigInt(dynCfg.phoneBase || '7100000000');
+    for (let i = 0; i < vus; i++) {
+        const idx   = startIdx + i;
+        const phone = String(phoneBase + BigInt(i));
+        const email = `${dynCfg.emailPrefix}${idx}@${dynCfg.emailDomain}`;
+        const name  = `${dynCfg.namePrefix}${idx}`;
+        const vars  = {
+            index: idx, email, phoneNumber: phone, name,
+            timestamp: Date.now(), random: Math.floor(Math.random() * 1e9),
+            uuid: crypto.randomUUID(),
+        };
+        if (dynCfg.extraKey) vars[dynCfg.extraKey] = dynCfg.extraVal || '';
+        // Apply template
+        const bodyStr = (dynCfg.template || '{}').replace(/\{\{(\w+)\}\}/g, (_, k) =>
+            vars[k] !== undefined ? vars[k] : `{{${k}}}`);
+        let finalBody = bodyStr;
+        if (dynCfg.encrypt && dynCfg.encKey) {
+            const encField = dynCfg.encField || 'encryptedData';
+            const encrypted = aesEncrypt(bodyStr, dynCfg.encKey);
+            finalBody = JSON.stringify({ [encField]: encrypted });
+        }
+        results.push({ vars, finalBody, email, phoneNumber: phone });
+    }
+    return results;
+}
 
 const REPORTS_DIR = path.join(__dirname, '..', 'reports', 'load-tests');
 if (!fs.existsSync(REPORTS_DIR)) fs.mkdirSync(REPORTS_DIR, { recursive: true });
@@ -90,6 +128,8 @@ router.post('/start', auth, async (req, res) => {
         stopOnErrorRate, stopOnP95,
         p95Threshold = 3000,
         executedBy = 'Dashboard',
+        dynamicMode = false,
+        dynamicConfig = null,
     } = req.body || {};
 
     // ── Validation ──
@@ -123,6 +163,8 @@ router.post('/start', auth, async (req, res) => {
         timeout, rps, scenarioType, scenarioSteps,
         p95Threshold, stopOnErrorRate, stopOnP95,
         executedBy, startTime,
+        dynamicMode: !!dynamicMode,
+        dynamicConfig: dynamicMode ? dynamicConfig : null,
     };
 
     const runState = {
@@ -137,6 +179,7 @@ router.post('/start', auth, async (req, res) => {
         logs: [], timeline: [{ time: startTime, event: 'Test started', phase: 'Initializing' }],
         startTime, endTime: null, instance: null, verdict: null,
         reportPath: null, reportJsonPath: null,
+        perRequestResults: [],
     };
     _runs.set(runId, runState);
 
@@ -158,6 +201,14 @@ async function _executeRun(runId, cfg, state) {
 
     try {
         state.status = 'running';
+        addLog('Test started', 'Running');
+        addTimeline('Test started', 'Running');
+
+        // ── DYNAMIC MODE: concurrent fetch with unique payloads ──
+        if (cfg.dynamicMode && cfg.dynamicConfig) {
+            return await _executeDynamicRun(runId, cfg, state, addLog, addTimeline);
+        }
+
         addLog('Ramp-up started', 'Ramp-up');
         addTimeline('Ramp-up started', 'Ramp-up');
 
@@ -287,6 +338,94 @@ async function _executeRun(runId, cfg, state) {
     }
 }
 
+// ── Dynamic concurrent execution ──
+async function _executeDynamicRun(runId, cfg, state, addLog, addTimeline) {
+    const fetch = (...a) => import('node-fetch').then(m => m.default(...a)).catch(() => {
+        // fallback to built-in fetch (Node 18+)
+        return globalThis.fetch(...a);
+    });
+
+    const dynCfg = cfg.dynamicConfig;
+    const vus    = cfg.vus;
+    const payloads = buildDynPayloads(dynCfg, vus);
+
+    addLog(`Dynamic mode: firing ${vus} concurrent requests`, 'Running');
+    addTimeline(`Firing ${vus} concurrent requests`, 'Running');
+
+    const hdrs = { 'Content-Type': 'application/json', ...(cfg.headers || {}) };
+    // Remove masked values
+    Object.keys(hdrs).forEach(k => { if (hdrs[k] === '***masked***') delete hdrs[k]; });
+
+    const m = state.metrics;
+    const latAll = [];
+    const perResults = [];
+
+    const t0 = Date.now();
+    const promises = payloads.map(async (payload, idx) => {
+        const reqStart = Date.now();
+        let status = 0, responseTime = 0, error = null, responsePreview = '';
+        try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), cfg.timeout || 5000);
+            const res = await fetch(cfg.url, {
+                method: (cfg.method || 'POST').toUpperCase(),
+                headers: hdrs,
+                body: payload.finalBody,
+                signal: controller.signal,
+            });
+            clearTimeout(timer);
+            responseTime = Date.now() - reqStart;
+            status = res.status;
+            const text = await res.text().catch(() => '');
+            responsePreview = text.substring(0, 200);
+        } catch (e) {
+            responseTime = Date.now() - reqStart;
+            error = e.message || 'Request failed';
+            status = 0;
+        }
+
+        const ok = status >= 200 && status < 400;
+        m.totalReqs++;
+        if (ok) m.okReqs++; else m.errReqs++;
+        latAll.push(responseTime);
+        m.statusCodes[status] = (m.statusCodes[status] || 0) + 1;
+
+        perResults[idx] = {
+            index: idx + 1,
+            email: payload.email,
+            phoneNumber: payload.phoneNumber,
+            status,
+            responseTime,
+            ok,
+            error,
+            responsePreview,
+        };
+        addLog(`Request ${idx+1} → ${status} ${responseTime}ms ${payload.email}`, 'Running');
+    });
+
+    await Promise.all(promises);
+
+    const elapsed = (Date.now() - t0) / 1000 || 1;
+    m.rps         = parseFloat((m.totalReqs / elapsed).toFixed(2));
+    m.avgLatency  = latAll.length ? parseFloat((latAll.reduce((s,v)=>s+v,0)/latAll.length).toFixed(1)) : 0;
+    m.p50         = Math.round(pct(latAll, 50));
+    m.p90         = Math.round(pct(latAll, 90));
+    m.p95         = Math.round(pct(latAll, 95));
+    m.p99         = Math.round(pct(latAll, 99));
+    m.minLatency  = latAll.length ? Math.round(Math.min(...latAll)) : 0;
+    m.maxLatency  = latAll.length ? Math.round(Math.max(...latAll)) : 0;
+    m.errRate     = m.totalReqs > 0 ? parseFloat(((m.errReqs / m.totalReqs) * 100).toFixed(2)) : 0;
+
+    state.perRequestResults = perResults;
+    state.status  = 'completed';
+    state.endTime = new Date().toISOString();
+    state.verdict = verdict(m, cfg);
+
+    addLog(`Dynamic test done — ${m.okReqs}/${m.totalReqs} passed · P95 ${m.p95}ms`, 'Completed');
+    addTimeline('Dynamic test completed', 'Completed');
+    _saveResults(runId, state);
+}
+
 // ── Save JSON + HTML report ──
 function _saveResults(runId, state) {
     try {
@@ -326,16 +465,17 @@ router.get('/status/:runId', auth, (req, res) => {
     const remaining = Math.max(0, (state.config.duration || 30) - elapsed);
 
     res.json({
-        runId:     req.params.runId,
-        status:    state.status,
-        verdict:   state.verdict,
+        runId:             req.params.runId,
+        status:            state.status,
+        verdict:           state.verdict,
         elapsed,
         remaining,
-        config:    state.config,
-        metrics:   state.metrics,
-        logs:      state.logs.slice(-50),
-        timeline:  state.timeline,
-        phase:     state.timeline.length ? state.timeline[state.timeline.length - 1].phase : 'Initializing',
+        config:            state.config,
+        metrics:           state.metrics,
+        logs:              state.logs.slice(-50),
+        timeline:          state.timeline,
+        phase:             state.timeline.length ? state.timeline[state.timeline.length - 1].phase : 'Initializing',
+        perRequestResults: state.perRequestResults || [],
     });
 });
 
