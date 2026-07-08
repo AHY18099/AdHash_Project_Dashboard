@@ -626,7 +626,8 @@ router.post('/decrypt', (req, res) => {
         const plaintext = aesCbcDecrypt(ciphertext, key, iv);
         const parsed = JSON.parse(plaintext);
         const value = jsonPath
-            ? jsonPath.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : '', parsed)
+            ? jsonPath.replace(/^\$\.?/, '').split('.').filter(Boolean)
+                .reduce((o, k) => (o != null && o[k] !== undefined) ? o[k] : '', parsed)
             : parsed;
         res.json({ value: value !== undefined ? value : '' });
     } catch (e) {
@@ -783,7 +784,8 @@ const DECRYPT_URL = _BASE_URL + '/api/load-test/decrypt';
 const ENCRYPT_URL = _BASE_URL + '/api/load-test/encrypt';
 
 function _get(obj, path) {
-  return path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj);
+  return path.replace(/^\$\.?/, '').split('.').filter(Boolean)
+    .reduce((o, k) => (o != null && o[k] !== undefined) ? o[k] : undefined, obj);
 }
 
 function _resolveVars(str, vars) {
