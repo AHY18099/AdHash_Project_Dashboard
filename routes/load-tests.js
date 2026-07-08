@@ -801,9 +801,9 @@ function _resolveObj(obj, vars) {
 }
 
 export default function () {
-  // Use __ITER (global iteration counter across all VUs) so each iteration
-  // gets a unique data row — prevents same email being reused across iterations
-  const vuIdx = __ITER % DATA.length;
+  // With shared-iterations (1 iteration per VU), __VU is 1-based and unique per VU.
+  // __ITER resets to 0 for each VU so all VUs pick the same row — use __VU-1 instead.
+  const vuIdx = (__VU - 1) % DATA.length;
   const vuData = DATA[vuIdx];
   const vars = Object.assign({}, GLOBAL_VARS, vuData);
 
