@@ -217,6 +217,8 @@ app.use('/api', (req, res, next) => {
     if (PUBLIC_API_ROUTES.has('/api' + req.path)) return next();
     // Allow all /api/status-reports/* — POST uses x-api-key, GET uses JWT or cookie
     if (req.path.startsWith('/status-reports')) return next();
+    // Allow k6 crypto proxy endpoints — called from within k6 at runtime (no browser session)
+    if (req.path === '/load-test/encrypt' || req.path === '/load-test/decrypt') return next();
     if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized' });
     next();
 });
