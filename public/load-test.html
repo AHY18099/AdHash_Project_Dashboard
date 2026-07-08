@@ -584,14 +584,38 @@ input:checked+.slider::before{transform:translateX(16px)}
       </div>
       <div id="scen-dyn-generate">
         <div class="row" style="margin-bottom:8px">
-          <div class="col"><label>Email Prefix</label><input id="scen-dyn-email-prefix" value="loadtest" /></div>
-          <div class="col"><label>Email Domain</label><input id="scen-dyn-email-domain" value="mailinator.com" /></div>
-          <div class="col"><label>Start Index</label><input id="scen-dyn-start-index" type="number" value="1" min="1" /></div>
+          <div class="col"><label>Email Prefix</label><input id="scen-dyn-email-prefix" value="loadtest" oninput="updateDynPreview()" /></div>
+          <div class="col"><label>Email Domain</label><input id="scen-dyn-email-domain" value="mailinator.com" oninput="updateDynPreview()" /></div>
+          <div class="col"><label>Start Index</label><input id="scen-dyn-start-index" type="number" value="1" min="1" oninput="updateDynPreview()" /></div>
         </div>
-        <div class="row">
-          <div class="col"><label>Phone Base</label><input id="scen-dyn-phone-base" value="7100000000" /></div>
-          <div class="col"><label>Name Prefix</label><input id="scen-dyn-name-prefix" value="Load Test" /></div>
+        <div class="row" style="margin-bottom:12px">
+          <div class="col"><label>Phone Base</label><input id="scen-dyn-phone-base" value="7100000000" oninput="updateDynPreview()" /></div>
+          <div class="col"><label>Name Prefix</label><input id="scen-dyn-name-prefix" value="Load Test" oninput="updateDynPreview()" /></div>
           <div class="col"></div>
+        </div>
+        <!-- Live preview table -->
+        <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden">
+          <div style="background:#0f172a;padding:7px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;gap:8px">
+            <span>📋 Live Preview — what each VU will receive</span>
+            <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--accent2)">Updates as you type ↑</span>
+          </div>
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead>
+                <tr style="background:#1e293b">
+                  <th style="padding:7px 12px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border);white-space:nowrap">Variable</th>
+                  <th style="padding:7px 12px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">What it is</th>
+                  <th style="padding:7px 12px;text-align:left;color:var(--amber);font-size:10px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">VU 1</th>
+                  <th style="padding:7px 12px;text-align:left;color:var(--green);font-size:10px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">VU 2</th>
+                  <th style="padding:7px 12px;text-align:left;color:var(--accent2);font-size:10px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">VU 3</th>
+                </tr>
+              </thead>
+              <tbody id="dyn-preview-rows"></tbody>
+            </table>
+          </div>
+          <div style="padding:7px 12px;background:#0f172a;font-size:10px;color:var(--muted);border-top:1px solid var(--border)">
+            Use <code style="color:var(--amber);background:#1e293b;padding:1px 5px;border-radius:3px">{{email}}</code> <code style="color:var(--amber);background:#1e293b;padding:1px 5px;border-radius:3px">{{phoneNumber}}</code> <code style="color:var(--amber);background:#1e293b;padding:1px 5px;border-radius:3px">{{name}}</code> <code style="color:var(--amber);background:#1e293b;padding:1px 5px;border-radius:3px">{{index}}</code> in your step request bodies and URLs — each VU gets its own unique value automatically.
+          </div>
         </div>
       </div>
       <div id="scen-dyn-json" style="display:none">
@@ -1004,6 +1028,7 @@ window.addEventListener('DOMContentLoaded', () => {
     renderGlobalVars();
     loadHistory();
     loadTemplate();
+    updateDynPreview();
 });
 
 // ══════════════════════════ CONFIGURE ══════════════════════════
@@ -1787,10 +1812,40 @@ function newScenario() {
     showNotif('New scenario started.', 'info');
 }
 
+// ── Dynamic data preview table ──
+function updateDynPreview() {
+    const prefix = document.getElementById('scen-dyn-email-prefix')?.value || 'loadtest';
+    const domain = document.getElementById('scen-dyn-email-domain')?.value || 'mailinator.com';
+    const startIdx = parseInt(document.getElementById('scen-dyn-start-index')?.value) || 1;
+    const phoneBase = document.getElementById('scen-dyn-phone-base')?.value || '7100000000';
+    const namePrefix = document.getElementById('scen-dyn-name-prefix')?.value || 'Load Test';
+
+    const rows = [
+        { variable: '{{email}}',       what: 'Unique email per VU',        fn: i => `${prefix}${startIdx + i}@${domain}` },
+        { variable: '{{phoneNumber}}', what: 'Unique phone per VU',        fn: i => String(BigInt(phoneBase) + BigInt(i)) },
+        { variable: '{{name}}',        what: 'Unique display name per VU', fn: i => `${namePrefix} ${startIdx + i}` },
+        { variable: '{{index}}',       what: 'VU number (integer)',         fn: i => String(startIdx + i) },
+        { variable: '{{timestamp}}',   what: 'Current time in ms',         fn: () => '(runtime value)' },
+        { variable: '{{random}}',      what: 'Random 9-digit number',      fn: () => '(runtime value)' },
+        { variable: '{{uuid}}',        what: 'Random UUID v4',             fn: () => '(runtime value)' },
+    ];
+
+    const colors = ['var(--amber)', 'var(--green)', 'var(--accent2)'];
+    const tbody = document.getElementById('dyn-preview-rows');
+    if (!tbody) return;
+    tbody.innerHTML = rows.map(r => `
+      <tr style="border-bottom:1px solid #1e293b">
+        <td style="padding:6px 12px;font-family:monospace;color:var(--amber);white-space:nowrap">${r.variable}</td>
+        <td style="padding:6px 12px;color:var(--muted);font-size:11px">${r.what}</td>
+        ${[0,1,2].map(i => `<td style="padding:6px 12px;font-family:monospace;font-size:11px;color:${colors[i]}">${r.fn(i)}</td>`).join('')}
+      </tr>`).join('');
+}
+
 // ── Dynamic data toggles (Scenario Builder) ──
 function toggleScenDynamic() {
     const on = document.getElementById('scen-dyn-enable').checked;
     document.getElementById('scen-dyn-panel').style.display = on ? '' : 'none';
+    if (on) updateDynPreview();
 }
 function toggleScenDynSource() {
     const v = document.getElementById('scen-dyn-source').value;
