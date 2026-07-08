@@ -894,21 +894,28 @@ function _generateStepCode(step, idx) {
         assertCode = `  check(${varName}, { '${step.name || 'step'} ok': r => r.status >= 200 && r.status < 400 });\n`;
     }
 
-    // Captures — if responseDecryption is enabled, call server-side decrypt proxy
+    // Captures — decrypt response before extracting if needed
     let captureCode = '';
     if (step.captures && step.captures.length > 0) {
         const dec = step.responseDecryption;
-        if (dec?.enabled && dec.key && dec.iv) {
-            // Call /api/load-test/decrypt (Node.js AES-CBC) — avoids k6 WebCrypto issues
+        // Use explicit responseDecryption config, OR fall back to requestEncryption key/IV
+        // (API responses are encrypted with the same key when request encryption is on)
+        const enc = step.requestEncryption;
+        const decKey  = (dec?.enabled && dec.key)  ? dec.key  : (enc?.enabled && enc.key  ? enc.key  : null);
+        const decIv   = (dec?.enabled && dec.iv)   ? dec.iv   : (enc?.enabled && enc.iv   ? enc.iv   : null);
+        const decField = (dec?.enabled && dec.inputField) ? dec.inputField : (enc?.enabled ? (enc.outputField || 'encryptedData') : 'encryptedData');
+
+        if (decKey && decIv) {
+            // Decrypt response via server-side proxy, then extract jsonPath
             captureCode = step.captures.map(cap => {
                 if (!cap.varName || !cap.jsonPath) return '';
                 return [
                     `  try {`,
                     `    const _raw${idx+1} = ${varName}.json();`,
-                    `    const _encField${idx+1} = (_raw${idx+1} && _raw${idx+1}['${dec.inputField || 'encryptedData'}']) || '';`,
+                    `    const _encField${idx+1} = (_raw${idx+1} && _raw${idx+1}['${decField}']) || '';`,
                     `    const _decResp${idx+1} = http.post(`,
                     `      DECRYPT_URL,`,
-                    `      JSON.stringify({ ciphertext: _encField${idx+1}, key: ${JSON.stringify(dec.key)}, iv: ${JSON.stringify(dec.iv)}, jsonPath: '${cap.jsonPath}' }),`,
+                    `      JSON.stringify({ ciphertext: _encField${idx+1}, key: ${JSON.stringify(decKey)}, iv: ${JSON.stringify(decIv)}, jsonPath: '${cap.jsonPath}' }),`,
                     `      { headers: { 'Content-Type': 'application/json' }, tags: { isProxy: 'true' }, timeout: '5s' }`,
                     `    );`,
                     `    vars['${cap.varName}'] = (_decResp${idx+1}.json() || {}).value || '';`,
@@ -919,7 +926,7 @@ function _generateStepCode(step, idx) {
         } else {
             captureCode = step.captures.map(cap => {
                 if (!cap.varName || !cap.jsonPath) return '';
-                return `  try { const _j${idx+1} = ${varName}.json(); vars['${cap.varName}'] = _get(_j${idx+1}, '${cap.jsonPath}'); } catch {}`;
+                return `  try { const _j${idx+1} = ${varName}.json(); vars['${cap.varName}'] = _get(_j${idx+1}, '${cap.jsonPath}'); console.log('VU=' + __VU + ' STEP${idx+1} captured ${cap.varName}=' + String(vars['${cap.varName}']).substring(0,60)); } catch {}`;
             }).filter(Boolean).join('\n') + '\n';
         }
     }
