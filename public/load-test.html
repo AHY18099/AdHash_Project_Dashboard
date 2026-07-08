@@ -1657,7 +1657,7 @@ function _buildScenarioObject() {
         vus:           parseInt(document.getElementById('scen-vus')?.value) || parseInt(document.getElementById('cfg-vus')?.value) || 10,
         duration:      parseInt(document.getElementById('scen-duration')?.value) || parseInt(document.getElementById('cfg-duration')?.value) || 30,
         rampup:        parseInt(document.getElementById('scen-rampup')?.value) || parseInt(document.getElementById('cfg-rampup')?.value) || 0,
-        threads:       parseInt(document.getElementById('scen-threads')?.value) || 10,
+        threads:       parseInt(document.getElementById('scen-vus')?.value) || parseInt(document.getElementById('cfg-vus')?.value) || 10,
         timeout:       parseInt(document.getElementById('scen-timeout')?.value) || parseInt(document.getElementById('cfg-timeout')?.value) || 5000,
         scenarioType:  document.getElementById('cfg-scenario')?.value || 'Baseline Load Test',
         p95Threshold:  parseInt(document.getElementById('scen-p95threshold')?.value) || parseInt(document.getElementById('cfg-p95threshold')?.value) || 3000,
@@ -1742,7 +1742,7 @@ async function loadScenario(id) {
     if (s.vus)          document.getElementById('scen-vus').value          = s.vus;
     if (s.duration)     document.getElementById('scen-duration').value     = s.duration;
     if (s.rampup != null) document.getElementById('scen-rampup').value     = s.rampup;
-    if (s.threads)      document.getElementById('scen-threads').value      = s.threads;
+    // scen-threads removed — iterations always equals VUs
     if (s.timeout)      document.getElementById('scen-timeout').value      = s.timeout;
     if (s.p95Threshold) document.getElementById('scen-p95threshold').value = s.p95Threshold;
 
@@ -1804,7 +1804,7 @@ function newScenario() {
     document.getElementById('scen-vus').value = '10';
     document.getElementById('scen-duration').value = '30';
     document.getElementById('scen-rampup').value = '0';
-    document.getElementById('scen-threads').value = '10';
+    // scen-threads removed — iterations always equals VUs
     document.getElementById('scen-timeout').value = '5000';
     document.getElementById('scen-p95threshold').value = '3000';
     document.getElementById('scen-dyn-enable').checked = false;
