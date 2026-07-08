@@ -846,10 +846,10 @@ function _generateStepCode(step, idx) {
                 // Runtime encrypt: resolve vars first, then call /api/load-test/encrypt
                 bodyCode = [
                     `  const _plainBody${idx+1} = _resolveVars(${JSON.stringify(bodyStr)}, vars);`,
-                    `  console.log('VU=' + __VU + ' STEP${idx+1} req=' + _plainBody${idx+1}.substring(0,300));`,
+                    `  console.log('VU=' + __VU + ' STEP${idx+1} PLAIN_REQ=' + _plainBody${idx+1});`,
                     `  const _encResp${idx+1} = http.post(ENCRYPT_URL, JSON.stringify({ plaintext: _plainBody${idx+1}, key: ${JSON.stringify(enc.key)}, iv: ${JSON.stringify(enc.iv || '')}, outputField: ${JSON.stringify(enc.outputField || 'encryptedData')} }), { headers: { 'Content-Type': 'application/json' }, tags: { isProxy: 'true' }, timeout: '5s' });`,
-                    `  if (_encResp${idx+1}.status !== 200) console.log('VU=' + __VU + ' STEP${idx+1} encProxy error=' + _encResp${idx+1}.status + ' ' + _encResp${idx+1}.body.substring(0,100));`,
                     `  const _body${idx+1} = ((_encResp${idx+1}.json() || {}).body) || '{}';`,
+                    `  console.log('VU=' + __VU + ' STEP${idx+1} ENC_REQ=' + _body${idx+1});`,
                 ].join('\n') + '\n';
                 bodyRef = `_body${idx+1}`;
             } else {
@@ -939,7 +939,7 @@ function _generateStepCode(step, idx) {
         bodyCode,
         retryWrapStart,
         httpCall + '\n',
-        `  console.log('VU=' + __VU + ' STEP${idx+1}[' + ${varName}.status + '] res=' + ${varName}.body.substring(0,400));\n`,
+        `  console.log('VU=' + __VU + ' STEP${idx+1}[' + ${varName}.status + '] ENC_RES=' + ${varName}.body.substring(0,400));\n`,
         assertCode,
         captureCode,
         retryWrapEnd,
