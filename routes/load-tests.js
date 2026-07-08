@@ -448,7 +448,7 @@ router.get('/history', auth, (req, res) => {
                     startTime:    data.startTime,
                     endTime:      data.endTime,
                     status:       data.status,
-                    verdict:      data.verdict,
+                    verdict:      data.verdict || (data.status === 'failed' ? 'FAIL' : null),
                     executedBy:   data.config?.executedBy || '—',
                     successRate:  data.metrics?.totalReqs > 0
                         ? parseFloat(((data.metrics.okReqs / data.metrics.totalReqs) * 100).toFixed(1))
@@ -1167,6 +1167,7 @@ async function _executeK6Run(runId, cfg, state, addLog, addTimeline) {
 
     } catch (err) {
         state.status  = 'failed';
+        state.verdict = 'FAIL';
         state.endTime = new Date().toISOString();
         if (err.code === 'ENOENT') {
             state.logs.push({ time: new Date().toISOString(), event: 'k6 not found. Please install k6 from https://k6.io or set K6_PATH env var.', phase: 'Failed' });
@@ -1449,7 +1450,7 @@ ${show('showExecutiveSummary') ? `
     This load test was executed to validate the stability and response time of <strong>${cfg.projectName || 'the application'}</strong>
     under concurrent user traffic in the <strong>${cfg.environment || 'unknown'}</strong> environment.
     The test ran a <strong>${cfg.scenarioType || 'load'}</strong> scenario with <strong>${cfg.vus} virtual users</strong>
-    for <strong>${cfg.duration} seconds</strong> against <strong>${cfg.url}</strong>.
+    for <strong>${cfg.duration} seconds</strong>${cfg.steps && cfg.steps.length ? ` across <strong>${cfg.steps.filter(s => s.enabled !== false).length} API steps</strong>` : cfg.url ? ` against <strong>${cfg.url}</strong>` : ''}.
     Based on the configured thresholds and observed metrics, the final result is
     <strong style="color:${vdColor}">${vd}</strong>.
     ${vd === 'PASS' ? 'The application handled the load within acceptable performance boundaries.' :
