@@ -951,7 +951,10 @@ function _generateStepCode(step, idx) {
 
 function _buildK6DataArray(scenario, count) {
     const { dynamicData = {}, globalVars = {}, steps = [] } = scenario;
-    const startIdx   = parseInt(dynamicData.startIndex) || 1;
+    // If no explicit startIndex, derive one from current minute so each run uses
+    // fresh emails automatically (e.g. run at 14:37 → starts at loadtest14370001)
+    const defaultStart = parseInt(String(Date.now()).slice(-6)); // last 6 digits of ms timestamp
+    const startIdx   = parseInt(dynamicData.startIndex) || defaultStart;
     const phoneBase  = BigInt(dynamicData.phoneBase || '7100000000');
     const emailPrefix  = dynamicData.emailPrefix  || 'loadtest';
     const emailDomain  = dynamicData.emailDomain  || 'mailinator.com';
