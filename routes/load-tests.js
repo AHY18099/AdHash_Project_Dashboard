@@ -1065,13 +1065,53 @@ async function _executeK6Run(runId, cfg, state, addLog, addTimeline) {
 
         state.instance = proc;
 
+        // vuStepMap accumulates partial step data keyed by "VU:step"
+        const vuStepMap = {};
+
         let stdoutBuf = '';
         proc.stdout.on('data', chunk => {
             stdoutBuf += chunk.toString();
             const lines = stdoutBuf.split('\n');
             stdoutBuf   = lines.pop();
             for (const line of lines) {
-                if (line.trim()) addLog(line.trim().substring(0, 200), 'Running');
+                if (!line.trim()) continue;
+                addLog(line.trim().substring(0, 200), 'Running');
+
+                // Parse structured VU/step log lines emitted by the k6 script
+                // Format: ...msg="VU=N STEPN PLAIN_REQ=..." or ENC_REQ / ENC_RES
+                const msgMatch = line.match(/msg="VU=(\d+) STEP(\d+) (PLAIN_REQ|ENC_REQ|ENC_RES(?:_DEC)?|captured \w+)=(.+?)(?:"\s*source=|"$)/);
+                if (msgMatch) {
+                    const [, vu, step, kind, val] = msgMatch;
+                    const key = `${vu}:${step}`;
+                    if (!vuStepMap[key]) vuStepMap[key] = { vu: parseInt(vu), step: parseInt(step) };
+                    if (kind === 'PLAIN_REQ') vuStepMap[key].plainReq = val;
+                    else if (kind === 'ENC_REQ') vuStepMap[key].encReq = val;
+                    else if (kind.startsWith('ENC_RES')) {
+                        // check if this is status line: ENC_RES has format VU=N STEPN[STATUS] ENC_RES=...
+                        const statusMatch = line.match(/STEP\d+\[(\d+)\]/);
+                        if (statusMatch) vuStepMap[key].status = parseInt(statusMatch[1]);
+                        vuStepMap[key].encRes = val;
+                        // finalize this step entry
+                        if (!state.perRequestResults) state.perRequestResults = [];
+                        const existing = state.perRequestResults.findIndex(r => r.vu === parseInt(vu) && r.step === parseInt(step));
+                        if (existing >= 0) state.perRequestResults[existing] = { ...vuStepMap[key] };
+                        else state.perRequestResults.push({ ...vuStepMap[key] });
+                    }
+                } else {
+                    // Also catch the combined status line: VU=N STEPN[STATUS] ENC_RES=...
+                    const statusLine = line.match(/msg="VU=(\d+) STEP(\d+)\[(\d+)\] ENC_RES=(.+?)(?:"\s*source=|"$)/);
+                    if (statusLine) {
+                        const [, vu, step, status, encRes] = statusLine;
+                        const key = `${vu}:${step}`;
+                        if (!vuStepMap[key]) vuStepMap[key] = { vu: parseInt(vu), step: parseInt(step) };
+                        vuStepMap[key].status = parseInt(status);
+                        vuStepMap[key].encRes = encRes;
+                        if (!state.perRequestResults) state.perRequestResults = [];
+                        const existing = state.perRequestResults.findIndex(r => r.vu === parseInt(vu) && r.step === parseInt(step));
+                        if (existing >= 0) state.perRequestResults[existing] = { ...vuStepMap[key] };
+                        else state.perRequestResults.push({ ...vuStepMap[key] });
+                    }
+                }
             }
         });
         proc.stderr.on('data', chunk => {
@@ -1250,6 +1290,76 @@ function _generateHtml(state, tmpl = {}) {
     const logRows = (state.logs || []).slice(-20).map(l =>
         `<tr><td style="color:#64748b;font-size:11px">${new Date(l.time).toLocaleString('en-IN')}</td><td>${l.phase}</td><td>${l.event}</td></tr>`
     ).join('');
+
+    // Build per-VU request/response log section
+    const _esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const _tryFmt = s => { try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s || '—'; } };
+    const _statusColor = code => {
+        const c = parseInt(code);
+        if (c >= 200 && c < 300) return '#10b981';
+        if (c >= 400 && c < 500) return '#f59e0b';
+        return '#ef4444';
+    };
+    const perReq = state.perRequestResults || [];
+    let vuRequestLogHtml = '';
+    if (perReq.length > 0) {
+        // Group by VU
+        const byVU = {};
+        for (const r of perReq) {
+            if (!byVU[r.vu]) byVU[r.vu] = [];
+            byVU[r.vu].push(r);
+        }
+        const vuNums = Object.keys(byVU).map(Number).sort((a,b)=>a-b);
+        // Get step URLs from cfg steps
+        const stepUrls = (cfg.steps || []).filter(s => s.enabled !== false).map(s => s.url || '');
+        const stepMethods = (cfg.steps || []).filter(s => s.enabled !== false).map(s => s.method || 'POST');
+
+        vuRequestLogHtml = vuNums.map(vuNum => {
+            const steps = byVU[vuNum].sort((a,b) => a.step - b.step);
+            const stepsHtml = steps.map(r => {
+                const stepIdx = r.step - 1;
+                const url = stepUrls[stepIdx] || '—';
+                const method = stepMethods[stepIdx] || 'POST';
+                const statusColor = _statusColor(r.status);
+                const statusBadge = r.status
+                    ? `<span style="background:${statusColor}22;color:${statusColor};border:1px solid ${statusColor};padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700">${r.status}</span>`
+                    : `<span style="color:#94a3b8">—</span>`;
+
+                return `
+<div style="border:1px solid #e2e8f0;border-radius:8px;margin-bottom:12px;overflow:hidden">
+  <div style="background:#f1f5f9;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="background:#3b82f6;color:#fff;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700">Step ${r.step}</span>
+    <span style="font-size:11px;font-weight:700;color:#64748b;background:#e2e8f0;padding:2px 8px;border-radius:4px">${_esc(method)}</span>
+    <span style="font-size:12px;font-family:monospace;color:#1e293b;word-break:break-all">${_esc(url)}</span>
+    <span style="margin-left:auto">${statusBadge}</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid #e2e8f0">
+    <div style="padding:12px 16px;border-right:1px solid #e2e8f0">
+      <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📤 Request — Plain (Decrypted)</div>
+      <pre style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:11px;margin:0;white-space:pre-wrap;word-break:break-all;color:#1e293b;max-height:180px;overflow-y:auto">${_esc(_tryFmt(r.plainReq))}</pre>
+    </div>
+    <div style="padding:12px 16px">
+      <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">🔒 Request — Encrypted (Sent to API)</div>
+      <pre style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:11px;margin:0;white-space:pre-wrap;word-break:break-all;color:#7c3aed;max-height:180px;overflow-y:auto">${_esc(_tryFmt(r.encReq))}</pre>
+    </div>
+  </div>
+  <div style="padding:12px 16px;border-top:1px solid #e2e8f0">
+    <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📥 Response (from API)</div>
+    <pre style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:11px;margin:0;white-space:pre-wrap;word-break:break-all;color:${statusColor};max-height:180px;overflow-y:auto">${_esc(_tryFmt(r.encRes))}</pre>
+  </div>
+</div>`;
+            }).join('');
+
+            return `
+<div style="border:2px solid #3b82f6;border-radius:10px;margin-bottom:20px;overflow:hidden">
+  <div style="background:#1e3a5f;color:#fff;padding:12px 20px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:10px">
+    <span style="background:#3b82f6;padding:3px 12px;border-radius:20px;font-size:13px">VU ${vuNum}</span>
+    <span style="font-size:12px;font-weight:400;color:#93c5fd">${steps.length} step(s) recorded</span>
+  </div>
+  <div style="padding:16px">${stepsHtml}</div>
+</div>`;
+        }).join('');
+    }
 
     const genTime = new Date().toLocaleString('en-IN', {
         weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
@@ -1434,6 +1544,17 @@ ${show('showTimeline') ? `
   <h2>⏱ Test Timeline</h2>
   <table><thead><tr><th>Time</th><th>Phase</th><th>Event</th></tr></thead>
   <tbody>${tlRows}</tbody></table>
+</div>` : ''}
+
+${vuRequestLogHtml ? `
+<!-- VU REQUEST/RESPONSE LOG -->
+<div class="section">
+  <h2>🔬 Load Request &amp; Response Log</h2>
+  <p style="font-size:13px;color:#64748b;margin-bottom:16px">
+    Full request and response for every step executed by each Virtual User.
+    Each step shows the plain (decrypted) request body, the encrypted body actually sent to the API, and the raw API response.
+  </p>
+  ${vuRequestLogHtml}
 </div>` : ''}
 
 ${show('showTimeline') && logRows ? `
