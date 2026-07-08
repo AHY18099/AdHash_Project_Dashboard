@@ -669,7 +669,7 @@ router.post('/scenario/k6-script', auth, (req, res) => {
 // POST /api/load-test/scenario/dry-run — run with vus=1, duration=30
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/scenario/dry-run', auth, async (req, res) => {
-    const scenario = { ...req.body, vus: 1, duration: 30 };
+    const scenario = { ...req.body, vus: 1, duration: 30, threads: 1 };
     const runId    = 'lt_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
     const startTime = new Date().toISOString();
     const cfg = { ...scenario, startTime, scenarioMode: true };
@@ -696,13 +696,15 @@ function _scenarioToK6Script(scenario) {
         globalVars = {}, dynamicData = {}, steps = [],
         scenarioName = 'Load Test',
     } = scenario;
+    // threads = total iterations across all VUs; defaults to vus (1 iteration per VU)
+    const iterations = parseInt(scenario.threads) || vus;
 
     const enabledSteps = steps.filter(s => s.enabled !== false);
 
     // Build per-VU data array (for dynamic data)
-    // Generate enough data rows for all iterations: vus × (duration / ~1s per iter) + buffer
+    // Generate enough rows to cover all iterations with buffer
     const iterEstimate = Math.ceil(vus * (scenario.duration || 30) * 1.5);
-    const dataArray = _buildK6DataArray(scenario, Math.max(vus, iterEstimate, 100));
+    const dataArray = _buildK6DataArray(scenario, Math.max(vus, iterations, iterEstimate, 100));
 
     // Build options
     // Workflow scenarios use shared-iterations: N VUs each run the full flow once simultaneously.
@@ -718,7 +720,7 @@ function _scenarioToK6Script(scenario) {
     registration_flow: {
       executor: 'shared-iterations',
       vus: ${vus},
-      iterations: ${vus},
+      iterations: ${iterations},
       maxDuration: '${graceTime}s',
     },
   },
