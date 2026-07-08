@@ -696,8 +696,8 @@ function _scenarioToK6Script(scenario) {
         globalVars = {}, dynamicData = {}, steps = [],
         scenarioName = 'Load Test',
     } = scenario;
-    // threads = total iterations across all VUs; defaults to vus (1 iteration per VU)
-    const iterations = parseInt(scenario.threads) || vus;
+    // For workflow scenarios: each VU runs the full flow exactly once → iterations = vus
+    const iterations = vus;
 
     const enabledSteps = steps.filter(s => s.enabled !== false);
 

@@ -534,11 +534,6 @@ input:checked+.slider::before{transform:translateX(16px)}
     </div>
     <div class="row">
       <div class="col">
-        <label>Threads / Iterations</label>
-        <input id="scen-threads" type="number" value="10" min="1" max="10000" placeholder="10" />
-        <div class="form-hint">Total iterations (shared across all VUs)</div>
-      </div>
-      <div class="col">
         <label>Request Timeout (ms)</label>
         <input id="scen-timeout" type="number" value="5000" min="500" max="60000" placeholder="5000" />
         <div class="form-hint">Per-request timeout</div>
@@ -547,6 +542,12 @@ input:checked+.slider::before{transform:translateX(16px)}
         <label>P95 Threshold (ms)</label>
         <input id="scen-p95threshold" type="number" value="3000" min="100" max="30000" placeholder="3000" />
         <div class="form-hint">Fail if P95 latency exceeds this</div>
+      </div>
+      <div class="col">
+        <div style="background:#0f172a;border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-top:18px">
+          <div style="font-size:11px;color:var(--accent2);font-weight:700">ℹ️ Iterations = VUs</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Each VU runs the full scenario exactly once. 10 VUs = 10 complete flows running simultaneously.</div>
+        </div>
       </div>
     </div>
   </div>
