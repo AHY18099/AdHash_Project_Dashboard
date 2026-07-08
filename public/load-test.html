@@ -1762,6 +1762,7 @@ async function loadScenario(id) {
 
     renderSteps();
     renderGlobalVars();
+    updateDynPreview();
     document.getElementById('saved-scenarios-panel').style.display = 'none';
     showNotif(`Scenario "${_scenarioMeta.name}" loaded.`, 'success');
 }
