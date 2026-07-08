@@ -512,6 +512,45 @@ input:checked+.slider::before{transform:translateX(16px)}
     <div id="saved-scenarios-list"><div style="color:var(--muted);font-size:12px">Loading…</div></div>
   </div>
 
+  <!-- TEST EXECUTION CONFIG -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">⚙️ Test Execution Config</div>
+    <div class="row" style="margin-bottom:10px">
+      <div class="col">
+        <label>Virtual Users (VUs)</label>
+        <input id="scen-vus" type="number" value="10" min="1" max="500" placeholder="10" />
+        <div class="form-hint">Concurrent users running the scenario</div>
+      </div>
+      <div class="col">
+        <label>Duration (seconds)</label>
+        <input id="scen-duration" type="number" value="30" min="5" max="3600" placeholder="30" />
+        <div class="form-hint">Total test duration</div>
+      </div>
+      <div class="col">
+        <label>Ramp-up (seconds)</label>
+        <input id="scen-rampup" type="number" value="0" min="0" max="600" placeholder="0" />
+        <div class="form-hint">Time to ramp VUs up to full count</div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col">
+        <label>Threads / Iterations</label>
+        <input id="scen-threads" type="number" value="10" min="1" max="10000" placeholder="10" />
+        <div class="form-hint">Total iterations (shared across all VUs)</div>
+      </div>
+      <div class="col">
+        <label>Request Timeout (ms)</label>
+        <input id="scen-timeout" type="number" value="5000" min="500" max="60000" placeholder="5000" />
+        <div class="form-hint">Per-request timeout</div>
+      </div>
+      <div class="col">
+        <label>P95 Threshold (ms)</label>
+        <input id="scen-p95threshold" type="number" value="3000" min="100" max="30000" placeholder="3000" />
+        <div class="form-hint">Fail if P95 latency exceeds this</div>
+      </div>
+    </div>
+  </div>
+
   <!-- GLOBAL VARIABLES -->
   <div class="card" style="margin-bottom:12px">
     <div class="card-title">🔧 Global Variables
@@ -1002,7 +1041,13 @@ function _showActiveScenario(scenario) {
     const steps = scenario.steps || [];
     card.style.display = '';
     document.getElementById('active-scenario-name').textContent = scenario.scenarioName || scenario.name || 'Unnamed Scenario';
-    document.getElementById('active-scenario-summary').textContent = `${steps.length} step(s) · ${scenario.projectName || ''} ${scenario.environment || ''}`.trim();
+    document.getElementById('active-scenario-summary').textContent = `${steps.length} step(s) · ${scenario.vus || 10} VUs · ${scenario.duration || 30}s · ${scenario.projectName || ''} ${scenario.environment || ''}`.trim();
+    // Sync execution config to Configure tab
+    if (scenario.vus)          { const el = document.getElementById('cfg-vus');          if (el) el.value = scenario.vus; }
+    if (scenario.duration)     { const el = document.getElementById('cfg-duration');     if (el) el.value = scenario.duration; }
+    if (scenario.rampup != null){ const el = document.getElementById('cfg-rampup');      if (el) el.value = scenario.rampup; }
+    if (scenario.timeout)      { const el = document.getElementById('cfg-timeout');      if (el) el.value = scenario.timeout; }
+    if (scenario.p95Threshold) { const el = document.getElementById('cfg-p95threshold'); if (el) el.value = scenario.p95Threshold; }
 }
 
 function _buildDynRecord(index, cfg) {
@@ -1583,12 +1628,13 @@ function _buildScenarioObject() {
         tags:          _scenarioMeta.tags || document.getElementById('scen-tags')?.value || '',
         projectName:   document.getElementById('cfg-project')?.value || '',
         environment:   document.getElementById('cfg-env')?.value || 'QA',
-        vus:           parseInt(document.getElementById('cfg-vus')?.value) || 10,
-        duration:      parseInt(document.getElementById('cfg-duration')?.value) || 30,
-        rampup:        parseInt(document.getElementById('cfg-rampup')?.value) || 0,
-        timeout:       parseInt(document.getElementById('cfg-timeout')?.value) || 5000,
+        vus:           parseInt(document.getElementById('scen-vus')?.value) || parseInt(document.getElementById('cfg-vus')?.value) || 10,
+        duration:      parseInt(document.getElementById('scen-duration')?.value) || parseInt(document.getElementById('cfg-duration')?.value) || 30,
+        rampup:        parseInt(document.getElementById('scen-rampup')?.value) || parseInt(document.getElementById('cfg-rampup')?.value) || 0,
+        threads:       parseInt(document.getElementById('scen-threads')?.value) || 10,
+        timeout:       parseInt(document.getElementById('scen-timeout')?.value) || parseInt(document.getElementById('cfg-timeout')?.value) || 5000,
         scenarioType:  document.getElementById('cfg-scenario')?.value || 'Baseline Load Test',
-        p95Threshold:  parseInt(document.getElementById('cfg-p95threshold')?.value) || 3000,
+        p95Threshold:  parseInt(document.getElementById('scen-p95threshold')?.value) || parseInt(document.getElementById('cfg-p95threshold')?.value) || 3000,
         executedBy:    'Dashboard',
         globalVars:    globalVarsObj,
         dynamicData,
@@ -1666,6 +1712,14 @@ async function loadScenario(id) {
     document.getElementById('scen-desc').value = _scenarioMeta.description;
     document.getElementById('scen-tags').value = _scenarioMeta.tags;
 
+    // Restore execution config
+    if (s.vus)          document.getElementById('scen-vus').value          = s.vus;
+    if (s.duration)     document.getElementById('scen-duration').value     = s.duration;
+    if (s.rampup != null) document.getElementById('scen-rampup').value     = s.rampup;
+    if (s.threads)      document.getElementById('scen-threads').value      = s.threads;
+    if (s.timeout)      document.getElementById('scen-timeout').value      = s.timeout;
+    if (s.p95Threshold) document.getElementById('scen-p95threshold').value = s.p95Threshold;
+
     // Restore dynamic data
     const dyn = s.dynamicData || {};
     if (dyn.enabled) {
@@ -1720,6 +1774,12 @@ function newScenario() {
     document.getElementById('scen-name').value = '';
     document.getElementById('scen-desc').value = '';
     document.getElementById('scen-tags').value = '';
+    document.getElementById('scen-vus').value = '10';
+    document.getElementById('scen-duration').value = '30';
+    document.getElementById('scen-rampup').value = '0';
+    document.getElementById('scen-threads').value = '10';
+    document.getElementById('scen-timeout').value = '5000';
+    document.getElementById('scen-p95threshold').value = '3000';
     document.getElementById('scen-dyn-enable').checked = false;
     document.getElementById('scen-dyn-panel').style.display = 'none';
     renderSteps();
