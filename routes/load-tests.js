@@ -846,7 +846,9 @@ function _generateStepCode(step, idx) {
                 // Runtime encrypt: resolve vars first, then call /api/load-test/encrypt
                 bodyCode = [
                     `  const _plainBody${idx+1} = _resolveVars(${JSON.stringify(bodyStr)}, vars);`,
+                    `  console.log('Step ${idx+1} plaintext=' + _plainBody${idx+1}.substring(0,300));`,
                     `  const _encResp${idx+1} = http.post(ENCRYPT_URL, JSON.stringify({ plaintext: _plainBody${idx+1}, key: ${JSON.stringify(enc.key)}, iv: ${JSON.stringify(enc.iv || '')}, outputField: ${JSON.stringify(enc.outputField || 'encryptedData')} }), { headers: { 'Content-Type': 'application/json' }, tags: { isProxy: 'true' }, timeout: '5s' });`,
+                    `  console.log('Step ${idx+1} encResp=' + _encResp${idx+1}.status + ' body=' + _encResp${idx+1}.body.substring(0,100));`,
                     `  const _body${idx+1} = ((_encResp${idx+1}.json() || {}).body) || '{}';`,
                 ].join('\n') + '\n';
                 bodyRef = `_body${idx+1}`;
@@ -908,7 +910,8 @@ function _generateStepCode(step, idx) {
                     `      { headers: { 'Content-Type': 'application/json' }, tags: { isProxy: 'true' }, timeout: '5s' }`,
                     `    );`,
                     `    vars['${cap.varName}'] = (_decResp${idx+1}.json() || {}).value || '';`,
-                    `  } catch(e) { vars['${cap.varName}'] = ''; }`,
+                    `    console.log('Step ${idx+1} captured ${cap.varName}=' + vars['${cap.varName}'].substring(0,60));`,
+                    `  } catch(e) { vars['${cap.varName}'] = ''; console.log('Step ${idx+1} capture error: ' + e); }`,
                 ].join('\n');
             }).filter(Boolean).join('\n') + '\n';
         } else {
