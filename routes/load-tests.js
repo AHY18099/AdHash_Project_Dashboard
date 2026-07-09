@@ -393,17 +393,54 @@ router.get('/report/:runId', auth, (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// GET /api/load-test/report/:runId/download
+// GET /api/load-test/report/:runId/download?logs=1  (full)
+// GET /api/load-test/report/:runId/download?logs=0  (strip VU req/res log)
 // ══════════════════════════════════════════════════════════════════════════════
 router.get('/report/:runId/download', auth, (req, res) => {
     const htmlPath = path.join(REPORTS_DIR, `${req.params.runId}.html`);
     if (!fs.existsSync(htmlPath)) return res.status(404).json({ error: 'Report not found' });
-    const state = _runs.get(req.params.runId);
-    const proj  = state?.config?.projectName || 'LoadTest';
-    const ts    = new Date().toISOString().slice(0, 10);
-    res.setHeader('Content-Disposition', `attachment; filename="LoadTest-${proj}-${ts}.html"`);
+    const state   = _runs.get(req.params.runId);
+    const proj    = state?.config?.projectName || 'LoadTest';
+    const ts      = new Date().toISOString().slice(0, 10);
+    const withLogs = req.query.logs !== '0'; // default: include logs
+    const suffix  = withLogs ? 'WithLogs' : 'NoLogs';
+
+    let html = fs.readFileSync(htmlPath, 'utf8');
+    if (!withLogs) {
+        // Strip the VU log section: remove from the highlighted section opening tag to its closing </div>
+        // The section is wrapped in <div class="log-section" id="vu-log-section">...</div>
+        html = html.replace(
+            /<!-- VU REQUEST\/RESPONSE LOG[\s\S]*?<div class="log-section" id="vu-log-section">[\s\S]*?<\/div>\s*(?=<!--|\$\{|<div class="section|<footer)/,
+            `<!-- VU Request/Response Log removed — use "Download With Logs" for full report -->\n`
+        );
+        // Simpler fallback: remove between the two known comment markers
+        if (html.includes('id="vu-log-section"')) {
+            // Walk the DOM-like string: find opening div, count nesting, remove to closing div
+            const startMarker = '<div class="log-section" id="vu-log-section">';
+            const startIdx = html.indexOf(startMarker);
+            if (startIdx !== -1) {
+                let depth = 0, i = startIdx, found = false;
+                while (i < html.length) {
+                    if (html.startsWith('<div', i)) depth++;
+                    else if (html.startsWith('</div>', i)) {
+                        depth--;
+                        if (depth === 0) {
+                            html = html.slice(0, startIdx) +
+                                `\n<div class="section"><h2>🔬 Load Request &amp; Response Log</h2><p style="color:#64748b;font-size:13px;padding:12px 0">⚠ Omitted in this version. Download the <strong>With Logs</strong> version for full payload details.</p></div>\n` +
+                                html.slice(i + 6);
+                            found = true;
+                            break;
+                        }
+                    }
+                    i++;
+                }
+            }
+        }
+    }
+
+    res.setHeader('Content-Disposition', `attachment; filename="LoadTest-${proj}-${ts}-${suffix}.html"`);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(fs.readFileSync(htmlPath, 'utf8'));
+    res.send(html);
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1290,85 +1327,153 @@ function _generateHtml(state, tmpl = {}) {
 
     const fmtBytes = (b) => b > 1048576 ? (b / 1048576).toFixed(2) + ' MB' : b > 1024 ? (b / 1024).toFixed(1) + ' KB' : (b || 0) + ' B';
 
-    // Recommendation text — detailed root cause + team actions
+    // ── Certified Performance Tester level QA Recommendation ──
     let recText = '', qaRec = '', recColor = '';
     const p95ms    = m.p95 || 0;
+    const p50ms    = m.p50 || 0;
+    const p99ms    = m.p99 || 0;
+    const avgLat   = m.avgLatency || 0;
     const errPct   = parseFloat(errRateDisp);
     const totalR   = m.totalReqs || 0;
     const failedR  = m.errReqs   || 0;
+    const okR      = m.okReqs    || 0;
     const p95Thr   = cfg.p95Threshold || 3000;
+    const vusCount = cfg.vus || 0;
+    const durSec   = cfg.duration || 0;
+    const rps      = m.rps || 0;
+    const testWindow = `${new Date(state.startTime || Date.now()).toLocaleString('en-IN')} – ${new Date(state.endTime || Date.now()).toLocaleString('en-IN')}`;
+
+    // Derived insights
+    const latSpread   = p99ms - p50ms;          // p99–p50 spread indicates tail-latency risk
+    const latSpreadHigh = latSpread > 1500;      // wide spread = unstable response times
+    const throughputPerVU = totalR > 0 && vusCount > 0 ? (totalR / vusCount).toFixed(1) : '—';
+    const avgRespOk   = avgLat <= p95Thr * 0.5;  // avg is comfortably within budget
+
+    const h = (txt, color) => `<p style="margin-top:14px;font-weight:800;font-size:12px;color:${color};text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid ${color}33;padding-bottom:4px">${txt}</p>`;
 
     if (vd === 'PASS') {
         recText = `
-          <p>All performance thresholds were met under the tested load of <strong>${cfg.vus || 0} Virtual Users</strong> over <strong>${cfg.duration || 0}s</strong>.</p>
-          <ul style="margin:10px 0 0 18px;line-height:1.9">
-            <li>Success rate: <strong>${successRate}%</strong> — within acceptable limits.</li>
-            <li>P95 response time: <strong>${p95ms}ms</strong> — below the ${p95Thr}ms threshold.</li>
-            <li>Error rate: <strong>${errPct}%</strong> — no significant failure pattern detected.</li>
+          ${h('📊 Test Outcome Summary', '#065f46')}
+          <p>All performance acceptance criteria were satisfied under the validated load of <strong>${vusCount} concurrent Virtual Users (VUs)</strong> executing <strong>${cfg.steps?.filter(s=>s.enabled!==false).length || 1} API step(s)</strong> over <strong>${durSec}s</strong> (${cfg.scenarioType || 'Baseline Load Test'}).</p>
+          ${h('📈 Observed Performance Profile', '#065f46')}
+          <ul style="margin:4px 0 0 18px;line-height:2">
+            <li><strong>Success Rate:</strong> ${successRate}% (${okR.toLocaleString()} of ${totalR.toLocaleString()} requests) — meets the ≥99% acceptance criterion.</li>
+            <li><strong>P50 (median) latency:</strong> ${p50ms}ms — half of all requests responded faster than this. Indicates good baseline performance.</li>
+            <li><strong>P95 latency:</strong> ${p95ms}ms — below the configured threshold of ${p95Thr}ms. 95% of users experienced sub-threshold response times.</li>
+            <li><strong>P99 latency:</strong> ${p99ms}ms — worst-case experienced by top 1% of requests. ${p99ms <= p95Thr * 1.5 ? 'Acceptable variance from P95.' : 'Slightly elevated; monitor in production under higher concurrency.'}</li>
+            <li><strong>Latency spread (P99–P50):</strong> ${latSpread}ms — ${latSpreadHigh ? '⚠ Moderate spread detected. Response times are not fully stable; intermittent slowdowns possible under peak traffic.' : 'Tight distribution. Response times are consistent across the VU pool.'}</li>
+            <li><strong>Average latency:</strong> ${avgLat}ms — ${avgRespOk ? 'well within the response budget' : 'approaching threshold; verify under higher VU counts'}.</li>
+            <li><strong>Throughput:</strong> ${rps} RPS · ${throughputPerVU} requests/VU — throughput is proportional to VU count, no saturation observed.</li>
+            <li><strong>Error rate:</strong> ${errPct}% — no systematic failure pattern. Any isolated errors are within noise tolerance.</li>
           </ul>
-          <p style="margin-top:10px">The application is stable and can be considered ready for release from a load testing perspective.</p>`;
-        qaRec    = 'GO';
+          ${h('✅ QA Sign-Off Criteria Met', '#065f46')}
+          <ul style="margin:4px 0 0 18px;line-height:2">
+            <li>P95 ≤ ${p95Thr}ms threshold: <strong style="color:#10b981">PASS</strong> (actual: ${p95ms}ms)</li>
+            <li>Error rate &lt; 1%: <strong style="color:#10b981">PASS</strong> (actual: ${errPct}%)</li>
+            <li>Success rate ≥ 99%: <strong style="color:#10b981">PASS</strong> (actual: ${successRate}%)</li>
+          </ul>
+          ${h('🔭 Observations & Proactive Guidance for QA Team', '#065f46')}
+          <ul style="margin:4px 0 0 18px;line-height:2">
+            <li><strong>Test Coverage Gap:</strong> This test validated ${vusCount} VUs. Before production release, run a <strong>Stress Test at 2–3× this VU count</strong> to identify the application's breaking point and ensure headroom.</li>
+            <li><strong>Soak Test:</strong> Run this scenario for <strong>30+ minutes at current VU count</strong> to detect memory leaks, connection pool degradation, and heap growth over time. Short tests can mask long-running stability issues.</li>
+            <li><strong>Spike Test:</strong> Simulate a sudden traffic burst (e.g., 0 → ${vusCount * 3} VUs in 5s) to validate auto-scaling, queue behaviour, and circuit-breaker effectiveness.</li>
+            ${latSpreadHigh ? `<li><strong>Latency Variance (P99–P50 = ${latSpread}ms):</strong> The spread is wide. Investigate whether specific steps (check the VU log) consistently have higher tail latency. Garbage collection pauses, DB lock contention, or third-party API variance are common causes.</li>` : ''}
+            <li><strong>Baseline Regression:</strong> Save this report as the performance baseline. On every future build, compare P95, RPS, and success rate against this baseline to detect performance regressions early.</li>
+          </ul>
+          ${h('🛠 Guidance for Development Team', '#065f46')}
+          <ul style="margin:4px 0 0 18px;line-height:2">
+            <li>Current performance is acceptable. To maintain it as user base grows: monitor production APM dashboards for P95 drift, DB slow-query logs, and connection pool saturation.</li>
+            <li>If any endpoint's P95 is within 30% of the threshold today, profile and optimise proactively — do not wait for a test failure.</li>
+            <li>Implement <strong>rate-limiting and circuit-breakers</strong> on high-traffic endpoints to protect stability during unexpected spikes beyond tested VU levels.</li>
+          </ul>`;
+        qaRec    = 'GO — RELEASE APPROVED';
         recColor = '#10b981';
+
     } else if (vd === 'RISK') {
-        // Identify which dimension is the risk
         const highLatency = p95ms > p95Thr;
         const highErr     = errPct >= 1 && errPct < 10;
+        const latRatio    = p95Thr > 0 ? (p95ms / p95Thr).toFixed(2) : '—';
         recText = `
-          <p><strong>Performance risks detected</strong> under <strong>${cfg.vus || 0} VUs</strong>. The application passed most checks but has borderline metrics requiring review before release.</p>
-          <p style="margin-top:10px;font-weight:700;color:#92400e">Root Cause Analysis</p>
-          <ul style="margin:6px 0 0 18px;line-height:1.9">
-            ${highLatency ? `<li><strong>High P95 Latency (${p95ms}ms &gt; ${p95Thr}ms threshold):</strong> Indicates slow API responses under concurrent load. Likely causes: unoptimized DB queries, missing indexes, synchronous blocking in API handlers, or under-provisioned server resources.</li>` : ''}
-            ${highErr ? `<li><strong>Elevated Error Rate (${errPct}%):</strong> ${failedR} out of ${totalR} requests failed. Check for rate-limiting, connection pool exhaustion, or timeout cascades. Review status code distribution above for specific error types.</li>` : ''}
-            ${!highLatency && !highErr ? `<li>Metrics are near threshold boundaries — borderline success/error rates or latency. Retest with increased VUs to confirm stability ceiling.</li>` : ''}
+          ${h('⚠ Test Outcome Summary', '#92400e')}
+          <p><strong>Performance risks were detected</strong> under <strong>${vusCount} VUs</strong> over <strong>${durSec}s</strong>. The application met some but not all acceptance criteria. <strong>Conditional release is permitted only after risk review and sign-off by the release manager.</strong></p>
+          ${h('📈 Observed Performance Profile', '#92400e')}
+          <ul style="margin:4px 0 0 18px;line-height:2">
+            <li><strong>Success rate:</strong> ${successRate}% (${okR.toLocaleString()} passed, ${failedR.toLocaleString()} failed of ${totalR.toLocaleString()} total)</li>
+            <li><strong>P95 latency:</strong> ${p95ms}ms ${highLatency ? `— <strong style="color:#b45309">EXCEEDS threshold by ${p95ms - p95Thr}ms (${latRatio}× the ${p95Thr}ms limit)</strong>` : `— within ${p95Thr}ms threshold`}</li>
+            <li><strong>P99 latency:</strong> ${p99ms}ms · <strong>P50:</strong> ${p50ms}ms · <strong>Avg:</strong> ${avgLat}ms</li>
+            <li><strong>Error rate:</strong> ${errPct}% ${highErr ? `— <strong style="color:#b45309">${failedR} requests failed</strong>` : '— within tolerance'}</li>
+            <li><strong>Throughput:</strong> ${rps} RPS — ${rps > 0 ? 'active traffic generated' : 'verify k6 metrics output'}</li>
           </ul>
-          <p style="margin-top:12px;font-weight:700;color:#92400e">Actions for Development Team</p>
-          <ul style="margin:6px 0 0 18px;line-height:1.9">
-            <li>Profile the slowest API endpoints using APM tools (New Relic, Datadog, or server logs).</li>
-            <li>Check database query execution plans — add indexes on frequently filtered/joined columns.</li>
-            <li>Review connection pool size (DB, Redis) — increase if pool exhaustion is detected in logs.</li>
-            <li>Implement response caching for read-heavy endpoints where data freshness allows.</li>
-            <li>Ensure async/await is used correctly — avoid accidental synchronous blocking in Node.js handlers.</li>
+          ${h('🔍 Root Cause Analysis', '#92400e')}
+          <ul style="margin:4px 0 0 18px;line-height:2">
+            ${highLatency ? `<li><strong>Latency degradation at P95 (${p95ms}ms, ${latRatio}× threshold):</strong> Concurrent request queuing is building up under load. Most common causes: (1) unindexed MongoDB/SQL queries that execute fast for 1 user but serialise under 10+; (2) synchronous I/O blocking Node.js event loop; (3) downstream service (auth, payment, email) not scaled proportionally to load.</li>` : ''}
+            ${highErr ? `<li><strong>Elevated error rate (${errPct}%, ${failedR} failures):</strong> Review the status code distribution table above. HTTP 5xx = server-side: check for unhandled exceptions, OOM, DB write failures. HTTP 4xx at scale = likely rate-limiting or token/session exhaustion per VU.</li>` : ''}
+            ${latSpreadHigh ? `<li><strong>High latency variance (P99–P50 = ${latSpread}ms):</strong> The tail of the distribution is significantly longer than the median. This is a hallmark of intermittent resource contention — connection pool wait times, GC pauses, or lock waits in the database layer.</li>` : ''}
+            ${!highLatency && !highErr ? `<li>Metrics are at or near threshold boundaries. The application is operating at the edge of its current capacity at ${vusCount} VUs. Any increase in traffic or payload complexity could push results into FAIL territory.</li>` : ''}
           </ul>
-          <p style="margin-top:12px;font-weight:700;color:#92400e">Actions for QA Team</p>
-          <ul style="margin:6px 0 0 18px;line-height:1.9">
-            <li>Re-run this exact test after dev fixes are applied to confirm improvement.</li>
-            <li>Run a soak test (30+ minutes at current VU count) to check for memory leaks or connection degradation over time.</li>
-            <li>Escalate to dev team with this report and the specific failing step data from the VU log above.</li>
-            <li>Document this result as a known risk in the release sign-off if the release deadline cannot be postponed.</li>
+          ${h('🛠 Actions for Development Team', '#92400e')}
+          <ul style="margin:4px 0 0 18px;line-height:2">
+            <li><strong>Instrument during the test window (${testWindow}):</strong> Pull APM traces, DB slow-query logs, and CPU/memory graphs for this exact window. Correlate spikes with the k6 ramp-up phase.</li>
+            <li><strong>Database:</strong> Run <code>EXPLAIN</code> / <code>db.collection.explain("executionStats")</code> on queries executing during peak load. Add compound indexes on high-frequency filter fields.</li>
+            <li><strong>Connection pool:</strong> Increase MongoDB <code>maxPoolSize</code> and verify connections are being released correctly (no leak). Check via <code>db.serverStatus().connections</code>.</li>
+            <li><strong>Event loop blocking:</strong> Use <code>--prof</code> or <code>clinic.js flame</code> to identify CPU-heavy synchronous code paths.</li>
+            <li><strong>Downstream services:</strong> If any step has consistently high latency in the VU log, isolate whether the bottleneck is your API or an external dependency (add <code>x-response-time</code> headers).</li>
+            <li><strong>Caching:</strong> For read-heavy steps (e.g., user lookup, config fetch), add Redis caching with TTL appropriate to data freshness requirements.</li>
+          </ul>
+          ${h('🔬 Actions for QA Team', '#92400e')}
+          <ul style="margin:4px 0 0 18px;line-height:2">
+            <li><strong>Raise a P2 performance defect</strong> and attach this report. Include the specific failing step from the VU Request Log as evidence.</li>
+            <li><strong>Do not close the defect</strong> until a retest at the same VU count passes all thresholds. Partial retests (lower VU count) do not count.</li>
+            <li><strong>Soak Test:</strong> Schedule a 30-minute soak at ${vusCount} VUs post-fix to confirm the fix holds under sustained load (not just the first 60s).</li>
+            <li><strong>Regression check:</strong> Compare P95 and error rate against any prior PASS baseline. Confirm the fix did not regress previously-passing endpoints.</li>
+            <li>If the release deadline cannot be postponed, obtain <strong>explicit written sign-off</strong> from the release manager acknowledging the performance risk and the conditions under which the application will be monitored post-release.</li>
           </ul>`;
-        qaRec    = 'CONDITIONAL GO';
+        qaRec    = 'CONDITIONAL GO — RISK ACCEPTED';
         recColor = '#f59e0b';
+
     } else {
-        // FAIL — most detailed analysis
+        // FAIL
         const criticalErr = errPct >= 10;
         const criticalLat = p95ms > p95Thr * 2;
+        const latRatio    = p95Thr > 0 ? (p95ms / p95Thr).toFixed(1) : '—';
         recText = `
-          <p><strong>Performance test FAILED.</strong> The application did not meet the minimum acceptable thresholds under <strong>${cfg.vus || 0} Virtual Users</strong>. <span style="color:#dc2626;font-weight:700">Release is NOT recommended</span> until issues are resolved and retested.</p>
-          <p style="margin-top:10px;font-weight:700;color:#991b1b">Root Cause Analysis</p>
-          <ul style="margin:6px 0 0 18px;line-height:1.9">
-            ${criticalErr ? `<li><strong>Critical Error Rate (${errPct}%):</strong> ${failedR} of ${totalR} requests returned errors. This indicates systemic failures — server crashes, unhandled exceptions, or infrastructure capacity limits being hit. Review status codes in the distribution table above for the specific failure types (5xx = server-side crash/timeout; 4xx = auth/validation issue at scale).</li>` : ''}
-            ${criticalLat ? `<li><strong>Severe Latency (P95 ${p95ms}ms — ${Math.round(p95ms/p95Thr)}× the ${p95Thr}ms threshold):</strong> Responses this slow will cause client-side timeouts and a degraded user experience. The API is likely queuing requests faster than it can process them — a classic CPU/DB saturation pattern.</li>` : ''}
-            ${!criticalErr && errPct > 0 ? `<li><strong>Elevated Error Rate (${errPct}%):</strong> ${failedR} requests failed. Check VU Request Log above for specific step failures and HTTP status codes.</li>` : ''}
-            ${!criticalLat && p95ms > p95Thr ? `<li><strong>P95 Latency Exceeded (${p95ms}ms &gt; ${p95Thr}ms):</strong> Requests are consistently slow under concurrent load. Bottleneck likely in DB or downstream service.</li>` : ''}
+          ${h('🚫 Test Outcome Summary', '#991b1b')}
+          <p><strong>Performance test FAILED.</strong> The application did not meet the minimum acceptance criteria under <strong>${vusCount} VUs</strong> over <strong>${durSec}s</strong>. <span style="color:#dc2626;font-weight:800">RELEASE BLOCKED</span> — do not proceed to production until all issues are resolved, fixed, and retested to PASS.</p>
+          ${h('📈 Failure Metrics Summary', '#991b1b')}
+          <ul style="margin:4px 0 0 18px;line-height:2">
+            <li><strong>Success rate:</strong> ${successRate}% — <strong style="color:#dc2626">${failedR.toLocaleString()} out of ${totalR.toLocaleString()} requests failed</strong> (threshold: ≥99%)</li>
+            <li><strong>Error rate:</strong> ${errPct}% ${criticalErr ? `— <strong style="color:#dc2626">CRITICAL: systemic failure rate indicates infrastructure-level saturation</strong>` : ''}</li>
+            <li><strong>P95 latency:</strong> ${p95ms}ms ${criticalLat ? `— <strong style="color:#dc2626">${latRatio}× the ${p95Thr}ms threshold. Severe saturation.</strong>` : `— exceeds ${p95Thr}ms threshold`}</li>
+            <li><strong>P99 latency:</strong> ${p99ms}ms · <strong>P50:</strong> ${p50ms}ms · <strong>Avg:</strong> ${avgLat}ms · <strong>Spread:</strong> ${latSpread}ms</li>
+            <li><strong>Throughput:</strong> ${rps} RPS across ${vusCount} VUs</li>
           </ul>
-          <p style="margin-top:12px;font-weight:700;color:#991b1b">Immediate Actions for Development Team</p>
-          <ul style="margin:6px 0 0 18px;line-height:1.9">
-            <li><strong>Check server/application logs</strong> for stack traces, unhandled exceptions, or OOM errors during the test window (${new Date(state.startTime || Date.now()).toLocaleString('en-IN')} – ${new Date(state.endTime || Date.now()).toLocaleString('en-IN')}).</li>
-            <li><strong>Identify the bottleneck layer:</strong> Is it the Node.js process CPU-bound? DB query time? External API timeout? Use profiling or distributed tracing to narrow down.</li>
-            <li><strong>Database:</strong> Run EXPLAIN on the queries executed during the test. Check for full-table scans, missing indexes, or N+1 query patterns.</li>
-            <li><strong>Connection limits:</strong> Verify MongoDB/Redis connection pool maximums — increase and test. Check for connection leaks (connections not being released).</li>
-            <li><strong>Horizontal scaling:</strong> If the single instance is the bottleneck, test with load balancing across 2 instances before the next load test.</li>
-            <li><strong>Async patterns:</strong> Review all database calls in the failing endpoint(s) — ensure they are properly awaited and not blocking the event loop.</li>
+          ${h('🔍 Root Cause Analysis', '#991b1b')}
+          <ul style="margin:4px 0 0 18px;line-height:2">
+            ${criticalErr ? `<li><strong>Systemic error rate (${errPct}%):</strong> This level of failure (${failedR} requests) indicates the application is crashing, exhausting resources, or hitting hard infrastructure limits. Check: (1) Node.js process crashes in PM2/Railway logs; (2) MongoDB connection pool exhaustion (<code>MongoPoolExhaustedError</code>); (3) OS-level file descriptor limits (<code>ulimit -n</code>); (4) Memory OOM causing process restarts.</li>` : ''}
+            ${criticalLat ? `<li><strong>Severe latency degradation (P95 ${p95ms}ms = ${latRatio}× threshold):</strong> The API is receiving requests faster than it can process them — a textbook throughput saturation pattern. Every additional VU worsens response time non-linearly. The current architecture cannot sustain ${vusCount} concurrent users at this workload. Root causes: single-threaded CPU saturation, unindexed DB queries becoming table scans at scale, or a downstream service bottleneck without connection pooling.</li>` : ''}
+            ${!criticalErr && errPct > 0 ? `<li><strong>Elevated error rate (${errPct}%, ${failedR} failures):</strong> Review the status code distribution above. Map each failing step in the VU Request Log to its HTTP status to identify whether failures are auth-related (401/403), validation (400), rate-limited (429), or server errors (5xx).</li>` : ''}
+            ${!criticalLat && p95ms > p95Thr ? `<li><strong>P95 threshold breach (${p95ms}ms &gt; ${p95Thr}ms):</strong> Response times are consistently above acceptable limits under concurrent load. This confirms a scalability bottleneck exists in the current implementation.</li>` : ''}
+            <li><strong>Test Window:</strong> ${testWindow} — check all server-side logs, APM traces, and DB slow-query logs for this exact window.</li>
           </ul>
-          <p style="margin-top:12px;font-weight:700;color:#991b1b">Actions for QA Team</p>
-          <ul style="margin:6px 0 0 18px;line-height:1.9">
-            <li><strong>Block the release</strong> — this result is a NO-GO. Raise a P1 defect and share this report with the dev team immediately.</li>
-            <li>Isolate which step in the workflow is failing first by reviewing the VU Request Log section — the first step with a non-2xx status is the primary failure point.</li>
-            <li>Run a smoke test (1 VU) to confirm the flow works at all — if 1 VU also fails, this is a functional bug, not just a performance issue.</li>
-            <li>Once dev delivers a fix, re-run this exact scenario before approving the release. Do not accept partial retests.</li>
-            <li>Consider reducing VU count to find the maximum stable concurrency level (e.g., test at 1, 2, 5, 10 VUs to identify the breaking point).</li>
+          ${h('🛠 Immediate Actions for Development Team', '#991b1b')}
+          <ul style="margin:4px 0 0 18px;line-height:2">
+            <li><strong>Step 1 — Triage:</strong> Pull server logs for the test window. Look for <code>FATAL</code>, <code>ENOMEM</code>, <code>ECONNREFUSED</code>, <code>MongoPoolExhaustedError</code>, and unhandled promise rejections. This identifies whether it is a crash, resource exhaustion, or a logic error.</li>
+            <li><strong>Step 2 — Isolate the bottleneck layer:</strong> Use <code>clinic.js flame</code> or Node.js <code>--prof</code> + <code>node --prof-process</code> to identify CPU-bound code paths. Check if the event loop is blocked by synchronous operations (JSON.parse on large payloads, bcrypt, file I/O).</li>
+            <li><strong>Step 3 — Database profiling:</strong> Enable MongoDB profiler (<code>db.setProfilingLevel(1, {slowms: 100})</code>) during a rerun at lower VU count. Review <code>db.system.profile</code> for queries with <code>millis &gt; 100</code> and add the missing indexes.</li>
+            <li><strong>Step 4 — Connection pool sizing:</strong> Check current <code>maxPoolSize</code> in Mongoose/MongoClient config. Increase to <code>min(50, VUs × steps)</code>. Confirm connections are released — wrap all DB calls in try/finally or use the ORM's managed sessions.</li>
+            <li><strong>Step 5 — Horizontal scaling check:</strong> If a single Node.js instance is saturated, validate with <code>pm2 start --instances max</code> (cluster mode) before the next load test to confirm the bottleneck is CPU-bound and not I/O-bound.</li>
+            <li><strong>Step 6 — Downstream dependencies:</strong> Review each step in the VU log for consistently high response times. If Step N is slow for every VU, the bottleneck is in that API's backend. Add <code>X-Response-Time</code> headers and compare server-processing vs. network time.</li>
+          </ul>
+          ${h('🔬 Actions for QA Team', '#991b1b')}
+          <ul style="margin:4px 0 0 18px;line-height:2">
+            <li><strong>Raise a P1 (Critical) performance defect</strong> immediately. Attach this full report (with logs version) as evidence. Set the severity to Blocker and link it to the current release milestone.</li>
+            <li><strong>Run 1-VU smoke test first:</strong> If 1 VU also fails, this is a functional defect — escalate to the dev team as a Priority 0 issue before any performance work begins. Do not treat a functional bug as a performance problem.</li>
+            <li><strong>Binary VU search:</strong> Once 1 VU passes, find the maximum stable VU count by testing at: 1 → 2 → 5 → 10 → 20 VUs. The point where errors appear is the application's current concurrency ceiling. Document it in the defect.</li>
+            <li><strong>Retest requirements:</strong> The dev team must deliver a fix and the QA team must rerun this <em>exact</em> scenario (same VUs, duration, steps, thresholds). Partial retests or smoke tests do not satisfy the retest criteria for a P1 performance defect.</li>
+            <li><strong>Root cause evidence collection:</strong> Before any fix is applied, capture: (1) server CPU and memory graphs for the test window; (2) MongoDB slow-query logs; (3) application error logs. This evidence is required for the defect report and prevents the team from guessing the root cause.</li>
+            <li><strong>Do not release</strong> under any circumstance until this defect is closed with a verified PASS retest result. Document the blocking decision in the release sign-off form.</li>
           </ul>`;
-        qaRec    = 'NO-GO';
+        qaRec    = 'NO-GO — RELEASE BLOCKED';
         recColor = '#ef4444';
     }
 
@@ -1434,38 +1539,51 @@ function _generateHtml(state, tmpl = {}) {
                     ? `<span style="background:${statusColor}22;color:${statusColor};border:1px solid ${statusColor};padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700">${r.status}</span>`
                     : `<span style="color:#94a3b8">—</span>`;
 
+                const resLblClass = parseInt(r.status) >= 500 ? 'panel-lbl-res-err' : parseInt(r.status) >= 400 ? 'panel-lbl-res-warn' : 'panel-lbl-res-ok';
+                const resIcon = parseInt(r.status) >= 500 ? '🔴' : parseInt(r.status) >= 400 ? '🟡' : '🟢';
                 return `
-<div style="border:1px solid #e2e8f0;border-radius:8px;margin-bottom:12px;overflow:hidden">
-  <div style="background:#f1f5f9;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <span style="background:#3b82f6;color:#fff;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700">Step ${r.step}</span>
-    <span style="font-size:11px;font-weight:700;color:#64748b;background:#e2e8f0;padding:2px 8px;border-radius:4px">${_esc(method)}</span>
-    <span style="font-size:12px;font-family:monospace;color:#1e293b;word-break:break-all">${_esc(url)}</span>
+<div style="border:1px solid #e2e8f0;border-radius:8px;margin-bottom:14px;overflow:hidden">
+  <div style="background:linear-gradient(90deg,#1e3a5f,#1e40af);padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="background:#3b82f6;color:#fff;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:800;letter-spacing:.3px">Step ${r.step}</span>
+    <span style="font-size:11px;font-weight:800;color:#fbbf24;background:rgba(245,158,11,.2);padding:2px 10px;border-radius:4px;letter-spacing:.5px">${_esc(method)}</span>
+    <span style="font-size:12px;font-family:monospace;color:#e2e8f0;word-break:break-all;flex:1">${_esc(url)}</span>
     <span style="margin-left:auto">${statusBadge}</span>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid #e2e8f0">
-    <div style="padding:12px 16px;border-right:1px solid #e2e8f0">
-      <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📤 Request — Plain (Decrypted)</div>
-      <pre style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:11px;margin:0;white-space:pre-wrap;word-break:break-all;color:#1e293b;max-height:180px;overflow-y:auto">${_esc(_tryFmt(r.plainReq))}</pre>
+    <div style="padding:12px 16px;border-right:1px solid #e2e8f0;background:#f0f9ff">
+      <div class="panel-lbl panel-lbl-plain">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        REQUEST — PLAIN (DECRYPTED)
+      </div>
+      <pre style="background:#fff;border:1px solid #bae6fd;border-radius:6px;padding:10px;font-size:11px;margin:0;white-space:pre-wrap;word-break:break-all;color:#0c4a6e;max-height:200px;overflow-y:auto">${_esc(_tryFmt(r.plainReq))}</pre>
     </div>
-    <div style="padding:12px 16px">
-      <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">🔒 Request — Encrypted (Sent to API)</div>
-      <pre style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:11px;margin:0;white-space:pre-wrap;word-break:break-all;color:#7c3aed;max-height:180px;overflow-y:auto">${_esc(_tryFmt(r.encReq))}</pre>
+    <div style="padding:12px 16px;background:#faf5ff">
+      <div class="panel-lbl panel-lbl-enc">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        REQUEST — ENCRYPTED (SENT TO API)
+      </div>
+      <pre style="background:#fff;border:1px solid #ddd6fe;border-radius:6px;padding:10px;font-size:11px;margin:0;white-space:pre-wrap;word-break:break-all;color:#5b21b6;max-height:200px;overflow-y:auto">${_esc(_tryFmt(r.encReq))}</pre>
     </div>
   </div>
-  <div style="padding:12px 16px;border-top:1px solid #e2e8f0">
-    <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📥 Response (from API)</div>
-    <pre style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:11px;margin:0;white-space:pre-wrap;word-break:break-all;color:${statusColor};max-height:180px;overflow-y:auto">${_esc(_tryFmt(r.encRes))}</pre>
+  <div style="padding:12px 16px;border-top:2px solid #e2e8f0;background:#f8fafc">
+    <div class="panel-lbl ${resLblClass}">
+      ${resIcon}
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:2px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      RESPONSE FROM API ${r.status ? `— HTTP ${r.status}` : ''}
+    </div>
+    <pre style="background:#fff;border:1px solid ${parseInt(r.status)>=500?'#fca5a5':parseInt(r.status)>=400?'#fde68a':'#a7f3d0'};border-radius:6px;padding:10px;font-size:11px;margin:0;white-space:pre-wrap;word-break:break-all;color:${statusColor};max-height:200px;overflow-y:auto">${_esc(_tryFmt(r.encRes))}</pre>
   </div>
 </div>`;
             }).join('');
 
             return `
-<div style="border:2px solid #3b82f6;border-radius:10px;margin-bottom:20px;overflow:hidden">
-  <div style="background:#1e3a5f;color:#fff;padding:12px 20px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:10px">
-    <span style="background:#3b82f6;padding:3px 12px;border-radius:20px;font-size:13px">VU ${vuNum}</span>
+<div style="border:2px solid #3b82f6;border-radius:12px;margin-bottom:20px;overflow:hidden;box-shadow:0 2px 8px rgba(59,130,246,.15)">
+  <div style="background:linear-gradient(90deg,#0f172a,#1e3a5f);color:#fff;padding:14px 20px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:12px">
+    <span style="background:#3b82f6;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:800">VU ${vuNum}</span>
     <span style="font-size:12px;font-weight:400;color:#93c5fd">${steps.length} step(s) recorded</span>
+    <span style="margin-left:auto;font-size:11px;color:#64748b">${steps.filter(s=>s.status&&s.status>=200&&s.status<400).length}/${steps.length} passed</span>
   </div>
-  <div style="padding:16px">${stepsHtml}</div>
+  <div style="padding:16px;background:#f8fafc">${stepsHtml}</div>
 </div>`;
         }).join('');
     }
@@ -1528,6 +1646,22 @@ tr:hover td{background:#f8fafc}
 .rel-item .value{font-size:15px;font-weight:800;color:${recColor}}
 .custom-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:12px}
 footer{text-align:center;padding:24px;color:#94a3b8;font-size:11px;border-top:1px solid #e2e8f0;margin-top:8px}
+/* ── VU Log section highlight ── */
+.log-section{background:#fff;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 2px 12px rgba(245,158,11,.18);border:2px solid #f59e0b}
+.log-section h2{font-size:15px;font-weight:700;color:#92400e;margin-bottom:6px;padding-bottom:10px;border-bottom:2px solid #fde68a;display:flex;align-items:center;gap:8px}
+.log-section-banner{background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#78350f;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.log-dl-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;border:none;cursor:pointer}
+.log-dl-btn-full{background:#92400e;color:#fff}
+.log-dl-btn-full:hover{background:#78350f}
+.log-dl-btn-clean{background:#fff;color:#92400e;border:1px solid #f59e0b}
+.log-dl-btn-clean:hover{background:#fef3c7}
+/* ── req/res panel labels ── */
+.panel-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:5px}
+.panel-lbl-plain{color:#0369a1}
+.panel-lbl-enc{color:#7c3aed}
+.panel-lbl-res-ok{color:#065f46}
+.panel-lbl-res-err{color:#991b1b}
+.panel-lbl-res-warn{color:#92400e}
 </style>
 </head>
 <body>
@@ -1535,13 +1669,16 @@ footer{text-align:center;padding:24px;color:#94a3b8;font-size:11px;border-top:1p
 
 <!-- HEADER -->
 <div class="rpt-header">
-  <div>
+  <div style="flex:1">
     <div class="rpt-brand"><span>${companyName.split(' ')[0]}</span> ${companyName.split(' ').slice(1).join(' ')}</div>
-    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <span class="badge badge-env">${cfg.environment || 'Unknown'}</span>
       <span class="badge badge-type">${cfg.scenarioType || 'Load Test'}</span>
       <span class="badge" style="background:rgba(245,158,11,.2);color:#fbbf24">⚡ Engine: k6</span>
       <span class="badge" style="background:rgba(139,92,246,.15);color:#c4b5fd">${cfg.mode === 'single' || !cfg.steps?.length || cfg.steps?.length === 1 ? 'Single API Test' : 'Workflow Scenario'}</span>
+    </div>
+    <div style="margin-top:16px">
+      <span class="verdict-badge">⬤ ${vd}</span>
     </div>
   </div>
   <div class="rpt-meta">
@@ -1549,7 +1686,6 @@ footer{text-align:center;padding:24px;color:#94a3b8;font-size:11px;border-top:1p
     <div class="sub">Project: <strong>${cfg.projectName || '—'}</strong></div>
     <div class="sub">Generated: ${genTime}</div>
     <div class="sub">Executed by: ${preparedBy}</div>
-    <div style="margin-top:12px"><span class="verdict-badge">⬤ ${vd}</span></div>
   </div>
 </div>
 
@@ -1659,12 +1795,30 @@ ${show('showTimeline') ? `
 </div>` : ''}
 
 ${vuRequestLogHtml ? `
-<!-- VU REQUEST/RESPONSE LOG -->
-<div class="section">
-  <h2>🔬 Load Request &amp; Response Log</h2>
-  <p style="font-size:13px;color:#64748b;margin-bottom:16px">
+<!-- VU REQUEST/RESPONSE LOG — highlighted sensitive section -->
+<div class="log-section" id="vu-log-section">
+  <h2>🔬 Load Request &amp; Response Log
+    <span style="margin-left:8px;font-size:11px;font-weight:600;background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:20px;border:1px solid #fde68a">⚠ SENSITIVE</span>
+  </h2>
+  <div class="log-section-banner">
+    <span>
+      <strong>⚠ Security Notice:</strong> This section contains raw API request &amp; response payloads including encrypted data.
+      Share only with authorised personnel. Use <em>Download Without Logs</em> for external distribution.
+    </span>
+    <span style="display:flex;gap:8px;flex-shrink:0">
+      <a href="${state.runId ? `/api/load-test/report/${state.runId}/download?logs=1` : '#'}" class="log-dl-btn log-dl-btn-full" download>
+        📥 Download With Logs
+      </a>
+      <a href="${state.runId ? `/api/load-test/report/${state.runId}/download?logs=0` : '#'}" class="log-dl-btn log-dl-btn-clean" download>
+        📄 Download Without Logs
+      </a>
+    </span>
+  </div>
+  <p style="font-size:13px;color:#78350f;margin-bottom:16px">
     Full request and response for every step executed by each Virtual User.
-    Each step shows the plain (decrypted) request body, the encrypted body actually sent to the API, and the raw API response.
+    Each step shows: <strong style="color:#0369a1">Plain (decrypted) request</strong> ·
+    <strong style="color:#7c3aed">Encrypted request sent to API</strong> ·
+    <strong style="color:#065f46">Raw API response</strong>.
   </p>
   ${vuRequestLogHtml}
 </div>` : ''}

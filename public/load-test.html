@@ -781,9 +781,10 @@ input:checked+.slider::before{transform:translateX(16px)}
           <div style="font-size:17px;font-weight:700" id="results-project-label">—</div>
           <div style="font-size:12px;color:var(--muted)" id="results-config-summary">—</div>
         </div>
-        <div style="margin-left:auto;display:flex;gap:10px">
+        <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-secondary" onclick="viewReport()" id="results-btn-report">📄 View Report</button>
-          <button class="btn btn-green" onclick="downloadReport()" id="results-btn-download">⬇ Download</button>
+          <button class="btn btn-green" onclick="downloadReport(true)" id="results-btn-download" title="Download full report including req/res logs">⬇ With Logs</button>
+          <button class="btn btn-secondary" onclick="downloadReport(false)" id="results-btn-download-clean" title="Download report without sensitive req/res logs (safe to share)">📄 Without Logs</button>
         </div>
       </div>
     </div>
@@ -2266,17 +2267,18 @@ async function stopTest() {
     } catch (e) { showNotif('Stop failed: ' + e.message, 'error'); }
 }
 
-function reportUrl(runId, download) {
+function reportUrl(runId, download, withLogs = true) {
     const tk = encodeURIComponent(getToken());
-    return `/api/load-test/report/${runId}${download ? '/download' : ''}?token=${tk}`;
+    if (download) return `/api/load-test/report/${runId}/download?logs=${withLogs ? '1' : '0'}&token=${tk}`;
+    return `/api/load-test/report/${runId}?token=${tk}`;
 }
 
 function viewReport() {
     if (_currentRunId) window.open(reportUrl(_currentRunId, false), '_blank');
 }
 
-function downloadReport() {
-    if (_currentRunId) window.open(reportUrl(_currentRunId, true));
+function downloadReport(withLogs = true) {
+    if (_currentRunId) window.open(reportUrl(_currentRunId, true, withLogs));
 }
 
 // ══════════════════════════ RESULTS ══════════════════════════
@@ -2407,8 +2409,9 @@ async function loadHistory() {
               <td style="color:var(--muted);font-size:11px">${dt}</td>
               <td>
                 <div style="display:flex;gap:4px">
-                  ${r.hasReport ? `<button class="btn btn-secondary btn-xs" onclick="openReport('${r.runId}')">📄</button>` : ''}
-                  ${r.hasReport ? `<button class="btn btn-secondary btn-xs" onclick="downloadRunReport('${r.runId}')">⬇</button>` : ''}
+                  ${r.hasReport ? `<button class="btn btn-secondary btn-xs" onclick="openReport('${r.runId}')" title="View report">📄</button>` : ''}
+                  ${r.hasReport ? `<button class="btn btn-secondary btn-xs" onclick="downloadRunReport('${r.runId}',true)" title="Download with logs">⬇📋</button>` : ''}
+                  ${r.hasReport ? `<button class="btn btn-secondary btn-xs" onclick="downloadRunReport('${r.runId}',false)" title="Download without logs (safe to share)">⬇📄</button>` : ''}
                   <button class="btn btn-secondary btn-xs" onclick="loadAndView('${r.runId}')">📊</button>
                   <button class="btn btn-danger btn-xs" onclick="deleteRun('${r.runId}')">🗑</button>
                 </div>
@@ -2421,7 +2424,7 @@ async function loadHistory() {
 }
 
 function openReport(runId) { window.open(reportUrl(runId, false), '_blank'); }
-function downloadRunReport(runId) { window.open(reportUrl(runId, true)); }
+function downloadRunReport(runId, withLogs = true) { window.open(reportUrl(runId, true, withLogs)); }
 
 async function loadAndView(runId) {
     await loadResults(runId);
