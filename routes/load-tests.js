@@ -1465,7 +1465,7 @@ function _generateHtml(state, tmpl = {}) {
     const m    = state.metrics || {};
     const t    = tmpl;
 
-    const companyName  = t.companyName  || 'AdHash Technology';
+    const companyName  = t.companyName  || 'Ad-Hash Technolabs Pvt Ltd';
     const reportTitle  = t.reportTitle  || 'Load Test Execution Report';
     const headerColor  = t.headerColor  || '#1e293b';
     const footerText   = t.footerText   || 'AdHash Project Control Center · Authorized Personnel Only';

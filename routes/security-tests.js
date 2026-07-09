@@ -574,7 +574,7 @@ router.get('/report-template', auth, (req, res) => res.json(_loadTemplate()));
 // ══════════════════════════════════════════════════════════════════════════
 function _generateHtml(state, tmpl = {}) {
     const cfg = state.config || {};
-    const companyName = tmpl.companyName || 'AdHash Technology';
+    const companyName = tmpl.companyName || 'Ad-Hash Technolabs Pvt Ltd';
     const reportTitle = tmpl.reportTitle || 'Security Test Report';
     const headerColor = tmpl.headerColor || '#0f172a';
     const preparedBy  = tmpl.preparedBy  || cfg.executedBy || 'QA Team';
