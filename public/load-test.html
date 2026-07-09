@@ -1834,6 +1834,7 @@ async function runStep(i) {
                </button>`
             : ''}
         </div>
+        ${result.resolvedBody ? `<details style="margin:0;border-top:1px solid var(--border)"><summary style="padding:5px 12px;font-size:10px;color:var(--muted);cursor:pointer;user-select:none">Sent Request Body (resolved)</summary><pre style="margin:0;padding:8px 12px;font-size:11px;color:var(--accent2);white-space:pre-wrap;word-break:break-all;background:var(--bg2);border:none">${_esc((() => { try { return JSON.stringify(JSON.parse(result.resolvedBody), null, 2); } catch { return result.resolvedBody; } })())}</pre></details>` : ''}
         <pre class="step-result-body">${_esc(displayBody)}</pre>
         ${capturedHtml}
       </div>`;

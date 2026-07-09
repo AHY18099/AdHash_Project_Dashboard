@@ -744,10 +744,12 @@ router.post('/step-run', auth, async (req, res) => {
 
         // Build body
         let bodyStr = null;
+        let resolvedBodyPlain = null; // pre-encryption resolved body for debug display
         if (['POST','PUT','PATCH'].includes(method) && step.body) {
             let bv = step.body;
             if (typeof bv === 'object') bv = JSON.stringify(bv);
             bv = resolveStr(bv);
+            resolvedBodyPlain = bv;
 
             const enc = step.requestEncryption;
             if (enc?.enabled && enc.key && enc.iv) {
@@ -846,7 +848,7 @@ router.post('/step-run', auth, async (req, res) => {
             decryptedBody,
             capturedValues,
             resolvedUrl: rawUrl,
-            resolvedBody: bodyStr,
+            resolvedBody: resolvedBodyPlain,
         });
     } catch(e) {
         res.status(500).json({ ok: false, error: e.message });
