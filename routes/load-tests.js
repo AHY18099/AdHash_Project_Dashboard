@@ -1081,8 +1081,8 @@ async function _executeK6Run(runId, cfg, state, addLog, addTimeline) {
 
         state.status       = 'running';
         state._metricsFile = metricsFile;
-        addLog('k6 script generated', 'Running');
-        addTimeline('k6 run started', 'Running');
+        addLog('Test script generated', 'Running');
+        addTimeline('Load test run started', 'Running');
 
         const k6Args = [
             'run',
@@ -1163,7 +1163,7 @@ async function _executeK6Run(runId, cfg, state, addLog, addTimeline) {
         proc.stderr.on('data', chunk => {
             const lines = chunk.toString().split('\n');
             for (const line of lines) {
-                if (line.trim()) addLog('[k6] ' + line.trim().substring(0, 200), 'Running');
+                if (line.trim()) addLog(line.trim().substring(0, 200), 'Running');
             }
         });
 
@@ -1207,7 +1207,7 @@ async function _executeK6Run(runId, cfg, state, addLog, addTimeline) {
         state.status  = 'completed';
         state.endTime = new Date().toISOString();
         state.verdict = verdict(state.metrics, cfg);
-        addLog(`k6 test completed — ${state.metrics.totalReqs} reqs · P95 ${state.metrics.p95}ms`, 'Completed');
+        addLog(`Load test completed — ${state.metrics.totalReqs} reqs · P95 ${state.metrics.p95}ms`, 'Completed');
         addTimeline('Test completed', 'Completed');
         _saveResults(runId_, state);
 
@@ -1216,7 +1216,7 @@ async function _executeK6Run(runId, cfg, state, addLog, addTimeline) {
         state.verdict = 'FAIL';
         state.endTime = new Date().toISOString();
         if (err.code === 'ENOENT') {
-            state.logs.push({ time: new Date().toISOString(), event: 'k6 not found. Please install k6 from https://k6.io or set K6_PATH env var.', phase: 'Failed' });
+            state.logs.push({ time: new Date().toISOString(), event: 'Load test engine not found. Please check K6_PATH env var.', phase: 'Failed' });
         } else {
             state.logs.push({ time: new Date().toISOString(), event: 'k6 run failed: ' + err.message, phase: 'Failed' });
         }
@@ -1853,15 +1853,39 @@ ${show('showExecutiveSummary') ? `
 </div>` : ''}
 
 <!-- FINAL STATUS -->
-<div class="section">
-  <h2>🏆 Final Status</h2>
-  <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
-    <div style="font-size:48px;font-weight:900;color:${vdColor}">${vd}</div>
-    <div class="kpi-grid" style="flex:1">
-      <div class="kpi"><div class="kpi-val green">${successRate}%</div><div class="kpi-lbl">Success Rate</div></div>
-      <div class="kpi"><div class="kpi-val ${parseFloat(errRateDisp) > 5 ? 'red' : 'amber'}">${errRateDisp}%</div><div class="kpi-lbl">Error Rate</div></div>
-      <div class="kpi"><div class="kpi-val blue">${m.p95 || 0}ms</div><div class="kpi-lbl">P95 Latency</div></div>
-      <div class="kpi"><div class="kpi-val purple">${m.rps || 0}</div><div class="kpi-lbl">Avg RPS</div></div>
+<div style="background:#fff;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 24px rgba(30,41,59,.10);border:2px solid ${vdColor};overflow:hidden">
+  <div style="background:linear-gradient(90deg,#0f172a,#1e293b,#334155);padding:14px 28px;display:flex;align-items:center;gap:12px">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>
+    <div style="font-size:14px;font-weight:800;color:#fff">Final Status</div>
+    <div style="font-size:11px;color:#94a3b8;margin-left:4px">Overall test outcome at a glance</div>
+  </div>
+  <div style="padding:20px 28px;display:flex;align-items:center;gap:28px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:${vdBg};border:2px solid ${vdColor};border-radius:14px;padding:20px 32px;min-width:130px;flex-shrink:0">
+      <div style="font-size:11px;font-weight:700;color:${vdTxt};text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Verdict</div>
+      <div style="font-size:36px;font-weight:900;color:${vdColor};letter-spacing:1px">${vd}</div>
+      <div style="font-size:20px;margin-top:4px">${vd==='PASS'?'✅':vd==='RISK'?'⚠️':'🚫'}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;flex:1">
+      <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:26px;font-weight:900;color:#15803d;line-height:1">${successRate}%</div>
+        <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.6px;margin-top:5px">Success Rate</div>
+        <div style="font-size:10px;color:#64748b;margin-top:2px">target ≥ 99%</div>
+      </div>
+      <div style="background:linear-gradient(135deg,${errPct<1?'#f0fdf4,#dcfce7':'#fff1f2,#fee2e2'});border:1px solid ${errPct<1?'#bbf7d0':'#fecdd3'};border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:26px;font-weight:900;color:${errPct<1?'#15803d':errPct<5?'#b45309':'#dc2626'};line-height:1">${errRateDisp}%</div>
+        <div style="font-size:10px;font-weight:700;color:${errPct<1?'#16a34a':errPct<5?'#d97706':'#ef4444'};text-transform:uppercase;letter-spacing:.6px;margin-top:5px">Error Rate</div>
+        <div style="font-size:10px;color:#64748b;margin-top:2px">target &lt; 1%</div>
+      </div>
+      <div style="background:linear-gradient(135deg,${p95ms<=p95Thr?'#eff6ff,#dbeafe':'#fff1f2,#fee2e2'});border:1px solid ${p95ms<=p95Thr?'#bfdbfe':'#fecdd3'};border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:26px;font-weight:900;color:${p95ms<=p95Thr?'#1d4ed8':'#dc2626'};line-height:1">${m.p95||0}ms</div>
+        <div style="font-size:10px;font-weight:700;color:${p95ms<=p95Thr?'#2563eb':'#ef4444'};text-transform:uppercase;letter-spacing:.6px;margin-top:5px">P95 Latency</div>
+        <div style="font-size:10px;color:#64748b;margin-top:2px">limit: ${p95Thr}ms</div>
+      </div>
+      <div style="background:linear-gradient(135deg,#fdf4ff,#fae8ff);border:1px solid #e9d5ff;border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:26px;font-weight:900;color:#7e22ce;line-height:1">${m.rps||0}</div>
+        <div style="font-size:10px;font-weight:700;color:#9333ea;text-transform:uppercase;letter-spacing:.6px;margin-top:5px">Avg RPS</div>
+        <div style="font-size:10px;color:#64748b;margin-top:2px">req / sec</div>
+      </div>
     </div>
   </div>
 </div>
@@ -2019,55 +2043,147 @@ ${show('showTestConfig') ? `
 
 ${show('showMetricCards') ? `
 <!-- KEY METRICS -->
-<div class="section">
-  <h2>📊 Key Metrics</h2>
-  <div class="kpi-grid">
-    <div class="kpi"><div class="kpi-val blue">${m.totalReqs || 0}</div><div class="kpi-lbl">Total Requests</div></div>
-    <div class="kpi"><div class="kpi-val green">${m.okReqs || 0}</div><div class="kpi-lbl">Success</div></div>
-    <div class="kpi"><div class="kpi-val red">${m.errReqs || 0}</div><div class="kpi-lbl">Failures</div></div>
-    <div class="kpi"><div class="kpi-val green">${successRate}%</div><div class="kpi-lbl">Success Rate</div></div>
-    <div class="kpi"><div class="kpi-val amber">${m.avgLatency || 0}ms</div><div class="kpi-lbl">Avg Latency</div></div>
-    <div class="kpi"><div class="kpi-val amber">${m.p50 || 0}ms</div><div class="kpi-lbl">P50 Latency</div></div>
-    <div class="kpi"><div class="kpi-val amber">${m.p90 || 0}ms</div><div class="kpi-lbl">P90 Latency</div></div>
-    <div class="kpi"><div class="kpi-val blue">${m.p95 || 0}ms</div><div class="kpi-lbl">P95 Latency</div></div>
-    <div class="kpi"><div class="kpi-val purple">${m.p99 || 0}ms</div><div class="kpi-lbl">P99 Latency</div></div>
-    <div class="kpi"><div class="kpi-val green">${m.minLatency || 0}ms</div><div class="kpi-lbl">Min Latency</div></div>
-    <div class="kpi"><div class="kpi-val red">${m.maxLatency || 0}ms</div><div class="kpi-lbl">Max Latency</div></div>
-    <div class="kpi"><div class="kpi-val purple">${m.rps || 0}</div><div class="kpi-lbl">RPS</div></div>
-    <div class="kpi"><div class="kpi-val blue">${dur}</div><div class="kpi-lbl">Duration</div></div>
-    <div class="kpi"><div class="kpi-val amber">${fmtBytes(m.dataSent || 0)}</div><div class="kpi-lbl">Data Sent</div></div>
-    <div class="kpi"><div class="kpi-val amber">${fmtBytes(m.dataRecv || 0)}</div><div class="kpi-lbl">Data Received</div></div>
+<div style="background:#fff;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 24px rgba(30,41,59,.10);border:1px solid #e2e8f0;overflow:hidden">
+  <div style="background:linear-gradient(90deg,#0f172a,#1e293b,#334155);padding:14px 28px;display:flex;align-items:center;gap:12px">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    <div style="font-size:14px;font-weight:800;color:#fff">Key Metrics</div>
+    <div style="font-size:11px;color:#94a3b8;margin-left:4px">Full performance measurement across the entire test run</div>
+  </div>
+  <div style="padding:20px 28px">
+    <!-- Row 1: Requests & Reliability -->
+    <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Requests &amp; Reliability</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px">
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:#0369a1">${m.totalReqs||0}</div>
+        <div style="font-size:10px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:.4px;margin-top:4px">Total Requests</div>
+      </div>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:#15803d">${m.okReqs||0}</div>
+        <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.4px;margin-top:4px">Successful</div>
+      </div>
+      <div style="background:${(m.errReqs||0)>0?'#fff1f2':'#f0fdf4'};border:1px solid ${(m.errReqs||0)>0?'#fecdd3':'#bbf7d0'};border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:${(m.errReqs||0)>0?'#dc2626':'#15803d'}">${m.errReqs||0}</div>
+        <div style="font-size:10px;font-weight:700;color:${(m.errReqs||0)>0?'#ef4444':'#16a34a'};text-transform:uppercase;letter-spacing:.4px;margin-top:4px">Failures</div>
+      </div>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:#15803d">${successRate}%</div>
+        <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.4px;margin-top:4px">Success Rate</div>
+      </div>
+      <div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:#7e22ce">${m.rps||0}</div>
+        <div style="font-size:10px;font-weight:700;color:#9333ea;text-transform:uppercase;letter-spacing:.4px;margin-top:4px">Avg RPS</div>
+      </div>
+    </div>
+    <!-- Row 2: Latency Distribution -->
+    <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Latency Distribution</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:10px;margin-bottom:20px">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:#15803d">${m.minLatency||0}ms</div>
+        <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-top:4px">Min</div>
+      </div>
+      <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:#b45309">${m.avgLatency||0}ms</div>
+        <div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.4px;margin-top:4px">Average</div>
+      </div>
+      <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:#b45309">${m.p50||0}ms</div>
+        <div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.4px;margin-top:4px">P50</div>
+      </div>
+      <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:#b45309">${m.p90||0}ms</div>
+        <div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.4px;margin-top:4px">P90</div>
+      </div>
+      <div style="background:${p95ms<=p95Thr?'#eff6ff':'#fff1f2'};border:1px solid ${p95ms<=p95Thr?'#bfdbfe':'#fecdd3'};border-radius:10px;padding:14px;text-align:center;position:relative">
+        <div style="font-size:22px;font-weight:900;color:${p95ms<=p95Thr?'#1d4ed8':'#dc2626'}">${m.p95||0}ms</div>
+        <div style="font-size:10px;font-weight:700;color:${p95ms<=p95Thr?'#2563eb':'#ef4444'};text-transform:uppercase;letter-spacing:.4px;margin-top:4px">P95 ★</div>
+        <div style="font-size:9px;color:#94a3b8;margin-top:2px">SLA limit</div>
+      </div>
+      <div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:#7e22ce">${m.p99||0}ms</div>
+        <div style="font-size:10px;font-weight:700;color:#9333ea;text-transform:uppercase;letter-spacing:.4px;margin-top:4px">P99</div>
+      </div>
+      <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:#dc2626">${m.maxLatency||0}ms</div>
+        <div style="font-size:10px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:.4px;margin-top:4px">Max</div>
+      </div>
+    </div>
+    <!-- Row 3: Network & Duration -->
+    <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Network &amp; Duration</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:#0369a1">${dur}</div>
+        <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-top:4px">Duration</div>
+      </div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:#b45309">${fmtBytes(m.dataSent||0)}</div>
+        <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-top:4px">Data Sent</div>
+      </div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:#b45309">${fmtBytes(m.dataRecv||0)}</div>
+        <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-top:4px">Data Received</div>
+      </div>
+    </div>
   </div>
 </div>` : ''}
 
 ${show('showCharts') ? `
 <!-- CHARTS -->
-<div class="section">
-  <h2>📈 Performance Charts</h2>
-  <div class="chart-grid">
-    <div class="chart-box"><h4>RPS over Time</h4><canvas id="ch-rps" height="140"></canvas></div>
-    <div class="chart-box"><h4>Avg Latency (ms) over Time</h4><canvas id="ch-lat" height="140"></canvas></div>
-    <div class="chart-box"><h4>Error Rate (%) over Time</h4><canvas id="ch-err" height="140"></canvas></div>
-    <div class="chart-box"><h4>Active Users over Time</h4><canvas id="ch-vus" height="140"></canvas></div>
-    <div class="chart-box"><h4>Status Code Distribution</h4><canvas id="ch-sc" height="140"></canvas></div>
-    <div class="chart-box"><h4>Success vs Failure</h4><canvas id="ch-sf" height="140"></canvas></div>
+<div style="background:#fff;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 24px rgba(30,41,59,.10);border:1px solid #e2e8f0;overflow:hidden">
+  <div style="background:linear-gradient(90deg,#0f172a,#1e293b,#334155);padding:14px 28px;display:flex;align-items:center;gap:12px">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    <div style="font-size:14px;font-weight:800;color:#fff">Performance Charts</div>
+    <div style="font-size:11px;color:#94a3b8;margin-left:4px">Time-series and distribution data across the test window</div>
+  </div>
+  <div style="padding:20px 28px">
+    <div class="chart-grid">
+      <div class="chart-box"><h4>RPS over Time</h4><canvas id="ch-rps" height="140"></canvas></div>
+      <div class="chart-box"><h4>Avg Latency (ms) over Time</h4><canvas id="ch-lat" height="140"></canvas></div>
+      <div class="chart-box"><h4>Error Rate (%) over Time</h4><canvas id="ch-err" height="140"></canvas></div>
+      <div class="chart-box"><h4>Active Users over Time</h4><canvas id="ch-vus" height="140"></canvas></div>
+      <div class="chart-box"><h4>Status Code Distribution</h4><canvas id="ch-sc" height="140"></canvas></div>
+      <div class="chart-box"><h4>Success vs Failure</h4><canvas id="ch-sf" height="140"></canvas></div>
+    </div>
   </div>
 </div>` : ''}
 
 ${scRows && show('showErrorSummary') ? `
 <!-- STATUS CODE DISTRIBUTION -->
-<div class="section">
-  <h2>🔢 Status Code Distribution</h2>
-  <table><thead><tr><th>Status Code</th><th>Count</th><th>Percentage</th></tr></thead>
-  <tbody>${scRows}</tbody></table>
+<div style="background:#fff;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 24px rgba(30,41,59,.10);border:1px solid #e2e8f0;overflow:hidden">
+  <div style="background:linear-gradient(90deg,#0f172a,#1e293b,#334155);padding:14px 28px;display:flex;align-items:center;gap:12px">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+    <div style="font-size:14px;font-weight:800;color:#fff">Status Code Distribution</div>
+    <div style="font-size:11px;color:#94a3b8;margin-left:4px">HTTP response codes returned across all requests</div>
+  </div>
+  <div style="padding:20px 28px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="padding:10px 14px;background:#f8fafc;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;text-align:left;border-bottom:2px solid #e2e8f0">Status Code</th>
+        <th style="padding:10px 14px;background:#f8fafc;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;text-align:left;border-bottom:2px solid #e2e8f0">Count</th>
+        <th style="padding:10px 14px;background:#f8fafc;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;text-align:left;border-bottom:2px solid #e2e8f0">Percentage</th>
+      </tr></thead>
+      <tbody>${scRows}</tbody>
+    </table>
+  </div>
 </div>` : ''}
 
 ${show('showTimeline') ? `
 <!-- TIMELINE -->
-<div class="section">
-  <h2>⏱ Test Timeline</h2>
-  <table><thead><tr><th>Time</th><th>Phase</th><th>Event</th></tr></thead>
-  <tbody>${tlRows}</tbody></table>
+<div style="background:#fff;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 24px rgba(30,41,59,.10);border:1px solid #e2e8f0;overflow:hidden">
+  <div style="background:linear-gradient(90deg,#0f172a,#1e293b,#334155);padding:14px 28px;display:flex;align-items:center;gap:12px">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    <div style="font-size:14px;font-weight:800;color:#fff">Test Timeline</div>
+    <div style="font-size:11px;color:#94a3b8;margin-left:4px">Key lifecycle events during test execution</div>
+  </div>
+  <div style="padding:20px 28px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="padding:10px 14px;background:#f8fafc;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;text-align:left;border-bottom:2px solid #e2e8f0">Time</th>
+        <th style="padding:10px 14px;background:#f8fafc;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;text-align:left;border-bottom:2px solid #e2e8f0">Phase</th>
+        <th style="padding:10px 14px;background:#f8fafc;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;text-align:left;border-bottom:2px solid #e2e8f0">Event</th>
+      </tr></thead>
+      <tbody>${tlRows}</tbody>
+    </table>
+  </div>
 </div>` : ''}
 
 ${vuRequestLogHtml ? `
@@ -2101,10 +2217,22 @@ ${vuRequestLogHtml ? `
 
 ${show('showTimeline') && logRows ? `
 <!-- ACTIVITY LOG -->
-<div class="section">
-  <h2>📋 Activity Log (last 20 entries)</h2>
-  <table><thead><tr><th>Time</th><th>Phase</th><th>Message</th></tr></thead>
-  <tbody>${logRows}</tbody></table>
+<div style="background:#fff;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 24px rgba(30,41,59,.10);border:1px solid #e2e8f0;overflow:hidden">
+  <div style="background:linear-gradient(90deg,#0f172a,#1e293b,#334155);padding:14px 28px;display:flex;align-items:center;gap:12px">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    <div style="font-size:14px;font-weight:800;color:#fff">Activity Log</div>
+    <div style="font-size:11px;color:#94a3b8;margin-left:4px">Last 20 entries from the test engine during execution</div>
+  </div>
+  <div style="padding:20px 28px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="padding:10px 14px;background:#f8fafc;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;text-align:left;border-bottom:2px solid #e2e8f0">Time</th>
+        <th style="padding:10px 14px;background:#f8fafc;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;text-align:left;border-bottom:2px solid #e2e8f0">Phase</th>
+        <th style="padding:10px 14px;background:#f8fafc;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;text-align:left;border-bottom:2px solid #e2e8f0">Message</th>
+      </tr></thead>
+      <tbody>${logRows}</tbody>
+    </table>
+  </div>
 </div>` : ''}
 
 ${show('showRecommendations') ? `
@@ -2206,25 +2334,54 @@ ${show('showRecommendations') ? `
 </div>` : ''}
 
 <!-- REPORT DETAILS (always shown) -->
-<div class="section">
-  <h2>📝 Report Details</h2>
-  <div class="custom-grid">
-    <div class="cfg-row"><div class="cfg-lbl">Prepared By</div><div class="cfg-val">${preparedBy}</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">Reviewed By</div><div class="cfg-val">${reviewedBy}</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">Approved By</div><div class="cfg-val">${approvedBy}</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">Client Name</div><div class="cfg-val">${clientName}</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">Release Version</div><div class="cfg-val">${releaseVer}</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">Sprint</div><div class="cfg-val">${sprintName}</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">Build Number</div><div class="cfg-val">${buildNumber}</div></div>
-    ${remarks ? `<div class="cfg-row" style="grid-column:1/-1"><div class="cfg-lbl">Remarks</div><div class="cfg-val">${remarks}</div></div>` : ''}
+<div style="background:#fff;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 24px rgba(30,41,59,.10);border:1px solid #e2e8f0;overflow:hidden">
+  <div style="background:linear-gradient(90deg,#0f172a,#1e293b,#334155);padding:14px 28px;display:flex;align-items:center;gap:12px">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <div style="font-size:14px;font-weight:800;color:#fff">Report Details</div>
+    <div style="font-size:11px;color:#94a3b8;margin-left:4px">Sign-off chain and release metadata</div>
+  </div>
+  <div style="padding:20px 28px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Prepared By</div>
+        <div style="font-size:14px;font-weight:700;color:#0f172a">${preparedBy}</div>
+      </div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Reviewed By</div>
+        <div style="font-size:14px;font-weight:700;color:#0f172a">${reviewedBy}</div>
+      </div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Approved By</div>
+        <div style="font-size:14px;font-weight:700;color:#0f172a">${approvedBy}</div>
+      </div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Client Name</div>
+        <div style="font-size:14px;font-weight:700;color:#0f172a">${clientName}</div>
+      </div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Release Version</div>
+        <div style="font-size:14px;font-weight:700;color:#0f172a">${releaseVer}</div>
+      </div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Sprint</div>
+        <div style="font-size:14px;font-weight:700;color:#0f172a">${sprintName}</div>
+      </div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Build Number</div>
+        <div style="font-size:14px;font-weight:700;color:#0f172a">${buildNumber}</div>
+      </div>
+      ${remarks ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;grid-column:1/-1"><div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Remarks</div><div style="font-size:13px;font-weight:600;color:#334155">${remarks}</div></div>` : ''}
+    </div>
   </div>
 </div>
 
-<footer>
-  <div>${footerText}</div>
-  <div style="margin-top:4px">${confidText}</div>
-  <div style="margin-top:4px">Report ID: ${state.runId} · Generated: ${genTime}</div>
-</footer>
+<div style="background:linear-gradient(90deg,#0f172a,#1e293b,#334155);border-radius:14px;margin-top:8px;padding:24px 28px;text-align:center">
+  <div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-.5px;margin-bottom:6px"><span style="color:#60a5fa">Ad</span>Hash Technology</div>
+  <div style="font-size:12px;color:#94a3b8;margin-bottom:10px">${footerText}</div>
+  <div style="display:inline-block;background:rgba(239,68,68,.15);color:#fca5a5;font-size:11px;font-weight:700;padding:4px 16px;border-radius:20px;border:1px solid rgba(239,68,68,.3);margin-bottom:12px">${confidText}</div>
+  <div style="height:1px;background:rgba(255,255,255,.1);margin:12px 0"></div>
+  <div style="font-size:11px;color:#64748b">Report ID: <span style="color:#94a3b8;font-family:monospace">${state.runId}</span> &nbsp;·&nbsp; Generated: ${genTime}</div>
+</div>
 
 </div><!-- .page -->
 
