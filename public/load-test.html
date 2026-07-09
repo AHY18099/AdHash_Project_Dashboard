@@ -213,7 +213,7 @@ input:checked+.slider::before{transform:translateX(16px)}
 
 <!-- TOP NAV -->
 <div class="topnav">
-  <div class="topnav-brand"><span>⚡</span> Load Test Center &nbsp;<span style="font-size:11px;font-weight:600;background:rgba(245,158,11,.2);color:#fbbf24;padding:2px 8px;border-radius:6px;vertical-align:middle">k6</span></div>
+  <div class="topnav-brand"><span>⚡</span> Load Test Center</div>
   <div class="topnav-right">
     <span id="ltc-role-badge" class="pill pill-red" style="display:none"></span>
     <span id="ltc-run-badge" class="pill" style="display:none"></span>
@@ -235,11 +235,11 @@ input:checked+.slider::before{transform:translateX(16px)}
 <div id="tab-configure" class="tab-pane active">
 
   <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#fbbf24;display:flex;align-items:center;gap:8px">
-    <span>⚡</span> <span>All load tests are executed server-side using <strong>k6</strong>. No browser-based load generation.</span>
+    <span>⚡</span> <span>All load tests are executed server-side. No browser-based load generation.</span>
   </div>
 
   <div class="card">
-    <div class="card-title">🎯 K6 Single API Test &nbsp;<span style="font-size:11px;font-weight:600;background:rgba(245,158,11,.2);color:#fbbf24;padding:2px 8px;border-radius:6px">Engine: ⚡ k6</span></div>
+    <div class="card-title">🎯 Single API Load Test</div>
     <div class="row">
       <div class="col">
         <label>Project</label>
@@ -452,7 +452,7 @@ input:checked+.slider::before{transform:translateX(16px)}
   <!-- Active Scenario from Builder (workflow mode) -->
   <div id="active-scenario-card" class="card" style="display:none;margin-bottom:0;border-color:var(--accent2)">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <div style="font-size:13px;font-weight:700;color:var(--accent2)">🔀 Active k6 Workflow Scenario</div>
+      <div style="font-size:13px;font-weight:700;color:var(--accent2)">🔀 Active Workflow Scenario</div>
       <div style="flex:1">
         <div style="font-size:13px;font-weight:700" id="active-scenario-name">—</div>
         <div style="font-size:11px;color:var(--muted)" id="active-scenario-summary">—</div>
@@ -462,9 +462,9 @@ input:checked+.slider::before{transform:translateX(16px)}
   </div>
 
   <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">
-    <button class="btn btn-primary" onclick="startTest()" id="btn-start">⚡ Start k6 Load Test</button>
+    <button class="btn btn-primary" onclick="startTest()" id="btn-start">⚡ Start Load Test</button>
     <button class="btn btn-secondary" onclick="generateDemo()">🧪 Generate Demo Report</button>
-    <button class="btn btn-secondary" onclick="switchTab('scenario')">🔀 K6 Workflow Builder</button>
+    <button class="btn btn-secondary" onclick="switchTab('scenario')">🔀 Workflow Builder</button>
   </div>
 
 </div>
@@ -482,11 +482,11 @@ input:checked+.slider::before{transform:translateX(16px)}
     <button class="btn btn-secondary btn-sm" onclick="loadScenariosPanel()" title="Load Scenario">📂 Load</button>
     <button class="btn btn-secondary btn-sm" onclick="newScenario()" title="New Scenario">➕ New</button>
     <div style="width:1px;height:22px;background:var(--border);margin:0 2px"></div>
-    <button class="btn btn-secondary btn-sm" onclick="exportK6Script()" title="Export k6 Script">📜 k6 Script</button>
+    <button class="btn btn-secondary btn-sm" onclick="exportK6Script()" title="Export Script">📜 Export Script</button>
     <button class="btn btn-secondary btn-sm" onclick="exportScenario()" title="Export JSON">📤 JSON</button>
     <button class="btn btn-secondary btn-sm" onclick="importScenario()" title="Import JSON">📥 Import</button>
     <div style="width:1px;height:22px;background:var(--border);margin:0 2px"></div>
-    <button class="btn btn-amber btn-sm" onclick="dryRun()" title="Dry Run with k6 — 1 VU, 30s">🧪 k6 Dry Run</button>
+    <button class="btn btn-amber btn-sm" onclick="dryRun()" title="Dry Run — 1 VU, 30s">🧪 Dry Run</button>
     <div style="width:1px;height:22px;background:var(--border);margin:0 2px"></div>
     <button class="btn btn-primary btn-sm" onclick="runScenarioFromBuilder()" title="Save and run with full VU count">▶ Run Full Test</button>
   </div>
@@ -672,11 +672,11 @@ input:checked+.slider::before{transform:translateX(16px)}
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;align-items:center">
     <button class="btn btn-secondary" onclick="addStep()">+ Add Step</button>
     <button class="btn btn-secondary" onclick="previewScenario()">👁 Preview Scenario</button>
-    <button class="btn btn-amber" onclick="dryRun()">🧪 k6 Dry Run (1 VU)</button>
+    <button class="btn btn-amber" onclick="dryRun()">🧪 Dry Run (1 VU)</button>
     <button class="btn btn-primary" onclick="applyScenario()">✅ Apply to Configure Tab</button>
     <button class="btn btn-secondary" onclick="clearScenario()" style="margin-left:auto">🗑 Clear All</button>
   </div>
-  <div class="form-hint" style="margin-top:8px">Each step runs sequentially per VU via k6. Captured variables from one step (e.g. authToken) are available in all subsequent steps.</div>
+  <div class="form-hint" style="margin-top:8px">Each step runs sequentially per VU. Captured variables from one step (e.g. authToken) are available in all subsequent steps.</div>
 
   <!-- PREVIEW MODAL -->
   <div id="scenario-preview-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:600;display:none;align-items:center;justify-content:center;padding:16px">
@@ -1315,7 +1315,7 @@ function startTest() {
     const isWorkflow     = !!(cfg.steps && cfg.steps.length > 1);
     const summary        = document.getElementById('confirm-summary');
     summary.innerHTML = `
-      <strong>Project:</strong> ${_esc(cfg.projectName)} · <strong>Env:</strong> ${_esc(cfg.environment)} · <strong>Engine:</strong> ⚡ k6<br>
+      <strong>Project:</strong> ${_esc(cfg.projectName)} · <strong>Env:</strong> ${_esc(cfg.environment)} · <strong>Engine:</strong> Server-side<br>
       ${isWorkflow
         ? `<strong>Scenario:</strong> ${_esc(cfg.scenarioName || 'Unnamed')} · <strong>Steps:</strong> ${cfg.steps.length}<br>`
         : `<strong>URL:</strong> ${_esc(cfg.url || cfg.steps?.[0]?.url || '—')}<br>`}
@@ -1601,7 +1601,7 @@ function renderSteps() {
               <input value="${_esc(s.requestEncryption.outputField||'encryptedData')}" oninput="_scenarioSteps[${i}].requestEncryption.outputField=this.value" style="height:32px;font-size:12px" />
             </div>
           </div>
-          <div class="form-hint" style="margin-top:6px">Body will be AES-encrypted on server before embedding in k6 script.</div>
+          <div class="form-hint" style="margin-top:6px">Body will be AES-encrypted on server before embedding in the test script.</div>
           ` : ''}
         </div>
 
@@ -1634,7 +1634,7 @@ function renderSteps() {
               <input value="${_esc(s.responseDecryption.inputField||'encryptedData')}" oninput="_scenarioSteps[${i}].responseDecryption.inputField=this.value" style="height:32px;font-size:12px" />
             </div>
           </div>
-          <div class="form-hint" style="margin-top:6px;color:var(--green)">✓ Response will be AES-128-CBC decrypted at runtime in k6 and the captured variable will contain the decrypted value.</div>
+          <div class="form-hint" style="margin-top:6px;color:var(--green)">✓ Response will be AES-128-CBC decrypted at runtime and the captured variable will contain the decrypted value.</div>
           ` : ''}
         </div>
 
@@ -1988,7 +1988,7 @@ async function runScenarioFromBuilder() {
     _pendingConfig = scenario;
     const isProd = scenario.environment === 'Production';
     document.getElementById('confirm-summary').innerHTML = `
-      <strong>Project:</strong> ${_esc(scenario.projectName)} · <strong>Env:</strong> ${_esc(scenario.environment)} · <strong>Engine:</strong> ⚡ k6<br>
+      <strong>Project:</strong> ${_esc(scenario.projectName)} · <strong>Env:</strong> ${_esc(scenario.environment)} · <strong>Engine:</strong> Server-side<br>
       <strong>Scenario:</strong> ${_esc(scenario.scenarioName)} · <strong>Steps:</strong> ${scenario.steps.filter(s => s.enabled !== false).length}<br>
       <strong>VUs:</strong> ${scenario.vus} · <strong>Duration:</strong> ${scenario.duration}s · <strong>Ramp-up:</strong> ${scenario.rampup || 0}s
     `;
@@ -2080,7 +2080,7 @@ function applyScenario() {
     const scenario = _buildScenarioObject();
     if (!scenario.steps || !scenario.steps.length) { showNotif('Add at least one step first.', 'error'); return; }
     _showActiveScenario(scenario);
-    showNotif(`Scenario "${scenario.scenarioName}" applied. Switch to Configure tab and click "Start k6 Load Test".`, 'success', 6000);
+    showNotif(`Scenario "${scenario.scenarioName}" applied. Switch to Configure tab and click "Start Load Test".`, 'success', 6000);
     switchTab('configure');
 }
 

@@ -1402,7 +1402,7 @@ function _generateHtml(state, tmpl = {}) {
             <li><strong>P95 latency:</strong> ${p95ms}ms ${highLatency ? `— <strong style="color:#b45309">EXCEEDS threshold by ${p95ms - p95Thr}ms (${latRatio}× the ${p95Thr}ms limit)</strong>` : `— within ${p95Thr}ms threshold`}</li>
             <li><strong>P99 latency:</strong> ${p99ms}ms · <strong>P50:</strong> ${p50ms}ms · <strong>Avg:</strong> ${avgLat}ms</li>
             <li><strong>Error rate:</strong> ${errPct}% ${highErr ? `— <strong style="color:#b45309">${failedR} requests failed</strong>` : '— within tolerance'}</li>
-            <li><strong>Throughput:</strong> ${rps} RPS — ${rps > 0 ? 'active traffic generated' : 'verify k6 metrics output'}</li>
+            <li><strong>Throughput:</strong> ${rps} RPS — ${rps > 0 ? 'active traffic generated' : 'verify metrics output'}</li>
           </ul>
           ${h('🔍 Root Cause Analysis', '#92400e')}
           <ul style="margin:4px 0 0 18px;line-height:2">
@@ -1413,7 +1413,7 @@ function _generateHtml(state, tmpl = {}) {
           </ul>
           ${h('🛠 Actions for Development Team', '#92400e')}
           <ul style="margin:4px 0 0 18px;line-height:2">
-            <li><strong>Instrument during the test window (${testWindow}):</strong> Pull APM traces, DB slow-query logs, and CPU/memory graphs for this exact window. Correlate spikes with the k6 ramp-up phase.</li>
+            <li><strong>Instrument during the test window (${testWindow}):</strong> Pull APM traces, DB slow-query logs, and CPU/memory graphs for this exact window. Correlate spikes with the ramp-up phase.</li>
             <li><strong>Database:</strong> Run <code>EXPLAIN</code> / <code>db.collection.explain("executionStats")</code> on queries executing during peak load. Add compound indexes on high-frequency filter fields.</li>
             <li><strong>Connection pool:</strong> Increase MongoDB <code>maxPoolSize</code> and verify connections are being released correctly (no leak). Check via <code>db.serverStatus().connections</code>.</li>
             <li><strong>Event loop blocking:</strong> Use <code>--prof</code> or <code>clinic.js flame</code> to identify CPU-heavy synchronous code paths.</li>
@@ -1674,7 +1674,7 @@ footer{text-align:center;padding:24px;color:#94a3b8;font-size:11px;border-top:1p
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <span class="badge badge-env">${cfg.environment || 'Unknown'}</span>
       <span class="badge badge-type">${cfg.scenarioType || 'Load Test'}</span>
-      <span class="badge" style="background:rgba(245,158,11,.2);color:#fbbf24">⚡ Engine: k6</span>
+      <span class="badge" style="background:rgba(139,92,246,.15);color:#c4b5fd">Server-side Engine</span>
       <span class="badge" style="background:rgba(139,92,246,.15);color:#c4b5fd">${cfg.mode === 'single' || !cfg.steps?.length || cfg.steps?.length === 1 ? 'Single API Test' : 'Workflow Scenario'}</span>
     </div>
     <div style="margin-top:16px">
@@ -1718,18 +1718,92 @@ ${show('showExecutiveSummary') ? `
     </div>
   </div>
 
-  <!-- What was tested -->
+  <!-- Result breakdown for DevOps / Developer audience -->
   <div style="padding:20px 28px 0">
-    <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">📌 What Was Tested</div>
-    <div style="font-size:14px;color:#1e293b;line-height:1.8;background:#f8fafc;border-radius:10px;padding:16px;border-left:4px solid #3b82f6">
-      The <strong>${cfg.projectName || 'application'}</strong> API was subjected to a
-      <strong>${cfg.scenarioType || 'Baseline Load Test'}</strong> simulating
-      <strong>${cfg.vus} concurrent users</strong> for <strong>${cfg.duration} seconds</strong>
-      ${cfg.rampup ? `with a <strong>${cfg.rampup}-second ramp-up</strong> ` : ''}
-      in the <strong>${cfg.environment || 'QA'}</strong> environment
-      ${cfg.steps && cfg.steps.filter(s=>s.enabled!==false).length > 0
-        ? `, executing a <strong>${cfg.steps.filter(s=>s.enabled!==false).length}-step API workflow</strong> per virtual user (registration → authentication → order flow)`
-        : cfg.url ? ` against <strong>${cfg.url}</strong>` : ''}.
+    <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">📊 Result Breakdown</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+
+      <!-- Latency profile -->
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">⏱ Latency Profile</div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:#64748b">P50 (median)</span>
+            <span style="font-size:13px;font-weight:800;color:#0f172a">${p50ms}ms</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:#64748b">P95</span>
+            <span style="font-size:13px;font-weight:800;color:${p95ms<=p95Thr?'#15803d':'#dc2626'}">${p95ms}ms <span style="font-size:10px;font-weight:600;color:#94a3b8">/ ${p95Thr}ms limit</span></span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:#64748b">P99</span>
+            <span style="font-size:13px;font-weight:800;color:#0f172a">${p99ms}ms</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:#64748b">Average</span>
+            <span style="font-size:13px;font-weight:800;color:#0f172a">${avgLat}ms</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:#64748b">Tail spread (P99−P50)</span>
+            <span style="font-size:13px;font-weight:800;color:${latSpreadHigh?'#b45309':'#0f172a'}">${latSpread}ms ${latSpreadHigh?'⚠':''}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Throughput & reliability -->
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">🚀 Throughput &amp; Reliability</div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:#64748b">Total Requests</span>
+            <span style="font-size:13px;font-weight:800;color:#0f172a">${(totalR).toLocaleString()}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:#64748b">Successful</span>
+            <span style="font-size:13px;font-weight:800;color:#15803d">${(okR).toLocaleString()} (${successRate}%)</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:#64748b">Failed</span>
+            <span style="font-size:13px;font-weight:800;color:${failedR>0?'#dc2626':'#15803d'}">${failedR.toLocaleString()} (${errRateDisp}%)</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:#64748b">Avg RPS</span>
+            <span style="font-size:13px;font-weight:800;color:#0f172a">${rps}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:#64748b">Requests / VU</span>
+            <span style="font-size:13px;font-weight:800;color:#0f172a">${throughputPerVU}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Test parameters -->
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">⚙ Test Parameters</div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:#64748b">Virtual Users</span>
+            <span style="font-size:13px;font-weight:800;color:#0f172a">${vusCount}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:#64748b">Duration</span>
+            <span style="font-size:13px;font-weight:800;color:#0f172a">${durSec}s</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:#64748b">Ramp-up</span>
+            <span style="font-size:13px;font-weight:800;color:#0f172a">${cfg.rampup||0}s</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:#64748b">API Steps / VU</span>
+            <span style="font-size:13px;font-weight:800;color:#0f172a">${cfg.steps?.filter(s=>s.enabled!==false).length||1}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:#64748b">Environment</span>
+            <span style="font-size:13px;font-weight:800;color:#1d4ed8">${cfg.environment||'QA'}</span>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1807,7 +1881,7 @@ ${show('showTestConfig') ? `
     </div>
     <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <span style="background:rgba(255,255,255,.15);color:#fff;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid rgba(255,255,255,.25)">${cfg.scenarioType || 'Load Test'}</span>
-      <span style="background:rgba(245,158,11,.25);color:#fbbf24;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid rgba(245,158,11,.4)">⚡ k6 Engine</span>
+      <span style="background:rgba(139,92,246,.15);color:#c4b5fd;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid rgba(139,92,246,.3)">Server-side Engine</span>
       <span style="background:${vd === 'PASS' ? 'rgba(16,185,129,.25)' : vd === 'RISK' ? 'rgba(245,158,11,.25)' : 'rgba(239,68,68,.25)'};color:${vdColor};padding:4px 14px;border-radius:20px;font-size:11px;font-weight:800;border:1px solid ${vdColor}66">${vd}</span>
     </div>
   </div>
