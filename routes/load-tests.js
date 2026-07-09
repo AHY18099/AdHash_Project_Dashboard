@@ -2008,12 +2008,12 @@ ${vuRequestLogHtml ? `
       Share only with authorised personnel. Use <em>Download Without Logs</em> for external distribution.
     </span>
     <span style="display:flex;gap:8px;flex-shrink:0">
-      <a href="${state.runId ? `/api/load-test/report/${state.runId}/download?logs=1` : '#'}" class="log-dl-btn log-dl-btn-full" download>
+      <button class="log-dl-btn log-dl-btn-full" onclick="(function(){var tk=localStorage.getItem('qa_jwt_token')||localStorage.getItem('qa_token')||'';window.open('/api/load-test/report/${state.runId}/download?logs=1&token='+encodeURIComponent(tk),'_blank');})()">
         📥 Download With Logs
-      </a>
-      <a href="${state.runId ? `/api/load-test/report/${state.runId}/download?logs=0` : '#'}" class="log-dl-btn log-dl-btn-clean" download>
+      </button>
+      <button class="log-dl-btn log-dl-btn-clean" onclick="(function(){var tk=localStorage.getItem('qa_jwt_token')||localStorage.getItem('qa_token')||'';window.open('/api/load-test/report/${state.runId}/download?logs=0&token='+encodeURIComponent(tk),'_blank');})()">
         📄 Download Without Logs
-      </a>
+      </button>
     </span>
   </div>
   <p style="font-size:13px;color:#78350f;margin-bottom:16px">
