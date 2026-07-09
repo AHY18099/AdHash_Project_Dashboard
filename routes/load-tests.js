@@ -382,8 +382,30 @@ function _serializeState(state) {
 
 // ── Template store (simple JSON file) ──
 const TEMPLATE_FILE = path.join(REPORTS_DIR, '_template.json');
+
+const _defaultTemplate = {
+    companyName:         'Ad-Hash Technolabs Pvt Ltd',
+    reportTitle:         'Load Test Execution Report',
+    headerColor:         '#1e293b',
+    preparedBy:          'QA Team',
+    clientName:          'Ad-Hash Technolabs',
+    reviewedBy:          'Senior QA',
+    approvedBy:          'QA Lead',
+    releaseVersion:      'v1.0.0',
+    footerText:          'Ad-Hash Technolabs Pvt Ltd · Authorized Personnel Only',
+    confidentialityText: 'CONFIDENTIAL — For authorized review only',
+};
+
+// ── MongoDB schema for template (1 doc, key='default') ──
+const _ltTemplateSchema = new mongoose.Schema({
+    key:  { type: String, default: 'default' },
+    data: Object,
+}, { collection: 'load_test_template' });
+const LTTemplate = mongoose.models.LTTemplate || mongoose.model('LTTemplate', _ltTemplateSchema);
+
 function _loadTemplate() {
-    try { return JSON.parse(fs.readFileSync(TEMPLATE_FILE, 'utf8')); } catch { return {}; }
+    // Read from disk (fast, in-process deploy)
+    try { return { ..._defaultTemplate, ...JSON.parse(fs.readFileSync(TEMPLATE_FILE, 'utf8')) }; } catch { return { ..._defaultTemplate }; }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -666,9 +688,12 @@ router.post('/demo-report', auth, (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/load-test/save-template
 // ══════════════════════════════════════════════════════════════════════════════
-router.post('/save-template', auth, (req, res) => {
+router.post('/save-template', auth, async (req, res) => {
     try {
-        fs.writeFileSync(TEMPLATE_FILE, JSON.stringify(req.body || {}, null, 2));
+        const data = req.body || {};
+        fs.writeFileSync(TEMPLATE_FILE, JSON.stringify(data, null, 2));
+        // Also persist to MongoDB so template survives redeploys
+        await LTTemplate.findOneAndUpdate({ key: 'default' }, { key: 'default', data }, { upsert: true }).catch(() => {});
         res.json({ ok: true });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -678,8 +703,23 @@ router.post('/save-template', auth, (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // GET /api/load-test/report-template
 // ══════════════════════════════════════════════════════════════════════════════
-router.get('/report-template', auth, (req, res) => {
-    res.json(_loadTemplate());
+router.get('/report-template', auth, async (req, res) => {
+    // Try disk first (fast)
+    try {
+        const diskData = JSON.parse(fs.readFileSync(TEMPLATE_FILE, 'utf8'));
+        return res.json({ ..._defaultTemplate, ...diskData });
+    } catch {}
+    // Disk empty (redeploy wiped it) — restore from MongoDB
+    try {
+        const doc = await LTTemplate.findOne({ key: 'default' }).lean();
+        if (doc?.data) {
+            // Restore to disk for subsequent calls
+            fs.writeFileSync(TEMPLATE_FILE, JSON.stringify(doc.data, null, 2));
+            return res.json({ ..._defaultTemplate, ...doc.data });
+        }
+    } catch {}
+    // No saved template anywhere — return defaults
+    res.json(_defaultTemplate);
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
