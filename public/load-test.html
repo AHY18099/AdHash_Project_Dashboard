@@ -487,6 +487,8 @@ input:checked+.slider::before{transform:translateX(16px)}
     <button class="btn btn-secondary btn-sm" onclick="importScenario()" title="Import JSON">📥 Import</button>
     <div style="width:1px;height:22px;background:var(--border);margin:0 2px"></div>
     <button class="btn btn-amber btn-sm" onclick="dryRun()" title="Dry Run with k6 — 1 VU, 30s">🧪 k6 Dry Run</button>
+    <div style="width:1px;height:22px;background:var(--border);margin:0 2px"></div>
+    <button class="btn btn-primary btn-sm" onclick="runScenarioFromBuilder()" title="Save and run with full VU count">▶ Run Full Test</button>
   </div>
 
   <!-- META ROW -->
@@ -853,6 +855,9 @@ input:checked+.slider::before{transform:translateX(16px)}
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
     <h2 style="font-size:17px;font-weight:800">Report Template Customization</h2>
     <button class="btn btn-green" onclick="saveTemplate()">💾 Save Template</button>
+  </div>
+  <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#93c5fd">
+    ℹ️ <strong>Report Details</strong> (Prepared By, Reviewed By, Approved By, Client Name, Sprint, Build Number) are configured here and applied to every generated report. Fill them in once and click <strong>Save Template</strong>.
   </div>
 
   <div class="row" style="align-items:flex-start">
@@ -1239,7 +1244,7 @@ function buildConfig() {
     const dynamicEnabled = document.getElementById('cfg-dynamic-enable')?.checked || false;
 
     const base = {
-        projectName:    document.getElementById('cfg-project').value || 'Unknown',
+        projectName:    document.getElementById('cfg-project').value || '',
         environment:    document.getElementById('cfg-env').value,
         url:            document.getElementById('cfg-url').value.trim(),
         method:         document.getElementById('cfg-method').value,
@@ -1259,19 +1264,29 @@ function buildConfig() {
 
     // ── If an active workflow scenario is loaded, send it as a full k6 scenario ──
     if (_activeScenario) {
+        // Prefer the scenario's own fields; only fall back to Configure tab if scenario fields are empty
+        const scenProject = _activeScenario.projectName || base.projectName || '';
+        const scenEnv     = _activeScenario.environment || base.environment || 'QA';
+        const scenUrl     = _activeScenario.url || base.url || '';
+        const scenVus     = parseInt(document.getElementById('scen-vus')?.value) || _activeScenario.vus || base.vus || 10;
+        const scenDur     = parseInt(document.getElementById('scen-duration')?.value) || _activeScenario.duration || base.duration || 30;
+        const scenRampup  = parseInt(document.getElementById('scen-rampup')?.value) ?? _activeScenario.rampup ?? base.rampup ?? 0;
+        const scenTimeout = parseInt(document.getElementById('scen-timeout')?.value) || _activeScenario.timeout || base.timeout || 5000;
+        const scenP95     = parseInt(document.getElementById('scen-p95threshold')?.value) || _activeScenario.p95Threshold || base.p95Threshold || 3000;
         return {
             ..._activeScenario,
-            projectName:    base.projectName,
-            environment:    base.environment,
-            vus:            base.vus,
-            duration:       base.duration,
-            rampup:         base.rampup,
-            timeout:        base.timeout,
-            scenarioType:   base.scenarioType,
-            p95Threshold:   base.p95Threshold,
+            projectName:     scenProject,
+            environment:     scenEnv,
+            url:             scenUrl,
+            vus:             scenVus,
+            duration:        scenDur,
+            rampup:          scenRampup,
+            timeout:         scenTimeout,
+            scenarioType:    base.scenarioType || _activeScenario.scenarioType || 'Baseline Load Test',
+            p95Threshold:    scenP95,
             stopOnErrorRate: base.stopOnErrorRate,
-            stopOnP95:      base.stopOnP95,
-            executedBy:     'Dashboard',
+            stopOnP95:       base.stopOnP95,
+            executedBy:      'Dashboard',
         };
     }
 
@@ -1954,6 +1969,30 @@ function importScenario() {
         r.readAsText(f);
     };
     inp.click();
+}
+
+// ── Run Full Test from Workflow Builder ──
+async function runScenarioFromBuilder() {
+    const scenario = _buildScenarioObject();
+    if (!scenario.steps || !scenario.steps.filter(s => s.enabled !== false).length) {
+        showNotif('Add at least one enabled step first.', 'error'); return;
+    }
+    if (!scenario.projectName) { showNotif('Please select a Project before running.', 'error'); return; }
+    if (scenario.vus > _maxVUs) { showNotif(`VU limit for your role is ${_maxVUs}.`, 'error'); return; }
+
+    // Set as active scenario so buildConfig() will use it
+    _activeScenario = scenario;
+
+    // Show confirmation modal via the Configure tab flow
+    _pendingConfig = scenario;
+    const isProd = scenario.environment === 'Production';
+    document.getElementById('confirm-summary').innerHTML = `
+      <strong>Project:</strong> ${_esc(scenario.projectName)} · <strong>Env:</strong> ${_esc(scenario.environment)} · <strong>Engine:</strong> ⚡ k6<br>
+      <strong>Scenario:</strong> ${_esc(scenario.scenarioName)} · <strong>Steps:</strong> ${scenario.steps.filter(s => s.enabled !== false).length}<br>
+      <strong>VUs:</strong> ${scenario.vus} · <strong>Duration:</strong> ${scenario.duration}s · <strong>Ramp-up:</strong> ${scenario.rampup || 0}s
+    `;
+    document.getElementById('confirm-warn').style.display = isProd ? '' : 'none';
+    document.getElementById('confirm-modal').style.display = 'flex';
 }
 
 // ── Dry Run ──
