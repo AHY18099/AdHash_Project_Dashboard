@@ -689,6 +689,169 @@ router.post('/encrypt', (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// POST /api/load-test/step-run — single-step trial run (VU1 preview)
+// Body: { step, globalVars, capturedVars, dynamicData }
+// Returns: { status, responseTime, rawBody, decryptedBody, headers, capturedValues, error }
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/step-run', auth, async (req, res) => {
+    const { step, globalVars = {}, capturedVars = {}, dynamicData = {} } = req.body || {};
+    if (!step) return res.status(400).json({ error: 'step is required' });
+
+    const http = require('http');
+    const https = require('https');
+    const { URL } = require('url');
+
+    // Build VU1 data row (index=1, email/phone from dynamicData config)
+    const vu1Data = (() => {
+        const emailPrefix = (dynamicData.emailPrefix || 'testuser') + '1';
+        const emailDomain = dynamicData.emailDomain || 'mailinator.com';
+        const phoneBase   = BigInt(dynamicData.phoneBase || '7100000000');
+        return {
+            index: '1',
+            email: `${emailPrefix}@${emailDomain}`,
+            phoneNumber: String(phoneBase),
+            name: (dynamicData.namePrefix || 'TestUser') + '1',
+            timestamp: String(Date.now()),
+            random: String(Math.floor(Math.random() * 1e9)),
+            uuid: crypto.randomUUID(),
+        };
+    })();
+
+    // Merge vars: globals → VU1 dynamic data → captured vars from prior steps
+    const vars = Object.assign({}, globalVars, vu1Data, capturedVars);
+
+    function resolveStr(s) {
+        if (typeof s !== 'string') return s;
+        return s.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] !== undefined ? vars[k] : `{{${k}}}`);
+    }
+    function resolveObj(o) {
+        if (typeof o === 'string') return resolveStr(o);
+        if (Array.isArray(o)) return o.map(resolveObj);
+        if (o !== null && typeof o === 'object') {
+            const out = {};
+            for (const k of Object.keys(o)) out[k] = resolveObj(o[k]);
+            return out;
+        }
+        return o;
+    }
+
+    try {
+        const method  = (step.method || 'GET').toUpperCase();
+        const rawUrl  = resolveStr(step.url || '');
+        const headers = Object.assign({ 'Content-Type': 'application/json' }, resolveObj(step.headers || {}));
+
+        // Build body
+        let bodyStr = null;
+        if (['POST','PUT','PATCH'].includes(method) && step.body) {
+            let bv = step.body;
+            if (typeof bv === 'object') bv = JSON.stringify(bv);
+            bv = resolveStr(bv);
+
+            const enc = step.requestEncryption;
+            if (enc?.enabled && enc.key && enc.iv) {
+                try {
+                    const encField  = enc.outputField || 'encryptedData';
+                    const encrypted = aesCbcEncrypt(bv, enc.key, enc.iv);
+                    bodyStr = JSON.stringify({ [encField]: encrypted });
+                } catch(e) { bodyStr = bv; }
+            } else {
+                bodyStr = bv;
+            }
+        }
+
+        // Make the HTTP request via Node built-ins (no extra deps)
+        const result = await new Promise((resolve) => {
+            let parsed;
+            try { parsed = new URL(rawUrl); } catch(e) { return resolve({ error: 'Invalid URL: ' + rawUrl }); }
+            const lib = parsed.protocol === 'https:' ? https : http;
+            const opts = {
+                hostname: parsed.hostname,
+                port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+                path: parsed.pathname + parsed.search,
+                method,
+                headers: { ...headers },
+                timeout: 10000,
+            };
+            if (bodyStr) {
+                opts.headers['Content-Length'] = Buffer.byteLength(bodyStr);
+            }
+            const t0 = Date.now();
+            const req2 = lib.request(opts, (resp) => {
+                const chunks = [];
+                resp.on('data', c => chunks.push(c));
+                resp.on('end', () => {
+                    const rawBody = Buffer.concat(chunks).toString('utf8');
+                    resolve({
+                        status: resp.statusCode,
+                        responseTime: Date.now() - t0,
+                        rawBody,
+                        resHeaders: resp.headers,
+                    });
+                });
+            });
+            req2.on('error', e => resolve({ error: e.message, status: 0, responseTime: Date.now() - t0, rawBody: '' }));
+            req2.on('timeout', () => { req2.destroy(); resolve({ error: 'Request timed out', status: 0, responseTime: 10000, rawBody: '' }); });
+            if (bodyStr) req2.write(bodyStr);
+            req2.end();
+        });
+
+        if (result.error && !result.rawBody) {
+            return res.json({ ok: false, error: result.error, status: result.status || 0, responseTime: result.responseTime || 0 });
+        }
+
+        // Try to decrypt response if response decryption is configured
+        // or if request encryption is on (same key/IV used for response)
+        let decryptedBody = null;
+        const dec  = step.responseDecryption;
+        const enc2 = step.requestEncryption;
+        const decKey  = (dec?.enabled && dec.key)  ? dec.key  : (enc2?.enabled && enc2.key  ? enc2.key  : null);
+        const decIv   = (dec?.enabled && dec.iv)   ? dec.iv   : (enc2?.enabled && enc2.iv   ? enc2.iv   : null);
+        const decField = (dec?.enabled && dec.inputField) ? dec.inputField : (enc2?.enabled ? (enc2.outputField || 'encryptedData') : 'encryptedData');
+
+        let parsedRaw = null;
+        try { parsedRaw = JSON.parse(result.rawBody); } catch(_) {}
+
+        if (decKey && decIv && parsedRaw) {
+            try {
+                const ciphertext = parsedRaw[decField] || '';
+                if (ciphertext) {
+                    const plain = aesCbcDecrypt(ciphertext, decKey, decIv);
+                    decryptedBody = JSON.parse(plain);
+                }
+            } catch(e) { decryptedBody = null; }
+        }
+
+        // Extract captures
+        const capturedValues = {};
+        if (step.captures && step.captures.length > 0) {
+            const src = decryptedBody || parsedRaw;
+            for (const cap of step.captures) {
+                if (!cap.varName || !cap.jsonPath) continue;
+                try {
+                    const val = cap.jsonPath.replace(/^\$\.?/, '').split('.').filter(Boolean)
+                        .reduce((o, k) => (o != null ? o[k] : undefined), src);
+                    if (val !== undefined) capturedValues[cap.varName] = val;
+                } catch(_) {}
+            }
+        }
+
+        res.json({
+            ok: true,
+            status: result.status,
+            responseTime: result.responseTime,
+            rawBody: result.rawBody,
+            parsedRaw,
+            decryptedBody,
+            capturedValues,
+            resolvedUrl: rawUrl,
+            resolvedBody: bodyStr,
+        });
+    } catch(e) {
+        res.status(500).json({ ok: false, error: e.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // POST /api/load-test/scenario/k6-script — generate downloadable k6 script
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/scenario/k6-script', auth, (req, res) => {
