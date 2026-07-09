@@ -260,6 +260,9 @@ input:checked+.slider::before{transform:translateX(16px);background:var(--green)
 /* ── DIVIDER ── */
 .divider{height:1px;background:var(--border);margin:18px 0}
 
+/* ── STEP SECTION inline code ── */
+.step-section code{background:var(--bg3);color:var(--accent2);padding:1px 5px;border-radius:4px;font-size:9px;border:1px solid var(--border)}
+
 @media(max-width:768px){
   .tab-btn{padding:12px 14px;font-size:11px}
   .kpi-row{grid-template-columns:repeat(2,1fr)}
@@ -1512,9 +1515,15 @@ function toggleStepCollapse(i) {
     renderSteps();
 }
 
+function _toggleSamplePane(i) {
+    _scenarioSteps[i]._showSamplePane = !_scenarioSteps[i]._showSamplePane;
+    renderSteps();
+}
+
 function addCapture(i) {
     if (!_scenarioSteps[i].captures) _scenarioSteps[i].captures = [];
     _scenarioSteps[i].captures.push({ varName: '', jsonPath: '' });
+    _scenarioSteps[i]._showSamplePane = true; // auto-open paste pane when adding first capture
     renderSteps();
 }
 function removeCapture(si, ci) {
@@ -1551,26 +1560,62 @@ function renderSteps() {
 
         // Assertions HTML
         const assertHtml = (s.assertions || []).map((a, ai) => `
-          <div class="assertion-row">
-            <select style="width:110px;height:30px;font-size:12px" onchange="_scenarioSteps[${i}].assertions[${ai}].type=this.value;renderSteps()">
-              <option ${a.type==='status'?'selected':''} value="status">Status =</option>
-              <option ${a.type==='jsonPath'?'selected':''} value="jsonPath">JSON path exists</option>
+          <div class="assertion-row" style="align-items:center;gap:8px;flex-wrap:nowrap">
+            <select style="width:140px;height:32px;font-size:12px;flex-shrink:0" onchange="_scenarioSteps[${i}].assertions[${ai}].type=this.value;renderSteps()">
+              <option ${a.type==='status'?'selected':''} value="status">Status code =</option>
+              <option ${a.type==='jsonPath'?'selected':''} value="jsonPath">Field exists</option>
               <option ${a.type==='contains'?'selected':''} value="contains">Body contains</option>
             </select>
-            ${a.type === 'status' ? `<input type="number" style="width:80px;height:30px;font-size:12px" value="${a.expected||200}" oninput="_scenarioSteps[${i}].assertions[${ai}].expected=parseInt(this.value)" />` : ''}
-            ${a.type === 'jsonPath' ? `<input placeholder="data.token" style="flex:1;height:30px;font-size:12px" value="${_esc(a.path||'')}" oninput="_scenarioSteps[${i}].assertions[${ai}].path=this.value" />` : ''}
-            ${a.type === 'contains' ? `<input placeholder="expected text" style="flex:1;height:30px;font-size:12px" value="${_esc(a.value||'')}" oninput="_scenarioSteps[${i}].assertions[${ai}].value=this.value" />` : ''}
-            <button class="step-remove" onclick="removeAssertion(${i},${ai})" title="Remove assertion">✕</button>
+            ${a.type === 'status' ? `<input type="number" style="width:80px;height:32px;font-size:13px;font-weight:700;text-align:center" value="${a.expected||200}" oninput="_scenarioSteps[${i}].assertions[${ai}].expected=parseInt(this.value)" />` : ''}
+            ${a.type === 'jsonPath' ? `<input placeholder="e.g. data.token" style="flex:1;height:32px;font-size:12px" value="${_esc(a.path||'')}" oninput="_scenarioSteps[${i}].assertions[${ai}].path=this.value" />` : ''}
+            ${a.type === 'contains' ? `<input placeholder="expected text in response body" style="flex:1;height:32px;font-size:12px" value="${_esc(a.value||'')}" oninput="_scenarioSteps[${i}].assertions[${ai}].value=this.value" />` : ''}
+            <button class="step-remove" style="flex-shrink:0" onclick="removeAssertion(${i},${ai})" title="Remove assertion">✕</button>
           </div>`).join('');
 
+        // Build flat key list from sample response of THIS step (for capture picker)
+        const _buildFlatKeys = (obj, prefix, depth) => {
+            if (depth > 4 || obj === null || typeof obj !== 'object') return [];
+            return Object.keys(obj).flatMap(k => {
+                const path = prefix ? prefix + '.' + k : k;
+                const val = obj[k];
+                const type = Array.isArray(val) ? 'array' : typeof val;
+                const preview = type === 'object' || type === 'array' ? '' : (' = ' + String(val).substring(0,30));
+                return [{ path, type, preview }, ..._buildFlatKeys(val, path, depth+1)];
+            });
+        };
+        let sampleKeys = [];
+        try {
+            const sr = _scenarioSteps[i]._sampleResponse;
+            if (sr) sampleKeys = _buildFlatKeys(typeof sr === 'string' ? JSON.parse(sr) : sr, '', 0);
+        } catch(e) {}
+
         // Captures HTML
-        const capHtml = (s.captures || []).map((cap, ci) => `
-          <div class="capture-row">
-            <input placeholder="varName" style="width:120px;height:30px;font-size:12px" value="${_esc(cap.varName||'')}" oninput="_scenarioSteps[${i}].captures[${ci}].varName=this.value" />
-            <span style="color:var(--muted);font-size:12px">←</span>
-            <input placeholder="data.token" style="flex:1;height:30px;font-size:12px" value="${_esc(cap.jsonPath||'')}" oninput="_scenarioSteps[${i}].captures[${ci}].jsonPath=this.value" />
-            <button class="step-remove" onclick="removeCapture(${i},${ci})" title="Remove capture">✕</button>
-          </div>`).join('');
+        const capHtml = (s.captures || []).map((cap, ci) => {
+            const opts = sampleKeys.map(k =>
+                `<option value="${_esc(k.path)}" ${cap.jsonPath===k.path?'selected':''}>${_esc(k.path)}${_esc(k.preview)}</option>`
+            ).join('');
+            return `
+          <div class="capture-row" style="align-items:flex-start;flex-wrap:nowrap;gap:6px">
+            <div style="display:flex;flex-direction:column;gap:3px;width:130px;flex-shrink:0">
+              <span style="font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.4px">Variable name</span>
+              <input placeholder="e.g. accessToken" style="width:100%;height:32px;font-size:12px" value="${_esc(cap.varName||'')}" oninput="_scenarioSteps[${i}].captures[${ci}].varName=this.value" />
+              <span style="font-size:9px;color:var(--muted)">Use as <code style="font-size:9px">{{${cap.varName||'varName'}}}</code></span>
+            </div>
+            <div style="display:flex;align-items:center;padding-top:20px;color:var(--muted2);font-size:13px;font-weight:700;flex-shrink:0">←</div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">
+              <span style="font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.4px">Response field path</span>
+              ${sampleKeys.length > 0 ? `
+              <select style="height:32px;font-size:12px;width:100%" onchange="_scenarioSteps[${i}].captures[${ci}].jsonPath=this.value;renderSteps()">
+                <option value="">— pick a field —</option>
+                ${opts}
+                <option value="__custom__" ${!sampleKeys.find(k=>k.path===cap.jsonPath)&&cap.jsonPath?'selected':''}>✏️ Type manually…</option>
+              </select>
+              ${(!sampleKeys.find(k=>k.path===cap.jsonPath)&&cap.jsonPath)||cap.jsonPath==='__custom__'?`<input placeholder="e.g. data.token" style="height:30px;font-size:12px;width:100%;margin-top:4px" value="${_esc(cap.jsonPath==='__custom__'?'':cap.jsonPath||'')}" oninput="_scenarioSteps[${i}].captures[${ci}].jsonPath=this.value" />`:''}`
+              : `<input placeholder="e.g. data.token  or  $.accessToken" style="height:32px;font-size:12px;width:100%" value="${_esc(cap.jsonPath||'')}" oninput="_scenarioSteps[${i}].captures[${ci}].jsonPath=this.value" />`}
+            </div>
+            <button class="step-remove" style="margin-top:20px;flex-shrink:0" onclick="removeCapture(${i},${ci})" title="Remove capture">✕</button>
+          </div>`;
+        }).join('');
 
         return `
     <div class="step-card ${s.enabled===false?'disabled-step':''}" id="step-card-${i}">
@@ -1639,9 +1684,25 @@ function renderSteps() {
         <div class="step-section" style="margin-bottom:8px">
           <div class="step-section-title">
             <span>📌 Captures (for next steps)</span>
-            <button class="btn btn-secondary btn-xs" onclick="addCapture(${i})">+ Add</button>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button class="btn btn-secondary btn-xs" onclick="_toggleSamplePane(${i})" title="Paste this step's response JSON to enable field picker">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                ${sampleKeys.length>0 ? `<span style="color:var(--green)">✓ ${sampleKeys.length} fields</span>` : 'Paste Response'}
+              </button>
+              <button class="btn btn-secondary btn-xs" onclick="addCapture(${i})">+ Add Capture</button>
+            </div>
           </div>
-          <div id="capture-${i}">${capHtml || '<div style="color:var(--muted);font-size:11px">No captures defined.</div>'}</div>
+          <!-- Sample response paste panel -->
+          <div id="sample-pane-${i}" style="display:${(s._showSamplePane)?'block':'none'};margin-bottom:10px">
+            <div style="font-size:10px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">
+              Paste a sample response from this step — enables smart field picker below
+            </div>
+            <textarea rows="5" style="font-size:11px;font-family:monospace;border-color:var(--accent2)"
+              placeholder='{"data":{"accessToken":"eyJ...","user":{"id":"123","tenantId":"abc"}}}'
+              oninput="_scenarioSteps[${i}]._sampleResponse=this.value;renderSteps()">${_esc(typeof s._sampleResponse==='string'?s._sampleResponse:s._sampleResponse?JSON.stringify(s._sampleResponse,null,2):'')}</textarea>
+            ${sampleKeys.length>0?`<div style="font-size:10px;color:var(--green);margin-top:4px">✓ ${sampleKeys.length} fields detected — use the dropdowns below to map captures</div>`:''}
+          </div>
+          <div id="capture-${i}">${capHtml || '<div style="color:var(--muted);font-size:11px;padding:4px 0">No captures defined. Click "+ Add Capture" to map a response field to a variable.</div>'}</div>
         </div>
 
         <!-- Row 6: Request Encryption -->
