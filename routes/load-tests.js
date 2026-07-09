@@ -1496,13 +1496,19 @@ function _generateHtml(state, tmpl = {}) {
     }).join('');
 
     // Timeline rows
+    const _stripK6 = s => String(s || '')
+        .replace(/\bk6 run started\b/gi, 'Load test run started')
+        .replace(/\bk6 test completed\b/gi, 'Load test completed')
+        .replace(/\bk6 not found\b/gi, 'Load test engine not found')
+        .replace(/\bk6\b/gi, '');
+
     const tlRows = (state.timeline || []).map(e =>
-        `<tr><td style="color:#64748b;font-size:11px">${new Date(e.time).toLocaleString('en-IN')}</td><td>${e.phase}</td><td>${e.event}</td></tr>`
+        `<tr><td style="color:#64748b;font-size:11px">${new Date(e.time).toLocaleString('en-IN')}</td><td>${e.phase}</td><td>${_stripK6(e.event)}</td></tr>`
     ).join('');
 
     // Log rows (last 20)
     const logRows = (state.logs || []).slice(-20).map(l =>
-        `<tr><td style="color:#64748b;font-size:11px">${new Date(l.time).toLocaleString('en-IN')}</td><td>${l.phase}</td><td>${l.event}</td></tr>`
+        `<tr><td style="color:#64748b;font-size:11px">${new Date(l.time).toLocaleString('en-IN')}</td><td>${l.phase}</td><td>${_stripK6(l.event)}</td></tr>`
     ).join('');
 
     // Build per-VU request/response log section
