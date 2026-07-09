@@ -8,6 +8,25 @@ const router = require('express').Router();
 const fs     = require('fs');
 const path       = require('path');
 const crypto     = require('crypto');
+const mongoose   = require('mongoose');
+
+// ── MongoDB schema for persisting load test reports across deploys ──
+const _ltReportSchema = new mongoose.Schema({
+    runId:       { type: String, required: true, unique: true },
+    startTime:   String,
+    projectName: String,
+    environment: String,
+    scenarioType: String,
+    vus:         Number,
+    duration:    Number,
+    verdict:     String,
+    executedBy:  String,
+    successRate: Number,
+    p95:         Number,
+    jsonData:    String, // full serialized state as JSON string
+    htmlData:    String, // generated HTML report
+}, { collection: 'load_test_reports' });
+const LTReport = mongoose.models.LTReport || mongoose.model('LTReport', _ltReportSchema);
 
 // ── AES-128-ECB encryption (PKCS7 padding via Node crypto) ──
 function aesEncrypt(plaintext, key) {
@@ -314,16 +333,42 @@ router.post('/start', auth, async (req, res) => {
     setImmediate(() => _executeK6Run(runId, cfg, runState));
 });
 
-// ── Save JSON + HTML report ──
+// ── Save JSON + HTML report (disk + MongoDB) ──
 function _saveResults(runId, state) {
     try {
         const jsonPath = path.join(REPORTS_DIR, `${runId}.json`);
         const htmlPath = path.join(REPORTS_DIR, `${runId}.html`);
         const template = _loadTemplate();
-        fs.writeFileSync(jsonPath, JSON.stringify(_serializeState(state), null, 2));
-        fs.writeFileSync(htmlPath, _generateHtml(state, template));
+        const serialized = _serializeState(state);
+        const htmlStr    = _generateHtml(state, template);
+        fs.writeFileSync(jsonPath, JSON.stringify(serialized, null, 2));
+        fs.writeFileSync(htmlPath, htmlStr);
         state.reportPath     = htmlPath;
         state.reportJsonPath = jsonPath;
+
+        // Persist to MongoDB so reports survive Railway redeploys
+        const sr = serialized.metrics?.totalReqs > 0
+            ? parseFloat(((serialized.metrics.okReqs / serialized.metrics.totalReqs) * 100).toFixed(1))
+            : 0;
+        LTReport.findOneAndUpdate(
+            { runId },
+            {
+                runId,
+                startTime:    serialized.startTime,
+                projectName:  serialized.config?.projectName || '—',
+                environment:  serialized.config?.environment || '—',
+                scenarioType: serialized.config?.scenarioType || '—',
+                vus:          serialized.config?.vus || 0,
+                duration:     serialized.config?.duration || 0,
+                verdict:      serialized.verdict || 'FAIL',
+                executedBy:   serialized.config?.executedBy || 'Dashboard',
+                successRate:  sr,
+                p95:          serialized.metrics?.p95 || 0,
+                jsonData:     JSON.stringify(serialized),
+                htmlData:     htmlStr,
+            },
+            { upsert: true, new: true }
+        ).catch(e => console.error('[load-test] MongoDB save failed:', e.message));
     } catch (e) {
         console.error('[load-test] save failed:', e.message);
     }
@@ -384,20 +429,38 @@ router.get('/results/:runId', auth, (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // GET /api/load-test/report/:runId  — view HTML
 // ══════════════════════════════════════════════════════════════════════════════
-router.get('/report/:runId', auth, (req, res) => {
+router.get('/report/:runId', auth, async (req, res) => {
     const htmlPath = path.join(REPORTS_DIR, `${req.params.runId}.html`);
-    if (!fs.existsSync(htmlPath)) return res.status(404).send('<h2>Report not found</h2>');
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache');
-    res.send(fs.readFileSync(htmlPath, 'utf8'));
+    if (fs.existsSync(htmlPath)) {
+        return res.send(fs.readFileSync(htmlPath, 'utf8'));
+    }
+    // Disk file missing (ephemeral Railway FS wiped) — try MongoDB
+    try {
+        const doc = await LTReport.findOne({ runId: req.params.runId }, { htmlData: 1 }).lean();
+        if (doc?.htmlData) {
+            // Restore to disk for subsequent requests
+            fs.writeFileSync(htmlPath, doc.htmlData);
+            return res.send(doc.htmlData);
+        }
+    } catch {}
+    res.status(404).send('<h2>Report not found</h2>');
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
 // GET /api/load-test/report/:runId/download?logs=1  (full)
 // GET /api/load-test/report/:runId/download?logs=0  (strip VU req/res log)
 // ══════════════════════════════════════════════════════════════════════════════
-router.get('/report/:runId/download', auth, (req, res) => {
+router.get('/report/:runId/download', auth, async (req, res) => {
     const htmlPath = path.join(REPORTS_DIR, `${req.params.runId}.html`);
+    // Restore from MongoDB if disk file missing
+    if (!fs.existsSync(htmlPath)) {
+        try {
+            const doc = await LTReport.findOne({ runId: req.params.runId }, { htmlData: 1 }).lean();
+            if (doc?.htmlData) fs.writeFileSync(htmlPath, doc.htmlData);
+        } catch {}
+    }
     if (!fs.existsSync(htmlPath)) return res.status(404).json({ error: 'Report not found' });
     const state   = _runs.get(req.params.runId);
     const proj    = state?.config?.projectName || 'LoadTest';
@@ -464,53 +527,65 @@ router.post('/stop/:runId', auth, (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// GET /api/load-test/history
+// GET /api/load-test/history — reads from MongoDB (persistent) + disk (current session)
 // ══════════════════════════════════════════════════════════════════════════════
-router.get('/history', auth, (req, res) => {
-    const rows = [];
+router.get('/history', auth, async (req, res) => {
+    try {
+        // Primary: fetch all from MongoDB (survives redeploys)
+        const dbRows = await LTReport.find({}, {
+            runId:1, startTime:1, projectName:1, environment:1, scenarioType:1,
+            vus:1, duration:1, verdict:1, executedBy:1, successRate:1, p95:1, _id:0
+        }).sort({ startTime: -1 }).lean();
 
-    // Scan disk for saved JSON reports
-    if (fs.existsSync(REPORTS_DIR)) {
-        for (const f of fs.readdirSync(REPORTS_DIR)) {
-            if (!f.endsWith('.json') || f.startsWith('_')) continue;
-            try {
-                const data = JSON.parse(fs.readFileSync(path.join(REPORTS_DIR, f), 'utf8'));
-                rows.push({
-                    runId:        data.runId,
-                    projectName:  data.config?.projectName || '—',
-                    environment:  data.config?.environment || '—',
-                    scenarioType: data.config?.scenarioType || '—',
-                    vus:          data.config?.vus || 0,
-                    duration:     data.config?.duration || 0,
-                    startTime:    data.startTime,
-                    endTime:      data.endTime,
-                    status:       data.status,
-                    verdict:      data.verdict || (data.status === 'failed' ? 'FAIL' : null),
-                    executedBy:   data.config?.executedBy || '—',
-                    successRate:  data.metrics?.totalReqs > 0
-                        ? parseFloat(((data.metrics.okReqs / data.metrics.totalReqs) * 100).toFixed(1))
-                        : 0,
-                    p95:          data.metrics?.p95 || 0,
-                    hasReport:    fs.existsSync(path.join(REPORTS_DIR, f.replace('.json', '.html'))),
-                });
-            } catch {}
+        const seen = new Set(dbRows.map(r => r.runId));
+        const rows = dbRows.map(r => ({ ...r, hasReport: true }));
+
+        // Fallback: also include any disk reports not yet in MongoDB (e.g. current session before save)
+        if (fs.existsSync(REPORTS_DIR)) {
+            for (const f of fs.readdirSync(REPORTS_DIR)) {
+                if (!f.endsWith('.json') || f.startsWith('_')) continue;
+                try {
+                    const data = JSON.parse(fs.readFileSync(path.join(REPORTS_DIR, f), 'utf8'));
+                    if (seen.has(data.runId)) continue;
+                    rows.push({
+                        runId:        data.runId,
+                        projectName:  data.config?.projectName || '—',
+                        environment:  data.config?.environment || '—',
+                        scenarioType: data.config?.scenarioType || '—',
+                        vus:          data.config?.vus || 0,
+                        duration:     data.config?.duration || 0,
+                        startTime:    data.startTime,
+                        verdict:      data.verdict || (data.status === 'failed' ? 'FAIL' : null),
+                        executedBy:   data.config?.executedBy || '—',
+                        successRate:  data.metrics?.totalReqs > 0
+                            ? parseFloat(((data.metrics.okReqs / data.metrics.totalReqs) * 100).toFixed(1))
+                            : 0,
+                        p95:          data.metrics?.p95 || 0,
+                        hasReport:    fs.existsSync(path.join(REPORTS_DIR, f.replace('.json', '.html'))),
+                    });
+                } catch {}
+            }
         }
-    }
 
-    rows.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
-    res.json({ runs: rows });
+        rows.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+        res.json({ runs: rows });
+    } catch (e) {
+        console.error('[load-test] history error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DELETE /api/load-test/history/:runId
 // ══════════════════════════════════════════════════════════════════════════════
-router.delete('/history/:runId', auth, (req, res) => {
+router.delete('/history/:runId', auth, async (req, res) => {
     const id  = req.params.runId;
     const json = path.join(REPORTS_DIR, `${id}.json`);
     const html = path.join(REPORTS_DIR, `${id}.html`);
     if (fs.existsSync(json)) fs.unlinkSync(json);
     if (fs.existsSync(html)) fs.unlinkSync(html);
     _runs.delete(id);
+    await LTReport.deleteOne({ runId: id }).catch(() => {});
     res.json({ ok: true });
 });
 
