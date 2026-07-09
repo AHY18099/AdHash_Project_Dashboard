@@ -1721,23 +1721,153 @@ ${show('showExecutiveSummary') ? `
 </div>
 
 ${show('showTestConfig') ? `
-<!-- TEST CONFIGURATION -->
-<div class="section">
-  <h2>⚙ Test Configuration</h2>
-  <div class="cfg-grid">
-    <div class="cfg-row"><div class="cfg-lbl">Project</div><div class="cfg-val">${cfg.projectName || '—'}</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">Environment</div><div class="cfg-val">${cfg.environment || '—'}</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">URL</div><div class="cfg-val" style="word-break:break-all">${cfg.url || '—'}</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">HTTP Method</div><div class="cfg-val">${cfg.method || 'GET'}</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">Scenario Type</div><div class="cfg-val">${cfg.scenarioType || '—'}</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">Engine</div><div class="cfg-val">⚡ k6 (server-side)</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">Concurrent Users</div><div class="cfg-val">${cfg.vus}</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">Ramp-up</div><div class="cfg-val">${cfg.rampup || 0}s</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">Duration</div><div class="cfg-val">${cfg.duration}s</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">Timeout</div><div class="cfg-val">${cfg.timeout || 5000}ms</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">P95 Threshold</div><div class="cfg-val">${cfg.p95Threshold || 3000}ms</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">Start Time</div><div class="cfg-val">${cfg.startTime ? new Date(cfg.startTime).toLocaleString('en-IN') : '—'}</div></div>
-    <div class="cfg-row"><div class="cfg-lbl">End Time</div><div class="cfg-val">${state.endTime ? new Date(state.endTime).toLocaleString('en-IN') : '—'}</div></div>
+<!-- TEST CONFIGURATION — Enterprise highlight -->
+<div style="background:#fff;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 24px rgba(30,64,175,.13);border:2px solid #1e40af;overflow:hidden">
+
+  <!-- Section header bar -->
+  <div style="background:linear-gradient(90deg,#1e3a8a 0%,#1d4ed8 60%,#2563eb 100%);padding:16px 28px;display:flex;align-items:center;gap:14px">
+    <div style="background:rgba(255,255,255,.15);border-radius:8px;padding:8px 10px;display:flex;align-items:center;justify-content:center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M8.46 8.46a5 5 0 0 0 0 7.07"/></svg>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:#fff;letter-spacing:.2px">Test Configuration</div>
+      <div style="font-size:11px;color:#93c5fd;margin-top:2px">Defines the scope, load parameters, and acceptance criteria for this test run</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="background:rgba(255,255,255,.15);color:#fff;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid rgba(255,255,255,.25)">${cfg.scenarioType || 'Load Test'}</span>
+      <span style="background:rgba(245,158,11,.25);color:#fbbf24;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid rgba(245,158,11,.4)">⚡ k6 Engine</span>
+      <span style="background:${vd === 'PASS' ? 'rgba(16,185,129,.25)' : vd === 'RISK' ? 'rgba(245,158,11,.25)' : 'rgba(239,68,68,.25)'};color:${vdColor};padding:4px 14px;border-radius:20px;font-size:11px;font-weight:800;border:1px solid ${vdColor}66">${vd}</span>
+    </div>
+  </div>
+
+  <!-- Row 1: Target & Identity -->
+  <div style="padding:0 28px">
+    <div style="border-bottom:1px solid #e2e8f0;padding:16px 0 14px">
+      <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">🎯 Test Target &amp; Identity</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Project</div>
+          <div style="font-size:15px;font-weight:800;color:#0f172a">${cfg.projectName || '—'}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Environment</div>
+          <div style="display:inline-block;font-size:13px;font-weight:700;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;padding:3px 12px;border-radius:20px">${cfg.environment || '—'}</div>
+        </div>
+        <div style="grid-column:span 2">
+          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Target URL</div>
+          <div style="font-size:13px;font-weight:600;color:#1e40af;font-family:monospace;background:#f0f9ff;border:1px solid #bae6fd;padding:6px 12px;border-radius:6px;word-break:break-all">${cfg.url || (cfg.steps?.[0]?.url) || '—'}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Load Parameters — the 4 most critical numbers -->
+    <div style="border-bottom:1px solid #e2e8f0;padding:16px 0 14px">
+      <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">⚡ Load Parameters</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:900;color:#1d4ed8;line-height:1">${cfg.vus}</div>
+          <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-top:4px">Virtual Users</div>
+          <div style="font-size:10px;color:#64748b;margin-top:2px">concurrent</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:900;color:#15803d;line-height:1">${cfg.duration}<span style="font-size:14px;font-weight:600">s</span></div>
+          <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.5px;margin-top:4px">Duration</div>
+          <div style="font-size:10px;color:#64748b;margin-top:2px">test window</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#fefce8,#fef9c3);border:1px solid #fde68a;border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:900;color:#b45309;line-height:1">${cfg.rampup || 0}<span style="font-size:14px;font-weight:600">s</span></div>
+          <div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.5px;margin-top:4px">Ramp-up</div>
+          <div style="font-size:10px;color:#64748b;margin-top:2px">warm-up period</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#fdf4ff,#fae8ff);border:1px solid #e9d5ff;border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:900;color:#7e22ce;line-height:1">${cfg.steps && cfg.steps.filter(s=>s.enabled!==false).length > 0 ? cfg.steps.filter(s=>s.enabled!==false).length : 1}<span style="font-size:14px;font-weight:600"></span></div>
+          <div style="font-size:10px;font-weight:700;color:#9333ea;text-transform:uppercase;letter-spacing:.5px;margin-top:4px">API Steps</div>
+          <div style="font-size:10px;color:#64748b;margin-top:2px">per VU flow</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Acceptance Thresholds -->
+    <div style="border-bottom:1px solid #e2e8f0;padding:16px 0 14px">
+      <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">📏 Acceptance Thresholds &amp; Actuals</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">P95 Latency Threshold</div>
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font-size:18px;font-weight:800;color:${p95ms <= p95Thr ? '#15803d' : '#dc2626'}">${p95ms}ms</span>
+            <span style="font-size:11px;color:#64748b">limit: ${cfg.p95Threshold || 3000}ms</span>
+          </div>
+          <div style="margin-top:6px;height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden">
+            <div style="height:100%;width:${Math.min(100,(p95ms/(cfg.p95Threshold||3000))*100).toFixed(1)}%;background:${p95ms <= p95Thr ? '#10b981' : '#ef4444'};border-radius:2px;transition:width .3s"></div>
+          </div>
+          <div style="font-size:10px;color:${p95ms <= p95Thr ? '#15803d' : '#dc2626'};font-weight:700;margin-top:4px">${p95ms <= p95Thr ? '✓ WITHIN THRESHOLD' : '✗ THRESHOLD BREACHED'}</div>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Error Rate Limit</div>
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font-size:18px;font-weight:800;color:${errPct < 1 ? '#15803d' : errPct < 5 ? '#b45309' : '#dc2626'}">${errRateDisp}%</span>
+            <span style="font-size:11px;color:#64748b">limit: &lt;1%</span>
+          </div>
+          <div style="margin-top:6px;height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden">
+            <div style="height:100%;width:${Math.min(100,errPct*10).toFixed(1)}%;background:${errPct < 1 ? '#10b981' : errPct < 5 ? '#f59e0b' : '#ef4444'};border-radius:2px"></div>
+          </div>
+          <div style="font-size:10px;color:${errPct < 1 ? '#15803d' : '#dc2626'};font-weight:700;margin-top:4px">${errPct < 1 ? '✓ WITHIN LIMIT' : '✗ LIMIT BREACHED'}</div>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Request Timeout</div>
+          <div style="font-size:18px;font-weight:800;color:#0f172a">${cfg.timeout || 5000}ms</div>
+          <div style="font-size:10px;color:#64748b;margin-top:6px">Per-request hard timeout</div>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Total Requests Executed</div>
+          <div style="font-size:18px;font-weight:800;color:#1d4ed8">${(m.totalReqs || 0).toLocaleString()}</div>
+          <div style="font-size:10px;color:#64748b;margin-top:6px">${m.rps || 0} avg RPS</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 4: Timing -->
+    <div style="padding:14px 0 16px">
+      <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">🕐 Test Execution Window</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;background:#eff6ff;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px">Start Time</div>
+            <div style="font-size:12px;font-weight:700;color:#1e293b">${cfg.startTime ? new Date(cfg.startTime).toLocaleString('en-IN') : '—'}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;background:#f0fdf4;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px">End Time</div>
+            <div style="font-size:12px;font-weight:700;color:#1e293b">${state.endTime ? new Date(state.endTime).toLocaleString('en-IN') : '—'}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;background:#fefce8;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px">Actual Duration</div>
+            <div style="font-size:12px;font-weight:700;color:#1e293b">${dur}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;background:#fdf4ff;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9333ea" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px">Executed By</div>
+            <div style="font-size:12px;font-weight:700;color:#1e293b">${preparedBy}</div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>` : ''}
 
