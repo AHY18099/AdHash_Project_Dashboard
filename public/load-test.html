@@ -491,6 +491,42 @@ input:checked+.slider::before{transform:translateX(16px)}
 
   <!-- META ROW -->
   <div class="card" style="margin-bottom:12px;padding:12px 16px">
+    <div class="row" style="gap:10px;margin-bottom:10px">
+      <div class="col">
+        <label>Project</label>
+        <select id="scen-project">
+          <option value="">— Select Project —</option>
+          <option value="Ad-Hash">Ad-Hash</option>
+          <option value="Ai Sign Pro">Ai Sign Pro</option>
+          <option value="Algomax">Algomax</option>
+          <option value="Auto Checker">Auto Checker</option>
+          <option value="DDP">DDP</option>
+          <option value="Humee">Humee</option>
+          <option value="Metcalf">Metcalf</option>
+          <option value="SMC">SMC</option>
+          <option value="Spark me">Spark me</option>
+          <option value="SyncTag">SyncTag</option>
+          <option value="SyncTrade">SyncTrade</option>
+          <option value="WavedIn">WavedIn</option>
+          <option value="ZapCRM">ZapCRM</option>
+          <option value="ZapTrade">ZapTrade</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Environment</label>
+        <select id="scen-env">
+          <option value="QA" selected>QA / Staging</option>
+          <option value="Production">Production</option>
+          <option value="UAT">UAT</option>
+          <option value="Dev">Dev</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Base URL (optional)</label>
+        <input id="scen-base-url" type="url" placeholder="https://api.example.com" />
+        <div class="form-hint">Shown in report header. Use {{baseUrl}} in step URLs.</div>
+      </div>
+    </div>
     <div class="row" style="gap:10px">
       <div class="col">
         <label>Description</label>
@@ -1652,8 +1688,9 @@ function _buildScenarioObject() {
         scenarioName:  _scenarioMeta.name || document.getElementById('scen-name')?.value || 'Unnamed Scenario',
         description:   _scenarioMeta.description || document.getElementById('scen-desc')?.value || '',
         tags:          _scenarioMeta.tags || document.getElementById('scen-tags')?.value || '',
-        projectName:   document.getElementById('cfg-project')?.value || '',
-        environment:   document.getElementById('cfg-env')?.value || 'QA',
+        projectName:   document.getElementById('scen-project')?.value || document.getElementById('cfg-project')?.value || '',
+        environment:   document.getElementById('scen-env')?.value || document.getElementById('cfg-env')?.value || 'QA',
+        url:           document.getElementById('scen-base-url')?.value.trim() || document.getElementById('cfg-url')?.value.trim() || '',
         vus:           parseInt(document.getElementById('scen-vus')?.value) || parseInt(document.getElementById('cfg-vus')?.value) || 10,
         duration:      parseInt(document.getElementById('scen-duration')?.value) || parseInt(document.getElementById('cfg-duration')?.value) || 30,
         rampup:        parseInt(document.getElementById('scen-rampup')?.value) || parseInt(document.getElementById('cfg-rampup')?.value) || 0,
@@ -1739,6 +1776,9 @@ async function loadScenario(id) {
     document.getElementById('scen-tags').value = _scenarioMeta.tags;
 
     // Restore execution config
+    if (s.projectName)  { const el = document.getElementById('scen-project');   if (el) el.value = s.projectName; }
+    if (s.environment)  { const el = document.getElementById('scen-env');       if (el) el.value = s.environment; }
+    if (s.url)          { const el = document.getElementById('scen-base-url');  if (el) el.value = s.url; }
     if (s.vus)          document.getElementById('scen-vus').value          = s.vus;
     if (s.duration)     document.getElementById('scen-duration').value     = s.duration;
     if (s.rampup != null) document.getElementById('scen-rampup').value     = s.rampup;
@@ -1801,6 +1841,9 @@ function newScenario() {
     document.getElementById('scen-name').value = '';
     document.getElementById('scen-desc').value = '';
     document.getElementById('scen-tags').value = '';
+    document.getElementById('scen-project').value = '';
+    document.getElementById('scen-env').value = 'QA';
+    document.getElementById('scen-base-url').value = '';
     document.getElementById('scen-vus').value = '10';
     document.getElementById('scen-duration').value = '30';
     document.getElementById('scen-rampup').value = '0';

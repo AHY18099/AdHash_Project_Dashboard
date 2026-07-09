@@ -1188,6 +1188,9 @@ async function _executeK6Run(runId, cfg, state, addLog, addTimeline) {
 }
 
 function _processK6MetricLines(lines, m, latencies, cfg) {
+    // Per-second buckets for time-series charts: { [secKey]: { reqs, errs, lats[], vus } }
+    if (!m._buckets) m._buckets = {};
+
     for (const line of lines) {
         let entry;
         try { entry = JSON.parse(line); } catch { continue; }
@@ -1196,27 +1199,57 @@ function _processK6MetricLines(lines, m, latencies, cfg) {
         const metric = entry.metric;
         const value  = entry.data?.value;
         const tags   = entry.data?.tags || {};
+        const ts     = entry.data?.time ? new Date(entry.data.time) : new Date();
+        const secKey = Math.floor(ts.getTime() / 1000); // 1-second bucket
+
+        if (!m._buckets[secKey]) m._buckets[secKey] = { reqs: 0, errs: 0, lats: [], vus: 0 };
+        const bucket = m._buckets[secKey];
 
         if (metric === 'http_reqs') {
-            if (tags.isProxy === 'true') continue; // exclude proxy calls from metrics
+            if (tags.isProxy === 'true') continue;
             m.totalReqs++;
             const isOk = tags.status && parseInt(tags.status) >= 200 && parseInt(tags.status) < 400;
             if (isOk) m.okReqs++;
-            else m.errReqs++;
+            else { m.errReqs++; bucket.errs++; }
+            bucket.reqs++;
             const sc = tags.status || '0';
             m.statusCodes = m.statusCodes || {};
             m.statusCodes[sc] = (m.statusCodes[sc] || 0) + 1;
+            if (!m._startTs) m._startTs = ts.getTime();
         } else if (metric === 'http_req_duration') {
             if (value !== undefined && tags.isProxy !== 'true') {
                 latencies.push(value);
-                // Update RPS approximately
-                const elapsed = (Date.now() - new Date(m._startTs || Date.now()).getTime()) / 1000 || 1;
+                bucket.lats.push(value);
+                const elapsed = (Date.now() - (m._startTs || Date.now())) / 1000 || 1;
                 m.rps = parseFloat((m.totalReqs / Math.max(elapsed, 1)).toFixed(2));
             }
+        } else if (metric === 'vus') {
+            if (value !== undefined) bucket.vus = Math.max(bucket.vus, value);
         }
     }
+
     if (m.totalReqs > 0) {
         m.errRate = parseFloat(((m.errReqs / m.totalReqs) * 100).toFixed(2));
+    }
+
+    // Rebuild time-series arrays from buckets (sorted by second)
+    const keys = Object.keys(m._buckets).map(Number).sort((a, b) => a - b);
+    if (keys.length > 0) {
+        m.rpsHistory          = keys.map(k => m._buckets[k].reqs);
+        m.latHistory          = keys.map(k => {
+            const ls = m._buckets[k].lats;
+            return ls.length ? parseFloat((ls.reduce((a, b) => a + b, 0) / ls.length).toFixed(1)) : 0;
+        });
+        m.errHistory          = keys.map(k => {
+            const b = m._buckets[k];
+            return b.reqs > 0 ? parseFloat(((b.errs / b.reqs) * 100).toFixed(2)) : 0;
+        });
+        m.activeUsersHistory  = keys.map(k => m._buckets[k].vus);
+        m.tickTimes           = keys.map(k => new Date(k * 1000).toISOString());
+        // Aggregate avgLatency live
+        if (latencies.length > 0) {
+            m.avgLatency = parseFloat((latencies.reduce((a, b) => a + b, 0) / latencies.length).toFixed(1));
+        }
     }
 }
 
@@ -1257,18 +1290,84 @@ function _generateHtml(state, tmpl = {}) {
 
     const fmtBytes = (b) => b > 1048576 ? (b / 1048576).toFixed(2) + ' MB' : b > 1024 ? (b / 1024).toFixed(1) + ' KB' : (b || 0) + ' B';
 
-    // Recommendation text
+    // Recommendation text — detailed root cause + team actions
     let recText = '', qaRec = '', recColor = '';
+    const p95ms    = m.p95 || 0;
+    const errPct   = parseFloat(errRateDisp);
+    const totalR   = m.totalReqs || 0;
+    const failedR  = m.errReqs   || 0;
+    const p95Thr   = cfg.p95Threshold || 3000;
+
     if (vd === 'PASS') {
-        recText  = 'Application performance is stable under the tested load. This result can be considered acceptable from a performance testing perspective for the tested scenario.';
+        recText = `
+          <p>All performance thresholds were met under the tested load of <strong>${cfg.vus || 0} Virtual Users</strong> over <strong>${cfg.duration || 0}s</strong>.</p>
+          <ul style="margin:10px 0 0 18px;line-height:1.9">
+            <li>Success rate: <strong>${successRate}%</strong> — within acceptable limits.</li>
+            <li>P95 response time: <strong>${p95ms}ms</strong> — below the ${p95Thr}ms threshold.</li>
+            <li>Error rate: <strong>${errPct}%</strong> — no significant failure pattern detected.</li>
+          </ul>
+          <p style="margin-top:10px">The application is stable and can be considered ready for release from a load testing perspective.</p>`;
         qaRec    = 'GO';
         recColor = '#10b981';
     } else if (vd === 'RISK') {
-        recText  = 'Application performance is partially acceptable, but some latency or error rate risks were observed. Recommended to review backend logs, API response time, database queries, and infrastructure scaling before production release.';
+        // Identify which dimension is the risk
+        const highLatency = p95ms > p95Thr;
+        const highErr     = errPct >= 1 && errPct < 10;
+        recText = `
+          <p><strong>Performance risks detected</strong> under <strong>${cfg.vus || 0} VUs</strong>. The application passed most checks but has borderline metrics requiring review before release.</p>
+          <p style="margin-top:10px;font-weight:700;color:#92400e">Root Cause Analysis</p>
+          <ul style="margin:6px 0 0 18px;line-height:1.9">
+            ${highLatency ? `<li><strong>High P95 Latency (${p95ms}ms &gt; ${p95Thr}ms threshold):</strong> Indicates slow API responses under concurrent load. Likely causes: unoptimized DB queries, missing indexes, synchronous blocking in API handlers, or under-provisioned server resources.</li>` : ''}
+            ${highErr ? `<li><strong>Elevated Error Rate (${errPct}%):</strong> ${failedR} out of ${totalR} requests failed. Check for rate-limiting, connection pool exhaustion, or timeout cascades. Review status code distribution above for specific error types.</li>` : ''}
+            ${!highLatency && !highErr ? `<li>Metrics are near threshold boundaries — borderline success/error rates or latency. Retest with increased VUs to confirm stability ceiling.</li>` : ''}
+          </ul>
+          <p style="margin-top:12px;font-weight:700;color:#92400e">Actions for Development Team</p>
+          <ul style="margin:6px 0 0 18px;line-height:1.9">
+            <li>Profile the slowest API endpoints using APM tools (New Relic, Datadog, or server logs).</li>
+            <li>Check database query execution plans — add indexes on frequently filtered/joined columns.</li>
+            <li>Review connection pool size (DB, Redis) — increase if pool exhaustion is detected in logs.</li>
+            <li>Implement response caching for read-heavy endpoints where data freshness allows.</li>
+            <li>Ensure async/await is used correctly — avoid accidental synchronous blocking in Node.js handlers.</li>
+          </ul>
+          <p style="margin-top:12px;font-weight:700;color:#92400e">Actions for QA Team</p>
+          <ul style="margin:6px 0 0 18px;line-height:1.9">
+            <li>Re-run this exact test after dev fixes are applied to confirm improvement.</li>
+            <li>Run a soak test (30+ minutes at current VU count) to check for memory leaks or connection degradation over time.</li>
+            <li>Escalate to dev team with this report and the specific failing step data from the VU log above.</li>
+            <li>Document this result as a known risk in the release sign-off if the release deadline cannot be postponed.</li>
+          </ul>`;
         qaRec    = 'CONDITIONAL GO';
         recColor = '#f59e0b';
     } else {
-        recText  = 'Application performance is not acceptable under the tested load. High error rate or latency was observed. Recommended to stop release until performance issues are fixed and retested.';
+        // FAIL — most detailed analysis
+        const criticalErr = errPct >= 10;
+        const criticalLat = p95ms > p95Thr * 2;
+        recText = `
+          <p><strong>Performance test FAILED.</strong> The application did not meet the minimum acceptable thresholds under <strong>${cfg.vus || 0} Virtual Users</strong>. <span style="color:#dc2626;font-weight:700">Release is NOT recommended</span> until issues are resolved and retested.</p>
+          <p style="margin-top:10px;font-weight:700;color:#991b1b">Root Cause Analysis</p>
+          <ul style="margin:6px 0 0 18px;line-height:1.9">
+            ${criticalErr ? `<li><strong>Critical Error Rate (${errPct}%):</strong> ${failedR} of ${totalR} requests returned errors. This indicates systemic failures — server crashes, unhandled exceptions, or infrastructure capacity limits being hit. Review status codes in the distribution table above for the specific failure types (5xx = server-side crash/timeout; 4xx = auth/validation issue at scale).</li>` : ''}
+            ${criticalLat ? `<li><strong>Severe Latency (P95 ${p95ms}ms — ${Math.round(p95ms/p95Thr)}× the ${p95Thr}ms threshold):</strong> Responses this slow will cause client-side timeouts and a degraded user experience. The API is likely queuing requests faster than it can process them — a classic CPU/DB saturation pattern.</li>` : ''}
+            ${!criticalErr && errPct > 0 ? `<li><strong>Elevated Error Rate (${errPct}%):</strong> ${failedR} requests failed. Check VU Request Log above for specific step failures and HTTP status codes.</li>` : ''}
+            ${!criticalLat && p95ms > p95Thr ? `<li><strong>P95 Latency Exceeded (${p95ms}ms &gt; ${p95Thr}ms):</strong> Requests are consistently slow under concurrent load. Bottleneck likely in DB or downstream service.</li>` : ''}
+          </ul>
+          <p style="margin-top:12px;font-weight:700;color:#991b1b">Immediate Actions for Development Team</p>
+          <ul style="margin:6px 0 0 18px;line-height:1.9">
+            <li><strong>Check server/application logs</strong> for stack traces, unhandled exceptions, or OOM errors during the test window (${new Date(state.startTime || Date.now()).toLocaleString('en-IN')} – ${new Date(state.endTime || Date.now()).toLocaleString('en-IN')}).</li>
+            <li><strong>Identify the bottleneck layer:</strong> Is it the Node.js process CPU-bound? DB query time? External API timeout? Use profiling or distributed tracing to narrow down.</li>
+            <li><strong>Database:</strong> Run EXPLAIN on the queries executed during the test. Check for full-table scans, missing indexes, or N+1 query patterns.</li>
+            <li><strong>Connection limits:</strong> Verify MongoDB/Redis connection pool maximums — increase and test. Check for connection leaks (connections not being released).</li>
+            <li><strong>Horizontal scaling:</strong> If the single instance is the bottleneck, test with load balancing across 2 instances before the next load test.</li>
+            <li><strong>Async patterns:</strong> Review all database calls in the failing endpoint(s) — ensure they are properly awaited and not blocking the event loop.</li>
+          </ul>
+          <p style="margin-top:12px;font-weight:700;color:#991b1b">Actions for QA Team</p>
+          <ul style="margin:6px 0 0 18px;line-height:1.9">
+            <li><strong>Block the release</strong> — this result is a NO-GO. Raise a P1 defect and share this report with the dev team immediately.</li>
+            <li>Isolate which step in the workflow is failing first by reviewing the VU Request Log section — the first step with a non-2xx status is the primary failure point.</li>
+            <li>Run a smoke test (1 VU) to confirm the flow works at all — if 1 VU also fails, this is a functional bug, not just a performance issue.</li>
+            <li>Once dev delivers a fix, re-run this exact scenario before approving the release. Do not accept partial retests.</li>
+            <li>Consider reducing VU count to find the maximum stable concurrency level (e.g., test at 1, 2, 5, 10 VUs to identify the breaking point).</li>
+          </ul>`;
         qaRec    = 'NO-GO';
         recColor = '#ef4444';
     }
@@ -1419,7 +1518,10 @@ tr:hover td{background:#f8fafc}
 @media(max-width:700px){.chart-grid{grid-template-columns:1fr}.rpt-header{flex-direction:column}.rpt-meta{text-align:left}.kpi-grid{grid-template-columns:repeat(2,1fr)}}
 .chart-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px}
 .chart-box h4{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
-.rec-box{padding:16px 20px;border-radius:10px;font-size:14px;line-height:1.7;border-left:4px solid ${recColor};background:${vdBg}}
+.rec-box{padding:16px 20px;border-radius:10px;font-size:13px;line-height:1.8;border-left:4px solid ${recColor};background:${vdBg};color:${vdTxt}}
+.rec-box p{margin:0 0 8px}
+.rec-box ul{margin:4px 0 10px 18px;padding:0}
+.rec-box li{margin-bottom:4px}
 .rel-row{display:flex;gap:20px;flex-wrap:wrap}
 .rel-item{flex:1;min-width:180px;background:#f8fafc;border-radius:10px;padding:16px;border:1px solid #e2e8f0}
 .rel-item .label{font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:6px}
@@ -1592,8 +1694,7 @@ ${show('showRecommendations') ? `
   </div>
 </div>` : ''}
 
-<!-- CUSTOM FIELDS -->
-${(preparedBy !== 'QA Team' || reviewedBy !== '—' || clientName !== '—') ? `
+<!-- REPORT DETAILS (always shown) -->
 <div class="section">
   <h2>📝 Report Details</h2>
   <div class="custom-grid">
@@ -1606,7 +1707,7 @@ ${(preparedBy !== 'QA Team' || reviewedBy !== '—' || clientName !== '—') ? `
     <div class="cfg-row"><div class="cfg-lbl">Build Number</div><div class="cfg-val">${buildNumber}</div></div>
     ${remarks ? `<div class="cfg-row" style="grid-column:1/-1"><div class="cfg-lbl">Remarks</div><div class="cfg-val">${remarks}</div></div>` : ''}
   </div>
-</div>` : ''}
+</div>
 
 <footer>
   <div>${footerText}</div>
