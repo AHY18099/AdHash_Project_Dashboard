@@ -2418,7 +2418,7 @@ ${show('showRecommendations') ? `
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 0 2-2h11"/></svg>
     </div>
     <div>
-      <div style="font-size:15px;font-weight:800;color:#fff">QA Recommendation</div>
+      <div style="font-size:15px;font-weight:800;color:#fff">Recommendation</div>
       <div style="font-size:11px;color:rgba(255,255,255,.65);margin-top:2px">ISTQB / CPTPA certified performance tester analysis</div>
     </div>
     <div style="margin-left:auto">
