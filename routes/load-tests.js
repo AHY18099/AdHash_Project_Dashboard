@@ -701,16 +701,18 @@ router.post('/step-run', auth, async (req, res) => {
     const https = require('https');
     const { URL } = require('url');
 
-    // Build VU1 data row (index=1, email/phone from dynamicData config)
+    // Build VU1 data row — respects startIndex from Dynamic Test Data config
     const vu1Data = (() => {
-        const emailPrefix = (dynamicData.emailPrefix || 'testuser') + '1';
+        const startIndex  = parseInt(dynamicData.startIndex) || 1;
+        const idx         = startIndex; // VU1 → first index in the configured range
+        const emailPrefix = dynamicData.emailPrefix || 'testuser';
         const emailDomain = dynamicData.emailDomain || 'mailinator.com';
         const phoneBase   = BigInt(dynamicData.phoneBase || '7100000000');
         return {
-            index: '1',
-            email: `${emailPrefix}@${emailDomain}`,
-            phoneNumber: String(phoneBase),
-            name: (dynamicData.namePrefix || 'TestUser') + '1',
+            index: String(idx),
+            email: `${emailPrefix}${idx}@${emailDomain}`,
+            phoneNumber: String(phoneBase), // VU1 = base phone
+            name: `${dynamicData.namePrefix || 'TestUser'} ${idx}`,
             timestamp: String(Date.now()),
             random: String(Math.floor(Math.random() * 1e9)),
             uuid: crypto.randomUUID(),

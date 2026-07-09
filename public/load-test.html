@@ -1604,122 +1604,117 @@ function _extractBodyFields(step) {
 }
 
 // ── Render the capture mapper section for step i ──
+// _renderCaptureMapper: captures extract values from THIS step's own response
+// for use as {{varName}} in subsequent steps.
 function _renderCaptureMapper(i, s) {
-    const prevStep = i > 0 ? _scenarioSteps[i - 1] : null;
-    const prevResponse = prevStep ? (prevStep._runResult || null) : null;
-    const prevKeys = prevResponse
-        ? _flattenJson(prevResponse.decryptedBody || prevResponse.parsedRaw || {}, '', 0)
-        : (prevStep?._sampleResponse ? _flattenJson(
-            typeof prevStep._sampleResponse === 'string'
-                ? (() => { try { return JSON.parse(prevStep._sampleResponse); } catch { return {}; } })()
-                : prevStep._sampleResponse, '', 0) : []);
+    // Source = this step's own run result (what we extract FROM)
+    const ownResult  = s._runResult || null;
+    const ownKeys    = ownResult
+        ? _flattenJson(ownResult.decryptedBody || ownResult.parsedRaw || {}, '', 0).filter(k => k.type !== 'object')
+        : [];
+    const hasOwnResponse = ownKeys.length > 0;
 
-    // Normalize path for display: if path has no dot it's a root field → show as $.field too
-    const normPath = p => p; // keep as-is; backend strips $. prefix
+    const captures = s.captures || [];
 
-    const bodyFields = _extractBodyFields(s);
-    const captures   = s.captures || [];
+    // Split into drag-mapped captures (have _bodyField sentinel) and manual ones
+    const dragCaptures   = captures.filter(c => c._bodyField);
+    const manualCaptures = captures.filter(c => !c._bodyField);
 
-    // Find if a body field already has a capture mapping
-    const mappingFor = field => captures.find(c => c._bodyField === field);
-
-    const hasResponse = prevKeys.length > 0;
-    const isFirstStep = i === 0;
-
-    // Build response chips for drag source
-    const resChips = prevKeys
-        .filter(k => k.type !== 'object') // skip object containers, show leaf values only
-        .map((k, ki) => `
-        <div class="res-chip capture-field-chip"
+    // Build response field chips (drag source)
+    const resChips = ownKeys.map((k, ki) => {
+        const alreadyMapped = captures.find(c => c.jsonPath === k.path);
+        return `
+        <div class="res-chip capture-field-chip${alreadyMapped ? ' mapped' : ''}"
              draggable="true"
-             data-path="${_esc(k.path)}"
-             data-value="${_esc(k.value)}"
-             id="res-chip-${i}-${ki}"
              ondragstart="_onResChipDragStart(event,'${_esc(k.path)}','${_esc(k.value)}')"
              ondragend="_onResChipDragEnd(event)"
-             title="${_esc(k.path)} = ${_esc(k.value)}">
-          <span style="font-family:monospace;font-size:10px;font-weight:700">${_esc(k.path)}</span>
-          <span class="res-chip-val">${_esc(k.value)}</span>
-        </div>`).join('');
-
-    // Build request param rows with drop zones
-    const reqRows = bodyFields.map((f, fi) => {
-        const mapped = mappingFor(f.field);
-        return `
-        <div class="req-chip capture-field-chip ${mapped ? 'mapped' : ''}" style="flex-direction:column;align-items:flex-start;gap:3px">
-          <div style="display:flex;align-items:center;gap:6px;width:100%">
-            <span style="font-family:monospace;font-size:10px;font-weight:700;color:var(--text)">${_esc(f.field)}</span>
-            ${f.isVar ? `<span style="font-size:9px;color:var(--muted2);background:var(--bg3);padding:1px 5px;border-radius:4px;border:1px solid var(--border)">${_esc(f.value)}</span>` : `<span style="font-size:9px;color:var(--muted)">${_esc(f.value)}</span>`}
-            ${mapped ? `<button onclick="_removeCaptureByField(${i},'${_esc(f.field)}')" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px" title="Remove mapping">✕</button>` : ''}
-          </div>
-          <div class="drop-zone ${mapped ? 'filled' : ''}"
-               id="dz-${i}-${fi}"
-               data-step="${i}" data-field="${_esc(f.field)}"
-               ondragover="_onDzDragOver(event)"
-               ondragleave="_onDzDragLeave(event)"
-               ondrop="_onDzDrop(event,${i},'${_esc(f.field)}')">
-            ${mapped
-                ? `<div class="capture-mapped-chip">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                    <span style="font-family:monospace">${_esc(mapped.jsonPath)}</span>
-                    <span style="font-size:9px;opacity:.7">→ {{${_esc(mapped.varName)}}}</span>
-                   </div>`
-                : `<span style="font-size:10px">Drop response field here</span>`}
-          </div>
+             title="Drag to create capture: ${_esc(k.path)} = ${_esc(k.value)}">
+          <span style="font-family:monospace;font-size:10px;font-weight:700;flex-shrink:0">${_esc(k.path)}</span>
+          <span class="res-chip-val" style="color:var(--green)">${_esc(k.value)}</span>
+          ${alreadyMapped ? '<span style="font-size:9px;opacity:.6;flex-shrink:0">✓ mapped</span>' : ''}
         </div>`;
     }).join('');
 
-    // Also show any manual captures that aren't tied to a body field
-    const manualCaptures = captures.filter(c => !c._bodyField);
+    // Build the capture drop zone (single target)
+    const dropZoneHtml = `
+        <div class="drop-zone" id="dz-cap-${i}"
+             style="min-height:44px;border-radius:8px;margin-top:4px"
+             ondragover="_onDzDragOver(event)"
+             ondragleave="_onDzDragLeave(event)"
+             ondrop="_onCaptureDrop(event,${i})">
+          <span style="font-size:10px">Drag a field here to capture it</span>
+        </div>`;
+
+    // Build existing drag-created captures
+    const dragCapturesHtml = dragCaptures.map((cap) => {
+        const realCi = captures.indexOf(cap);
+        return `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.25);border-radius:8px;margin-bottom:5px">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span style="font-family:monospace;font-size:11px;color:var(--text);font-weight:700">${_esc(cap.jsonPath)}</span>
+          <span style="font-size:10px;color:var(--muted)">→</span>
+          <input style="width:130px;height:26px;font-size:11px;font-family:monospace" value="${_esc(cap.varName||'')}"
+                 placeholder="varName"
+                 oninput="_scenarioSteps[${i}].captures[${realCi}].varName=this.value" />
+          <span style="font-size:10px;color:var(--muted2)">available as <code>{{${_esc(cap.varName||'varName')}}}</code></span>
+          <button class="step-remove" style="margin-left:auto" onclick="removeCapture(${i},${realCi})" title="Remove">✕</button>
+        </div>`;
+    }).join('');
+
+    // Build manual captures
     const manualHtml = manualCaptures.map((cap, ci) => {
         const realCi = captures.indexOf(cap);
         return `
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-          <input placeholder="varName" style="width:120px;height:30px;font-size:12px" value="${_esc(cap.varName||'')}"
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+          <input placeholder="varName" style="width:130px;height:30px;font-size:12px;font-family:monospace" value="${_esc(cap.varName||'')}"
                  oninput="_scenarioSteps[${i}].captures[${realCi}].varName=this.value" />
-          <span style="color:var(--muted2);font-size:12px;font-weight:700">←</span>
-          <input placeholder="e.g. data.token  or  accessToken" style="flex:1;min-width:140px;height:30px;font-size:12px"
+          <span style="color:var(--muted2);font-size:12px;font-weight:700;flex-shrink:0">←</span>
+          <input placeholder="e.g. data.emailVerificationToken  or  accessToken" style="flex:1;min-width:160px;height:30px;font-size:11px;font-family:monospace"
                  value="${_esc(cap.jsonPath||'')}" oninput="_scenarioSteps[${i}].captures[${realCi}].jsonPath=this.value" />
+          <span style="font-size:10px;color:var(--muted2);white-space:nowrap">→ <code>{{${_esc(cap.varName||'varName')}}}</code></span>
           <button class="step-remove" onclick="removeCapture(${i},${realCi})" title="Remove">✕</button>
         </div>`;
     }).join('');
 
+    const hasAnything = dragCaptures.length > 0 || manualCaptures.length > 0;
+
     return `
     <div class="step-section" style="margin-bottom:8px">
       <div class="step-section-title">
-        <span>📌 Captures — map response → next step</span>
-        <button class="btn btn-secondary btn-xs" onclick="addCapture(${i})" title="Add manual capture">+ Manual</button>
+        <span>📌 Captures — extract from <em>this</em> step's response for next steps</span>
+        <button class="btn btn-secondary btn-xs" onclick="addCapture(${i})" title="Add manual capture (type path manually)">+ Manual</button>
       </div>
 
-      ${isFirstStep ? `
-        <div style="font-size:11px;color:var(--muted);padding:6px 0">
-          This is the first step. Run it to populate its response, then map fields in the next step.
-        </div>` :
-        !hasResponse ? `
-        <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--amber);display:flex;align-items:center;gap:8px;margin-bottom:8px">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          Click <strong>▶ Run</strong> on Step ${i} to execute it first — its response fields will appear here for drag-and-drop mapping.
+      ${!hasOwnResponse ? `
+        <div style="background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.2);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--accent2);display:flex;align-items:center;gap:8px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Click <strong>▶ Run</strong> on this step first — its response fields will appear here. Drag any field to create a capture variable for the next step.
         </div>
-        ${bodyFields.length > 0 ? `
-        <div style="font-size:10px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">This step's request fields (drag response onto them after running Step ${i})</div>
-        ${reqRows}` : ''}` :
-        `
-        <div style="display:grid;grid-template-columns:1fr 32px 1fr;gap:0;align-items:start">
-          <div>
-            <div class="capture-col-hdr">Step ${i+1} Request Fields</div>
-            <div class="capture-col-body">${reqRows || '<div style="color:var(--muted);font-size:11px;padding:8px">No body fields found.</div>'}</div>
-          </div>
-          <div class="capture-arrow-col" style="padding-top:36px">
-            ${bodyFields.map((_,fi) => `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`).join('')}
-          </div>
-          <div>
-            <div class="capture-col-hdr">Step ${i} Response Fields <span style="font-weight:400;opacity:.7">(drag onto request field)</span></div>
-            <div class="capture-col-body" style="max-height:300px;overflow-y:auto">${resChips || '<div style="color:var(--muted);font-size:11px;padding:8px">No fields in response.</div>'}</div>
-          </div>
-        </div>`
-      }
+        ${hasAnything ? '<div style="margin-top:8px"></div>' : ''}` :
+      `
+      <div style="display:grid;grid-template-columns:1fr 24px 1fr;gap:4px;align-items:start;margin-bottom:8px">
+        <div>
+          <div class="capture-col-hdr" style="border-radius:7px 7px 0 0">Step ${i+1} Response Fields — drag to capture</div>
+          <div class="capture-col-body" style="max-height:220px;overflow-y:auto">${resChips}</div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;padding-top:40px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </div>
+        <div>
+          <div class="capture-col-hdr" style="border-radius:7px 7px 0 0">Drop zone — creates capture variable</div>
+          <div class="capture-col-body">${dropZoneHtml}</div>
+        </div>
+      </div>`}
 
-      ${manualHtml ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Manual Captures</div>${manualHtml}</div>` : ''}
+      ${dragCapturesHtml}
+
+      ${manualCaptures.length > 0 ? `
+        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
+          <div style="font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Manual — type path directly</div>
+          ${manualHtml}
+        </div>` : ''}
+
+      ${!hasAnything && hasOwnResponse ? `<div style="font-size:11px;color:var(--muted);padding:4px 0">No captures yet. Drag a field from the left panel, or click + Manual.</div>` : ''}
     </div>`;
 }
 
@@ -1735,26 +1730,27 @@ function _onResChipDragStart(e, path, value) {
 function _onResChipDragEnd(e) { e.target.classList.remove('dragging'); }
 function _onDzDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('over'); e.dataTransfer.dropEffect = 'copy'; }
 function _onDzDragLeave(e) { e.currentTarget.classList.remove('over'); }
-function _onDzDrop(e, stepIdx, bodyField) {
+
+// Drop onto the capture zone — creates a new capture from this step's own response field
+function _onCaptureDrop(e, stepIdx) {
     e.preventDefault();
     e.currentTarget.classList.remove('over');
     const path = _dragPath || e.dataTransfer.getData('text/plain');
     if (!path) return;
-    // auto-generate varName from last segment of path
+    // auto-generate varName from last segment (e.g. data.emailVerificationToken → emailVerificationToken)
     const varName = path.replace(/^\$\.?/, '').split('.').pop() || 'captured';
     const s = _scenarioSteps[stepIdx];
     if (!s.captures) s.captures = [];
-    // Remove old mapping for this body field if exists
-    const existing = s.captures.findIndex(c => c._bodyField === bodyField);
-    if (existing >= 0) s.captures.splice(existing, 1);
-    s.captures.push({ varName, jsonPath: path, _bodyField: bodyField });
+    // Don't duplicate — if same jsonPath already captured, just update varName
+    const existing = s.captures.findIndex(c => c.jsonPath === path && c._bodyField);
+    if (existing >= 0) { s.captures[existing].varName = varName; }
+    else { s.captures.push({ varName, jsonPath: path, _bodyField: '__drag__' }); }
     renderSteps();
-}
-function _removeCaptureByField(stepIdx, bodyField) {
-    const s = _scenarioSteps[stepIdx];
-    if (!s.captures) return;
-    const idx = s.captures.findIndex(c => c._bodyField === bodyField);
-    if (idx >= 0) { s.captures.splice(idx, 1); renderSteps(); }
+    // After renderSteps wipes DOM, restore result panel
+    const panel = document.getElementById(`step-result-${stepIdx}`);
+    if (panel && _scenarioSteps[stepIdx]._runResult) {
+        // panel was already restored by renderSteps' built-in panel restore
+    }
 }
 
 // ── Single-step trial run ──
@@ -1782,6 +1778,7 @@ async function runStep(i) {
         dynData.emailDomain  = document.getElementById('scen-dyn-email-domain')?.value  || 'mailinator.com';
         dynData.phoneBase    = document.getElementById('scen-dyn-phone-base')?.value    || '7100000000';
         dynData.namePrefix   = document.getElementById('scen-dyn-name-prefix')?.value   || 'TestUser';
+        dynData.startIndex   = parseInt(document.getElementById('scen-dyn-start-index')?.value) || 1;
     } catch(_) {}
 
     btn.classList.add('running');
@@ -1840,13 +1837,9 @@ async function runStep(i) {
 
     panel.style.display = 'block';
 
-    // Re-render steps to update capture mapper with new response fields.
-    // Save panel HTML first so it survives the re-render.
-    const savedPanelHtml = panel.innerHTML;
+    // Re-render so capture mapper updates with the new response fields.
+    // renderSteps() now preserves open result panels automatically.
     renderSteps();
-    // Restore result panel after re-render
-    const newPanel = document.getElementById(`step-result-${i}`);
-    if (newPanel) { newPanel.innerHTML = savedPanelHtml; newPanel.style.display = 'block'; }
 
     const newBtn = document.getElementById(`run-btn-${i}`);
     if (newBtn) { newBtn.classList.remove('running'); newBtn.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run'; }
@@ -1855,15 +1848,10 @@ async function runStep(i) {
 function _saveRunResponseToNextStep(i) {
     const result = _scenarioSteps[i]._runResult;
     if (!result) return;
-    showNotif('Response saved — scroll to the next step and drag fields onto request params.', 'success');
+    showNotif('Response ready — scroll to next step, then drag fields to capture them.', 'success');
     if (i + 1 < _scenarioSteps.length) {
         _scenarioSteps[i + 1]._collapsed = false;
-        // Save current panel before re-render
-        const curPanel = document.getElementById(`step-result-${i}`);
-        const savedHtml = curPanel ? curPanel.innerHTML : '';
-        renderSteps();
-        const restoredPanel = document.getElementById(`step-result-${i}`);
-        if (restoredPanel && savedHtml) { restoredPanel.innerHTML = savedHtml; restoredPanel.style.display = 'block'; }
+        renderSteps(); // renderSteps preserves open panels automatically
         setTimeout(() => {
             const nextCard = document.getElementById(`step-card-${i + 1}`);
             if (nextCard) nextCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1877,6 +1865,12 @@ function renderSteps() {
         c.innerHTML = '<div class="empty" style="padding:30px"><div class="empty-icon">🔀</div><h3>No Steps Yet</h3><p>Click "+ Add Step" below to build your test scenario.</p></div>';
         return;
     }
+    // Preserve any open result panels before wiping DOM
+    const savedPanels = {};
+    _scenarioSteps.forEach((_, i) => {
+        const p = document.getElementById(`step-result-${i}`);
+        if (p && p.style.display !== 'none' && p.innerHTML.trim()) savedPanels[i] = p.innerHTML;
+    });
     c.innerHTML = _scenarioSteps.map((s, i) => {
         const isCollapsed = !!s._collapsed;
         const method = (s.method || 'GET').toUpperCase();
@@ -2066,6 +2060,11 @@ function renderSteps() {
       </div>
     </div>`;
     }).join('');
+    // Restore result panels that were open before re-render
+    Object.entries(savedPanels).forEach(([idx, html]) => {
+        const p = document.getElementById(`step-result-${idx}`);
+        if (p) { p.innerHTML = html; p.style.display = 'block'; }
+    });
 }
 
 function _tryParseJSON(str, fallback) {
