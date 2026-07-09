@@ -1690,19 +1690,91 @@ footer{text-align:center;padding:24px;color:#94a3b8;font-size:11px;border-top:1p
 </div>
 
 ${show('showExecutiveSummary') ? `
-<!-- EXECUTIVE SUMMARY -->
-<div class="section">
-  <h2>📋 Executive Summary</h2>
-  <div class="exec-box">
-    This load test was executed to validate the stability and response time of <strong>${cfg.projectName || 'the application'}</strong>
-    under concurrent user traffic in the <strong>${cfg.environment || 'unknown'}</strong> environment.
-    The test ran a <strong>${cfg.scenarioType || 'load'}</strong> scenario with <strong>${cfg.vus} virtual users</strong>
-    for <strong>${cfg.duration} seconds</strong>${cfg.steps && cfg.steps.length ? ` across <strong>${cfg.steps.filter(s => s.enabled !== false).length} API steps</strong>` : cfg.url ? ` against <strong>${cfg.url}</strong>` : ''}.
-    Based on the configured thresholds and observed metrics, the final result is
-    <strong style="color:${vdColor}">${vd}</strong>.
-    ${vd === 'PASS' ? 'The application handled the load within acceptable performance boundaries.' :
-      vd === 'RISK' ? 'Some metrics are approaching risk thresholds — review recommended before release.' :
-      'Performance issues were detected — remediation required before production deployment.'}
+<!-- EXECUTIVE SUMMARY — Enterprise -->
+<div style="background:#fff;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 24px rgba(30,41,59,.10);border:2px solid ${vdColor}44;overflow:hidden">
+
+  <!-- Header bar -->
+  <div style="background:linear-gradient(90deg,#0f172a 0%,#1e293b 70%,#334155 100%);padding:16px 28px;display:flex;align-items:center;gap:14px">
+    <div style="background:rgba(255,255,255,.12);border-radius:8px;padding:8px 10px;flex-shrink:0">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:#fff;letter-spacing:.2px">Executive Summary</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:2px">Plain-language outcome for all stakeholders — no technical background required</div>
+    </div>
+    <div style="margin-left:auto">
+      <span style="background:${vd==='PASS'?'rgba(16,185,129,.2)':vd==='RISK'?'rgba(245,158,11,.2)':'rgba(239,68,68,.2)'};color:${vdColor};padding:6px 18px;border-radius:20px;font-size:13px;font-weight:900;border:2px solid ${vdColor};letter-spacing:.5px">${vd}</span>
+    </div>
+  </div>
+
+  <!-- Verdict banner -->
+  <div style="background:${vd==='PASS'?'linear-gradient(90deg,#d1fae5,#ecfdf5)':vd==='RISK'?'linear-gradient(90deg,#fef3c7,#fffbeb)':'linear-gradient(90deg,#fee2e2,#fff1f2)'};border-bottom:1px solid ${vdColor}33;padding:14px 28px;display:flex;align-items:center;gap:16px">
+    <div style="width:44px;height:44px;background:${vdColor};border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 12px ${vdColor}55">
+      <span style="font-size:20px">${vd==='PASS'?'✓':vd==='RISK'?'⚠':'✗'}</span>
+    </div>
+    <div>
+      <div style="font-size:16px;font-weight:900;color:${vdTxt}">${vd==='PASS'?'Performance Test PASSED — Application is Ready':vd==='RISK'?'Performance Test at RISK — Conditional Release Only':'Performance Test FAILED — Release Blocked'}</div>
+      <div style="font-size:13px;color:${vdTxt};opacity:.8;margin-top:3px">${vd==='PASS'?'All performance acceptance criteria were met under the defined load conditions.':vd==='RISK'?'One or more metrics are approaching threshold boundaries. Risk acceptance sign-off required.':'Critical performance failures detected. The application must not proceed to production.'}</div>
+    </div>
+  </div>
+
+  <!-- What was tested -->
+  <div style="padding:20px 28px 0">
+    <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">📌 What Was Tested</div>
+    <div style="font-size:14px;color:#1e293b;line-height:1.8;background:#f8fafc;border-radius:10px;padding:16px;border-left:4px solid #3b82f6">
+      The <strong>${cfg.projectName || 'application'}</strong> API was subjected to a
+      <strong>${cfg.scenarioType || 'Baseline Load Test'}</strong> simulating
+      <strong>${cfg.vus} concurrent users</strong> for <strong>${cfg.duration} seconds</strong>
+      ${cfg.rampup ? `with a <strong>${cfg.rampup}-second ramp-up</strong> ` : ''}
+      in the <strong>${cfg.environment || 'QA'}</strong> environment
+      ${cfg.steps && cfg.steps.filter(s=>s.enabled!==false).length > 0
+        ? `, executing a <strong>${cfg.steps.filter(s=>s.enabled!==false).length}-step API workflow</strong> per virtual user (registration → authentication → order flow)`
+        : cfg.url ? ` against <strong>${cfg.url}</strong>` : ''}.
+    </div>
+  </div>
+
+  <!-- Key numbers — layman KPIs -->
+  <div style="padding:16px 28px 0">
+    <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">📊 Key Numbers at a Glance</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+      <div style="background:${parseFloat(successRate)>=99?'#f0fdf4':'#fff7ed'};border:1px solid ${parseFloat(successRate)>=99?'#bbf7d0':'#fed7aa'};border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:24px;font-weight:900;color:${parseFloat(successRate)>=99?'#15803d':'#b45309'}">${successRate}%</div>
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-top:3px">Requests Succeeded</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:1px">target ≥ 99%</div>
+      </div>
+      <div style="background:${p95ms<=p95Thr?'#f0fdf4':'#fff1f2'};border:1px solid ${p95ms<=p95Thr?'#bbf7d0':'#fecdd3'};border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:24px;font-weight:900;color:${p95ms<=p95Thr?'#15803d':'#dc2626'}">${p95ms}<span style="font-size:13px">ms</span></div>
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-top:3px">Response Time (P95)</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:1px">limit: ${p95Thr}ms</div>
+      </div>
+      <div style="background:${errPct<1?'#f0fdf4':'#fff1f2'};border:1px solid ${errPct<1?'#bbf7d0':'#fecdd3'};border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:24px;font-weight:900;color:${errPct<1?'#15803d':'#dc2626'}">${errRateDisp}%</div>
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-top:3px">Error Rate</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:1px">target &lt; 1%</div>
+      </div>
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:24px;font-weight:900;color:#0369a1">${(m.totalReqs||0).toLocaleString()}</div>
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-top:3px">Total Requests</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:1px">${rps} req/sec avg</div>
+      </div>
+      <div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:24px;font-weight:900;color:#7e22ce">${dur}</div>
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-top:3px">Test Duration</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:1px">${cfg.vus} virtual users</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Plain-language verdict -->
+  <div style="padding:16px 28px 20px">
+    <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">🗣 Plain-Language Verdict</div>
+    <div style="font-size:14px;color:#334155;line-height:1.8;border-radius:10px;padding:16px;background:${vdBg};border:1px solid ${vdColor}33">
+      ${vd==='PASS'
+        ? `<strong style="color:${vdTxt}">${cfg.projectName||'The application'} passed this load test.</strong> Under ${cfg.vus} simultaneous users, every response was fast (P95: ${p95ms}ms, well below the ${p95Thr}ms limit), the error rate was negligible (${errRateDisp}%), and all ${(m.totalReqs||0).toLocaleString()} requests completed successfully. <strong>The system is stable and ready for release under these load conditions.</strong>`
+        : vd==='RISK'
+        ? `<strong style="color:${vdTxt}">The application is showing warning signs under ${cfg.vus} concurrent users.</strong> Some metrics are near their limits. While the application is still functional, continued load or production traffic could push it into failure. <strong>A release decision requires explicit risk acknowledgement from the release manager.</strong> The development team should investigate the flagged areas before the next test cycle.`
+        : `<strong style="color:${vdTxt}">${cfg.projectName||'The application'} failed this load test.</strong> Under ${cfg.vus} concurrent users, the system produced ${errRateDisp}% errors and response times reached ${p95ms}ms — ${p95ms > p95Thr ? `${(p95ms-p95Thr)}ms over the limit` : 'exceeding threshold'}. <strong>This application is not ready for production. Release is blocked until the issues are fixed and a full retest passes.</strong>`}
+    </div>
   </div>
 </div>` : ''}
 
@@ -1962,19 +2034,100 @@ ${show('showTimeline') && logRows ? `
 </div>` : ''}
 
 ${show('showRecommendations') ? `
-<!-- RECOMMENDATIONS -->
-<div class="section">
-  <h2>💡 QA Recommendation</h2>
-  <div class="rec-box">${recText}</div>
+<!-- QA RECOMMENDATION — Enterprise -->
+<div style="background:#fff;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 24px rgba(30,41,59,.10);border:2px solid ${recColor}55;overflow:hidden">
+
+  <!-- Header -->
+  <div style="background:linear-gradient(90deg,${vd==='PASS'?'#064e3b,#065f46,#047857':vd==='RISK'?'#78350f,#92400e,#b45309':'#7f1d1d,#991b1b,#b91c1c'} 100%);padding:16px 28px;display:flex;align-items:center;gap:14px">
+    <div style="background:rgba(255,255,255,.15);border-radius:8px;padding:8px 10px;flex-shrink:0">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 0 2-2h11"/></svg>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:#fff">QA Recommendation</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.65);margin-top:2px">ISTQB / CPTPA certified performance tester analysis</div>
+    </div>
+    <div style="margin-left:auto">
+      <span style="background:rgba(255,255,255,.15);color:#fff;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:800;border:1.5px solid rgba(255,255,255,.4);letter-spacing:.3px">${qaRec}</span>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div style="padding:24px 28px;font-size:13px;line-height:1.85;color:#1e293b">
+    ${recText}
+  </div>
 </div>
 
-<!-- RELEASE DECISION -->
-<div class="section">
-  <h2>🚀 Release Decision</h2>
-  <div class="rel-row">
-    <div class="rel-item"><div class="label">QA Recommendation</div><div class="value">${qaRec}</div></div>
-    <div class="rel-item"><div class="label">Based On</div><div class="value" style="font-size:13px;font-weight:600;color:#334155">Success ${successRate}% · Error ${errRateDisp}% · P95 ${m.p95 || 0}ms</div></div>
-    <div class="rel-item"><div class="label">Next Action</div><div class="value" style="font-size:13px;font-weight:600;color:#334155">${vd === 'PASS' ? 'Proceed to release' : vd === 'RISK' ? 'Review and retest' : 'Fix and retest'}</div></div>
+<!-- RELEASE DECISION — Enterprise -->
+<div style="background:#fff;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 24px rgba(30,41,59,.10);border:2px solid ${recColor}44;overflow:hidden">
+
+  <!-- Header -->
+  <div style="background:linear-gradient(90deg,#0f172a,#1e293b,#334155);padding:16px 28px;display:flex;align-items:center;gap:14px">
+    <div style="background:rgba(255,255,255,.12);border-radius:8px;padding:8px 10px;flex-shrink:0">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:#fff">Release Decision</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:2px">Final go/no-go based on observed metrics vs. acceptance criteria</div>
+    </div>
+  </div>
+
+  <!-- Decision cards -->
+  <div style="padding:20px 28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px">
+
+    <!-- Verdict card -->
+    <div style="background:${vd==='PASS'?'linear-gradient(135deg,#d1fae5,#a7f3d0)':vd==='RISK'?'linear-gradient(135deg,#fef3c7,#fde68a)':'linear-gradient(135deg,#fee2e2,#fecaca)'};border:2px solid ${recColor};border-radius:12px;padding:18px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px">
+      <div style="font-size:32px">${vd==='PASS'?'✅':vd==='RISK'?'⚠️':'🚫'}</div>
+      <div style="font-size:11px;font-weight:700;color:${vdTxt};text-transform:uppercase;letter-spacing:.5px">QA Verdict</div>
+      <div style="font-size:16px;font-weight:900;color:${vdTxt}">${qaRec}</div>
+    </div>
+
+    <!-- Evidence card -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px">
+      <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">Evidence</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:12px;color:#64748b">Success Rate</span>
+          <span style="font-size:13px;font-weight:800;color:${parseFloat(successRate)>=99?'#15803d':'#dc2626'}">${successRate}%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:12px;color:#64748b">Error Rate</span>
+          <span style="font-size:13px;font-weight:800;color:${errPct<1?'#15803d':errPct<10?'#b45309':'#dc2626'}">${errRateDisp}%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:12px;color:#64748b">P95 Latency</span>
+          <span style="font-size:13px;font-weight:800;color:${p95ms<=p95Thr?'#15803d':'#dc2626'}">${p95ms}ms / ${p95Thr}ms</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:12px;color:#64748b">Total Requests</span>
+          <span style="font-size:13px;font-weight:800;color:#1d4ed8">${(m.totalReqs||0).toLocaleString()}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Next action card -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px">
+      <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">Next Action</div>
+      <div style="font-size:13px;font-weight:700;color:${recColor};margin-bottom:10px">${vd==='PASS'?'Proceed to release pipeline':'Fix issues and retest'}</div>
+      <ul style="margin:0 0 0 16px;padding:0;font-size:12px;color:#475569;line-height:2">
+        ${vd==='PASS'
+          ? `<li>Archive this report as performance baseline</li>
+             <li>Schedule stress test at ${cfg.vus*2}–${cfg.vus*3} VUs before next release</li>
+             <li>Monitor production P95 after deployment</li>`
+          : vd==='RISK'
+          ? `<li>Obtain release manager risk sign-off</li>
+             <li>Raise P2 performance defect with this report</li>
+             <li>Retest at same VU count after dev fixes</li>`
+          : `<li>Raise P1 blocker defect immediately</li>
+             <li>Dev team: run 1-VU smoke test first</li>
+             <li>Full retest required — no partial retests</li>`}
+      </ul>
+    </div>
+  </div>
+
+  <!-- Footer strip -->
+  <div style="background:#f1f5f9;border-top:1px solid #e2e8f0;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <div style="font-size:11px;color:#64748b">Prepared by: <strong>${preparedBy}</strong> · ${new Date(state.endTime||Date.now()).toLocaleString('en-IN')}</div>
+    <div style="font-size:11px;color:#64748b">Standard: <strong>ISTQB Performance Testing · CPTPA Guidelines</strong></div>
   </div>
 </div>` : ''}
 
