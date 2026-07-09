@@ -1737,11 +1737,11 @@ function _onCaptureDrop(e, stepIdx) {
     e.currentTarget.classList.remove('over');
     const path = _dragPath || e.dataTransfer.getData('text/plain');
     if (!path) return;
-    // auto-generate varName as camelCase join so user.id → userId, not just id
+    // auto-generate varName: last segment of path, first char forced lowercase
+    // user.id → id, user.tenantId → tenantId, accessToken → accessToken
     const _parts = path.replace(/^\$\.?/, '').split('.').filter(Boolean);
-    const varName = _parts.length > 1
-        ? _parts.map((p, i) => i === 0 ? p : p.charAt(0).toUpperCase() + p.slice(1)).join('')
-        : (_parts[0] || 'captured');
+    const _last = _parts[_parts.length - 1] || 'captured';
+    const varName = _last.charAt(0).toLowerCase() + _last.slice(1);
     const s = _scenarioSteps[stepIdx];
     if (!s.captures) s.captures = [];
     // Don't duplicate — if same jsonPath already captured, just update varName
