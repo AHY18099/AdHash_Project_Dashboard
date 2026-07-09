@@ -438,11 +438,20 @@ router.get('/report/:runId', auth, async (req, res) => {
     }
     // Disk file missing (ephemeral Railway FS wiped) — try MongoDB
     try {
-        const doc = await LTReport.findOne({ runId: req.params.runId }, { htmlData: 1 }).lean();
+        const doc = await LTReport.findOne({ runId: req.params.runId }, { htmlData: 1, jsonData: 1 }).lean();
         if (doc?.htmlData) {
-            // Restore to disk for subsequent requests
             fs.writeFileSync(htmlPath, doc.htmlData);
             return res.send(doc.htmlData);
+        }
+        // htmlData missing but jsonData present — regenerate HTML from saved state
+        if (doc?.jsonData) {
+            const state = JSON.parse(doc.jsonData);
+            const template = _loadTemplate();
+            const html = _generateHtml(state, template);
+            fs.writeFileSync(htmlPath, html);
+            // Also persist htmlData so next time is instant
+            LTReport.updateOne({ runId: req.params.runId }, { $set: { htmlData: html } }).catch(() => {});
+            return res.send(html);
         }
     } catch {}
     res.status(404).send('<h2>Report not found</h2>');
@@ -457,8 +466,15 @@ router.get('/report/:runId/download', auth, async (req, res) => {
     // Restore from MongoDB if disk file missing
     if (!fs.existsSync(htmlPath)) {
         try {
-            const doc = await LTReport.findOne({ runId: req.params.runId }, { htmlData: 1 }).lean();
-            if (doc?.htmlData) fs.writeFileSync(htmlPath, doc.htmlData);
+            const doc = await LTReport.findOne({ runId: req.params.runId }, { htmlData: 1, jsonData: 1 }).lean();
+            if (doc?.htmlData) {
+                fs.writeFileSync(htmlPath, doc.htmlData);
+            } else if (doc?.jsonData) {
+                const state = JSON.parse(doc.jsonData);
+                const html = _generateHtml(state, _loadTemplate());
+                fs.writeFileSync(htmlPath, html);
+                LTReport.updateOne({ runId: req.params.runId }, { $set: { htmlData: html } }).catch(() => {});
+            }
         } catch {}
     }
     if (!fs.existsSync(htmlPath)) return res.status(404).json({ error: 'Report not found' });
