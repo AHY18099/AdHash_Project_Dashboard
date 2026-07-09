@@ -1737,8 +1737,11 @@ function _onCaptureDrop(e, stepIdx) {
     e.currentTarget.classList.remove('over');
     const path = _dragPath || e.dataTransfer.getData('text/plain');
     if (!path) return;
-    // auto-generate varName from last segment (e.g. data.emailVerificationToken → emailVerificationToken)
-    const varName = path.replace(/^\$\.?/, '').split('.').pop() || 'captured';
+    // auto-generate varName as camelCase join so user.id → userId, not just id
+    const _parts = path.replace(/^\$\.?/, '').split('.').filter(Boolean);
+    const varName = _parts.length > 1
+        ? _parts.map((p, i) => i === 0 ? p : p.charAt(0).toUpperCase() + p.slice(1)).join('')
+        : (_parts[0] || 'captured');
     const s = _scenarioSteps[stepIdx];
     if (!s.captures) s.captures = [];
     // Don't duplicate — if same jsonPath already captured, just update varName
