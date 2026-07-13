@@ -8557,6 +8557,25 @@ body.dark .sw-pin-path{color:#fbbf24}body.dark .sw-pin-query{color:#93c5fd}body.
 /* Empty + search */
 .sw-empty{text-align:center;padding:48px 20px;color:var(--mut)}
 .sw-empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
+/* Transparent mode banner */
+.sw-transparent-bar{display:flex;align-items:center;gap:12px;padding:9px 16px;border-radius:10px;margin-bottom:16px;font-size:12px;font-weight:600;transition:all .2s;flex-wrap:wrap}
+.sw-transparent-bar.off{background:rgba(100,116,139,.08);border:1.5px solid var(--border);color:var(--mut)}
+.sw-transparent-bar.on{background:rgba(16,185,129,.08);border:1.5px solid rgba(16,185,129,.4);color:#059669}
+body.dark .sw-transparent-bar.on{color:#34d399}
+.sw-tm-toggle{position:relative;display:inline-block;width:38px;height:20px;flex-shrink:0}
+.sw-tm-toggle input{opacity:0;width:0;height:0;position:absolute}
+.sw-tm-slider{position:absolute;inset:0;border-radius:20px;background:#cbd5e1;cursor:pointer;transition:background .2s}
+.sw-tm-slider:before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.sw-tm-toggle input:checked+.sw-tm-slider{background:#10b981}
+.sw-tm-toggle input:checked+.sw-tm-slider:before{transform:translateX(18px)}
+.sw-tm-label{flex:1;min-width:0}
+.sw-tm-badge{font-size:10px;padding:2px 8px;border-radius:50px;font-weight:700;white-space:nowrap}
+.sw-tm-badge.on{background:rgba(16,185,129,.15);color:#059669;border:1px solid rgba(16,185,129,.3)}
+.sw-tm-badge.off{background:rgba(100,116,139,.12);color:var(--mut);border:1px solid var(--border)}
+/* URL source row fix */
+.sw-source-row{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;margin-bottom:16px;flex-wrap:wrap}
+.sw-del-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:1.5px solid #fca5a5;background:rgba(220,38,38,.06);color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;transition:all .18s;white-space:nowrap;flex-shrink:0}
+.sw-del-btn:hover{background:#dc2626;color:#fff;border-color:#dc2626;box-shadow:0 3px 10px rgba(220,38,38,.3)}
 </style>
 </head><body>
 
@@ -9036,7 +9055,42 @@ const _SW_MC={
   options:{bg:'rgba(13,90,167,.1)',  color:'#0d5aa7',solid:'#0d5aa7',border:'rgba(13,90,167,.4)',  glow:'transparent'},
 };
 let _swSpec=null,_swBaseUrl='',_swProjId='';
-let _swLoading=false; // prevent concurrent spec loads
+let _swLoading=false;
+let _swTransparent=true; // Transparent mode: auto-encrypt requests + auto-decrypt responses (AES-128-CBC)
+
+// AES-128-CBC key/IV for WavedIn API (same key used in swagger-ui-init.js)
+const _SW_AES_KEY='xfnr3PVyckouBZxW';
+
+async function _swAesKey(){
+  const raw=new TextEncoder().encode(_SW_AES_KEY).slice(0,16);
+  return crypto.subtle.importKey('raw',raw,{name:'AES-CBC'},false,['encrypt','decrypt']);
+}
+async function _swEncrypt(plaintext){
+  const key=await _swAesKey();
+  const iv=new TextEncoder().encode(_SW_AES_KEY).slice(0,16);
+  const enc=await crypto.subtle.encrypt({name:'AES-CBC',iv},key,new TextEncoder().encode(plaintext));
+  return btoa(String.fromCharCode(...new Uint8Array(enc)));
+}
+async function _swDecrypt(b64){
+  try{
+    const key=await _swAesKey();
+    const iv=new TextEncoder().encode(_SW_AES_KEY).slice(0,16);
+    const buf=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+    const dec=await crypto.subtle.decrypt({name:'AES-CBC',iv},key,buf);
+    return new TextDecoder().decode(dec);
+  }catch(_){return null;}
+}
+async function _swMaybeDecrypt(text){
+  // If response is a JSON object with a single "key" field, try to decrypt it
+  try{
+    const obj=JSON.parse(text);
+    if(obj&&typeof obj==='object'&&Object.keys(obj).length===1&&typeof obj.key==='string'){
+      const plain=await _swDecrypt(obj.key);
+      if(plain){try{return JSON.parse(plain);}catch(_){return plain;}}
+    }
+  }catch(_){}
+  return null;
+}
 
 // ── Render Swagger tab (returns HTML string for renderProject) ──
 // Guard: if the swagger explorer is already rendered for this project,
@@ -9200,6 +9254,11 @@ function _renderSwaggerExplorer(spec,container,p){
     <button onclick="_swToggleAuthPanel('${p}')" style="padding:8px 16px;background:var(--grad-a);color:#fff;border:none;border-radius:7px;cursor:pointer;font-weight:600;font-size:12px;white-space:nowrap">✓ Apply</button>
   </div>
 </div>
+<div id="sw-tm-bar-${p}" class="sw-transparent-bar ${_swTransparent?'on':'off'}">
+  <label class="sw-tm-toggle"><input type="checkbox" id="sw-tm-chk-${p}" ${_swTransparent?'checked':''} onchange="_swToggleTransparent('${p}',this.checked)"><span class="sw-tm-slider"></span></label>
+  <span class="sw-tm-label"><b>Transparent mode</b> — <span id="sw-tm-desc-${p}">${_swTransparent?'ON: type PLAINTEXT and see PLAINTEXT responses. Requests auto-encrypt, responses auto-decrypt.':'OFF: send raw AES-encrypted { key } body. Responses shown as-is.'}</span></span>
+  <span class="sw-tm-badge ${_swTransparent?'on':'off'}" id="sw-tm-badge-${p}">${_swTransparent?'ON':'OFF'}</span>
+</div>
 <div style="margin-bottom:12px">
   <input type="text" class="sw-search2" placeholder="🔍 Search endpoints, paths, methods…" oninput="_swFilter(this.value)" style="width:100%;box-sizing:border-box">
 </div>
@@ -9284,16 +9343,30 @@ function _swBody2(op,eid,solidColor){
   const ctTypes=Object.keys(ct).length?Object.keys(ct):['application/json'];
   const solid=solidColor||'#49cc90';
   let ex='{\n}';
-  if(jc?.example)ex=JSON.stringify(jc.example,null,2);
+  // Prefer "plaintext" named example when transparent mode is ON; else first example or schema
+  const namedExamples=jc?.examples||{};
+  const plainEx=namedExamples['plaintext']?.value||namedExamples['Plaintext']?.value;
+  const firstEx=Object.values(namedExamples)[0]?.value;
+  if(_swTransparent&&plainEx)ex=JSON.stringify(plainEx,null,2);
+  else if(jc?.example)ex=JSON.stringify(jc.example,null,2);
+  else if(firstEx)ex=JSON.stringify(firstEx,null,2);
   else if(jc?.schema)ex=_swExampleFromSchema(jc.schema);
   const schemaHtml=jc?.schema?_swSchemaView(jc.schema):'<span style="color:var(--mut);font-size:12px">No schema available</span>';
+  const exKeys=Object.keys(namedExamples);
+  const exDropdown=exKeys.length>1?`<select onchange="_swSetExample('${eid}',this.value,${escH(JSON.stringify(namedExamples))})" style="padding:4px 8px;border:1px solid #d3d3d3;border-radius:4px;font-size:11px;background:#fff;color:#3b4151;cursor:pointer;outline:none;max-width:200px">
+    <option value="">Examples…</option>
+    ${exKeys.map(k=>`<option value="${escH(k)}" ${(_swTransparent&&k==='plaintext')||(!_swTransparent&&k==='encrypted')?'selected':''}>${escH(k)}</option>`).join('')}
+  </select>`:'';
   return`<div style="padding:0 20px 0;border-top:1px solid rgba(0,0,0,.08);margin-top:2px">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0 8px">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0 8px;flex-wrap:wrap;gap:8px">
     <div style="display:flex;align-items:center;gap:8px">
       <span style="font-size:14px;font-weight:700;color:#3b4151">Request body</span>
       ${op.requestBody.required?`<span style="font-size:11px;color:#e53e3e;font-style:italic">required</span>`:''}
     </div>
-    <select id="${eid}-ct" style="padding:4px 28px 4px 8px;border:1px solid #d3d3d3;border-radius:4px;font-size:12px;background:#fff;color:#3b4151;cursor:pointer;outline:none;appearance:auto">${ctTypes.map(t=>`<option value="${escH(t)}">${escH(t)}</option>`).join('')}</select>
+    <div style="display:flex;align-items:center;gap:8px">
+      ${exDropdown}
+      <select id="${eid}-ct" style="padding:4px 8px;border:1px solid #d3d3d3;border-radius:4px;font-size:12px;background:#fff;color:#3b4151;cursor:pointer;outline:none">${ctTypes.map(t=>`<option value="${escH(t)}">${escH(t)}</option>`).join('')}</select>
+    </div>
   </div>
   <div style="display:flex;gap:0;align-items:center;margin-bottom:8px;border-bottom:1px solid rgba(0,0,0,.1)">
     <span id="${eid}-tab-edit" style="font-size:12px;font-weight:600;color:${solid};border-bottom:2px solid ${solid};padding:4px 10px 4px 0;cursor:pointer;margin-right:12px" onclick="_swBodyTab('${eid}','edit','${solid}')">Edit Value</span>
@@ -9400,6 +9473,13 @@ function _swSchemaView(s,indent,seen){
   }
   const typeStr=s.enum?escH(s.type||'string')+' ('+s.enum.map(e=>JSON.stringify(e)).join(' | ')+')':escH(s.type||'any');
   return`${pad}<span style="color:#6b6b6b">${typeStr}</span>`;
+}
+
+function _swSetExample(eid,key,examples){
+  if(!key)return;
+  const ex=examples[key]?.value;if(ex===undefined)return;
+  const ta=document.getElementById(eid+'-body');
+  if(ta)ta.value=JSON.stringify(ex,null,2);
 }
 
 function _swBodyTab(eid,tab,solid){
@@ -9572,12 +9652,28 @@ async function _swRun(eid,path,method,p){
     const authTok=document.getElementById('sw-auth-token-'+p)?.value?.trim();
     const authType=document.getElementById('sw-auth-type-'+p)?.value;
     if(authTok&&authType!=='none')hd[authType==='ApiKey'?'X-API-Key':'Authorization']=(authType==='ApiKey'?'':authType+' ')+authTok;
-    let body=null;
+    let body=null,sentPlainBody=null;
     const bodyEl=document.getElementById(eid+'-body');
-    if(bodyEl?.value?.trim()){try{body=JSON.parse(bodyEl.value);}catch(_){respEl.innerHTML=`<div style="padding:12px 16px;color:var(--fail);font-size:12px">❌ Invalid JSON in request body</div>`;return;}}
+    if(bodyEl?.value?.trim()){
+      try{sentPlainBody=JSON.parse(bodyEl.value);}catch(_){respEl.innerHTML=`<div style="padding:12px 16px;color:var(--fail);font-size:12px">❌ Invalid JSON in request body</div>`;return;}
+      if(_swTransparent){
+        // Transparent mode ON: auto-encrypt plaintext body to { key: "<cipher>" }
+        const cipher=await _swEncrypt(JSON.stringify(sentPlainBody));
+        body={key:cipher};
+      }else{
+        body=sentPlainBody;
+      }
+    }
     const fullUrl=_swBaseUrl+resolvedPath+(Object.keys(qp).length?'?'+Object.entries(qp).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&'):'');
     const r=await fetch('/api/swagger-execute',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},body:JSON.stringify({method,url:fullUrl,headers:hd,body,params:qp})});
-    _swRenderResp2(respEl,await r.json(),eid,method.toUpperCase(),fullUrl,body,hd);
+    const result=await r.json();
+    // Transparent mode ON: auto-decrypt response if it looks like { key: "<cipher>" }
+    if(_swTransparent&&result.body){
+      const rawStr=typeof result.body==='object'?JSON.stringify(result.body):String(result.body);
+      const decrypted=await _swMaybeDecrypt(rawStr);
+      if(decrypted!==null)result.body=decrypted;
+    }
+    _swRenderResp2(respEl,result,eid,method.toUpperCase(),fullUrl,sentPlainBody||body,hd);
   }catch(e){respEl.innerHTML=`<div style="padding:12px 16px;color:var(--fail);font-size:12px">❌ ${escH(e.message)}</div>`;}
 }
 
@@ -9668,6 +9764,16 @@ function _swClearResp(eid){const el=document.getElementById(eid+'-resp');if(el){
 function _swToggleAuthPanel(p){
   const panel=document.getElementById('sw-auth-panel-'+p);
   if(panel)panel.style.display=panel.style.display==='none'?'block':'none';
+}
+
+function _swToggleTransparent(p,on){
+  _swTransparent=on;
+  const bar=document.getElementById('sw-tm-bar-'+p);
+  const desc=document.getElementById('sw-tm-desc-'+p);
+  const badge=document.getElementById('sw-tm-badge-'+p);
+  if(bar){bar.className='sw-transparent-bar '+(on?'on':'off');}
+  if(desc)desc.textContent=on?'ON: type PLAINTEXT and see PLAINTEXT responses. Requests auto-encrypt, responses auto-decrypt.':'OFF: send raw AES-encrypted { key } body. Responses shown as-is.';
+  if(badge){badge.textContent=on?'ON':'OFF';badge.className='sw-tm-badge '+(on?'on':'off');}
 }
 
 // ── Run All APIs ──
