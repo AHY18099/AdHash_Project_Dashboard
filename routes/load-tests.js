@@ -883,10 +883,18 @@ router.post('/step-run', auth, async (req, res) => {
             resolvedBodyPlain = bv;
 
             const enc = step.requestEncryption;
-            if (enc?.enabled && enc.key && enc.iv) {
+            if (enc?.enabled && enc.key) {
                 try {
-                    const encField  = enc.outputField || 'encryptedData';
-                    const encrypted = aesCbcEncrypt(bv, enc.key, enc.iv);
+                    const encField = enc.outputField || 'encryptedData';
+                    const algo     = enc.algorithm || 'AES-128-CBC';
+                    let encrypted;
+                    if (algo === 'AES-128-ECB') {
+                        encrypted = aesEncrypt(bv, enc.key);
+                    } else {
+                        // AES-128-CBC — IV defaults to key if not specified (WavedIn pattern)
+                        const iv = enc.iv || enc.key;
+                        encrypted = aesCbcEncrypt(bv, enc.key, iv);
+                    }
                     bodyStr = JSON.stringify({ [encField]: encrypted });
                 } catch(e) { bodyStr = bv; }
             } else {
@@ -939,18 +947,27 @@ router.post('/step-run', auth, async (req, res) => {
         let decryptedBody = null;
         const dec  = step.responseDecryption;
         const enc2 = step.requestEncryption;
-        const decKey  = (dec?.enabled && dec.key)  ? dec.key  : (enc2?.enabled && enc2.key  ? enc2.key  : null);
-        const decIv   = (dec?.enabled && dec.iv)   ? dec.iv   : (enc2?.enabled && enc2.iv   ? enc2.iv   : null);
+        const decAlgo  = (dec?.enabled && dec.algorithm)  ? dec.algorithm  : (enc2?.enabled ? (enc2.algorithm || 'AES-128-CBC') : 'AES-128-CBC');
+        const decKey   = (dec?.enabled && dec.key)  ? dec.key  : (enc2?.enabled && enc2.key  ? enc2.key  : null);
+        const decIv    = (dec?.enabled && dec.iv)   ? dec.iv   : (enc2?.enabled && enc2.iv   ? enc2.iv   : (decKey || null));
         const decField = (dec?.enabled && dec.inputField) ? dec.inputField : (enc2?.enabled ? (enc2.outputField || 'encryptedData') : 'encryptedData');
 
         let parsedRaw = null;
         try { parsedRaw = JSON.parse(result.rawBody); } catch(_) {}
 
-        if (decKey && decIv && parsedRaw) {
+        if (decKey && parsedRaw) {
             try {
                 const ciphertext = parsedRaw[decField] || '';
                 if (ciphertext) {
-                    const plain = aesCbcDecrypt(ciphertext, decKey, decIv);
+                    let plain;
+                    if (decAlgo === 'AES-128-ECB') {
+                        const decipher = require('crypto').createDecipheriv('aes-128-ecb', Buffer.from(decKey, 'utf8').slice(0, 16), null);
+                        decipher.setAutoPadding(true);
+                        plain = Buffer.concat([decipher.update(Buffer.from(ciphertext, 'base64')), decipher.final()]).toString('utf8');
+                    } else {
+                        const iv = decIv || decKey;
+                        plain = aesCbcDecrypt(ciphertext, decKey, iv);
+                    }
                     decryptedBody = JSON.parse(plain);
                 }
             } catch(e) { decryptedBody = null; }
