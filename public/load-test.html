@@ -1756,6 +1756,22 @@ function _onCaptureDrop(e, stepIdx) {
     }
 }
 
+// ── WavedIn/SyncTag AES preset: key=IV=xfnr3PVyckouBZxW, output/input field=key ──
+function _swApplyWavedInEncPreset(i) {
+    _scenarioSteps[i].requestEncryption = {
+        enabled: true, algorithm: 'AES-128-CBC',
+        key: 'xfnr3PVyckouBZxW', iv: 'xfnr3PVyckouBZxW', outputField: 'key'
+    };
+    renderSteps();
+}
+function _swApplyWavedInDecPreset(i) {
+    _scenarioSteps[i].responseDecryption = {
+        enabled: true, algorithm: 'AES-128-CBC',
+        key: 'xfnr3PVyckouBZxW', iv: 'xfnr3PVyckouBZxW', inputField: 'key'
+    };
+    renderSteps();
+}
+
 // ── Single-step trial run ──
 async function runStep(i) {
     const s = _scenarioSteps[i];
@@ -1968,11 +1984,19 @@ function renderSteps() {
 
         <!-- Row 6: Request Encryption -->
         <div class="step-section" style="margin-bottom:8px">
-          <div class="step-section-title">
+          <div class="step-section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
             <span>🔒 Request Encryption</span>
-            <label class="switch"><input type="checkbox" ${s.requestEncryption?.enabled?'checked':''} onchange="_scenarioSteps[${i}].requestEncryption.enabled=this.checked;renderSteps()"><span class="slider"></span></label>
+            <div style="display:flex;align-items:center;gap:10px">
+              ${!s.requestEncryption?.enabled ? `<button onclick="_swApplyWavedInEncPreset(${i})" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1px solid var(--purple);color:var(--purple);background:rgba(139,92,246,.07);cursor:pointer;font-weight:700;white-space:nowrap" title="Auto-fill AES-128-CBC key=IV=xfnr3PVyckouBZxW, output field=key (WavedIn / SyncTag API format)">⚡ WavedIn Preset</button>` : ''}
+              <label class="switch"><input type="checkbox" ${s.requestEncryption?.enabled?'checked':''} onchange="_scenarioSteps[${i}].requestEncryption.enabled=this.checked;renderSteps()"><span class="slider"></span></label>
+            </div>
           </div>
           ${s.requestEncryption?.enabled ? `
+          <div style="margin-top:4px;margin-bottom:8px;padding:7px 12px;background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.2);border-radius:7px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span>Preset:</span>
+            <button onclick="_swApplyWavedInEncPreset(${i})" style="font-size:10px;padding:2px 10px;border-radius:5px;border:1px solid var(--purple);color:var(--purple);background:rgba(139,92,246,.07);cursor:pointer;font-weight:700">⚡ WavedIn / SyncTag</button>
+            <span style="color:var(--muted2)">AES-128-CBC · key=IV=xfnr3PVyckouBZxW · output field=key</span>
+          </div>
           <div class="row" style="gap:8px;margin-top:8px">
             <div class="col">
               <label>Algorithm</label>
@@ -1995,17 +2019,25 @@ function renderSteps() {
               <input value="${_esc(s.requestEncryption.outputField||'encryptedData')}" oninput="_scenarioSteps[${i}].requestEncryption.outputField=this.value" style="height:32px;font-size:12px" />
             </div>
           </div>
-          <div class="form-hint" style="margin-top:6px">Body will be AES-encrypted on server before embedding in the test script.</div>
+          <div class="form-hint" style="margin-top:6px">Body will be AES-encrypted before sending. <b>WavedIn API</b> needs output field = <code style="color:var(--purple)">key</code>.</div>
           ` : ''}
         </div>
 
         <!-- Row 7: Response Decryption -->
         <div class="step-section" style="margin-bottom:8px">
-          <div class="step-section-title">
+          <div class="step-section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
             <span>🔓 Response Decryption</span>
-            <label class="switch"><input type="checkbox" ${s.responseDecryption?.enabled?'checked':''} onchange="_scenarioSteps[${i}].responseDecryption.enabled=this.checked;renderSteps()"><span class="slider"></span></label>
+            <div style="display:flex;align-items:center;gap:10px">
+              ${!s.responseDecryption?.enabled ? `<button onclick="_swApplyWavedInDecPreset(${i})" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1px solid var(--green);color:var(--green);background:rgba(16,185,129,.07);cursor:pointer;font-weight:700;white-space:nowrap" title="Auto-fill AES-128-CBC key=IV=xfnr3PVyckouBZxW, input field=key">⚡ WavedIn Preset</button>` : ''}
+              <label class="switch"><input type="checkbox" ${s.responseDecryption?.enabled?'checked':''} onchange="_scenarioSteps[${i}].responseDecryption.enabled=this.checked;renderSteps()"><span class="slider"></span></label>
+            </div>
           </div>
           ${s.responseDecryption?.enabled ? `
+          <div style="margin-top:4px;margin-bottom:8px;padding:7px 12px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:7px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span>Preset:</span>
+            <button onclick="_swApplyWavedInDecPreset(${i})" style="font-size:10px;padding:2px 10px;border-radius:5px;border:1px solid var(--green);color:var(--green);background:rgba(16,185,129,.07);cursor:pointer;font-weight:700">⚡ WavedIn / SyncTag</button>
+            <span style="color:var(--muted2)">AES-128-CBC · key=IV=xfnr3PVyckouBZxW · input field=key</span>
+          </div>
           <div class="row" style="gap:8px;margin-top:8px">
             <div class="col">
               <label>Algorithm</label>
