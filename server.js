@@ -4499,18 +4499,71 @@ app.get('/api/swagger-proxy', async (req, res) => {
         const response = await fetch(url, { headers: { Accept: 'application/json, application/yaml, text/yaml, */*' }, timeout: 15000 });
         if (!response.ok) return res.status(response.status).json({ error: `Upstream returned ${response.status}: ${response.statusText}` });
         const ct = response.headers.get('content-type') || '';
-        // Reject HTML responses — Swagger UI HTML page, not a spec
+
+        // HTML response — this is a Swagger UI browser page. Auto-detect the actual spec.
         if (ct.includes('text/html')) {
-            const suggestedUrl = url.replace(/\/docs\/?$/, '/docs-json')
-                                    .replace(/\/swagger-ui\/?$/, '/swagger.json')
-                                    .replace(/\/swagger\/?$/, '/swagger.json');
+            const html = await response.text();
+            const baseUrl = url.replace(/\/$/, '');
+            const origin = new URL(url).origin;
+
+            // Strategy 1: extract swaggerDoc inline from swagger-ui-init.js
+            const initJsMatch = html.match(/src=["'][^"']*swagger-ui-init\.js["']/i);
+            if (initJsMatch) {
+                const initJsPath = initJsMatch[0].match(/src=["']([^"']+)["']/)[1];
+                const initJsUrl = initJsPath.startsWith('http') ? initJsPath
+                    : initJsPath.startsWith('/') ? origin + initJsPath
+                    : baseUrl + '/' + initJsPath.replace(/^\.\//, '');
+                try {
+                    const jsRes = await fetch(initJsUrl, { timeout: 15000 });
+                    if (jsRes.ok) {
+                        const jsText = await jsRes.text();
+                        // Inline swaggerDoc — extract the JSON object assigned to "swaggerDoc"
+                        const docMatch = jsText.match(/"swaggerDoc"\s*:\s*(\{[\s\S]*?\})\s*,\s*"(?:customOptions|swaggerUrl)"/);
+                        if (docMatch) {
+                            try {
+                                const spec = JSON.parse(docMatch[1]);
+                                if (spec.openapi || spec.swagger) return res.json(spec);
+                            } catch (_) {}
+                        }
+                        // swaggerUrl pointing to external JSON
+                        const swaggerUrlMatch = jsText.match(/"swaggerUrl"\s*:\s*"([^"]+)"/);
+                        if (swaggerUrlMatch) {
+                            const specUrl = swaggerUrlMatch[1].startsWith('http') ? swaggerUrlMatch[1]
+                                : origin + swaggerUrlMatch[1];
+                            const specRes = await fetch(specUrl, { timeout: 15000 });
+                            if (specRes.ok) {
+                                const spec = await specRes.json();
+                                if (spec.openapi || spec.swagger) return res.json(spec);
+                            }
+                        }
+                    }
+                } catch (_) {}
+            }
+
+            // Strategy 2: common spec URL suffixes relative to the given URL
+            const candidates = [
+                `${baseUrl}-json`, `${baseUrl}.json`,
+                `${baseUrl}/swagger.json`, `${baseUrl}/openapi.json`,
+                `${baseUrl}/api-json`, `${baseUrl}/docs-json`,
+                `${origin}/swagger.json`, `${origin}/openapi.json`,
+                `${origin}/api-json`, `${origin}/api/swagger.json`,
+            ];
+            for (const c of candidates) {
+                try {
+                    const r = await fetch(c, { headers: { Accept: 'application/json' }, timeout: 8000 });
+                    if (r.ok && !(r.headers.get('content-type') || '').includes('text/html')) {
+                        const spec = await r.json();
+                        if (spec.openapi || spec.swagger) return res.json(spec);
+                    }
+                } catch (_) {}
+            }
+
             return res.status(422).json({
-                error: 'URL returned an HTML page, not a Swagger/OpenAPI spec.',
-                hint: 'This URL points to the Swagger UI browser page. You need the raw JSON or YAML spec URL.',
-                suggestedUrl: suggestedUrl !== url ? suggestedUrl : null,
-                examples: [url.replace(/\/docs\/?$/, '/docs-json'), url.replace(/\/docs\/?$/, '/api-json'), url.replace(/\/docs\/?$/, '/swagger.json')]
+                error: 'URL returned an HTML page and the spec could not be auto-detected.',
+                hint: 'Please provide the direct JSON/YAML spec URL (e.g. ending in /swagger.json, /api-json, /openapi.json).',
             });
         }
+
         let spec;
         if (ct.includes('yaml') || url.endsWith('.yaml') || url.endsWith('.yml')) {
             const yaml = require('js-yaml');
