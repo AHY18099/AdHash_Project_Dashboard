@@ -23,13 +23,9 @@ const ROOT      = path.resolve(__dirname, '..');
 const DASHBOARD_URL = (process.env.DASHBOARD_URL || '').replace(/\/$/, '');
 const API_KEY       = process.env.STATUS_REPORT_API_KEY || '';
 
-if (!DASHBOARD_URL) {
-    console.warn('[post-report] ⚠  DASHBOARD_URL not set — skipping dashboard save');
-    process.exit(0);
-}
-if (!API_KEY) {
-    console.warn('[post-report] ⚠  STATUS_REPORT_API_KEY not set — skipping dashboard save');
-    process.exit(0);
+const SKIP_DASHBOARD = !DASHBOARD_URL || !API_KEY;
+if (SKIP_DASHBOARD) {
+    console.warn('[post-report] ⚠  DASHBOARD_URL or STATUS_REPORT_API_KEY not set — skipping dashboard save (Slack still fires)');
 }
 
 // ── Find the HTML report ──────────────────────────────────────────────────────
@@ -128,36 +124,38 @@ const payload = {
 };
 
 async function postReport() {
-    const url = `${DASHBOARD_URL}/api/status-reports`;
-    console.log(`[post-report] POSTing to ${url} …`);
+    let reportId = null;
 
-    const response = await fetch(url, {
-        method:  'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-api-key':    API_KEY,
-        },
-        body: JSON.stringify(payload),
-    });
-
-    const text = await response.text();
-    let data;
-    try { data = JSON.parse(text); } catch { data = { raw: text }; }
-
-    if (!response.ok || !data.success) {
-        throw new Error(`HTTP ${response.status}: ${data.error || text.slice(0, 200)}`);
+    // Save to dashboard (skip if env vars missing)
+    if (!SKIP_DASHBOARD) {
+        const url = `${DASHBOARD_URL}/api/status-reports`;
+        console.log(`[post-report] POSTing to ${url} …`);
+        try {
+            const response = await fetch(url, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+                body: JSON.stringify(payload),
+            });
+            const text = await response.text();
+            let data;
+            try { data = JSON.parse(text); } catch { data = { raw: text }; }
+            if (!response.ok || !data.success) {
+                console.warn(`[post-report] ⚠  Dashboard save failed: HTTP ${response.status}: ${data.error || text.slice(0, 200)}`);
+            } else {
+                reportId = data.report?.id;
+                console.log(`[post-report] ✅ Report saved to dashboard: ${reportId}`);
+            }
+        } catch (e) {
+            console.warn(`[post-report] ⚠  Dashboard save error: ${e.message}`);
+        }
     }
 
-    console.log(`[post-report] ✅ Report saved to dashboard: ${data.report?.id}`);
-
-    // Send Slack alert if status is warning or failed
+    // Always send Slack alert for failed/warning — independent of dashboard save
     if (overallStatus === 'warning' || overallStatus === 'failed') {
-        await sendSlackAlert(data.report?.id).catch(e =>
+        await sendSlackAlert(reportId).catch(e =>
             console.warn(`[post-report] ⚠  Slack notify failed (non-fatal): ${e.message}`)
         );
     }
-
-    return data;
 }
 
 async function sendSlackAlert(reportId) {
@@ -242,7 +240,7 @@ async function sendSlackAlert(reportId) {
 
 // Never let this script fail the CI pipeline — just warn
 postReport().catch(err => {
-    console.warn(`[post-report] ⚠  Dashboard save failed (non-fatal): ${err.message}`);
+    console.warn(`[post-report] ⚠  Unexpected error (non-fatal): ${err.message}`);
     process.exit(0);
 });
 
