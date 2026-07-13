@@ -6916,15 +6916,14 @@ async function migrateWfDocsToGitHub() {
     } catch (e) { console.warn('[backup] Could not schedule backup:', e.message); }
 
     // ── Exact-time GitHub Actions trigger (8:00 AM IST + 4:00 PM IST) ──
-    // GitHub's cron scheduler has 15-60 min delays. Instead, this server
-    // calculates the exact ms until the next target time and fires workflow_dispatch
-    // via the GitHub API at precisely the right moment.
+    // Polls every minute. Fires workflow_dispatch when UTC time matches a target.
+    // Polling survives Railway redeploys — no one-shot setTimeout that resets.
     (function _scheduleGHWorkflow() {
         const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
         const GH_OWNER     = 'AHY18099';
         const GH_REPO      = 'AdHash_Project_Dashboard';
         const GH_WORKFLOW  = 'enterprise-qa-dashboard.yml';
-        // IST target hours in UTC: 8:00 AM IST = 02:30 UTC, 4:00 PM IST = 10:30 UTC
+        // IST target times in UTC: 8:00 AM IST = 02:30 UTC, 4:00 PM IST = 10:30 UTC
         const UTC_TARGETS  = [{ h: 2, m: 30 }, { h: 10, m: 30 }];
 
         if (!GITHUB_TOKEN) {
@@ -6932,7 +6931,10 @@ async function migrateWfDocsToGitHub() {
             return;
         }
 
-        function _triggerWorkflow() {
+        // Track last-fired minute strings to prevent double-fire within the same minute
+        const _fired = new Set();
+
+        function _triggerWorkflow(label) {
             const https = require('https');
             const body  = JSON.stringify({ ref: 'master' });
             const opts  = {
@@ -6949,37 +6951,40 @@ async function migrateWfDocsToGitHub() {
                 },
             };
             const req = https.request(opts, r => {
-                console.log(`[gh-trigger] workflow_dispatch → HTTP ${r.statusCode}`);
+                console.log(`[gh-trigger] workflow_dispatch (${label}) → HTTP ${r.statusCode}`);
             });
             req.on('error', e => console.error('[gh-trigger] dispatch error:', e.message));
             req.write(body);
             req.end();
         }
 
-        function _msUntilNext() {
-            const now = new Date();
-            let nearest = Infinity;
+        // Poll every 30 seconds — fire when current UTC hour:minute matches a target
+        setInterval(() => {
+            const now   = new Date();
+            const h     = now.getUTCHours();
+            const m     = now.getUTCMinutes();
+            const key   = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}-${h}-${m}`;
             for (const t of UTC_TARGETS) {
-                const next = new Date(now);
-                next.setUTCHours(t.h, t.m, 0, 0);
-                if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
-                nearest = Math.min(nearest, next - now);
+                if (h === t.h && m === t.m && !_fired.has(key)) {
+                    _fired.add(key);
+                    // Keep _fired small — only need current day's entries
+                    if (_fired.size > 20) _fired.clear();
+                    const istLabel = `${((t.h + 5) % 24).toString().padStart(2,'0')}:${(t.m + 30) % 60 < 10 ? '0':''}${(t.m + 30) % 60} IST`;
+                    console.log(`[gh-trigger] firing workflow_dispatch at ${istLabel}`);
+                    _triggerWorkflow(istLabel);
+                }
             }
-            return nearest;
-        }
+        }, 30000); // check every 30 s so we never miss a minute window
 
-        function _scheduleNext() {
-            const delay = _msUntilNext();
-            const inMin = Math.round(delay / 60000);
-            console.log(`[gh-trigger] next workflow dispatch in ${inMin} min`);
-            setTimeout(() => {
-                _triggerWorkflow();
-                // Re-schedule immediately after firing so the next target is picked up
-                setTimeout(_scheduleNext, 60000); // wait 1 min before re-scheduling (avoids double-fire)
-            }, delay);
-        }
-
-        _scheduleNext();
+        // Log next target on startup
+        const now = new Date();
+        const targets = UTC_TARGETS.map(t => {
+            const next = new Date(now);
+            next.setUTCHours(t.h, t.m, 0, 0);
+            if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+            return Math.round((next - now) / 60000);
+        });
+        console.log(`[gh-trigger] polling every 30s. Next targets in: ${targets.join(' min, ')} min`);
     })();
 });
 })(); // end startup async IIFE
