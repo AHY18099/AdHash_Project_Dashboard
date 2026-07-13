@@ -2,9 +2,8 @@ name: Enterprise QA Dashboard
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '30 2 * * *'   # 8:00 AM IST (UTC+5:30)
-    - cron: '30 10 * * *'  # 4:00 PM IST (UTC+5:30)
+  # Cron removed — exact-time triggering handled by Railway Express server
+  # via GitHub API workflow_dispatch at 8:00 AM and 4:00 PM IST precisely
 
 jobs:
   qa-enterprise:

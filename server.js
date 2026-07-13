@@ -6861,6 +6861,73 @@ async function migrateWfDocsToGitHub() {
         runBackupIfNeeded().catch(e => console.warn('[backup] Startup check failed:', e.message));
         setInterval(() => runBackupIfNeeded().catch(e => console.warn('[backup]', e.message)), 24 * 60 * 60 * 1000);
     } catch (e) { console.warn('[backup] Could not schedule backup:', e.message); }
+
+    // ── Exact-time GitHub Actions trigger (8:00 AM IST + 4:00 PM IST) ──
+    // GitHub's cron scheduler has 15-60 min delays. Instead, this server
+    // calculates the exact ms until the next target time and fires workflow_dispatch
+    // via the GitHub API at precisely the right moment.
+    (function _scheduleGHWorkflow() {
+        const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+        const GH_OWNER     = 'AHY18099';
+        const GH_REPO      = 'AdHash_Project_Dashboard';
+        const GH_WORKFLOW  = 'enterprise-qa-dashboard.yml';
+        // IST target hours in UTC: 8:00 AM IST = 02:30 UTC, 4:00 PM IST = 10:30 UTC
+        const UTC_TARGETS  = [{ h: 2, m: 30 }, { h: 10, m: 30 }];
+
+        if (!GITHUB_TOKEN) {
+            console.warn('[gh-trigger] GITHUB_TOKEN not set — exact-time trigger disabled');
+            return;
+        }
+
+        function _triggerWorkflow() {
+            const https = require('https');
+            const body  = JSON.stringify({ ref: 'master' });
+            const opts  = {
+                hostname: 'api.github.com',
+                path:     `/repos/${GH_OWNER}/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/dispatches`,
+                method:   'POST',
+                headers:  {
+                    'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                    'Accept':        'application/vnd.github+json',
+                    'Content-Type':  'application/json',
+                    'Content-Length': Buffer.byteLength(body),
+                    'User-Agent':    'AdHash-Dashboard',
+                    'X-GitHub-Api-Version': '2022-11-28',
+                },
+            };
+            const req = https.request(opts, r => {
+                console.log(`[gh-trigger] workflow_dispatch → HTTP ${r.statusCode}`);
+            });
+            req.on('error', e => console.error('[gh-trigger] dispatch error:', e.message));
+            req.write(body);
+            req.end();
+        }
+
+        function _msUntilNext() {
+            const now = new Date();
+            let nearest = Infinity;
+            for (const t of UTC_TARGETS) {
+                const next = new Date(now);
+                next.setUTCHours(t.h, t.m, 0, 0);
+                if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+                nearest = Math.min(nearest, next - now);
+            }
+            return nearest;
+        }
+
+        function _scheduleNext() {
+            const delay = _msUntilNext();
+            const inMin = Math.round(delay / 60000);
+            console.log(`[gh-trigger] next workflow dispatch in ${inMin} min`);
+            setTimeout(() => {
+                _triggerWorkflow();
+                // Re-schedule immediately after firing so the next target is picked up
+                setTimeout(_scheduleNext, 60000); // wait 1 min before re-scheduling (avoids double-fire)
+            }, delay);
+        }
+
+        _scheduleNext();
+    })();
 });
 })(); // end startup async IIFE
 
