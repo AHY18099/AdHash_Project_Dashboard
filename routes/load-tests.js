@@ -955,22 +955,40 @@ router.post('/step-run', auth, async (req, res) => {
         let parsedRaw = null;
         try { parsedRaw = JSON.parse(result.rawBody); } catch(_) {}
 
-        if (decKey && parsedRaw) {
+        function _tryDecryptCipher(ciphertext, algo, key, iv) {
+            if (!ciphertext || typeof ciphertext !== 'string') return null;
             try {
+                let plain;
+                if (algo === 'AES-128-ECB') {
+                    const decipher = require('crypto').createDecipheriv('aes-128-ecb', Buffer.from(key, 'utf8').slice(0, 16), null);
+                    decipher.setAutoPadding(true);
+                    plain = Buffer.concat([decipher.update(Buffer.from(ciphertext, 'base64')), decipher.final()]).toString('utf8');
+                } else {
+                    plain = aesCbcDecrypt(ciphertext, key, iv || key);
+                }
+                try { return JSON.parse(plain); } catch(_) { return plain; }
+            } catch(_) { return null; }
+        }
+
+        if (decKey) {
+            // Case 1: response is JSON object with a cipher field e.g. { key: "..." }
+            if (parsedRaw && typeof parsedRaw === 'object') {
                 const ciphertext = parsedRaw[decField] || '';
                 if (ciphertext) {
-                    let plain;
-                    if (decAlgo === 'AES-128-ECB') {
-                        const decipher = require('crypto').createDecipheriv('aes-128-ecb', Buffer.from(decKey, 'utf8').slice(0, 16), null);
-                        decipher.setAutoPadding(true);
-                        plain = Buffer.concat([decipher.update(Buffer.from(ciphertext, 'base64')), decipher.final()]).toString('utf8');
-                    } else {
-                        const iv = decIv || decKey;
-                        plain = aesCbcDecrypt(ciphertext, decKey, iv);
-                    }
-                    decryptedBody = JSON.parse(plain);
+                    decryptedBody = _tryDecryptCipher(ciphertext, decAlgo, decKey, decIv);
                 }
-            } catch(e) { decryptedBody = null; }
+            }
+            // Case 2: entire response body is a raw base64 cipher string (no JSON wrapper)
+            if (!decryptedBody && result.rawBody && typeof result.rawBody === 'string') {
+                const trimmed = result.rawBody.trim().replace(/^"|"$/g, ''); // strip surrounding quotes if any
+                if (/^[A-Za-z0-9+/]+=*$/.test(trimmed) && trimmed.length > 20) {
+                    decryptedBody = _tryDecryptCipher(trimmed, decAlgo, decKey, decIv);
+                }
+            }
+            // Case 3: response is JSON string (entire body is a quoted base64 string)
+            if (!decryptedBody && parsedRaw && typeof parsedRaw === 'string') {
+                decryptedBody = _tryDecryptCipher(parsedRaw, decAlgo, decKey, decIv);
+            }
         }
 
         // Extract captures
