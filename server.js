@@ -5715,6 +5715,17 @@ app.post('/api/app-config/:namespace', requireAdmin, async (req, res) => {
 });
 
 // ── AutoChecker GitHub Actions API ───────────────────────────────────────────
+// POST /api/trigger-qa-now — admin-only: immediately fire the Enterprise QA Dashboard workflow
+app.post('/api/trigger-qa-now', requireAdmin, async (req, res) => {
+    try {
+        const token = process.env.GITHUB_TOKEN || '';
+        if (!token) return res.status(500).json({ error: 'GITHUB_TOKEN not set' });
+        const r = await _ghRequest('POST', `/repos/AHY18099/AdHash_Project_Dashboard/actions/workflows/enterprise-qa-dashboard.yml/dispatches`, { ref: 'master' }, token);
+        if (r.status === 204) res.json({ ok: true, message: 'Enterprise QA Dashboard workflow triggered' });
+        else res.status(r.status).json({ error: `GitHub returned ${r.status}`, body: r.body });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 const AC_REPO = 'AHY18099/autochecker-daily-task';
 const AC_WORKFLOW_ID = '223108562'; // AdHash AutoChecker Production Tests
 
@@ -6958,33 +6969,39 @@ async function migrateWfDocsToGitHub() {
             req.end();
         }
 
+        function _toISTLabel(utcH, utcM) {
+            const totalMin = utcH * 60 + utcM + 330; // +5:30 = 330 min
+            const istH = Math.floor(totalMin / 60) % 24;
+            const istM = totalMin % 60;
+            return `${String(istH).padStart(2,'0')}:${String(istM).padStart(2,'0')} IST`;
+        }
+
         // Poll every 30 seconds — fire when current UTC hour:minute matches a target
         setInterval(() => {
-            const now   = new Date();
-            const h     = now.getUTCHours();
-            const m     = now.getUTCMinutes();
-            const key   = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}-${h}-${m}`;
+            const now = new Date();
+            const h   = now.getUTCHours();
+            const m   = now.getUTCMinutes();
+            const key = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}-${h}-${m}`;
             for (const t of UTC_TARGETS) {
                 if (h === t.h && m === t.m && !_fired.has(key)) {
                     _fired.add(key);
-                    // Keep _fired small — only need current day's entries
                     if (_fired.size > 20) _fired.clear();
-                    const istLabel = `${((t.h + 5) % 24).toString().padStart(2,'0')}:${(t.m + 30) % 60 < 10 ? '0':''}${(t.m + 30) % 60} IST`;
-                    console.log(`[gh-trigger] firing workflow_dispatch at ${istLabel}`);
-                    _triggerWorkflow(istLabel);
+                    const label = _toISTLabel(t.h, t.m);
+                    console.log(`[gh-trigger] firing workflow_dispatch at ${label}`);
+                    _triggerWorkflow(label);
                 }
             }
         }, 30000); // check every 30 s so we never miss a minute window
 
-        // Log next target on startup
+        // Log next targets on startup
         const now = new Date();
-        const targets = UTC_TARGETS.map(t => {
+        const mins = UTC_TARGETS.map(t => {
             const next = new Date(now);
             next.setUTCHours(t.h, t.m, 0, 0);
             if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
-            return Math.round((next - now) / 60000);
+            return `${_toISTLabel(t.h, t.m)} in ${Math.round((next - now) / 60000)} min`;
         });
-        console.log(`[gh-trigger] polling every 30s. Next targets in: ${targets.join(' min, ')} min`);
+        console.log(`[gh-trigger] polling every 30s — next: ${mins.join(', ')}`);
     })();
 });
 })(); // end startup async IIFE
