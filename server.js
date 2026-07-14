@@ -6941,32 +6941,27 @@ async function migrateWfDocsToGitHub() {
             console.warn('[gh-trigger] GITHUB_TOKEN not set — exact-time trigger disabled');
             return;
         }
+        console.log(`[gh-trigger] GITHUB_TOKEN present (${GITHUB_TOKEN.length} chars, starts ${GITHUB_TOKEN.slice(0,8)}…)`);
 
         // Track last-fired minute strings to prevent double-fire within the same minute
         const _fired = new Set();
 
-        function _triggerWorkflow(label) {
-            const https = require('https');
-            const body  = JSON.stringify({ ref: 'master' });
-            const opts  = {
-                hostname: 'api.github.com',
-                path:     `/repos/${GH_OWNER}/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/dispatches`,
-                method:   'POST',
-                headers:  {
-                    'Authorization': `Bearer ${GITHUB_TOKEN}`,
-                    'Accept':        'application/vnd.github+json',
-                    'Content-Type':  'application/json',
-                    'Content-Length': Buffer.byteLength(body),
-                    'User-Agent':    'AdHash-Dashboard',
-                    'X-GitHub-Api-Version': '2022-11-28',
-                },
-            };
-            const req = https.request(opts, r => {
-                console.log(`[gh-trigger] workflow_dispatch (${label}) → HTTP ${r.statusCode}`);
-            });
-            req.on('error', e => console.error('[gh-trigger] dispatch error:', e.message));
-            req.write(body);
-            req.end();
+        async function _triggerWorkflow(label) {
+            try {
+                const r = await _ghRequest(
+                    'POST',
+                    `/repos/${GH_OWNER}/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/dispatches`,
+                    { ref: 'master' },
+                    GITHUB_TOKEN
+                );
+                if (r.status === 204) {
+                    console.log(`[gh-trigger] ✅ workflow_dispatch (${label}) → HTTP 204 OK`);
+                } else {
+                    console.error(`[gh-trigger] ❌ workflow_dispatch (${label}) → HTTP ${r.status}:`, JSON.stringify(r.body));
+                }
+            } catch (e) {
+                console.error(`[gh-trigger] ❌ dispatch error (${label}):`, e.message);
+            }
         }
 
         function _toISTLabel(utcH, utcM) {
