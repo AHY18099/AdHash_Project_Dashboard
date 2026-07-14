@@ -1519,6 +1519,7 @@ function _newStep() {
         headers: {}, queryParams: {}, body: null,
         assertions: [{ type: 'status', expected: 200 }],
         captures: [],
+        forEach: { enabled: false, arrayVar: '', itemPath: '', injectAs: '' },
         requestEncryption: { enabled: false, algorithm: 'AES-128-CBC', key: '', iv: '', outputField: 'encryptedData' },
         responseDecryption: { enabled: false, algorithm: 'AES-128-CBC', key: '', iv: '', inputField: 'encryptedData' },
         continueOnFailure: false,
@@ -1561,6 +1562,11 @@ function addCapture(i) {
 }
 function removeCapture(si, ci) {
     _scenarioSteps[si].captures.splice(ci, 1);
+    renderSteps();
+}
+function addArrayCapture(i) {
+    if (!_scenarioSteps[i].captures) _scenarioSteps[i].captures = [];
+    _scenarioSteps[i].captures.push({ varName: '', jsonPath: '', _isArray: true });
     renderSteps();
 }
 function addAssertion(i) {
@@ -1616,9 +1622,10 @@ function _renderCaptureMapper(i, s) {
 
     const captures = s.captures || [];
 
-    // Split into drag-mapped captures (have _bodyField sentinel) and manual ones
-    const dragCaptures   = captures.filter(c => c._bodyField);
-    const manualCaptures = captures.filter(c => !c._bodyField);
+    // Split into drag-mapped captures (have _bodyField sentinel), array captures, and manual ones
+    const dragCaptures   = captures.filter(c => c._bodyField && !c._isArray);
+    const arrayCaptures  = captures.filter(c => c._isArray);
+    const manualCaptures = captures.filter(c => !c._bodyField && !c._isArray);
 
     // Build response field chips (drag source)
     const resChips = ownKeys.map((k, ki) => {
@@ -1682,7 +1689,10 @@ function _renderCaptureMapper(i, s) {
     <div class="step-section" style="margin-bottom:8px">
       <div class="step-section-title">
         <span>📌 Captures — extract from <em>this</em> step's response for next steps</span>
-        <button class="btn btn-secondary btn-xs" onclick="addCapture(${i})" title="Add manual capture (type path manually)">+ Manual</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-secondary btn-xs" onclick="addArrayCapture(${i})" title="Capture entire array for use in a For Each step">+ Array</button>
+          <button class="btn btn-secondary btn-xs" onclick="addCapture(${i})" title="Add manual capture (type path manually)">+ Manual</button>
+        </div>
       </div>
 
       ${!hasOwnResponse ? `
@@ -1707,6 +1717,24 @@ function _renderCaptureMapper(i, s) {
       </div>`}
 
       ${dragCapturesHtml}
+
+      ${arrayCaptures.length > 0 ? `
+        <div style="margin-top:6px">
+          ${arrayCaptures.map((cap) => {
+            const realCi = captures.indexOf(cap);
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.25);border-radius:8px;margin-bottom:5px">
+              <span style="font-size:10px;background:rgba(59,130,246,.15);color:#3b82f6;padding:2px 7px;border-radius:5px;font-weight:700;flex-shrink:0">ARRAY</span>
+              <input style="width:180px;height:26px;font-size:11px;font-family:monospace" value="${_esc(cap.jsonPath||'')}" placeholder="e.g. data.list"
+                     oninput="_scenarioSteps[${i}].captures[${realCi}].jsonPath=this.value" />
+              <span style="font-size:10px;color:var(--muted)">→</span>
+              <input style="width:130px;height:26px;font-size:11px;font-family:monospace" value="${_esc(cap.varName||'')}"
+                     placeholder="varName"
+                     oninput="_scenarioSteps[${i}].captures[${realCi}].varName=this.value" />
+              <span style="font-size:10px;color:var(--muted2)">→ <code>{{${_esc(cap.varName||'arrayVar')}}}</code> (array)</span>
+              <button class="step-remove" style="margin-left:auto" onclick="removeCapture(${i},${realCi})" title="Remove">✕</button>
+            </div>`;
+          }).join('')}
+        </div>` : ''}
 
       ${manualCaptures.length > 0 ? `
         <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
@@ -1803,6 +1831,68 @@ async function runStep(i) {
     btn.classList.add('running');
     btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" opacity=".3"/><path d="M12 2a10 10 0 010 20A10 10 0 0112 2" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" class="spin-arc"/></svg> Running…';
     panel.style.display = 'none';
+
+    // ── forEach mode: loop over captured array ──
+    const fe = s.forEach;
+    if (fe?.enabled && fe.arrayVar && fe.injectAs) {
+        const arr = capturedVars[fe.arrayVar];
+        if (!Array.isArray(arr) || arr.length === 0) {
+            panel.innerHTML = `<div class="step-result-panel"><div class="step-result-header"><span class="step-result-status srs-err">ERR</span><span style="font-size:11px;color:var(--muted2)">For Each: {{${_esc(fe.arrayVar)}}} is not a captured array or is empty. Run the previous step first.</span></div></div>`;
+            panel.style.display = 'block';
+            const nb = document.getElementById(`run-btn-${i}`);
+            if (nb) { nb.classList.remove('running'); nb.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run'; }
+            return;
+        }
+        const results = [];
+        let passed = 0, failed = 0;
+        for (let idx = 0; idx < arr.length; idx++) {
+            const item = arr[idx];
+            const itemVal = fe.itemPath
+                ? fe.itemPath.split('.').reduce((o, k) => (o != null ? o[k] : undefined), item)
+                : item;
+            const loopVars = Object.assign({}, capturedVars, { [fe.injectAs]: itemVal });
+            const btn2 = document.getElementById(`run-btn-${i}`);
+            if (btn2) btn2.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" opacity=".3"/><path d="M12 2a10 10 0 010 20A10 10 0 0112 2" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" class="spin-arc"/></svg> ${idx+1}/${arr.length}…`;
+            let r;
+            try {
+                r = await api('POST', '/api/load-test/step-run', { step: s, globalVars, capturedVars: loopVars, dynamicData: dynData });
+            } catch(e) {
+                r = { ok: false, error: e.message, status: 0, responseTime: 0 };
+            }
+            results.push({ index: idx, itemVal, result: r });
+            if (r.status >= 200 && r.status < 300) passed++; else failed++;
+        }
+        _scenarioSteps[i]._runResult = { ok: true, _isForEach: true, results, capturedValues: {} };
+
+        const rowsHtml = results.map(({ index, itemVal, result: r }) => {
+            const st = r.status || 0;
+            const stCls = st >= 500 ? 'srs-5xx' : st >= 400 ? 'srs-4xx' : st >= 200 ? 'srs-2xx' : 'srs-err';
+            const body = r.decryptedBody ? JSON.stringify(r.decryptedBody, null, 2) : (r.parsedRaw ? JSON.stringify(r.parsedRaw, null, 2) : (r.rawBody || r.error || '—'));
+            return `<details style="margin-bottom:4px;border:1px solid var(--border);border-radius:7px;overflow:hidden">
+              <summary style="padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:11px;background:var(--bg2)">
+                <span class="step-result-status ${stCls}" style="font-size:10px;padding:1px 7px">${st||'ERR'}</span>
+                <span style="font-family:monospace;color:var(--accent2)">${_esc(String(itemVal).substring(0,40))}</span>
+                <span style="color:var(--muted2)">${r.responseTime||0}ms</span>
+                ${r.decryptedBody ? '<span style="font-size:9px;background:rgba(139,92,246,.12);color:#7c3aed;padding:1px 6px;border-radius:8px">Decrypted</span>' : ''}
+              </summary>
+              <pre style="margin:0;padding:8px 12px;font-size:11px;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow:auto">${_esc(body)}</pre>
+            </details>`;
+        }).join('');
+
+        panel.innerHTML = `<div class="step-result-panel">
+          <div class="step-result-header">
+            <span style="font-size:11px;font-weight:700">🔁 For Each — ${arr.length} items</span>
+            <span style="font-size:11px;color:#059669">✓ ${passed} passed</span>
+            ${failed > 0 ? `<span style="font-size:11px;color:#ef4444">✗ ${failed} failed</span>` : ''}
+          </div>
+          <div style="padding:10px 12px">${rowsHtml}</div>
+        </div>`;
+        panel.style.display = 'block';
+        const nb = document.getElementById(`run-btn-${i}`);
+        if (nb) { nb.classList.remove('running'); nb.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run'; }
+        renderSteps();
+        return;
+    }
 
     let result;
     try {
@@ -1981,6 +2071,55 @@ function renderSteps() {
 
         <!-- Row 5: Captures / field-mapping -->
         ${_renderCaptureMapper(i, s)}
+
+        <!-- Row 5b: For Each (iterate over captured array) -->
+        ${(() => {
+            const fe = s.forEach || {};
+            // Collect available array vars from all prior steps
+            const arrayVars = [];
+            for (let j = 0; j < i; j++) {
+                for (const cap of (_scenarioSteps[j].captures || [])) {
+                    if (cap._isArray && cap.varName) arrayVars.push(cap.varName);
+                }
+            }
+            return `
+        <div class="step-section" style="margin-bottom:8px">
+          <div class="step-section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <span>🔁 For Each (loop over array from previous step)</span>
+            <label class="switch"><input type="checkbox" ${fe.enabled?'checked':''} onchange="_scenarioSteps[${i}].forEach.enabled=this.checked;renderSteps()"><span class="slider"></span></label>
+          </div>
+          ${fe.enabled ? `
+          <div style="margin-top:8px;padding:10px 12px;background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.2);border-radius:8px">
+            <div class="row" style="gap:10px;flex-wrap:wrap;align-items:flex-end">
+              <div style="min-width:160px">
+                <label style="font-size:11px">Array variable (captured above)</label>
+                <select style="height:32px;font-size:12px" onchange="_scenarioSteps[${i}].forEach.arrayVar=this.value;renderSteps()">
+                  <option value="">— select —</option>
+                  ${arrayVars.map(v => `<option value="${_esc(v)}" ${fe.arrayVar===v?'selected':''}>${_esc(v)}</option>`).join('')}
+                </select>
+              </div>
+              <div style="min-width:160px">
+                <label style="font-size:11px">Field path in each item</label>
+                <input style="height:32px;font-size:12px;font-family:monospace" placeholder="e.g. _id" value="${_esc(fe.itemPath||'')}"
+                       oninput="_scenarioSteps[${i}].forEach.itemPath=this.value" />
+              </div>
+              <div style="min-width:160px">
+                <label style="font-size:11px">Inject as variable</label>
+                <input style="height:32px;font-size:12px;font-family:monospace" placeholder="e.g. currentId" value="${_esc(fe.injectAs||'')}"
+                       oninput="_scenarioSteps[${i}].forEach.injectAs=this.value" />
+              </div>
+            </div>
+            ${fe.arrayVar && fe.injectAs ? `
+            <div style="margin-top:8px;font-size:11px;color:var(--accent2);background:rgba(59,130,246,.07);border-radius:6px;padding:6px 10px">
+              ▶ Will call this step once per item in <code>{{${_esc(fe.arrayVar)}}}</code>${fe.itemPath ? `, extracting <code>${_esc(fe.itemPath)}</code>` : ''} as <code>{{${_esc(fe.injectAs)}}}</code> in the URL and body.
+            </div>` : `
+            <div style="margin-top:8px;font-size:11px;color:var(--muted)">
+              Select an array variable and inject-as name. Use <code>{{${_esc(fe.injectAs||'currentId')}}}</code> in this step's URL or body.
+            </div>`}
+          </div>` : `
+          <div style="font-size:11px;color:var(--muted)">Enable to repeat this step for every item in a captured array (e.g. call /createFriendRequest for each user from the previous listing).</div>`}
+        </div>`;
+        })()}
 
         <!-- Row 6: Request Encryption -->
         <div class="step-section" style="margin-bottom:8px">
