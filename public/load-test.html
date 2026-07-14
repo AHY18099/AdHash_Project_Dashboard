@@ -1982,6 +1982,8 @@ function renderSteps() {
         if (p && p.style.display !== 'none' && p.innerHTML.trim()) savedPanels[i] = p.innerHTML;
     });
     c.innerHTML = _scenarioSteps.map((s, i) => {
+        // Ensure forEach exists on steps created before this feature
+        if (!s.forEach) s.forEach = { enabled: false, arrayVar: '', itemPath: '', injectAs: '' };
         const isCollapsed = !!s._collapsed;
         const method = (s.method || 'GET').toUpperCase();
         const hasBody = ['POST','PUT','PATCH'].includes(method);
