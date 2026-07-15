@@ -1942,65 +1942,194 @@ function _generateHtml(state, tmpl = {}) {
 <title>${reportTitle} — ${cfg.projectName || 'Project'}</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"><\/script>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#1e293b;line-height:1.5}
-.page{max-width:1100px;margin:0 auto;padding:24px}
-.rpt-header{background:${headerColor};color:#fff;border-radius:16px;padding:36px 40px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px}
-.rpt-brand{font-size:28px;font-weight:800;letter-spacing:-.5px}
-.rpt-brand span{color:#60a5fa}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:#F0F2F8;color:#0D1224;line-height:1.55}
+.page{max-width:1100px;margin:0 auto;padding:28px 24px}
+
+/* ── REPORT HEADER ── */
+.rpt-header{
+  background:linear-gradient(135deg,#0F172A 0%,#1E293B 60%,#1E3A5F 100%);
+  color:#fff;border-radius:18px;padding:36px 44px;margin-bottom:24px;
+  display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:20px;
+  position:relative;overflow:hidden;
+  box-shadow:0 8px 32px rgba(15,23,42,0.35);
+}
+.rpt-header::before{
+  content:'';position:absolute;top:-60px;right:-40px;
+  width:260px;height:260px;border-radius:50%;
+  background:radial-gradient(circle,rgba(99,102,241,0.20),transparent 70%);
+  pointer-events:none;
+}
+.rpt-brand{font-size:26px;font-weight:900;letter-spacing:-.6px;display:flex;align-items:center;gap:10px}
+.rpt-brand-icon{
+  width:40px;height:40px;border-radius:10px;
+  background:linear-gradient(135deg,#EF4444,#DC2626);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  box-shadow:0 2px 10px rgba(220,38,38,0.45);
+}
+.rpt-brand em{font-style:normal;background:linear-gradient(90deg,#818CF8,#A78BFA);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .rpt-meta{text-align:right}
-.rpt-meta .title{font-size:18px;font-weight:700;margin-bottom:4px}
-.rpt-meta .sub{font-size:12px;opacity:.75}
-.badge{display:inline-block;padding:5px 16px;border-radius:20px;font-size:12px;font-weight:700}
-.badge-env{background:rgba(59,130,246,.2);color:#93c5fd}
-.badge-type{background:rgba(139,92,246,.2);color:#c4b5fd}
-.verdict-badge{font-size:20px;font-weight:900;padding:10px 28px;border-radius:12px;background:${vdBg};color:${vdTxt};border:2px solid ${vdColor}}
-.section{background:#fff;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
-.section h2{font-size:15px;font-weight:700;color:#1e293b;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:8px}
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-.kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;text-align:center}
-.kpi-val{font-size:24px;font-weight:800;line-height:1}
-.kpi-lbl{font-size:11px;color:#64748b;margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
-.kpi-val.green{color:#10b981}.kpi-val.red{color:#ef4444}.kpi-val.blue{color:#3b82f6}.kpi-val.amber{color:#f59e0b}.kpi-val.purple{color:#8b5cf6}
-.cfg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
-.cfg-row{display:flex;flex-direction:column;gap:2px}
-.cfg-lbl{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px}
-.cfg-val{font-size:13px;font-weight:600;color:#334155}
-.exec-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:10px;padding:20px;font-size:14px;color:#0c4a6e;line-height:1.7}
+.rpt-meta .title{font-size:17px;font-weight:800;margin-bottom:6px;letter-spacing:-.1px}
+.rpt-meta .sub{font-size:12px;color:rgba(255,255,255,0.65);margin-top:3px;line-height:1.6}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:.02em}
+.badge-env{background:rgba(59,130,246,.20);color:#93c5fd;border:1px solid rgba(59,130,246,.30)}
+.badge-type{background:rgba(139,92,246,.20);color:#c4b5fd;border:1px solid rgba(139,92,246,.30)}
+.verdict-badge{font-size:18px;font-weight:900;padding:9px 26px;border-radius:10px;background:${vdBg};color:${vdTxt};border:2px solid ${vdColor};letter-spacing:.04em;display:inline-flex;align-items:center;gap:8px}
+
+/* ── SECTIONS ── */
+.section{
+  background:#fff;border-radius:16px;padding:28px;margin-bottom:20px;
+  box-shadow:0 1px 3px rgba(15,23,42,0.06),0 4px 16px rgba(15,23,42,0.04);
+  border:1px solid rgba(79,70,229,0.07);
+  position:relative;overflow:hidden;
+  transition:box-shadow .2s;
+}
+.section:hover{box-shadow:0 4px 20px rgba(15,23,42,0.10)}
+.section h2{
+  font-size:11px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.09em;
+  margin-bottom:20px;padding-bottom:12px;
+  border-bottom:1px solid rgba(79,70,229,0.09);
+  display:flex;align-items:center;gap:10px;
+}
+.section-icon{
+  width:28px;height:28px;border-radius:7px;
+  display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;
+  background:rgba(79,70,229,0.08);border:1px solid rgba(79,70,229,0.15);
+}
+
+/* ── SECTION HEADER BAR (dark navy) — used for "Test Configuration" ── */
+.section-hdr-bar{
+  background:linear-gradient(90deg,#0F172A 0%,#1E293B 70%,#1e3a5f 100%);
+  border-radius:14px;margin-bottom:20px;overflow:hidden;
+  box-shadow:0 4px 20px rgba(15,23,42,0.28);
+}
+.section-hdr-bar-inner{
+  padding:18px 26px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+}
+.section-hdr-bar-icon{
+  width:40px;height:40px;border-radius:10px;
+  background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.15);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;
+}
+.section-hdr-bar-title{font-size:15px;font-weight:800;color:#fff;letter-spacing:-.1px}
+.section-hdr-bar-sub{font-size:11px;color:rgba(255,255,255,0.55);margin-top:3px}
+.section-hdr-bar-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.badge-hdr{display:inline-flex;align-items:center;padding:5px 14px;border-radius:8px;font-size:11px;font-weight:700;letter-spacing:.02em;border:1px solid}
+.badge-scenario{background:rgba(255,255,255,0.10);color:#e2e8f0;border-color:rgba(255,255,255,0.20)}
+.badge-engine{background:rgba(129,140,248,0.15);color:#a5b4fc;border-color:rgba(129,140,248,0.30)}
+.badge-verdict-pass{background:rgba(16,185,129,0.20);color:#6ee7b7;border-color:rgba(16,185,129,0.40)}
+.badge-verdict-risk{background:rgba(245,158,11,0.20);color:#fcd34d;border-color:rgba(245,158,11,0.40)}
+.badge-verdict-fail{background:rgba(239,68,68,0.20);color:#fca5a5;border-color:rgba(239,68,68,0.40)}
+.section-hdr-bar-body{background:#fff;border-radius:0 0 14px 14px;padding:24px 26px;border-top:1px solid rgba(79,70,229,0.07)}
+
+/* ── KPI TILES ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px}
+.kpi{
+  border-radius:14px;padding:20px 16px;text-align:center;
+  position:relative;overflow:hidden;border:1px solid transparent;
+  transition:transform .2s,box-shadow .2s;
+}
+.kpi:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.10)}
+.kpi-blue{background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border-color:#BFDBFE}
+.kpi-green{background:linear-gradient(135deg,#ECFDF5,#D1FAE5);border-color:#A7F3D0}
+.kpi-amber{background:linear-gradient(135deg,#FFFBEB,#FEF3C7);border-color:#FDE68A}
+.kpi-purple{background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border-color:#DDD6FE}
+.kpi-red{background:linear-gradient(135deg,#FFF1F2,#FFE4E6);border-color:#FECDD3}
+.kpi-teal{background:linear-gradient(135deg,#F0FDFA,#CCFBF1);border-color:#99F6E4}
+.kpi-val{font-size:28px;font-weight:900;line-height:1;letter-spacing:-.8px}
+.kpi-unit{font-size:14px;font-weight:700;margin-left:1px}
+.kpi-lbl{font-size:10px;font-weight:700;margin-top:6px;text-transform:uppercase;letter-spacing:.07em;opacity:.75}
+.kpi-sub{font-size:10px;margin-top:3px;opacity:.6}
+.kpi-val.green{color:#059669}.kpi-val.red{color:#DC2626}.kpi-val.blue{color:#2563EB}.kpi-val.amber{color:#D97706}.kpi-val.purple{color:#7C3AED}.kpi-val.teal{color:#0D9488}
+
+/* ── LOAD PARAM TILES (large colored number tiles) ── */
+.lparam-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:4px}
+.lparam{border-radius:14px;padding:22px 16px;text-align:center;border:1px solid transparent}
+.lparam-blue{background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border-color:#BFDBFE}
+.lparam-green{background:linear-gradient(135deg,#ECFDF5,#D1FAE5);border-color:#A7F3D0}
+.lparam-amber{background:linear-gradient(135deg,#FFFBEB,#FEF3C7);border-color:#FDE68A}
+.lparam-purple{background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border-color:#DDD6FE}
+.lparam-val{font-size:36px;font-weight:900;line-height:1;letter-spacing:-1px;display:flex;align-items:baseline;justify-content:center;gap:3px}
+.lparam-val-unit{font-size:16px;font-weight:700}
+.lparam-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-top:8px;opacity:.7}
+.lparam-sub{font-size:11px;margin-top:3px;opacity:.6}
+.lparam-blue .lparam-val{color:#2563EB}
+.lparam-green .lparam-val{color:#059669}
+.lparam-amber .lparam-val{color:#D97706}
+.lparam-purple .lparam-val{color:#7C3AED}
+
+/* ── THRESHOLD TILES ── */
+.thresh-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.thresh{background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:18px 20px;position:relative;overflow:hidden}
+.thresh-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#6B7280;margin-bottom:8px}
+.thresh-val{font-size:22px;font-weight:900;letter-spacing:-.5px;line-height:1}
+.thresh-limit{font-size:11px;color:#9CA3AF;margin-top:3px;font-weight:500}
+.thresh-progress{height:4px;background:#E5E7EB;border-radius:20px;margin-top:10px;overflow:hidden}
+.thresh-bar{height:100%;border-radius:20px;transition:width .6s ease}
+.thresh-status{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:8px}
+.thresh-ok{color:#059669}.thresh-warn{color:#D97706}.thresh-bad{color:#DC2626}
+
+/* ── CFG GRID (text info rows) ── */
+.cfg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.cfg-row{display:flex;flex-direction:column;gap:3px;padding:12px 16px;background:#F9FAFB;border-radius:10px;border:1px solid #F3F4F6}
+.cfg-lbl{font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.07em}
+.cfg-val{font-size:13px;font-weight:700;color:#111827}
+.env-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE}
+.url-box{background:#F1F5F9;border:1px solid #E2E8F0;border-radius:8px;padding:8px 12px;font-family:ui-monospace,'Consolas',monospace;font-size:12px;color:#334155;word-break:break-all}
+
+/* ── EXEC TIME GRID ── */
+.exec-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.exec-cell{display:flex;align-items:center;gap:12px;padding:14px 16px;background:#F9FAFB;border:1px solid #F3F4F6;border-radius:12px}
+.exec-cell-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.exec-cell-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9CA3AF;margin-bottom:3px}
+.exec-cell-val{font-size:13px;font-weight:700;color:#111827}
+
+.exec-box{background:linear-gradient(135deg,#F0F9FF,#E0F2FE);border:1px solid #BAE6FD;border-radius:12px;padding:20px;font-size:14px;color:#0C4A6E;line-height:1.75}
+
+/* ── TABLES ── */
 table{width:100%;border-collapse:collapse}
-th{padding:11px 14px;background:#f8fafc;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0}
-td{padding:10px 14px;border-bottom:1px solid #f1f5f9;font-size:13px}
-tr:hover td{background:#f8fafc}
+th{padding:11px 14px;background:#F9FAFB;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#6B7280;text-align:left;border-bottom:2px solid #E5E7EB}
+td{padding:10px 14px;border-bottom:1px solid #F3F4F6;font-size:13px}
+tr:hover td{background:#F9FAFB}
+
+/* ── CHARTS ── */
 .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:700px){.chart-grid{grid-template-columns:1fr}.rpt-header{flex-direction:column}.rpt-meta{text-align:left}.kpi-grid{grid-template-columns:repeat(2,1fr)}}
-.chart-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px}
-.chart-box h4{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
-.rec-box{padding:16px 20px;border-radius:10px;font-size:13px;line-height:1.8;border-left:4px solid ${recColor};background:${vdBg};color:${vdTxt}}
+@media(max-width:700px){.chart-grid{grid-template-columns:1fr}.rpt-header{flex-direction:column}.rpt-meta{text-align:left}.kpi-grid{grid-template-columns:repeat(2,1fr)}.lparam-grid{grid-template-columns:repeat(2,1fr)}.thresh-grid{grid-template-columns:1fr}}
+.chart-box{background:#F9FAFB;border:1px solid #E5E7EB;border-radius:14px;padding:20px}
+.chart-box h4{font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+
+/* ── RECOMMENDATION BOX ── */
+.rec-box{padding:20px 24px;border-radius:14px;font-size:13px;line-height:1.8;border-left:4px solid ${recColor};background:${vdBg};color:${vdTxt}}
 .rec-box p{margin:0 0 8px}
-.rec-box ul{margin:4px 0 10px 18px;padding:0}
-.rec-box li{margin-bottom:4px}
-.rel-row{display:flex;gap:20px;flex-wrap:wrap}
-.rel-item{flex:1;min-width:180px;background:#f8fafc;border-radius:10px;padding:16px;border:1px solid #e2e8f0}
-.rel-item .label{font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:6px}
-.rel-item .value{font-size:15px;font-weight:800;color:${recColor}}
+.rec-box ul{margin:4px 0 10px 20px;padding:0}
+.rec-box li{margin-bottom:5px}
+.rel-row{display:flex;gap:14px;flex-wrap:wrap}
+.rel-item{flex:1;min-width:180px;background:#F9FAFB;border-radius:12px;padding:18px;border:1px solid #E5E7EB}
+.rel-item .label{font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+.rel-item .value{font-size:16px;font-weight:900;color:${recColor}}
 .custom-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:12px}
-footer{text-align:center;padding:24px;color:#94a3b8;font-size:11px;border-top:1px solid #e2e8f0;margin-top:8px}
-/* ── VU Log section highlight ── */
-.log-section{background:#fff;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 2px 12px rgba(245,158,11,.18);border:2px solid #f59e0b}
-.log-section h2{font-size:15px;font-weight:700;color:#92400e;margin-bottom:6px;padding-bottom:10px;border-bottom:2px solid #fde68a;display:flex;align-items:center;gap:8px}
-.log-section-banner{background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#78350f;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
-.log-dl-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;border:none;cursor:pointer}
-.log-dl-btn-full{background:#92400e;color:#fff}
-.log-dl-btn-full:hover{background:#78350f}
-.log-dl-btn-clean{background:#fff;color:#92400e;border:1px solid #f59e0b}
-.log-dl-btn-clean:hover{background:#fef3c7}
-/* ── req/res panel labels ── */
-.panel-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:5px}
-.panel-lbl-plain{color:#0369a1}
-.panel-lbl-enc{color:#7c3aed}
-.panel-lbl-res-ok{color:#065f46}
-.panel-lbl-res-err{color:#991b1b}
-.panel-lbl-res-warn{color:#92400e}
+
+/* ── FOOTER ── */
+footer{text-align:center;padding:28px;color:#9CA3AF;font-size:11px;border-top:1px solid #E5E7EB;margin-top:12px}
+
+/* ── VU LOG ── */
+.log-section{background:#fff;border-radius:16px;padding:26px;margin-bottom:20px;box-shadow:0 2px 12px rgba(245,158,11,.15);border:2px solid rgba(245,158,11,.35)}
+.log-section h2{font-size:11px;font-weight:800;color:#92400e;margin-bottom:6px;padding-bottom:10px;border-bottom:1px solid #FDE68A;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:.08em}
+.log-section-banner{background:linear-gradient(135deg,#FFFBEB,#FEF3C7);border:1px solid #FDE68A;border-radius:10px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#78350F;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.log-dl-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:7px;font-size:11px;font-weight:700;text-decoration:none;border:none;cursor:pointer;transition:.15s}
+.log-dl-btn-full{background:#92400e;color:#fff}.log-dl-btn-full:hover{background:#78350f}
+.log-dl-btn-clean{background:#fff;color:#92400e;border:1px solid #F59E0B}.log-dl-btn-clean:hover{background:#FEF3C7}
+
+/* ── PANEL LABELS ── */
+.panel-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;display:flex;align-items:center;gap:5px}
+.panel-lbl-plain{color:#0369A1}
+.panel-lbl-enc{color:#7C3AED}
+.panel-lbl-res-ok{color:#065F46}
+.panel-lbl-res-err{color:#991B1B}
+.panel-lbl-res-warn{color:#92400E}
 </style>
 </head>
 <body>
@@ -2009,20 +2138,26 @@ footer{text-align:center;padding:24px;color:#94a3b8;font-size:11px;border-top:1p
 <!-- HEADER -->
 <div class="rpt-header">
   <div style="flex:1">
-    <div class="rpt-brand"><span>${companyName.split(' ')[0]}</span> ${companyName.split(' ').slice(1).join(' ')}</div>
-    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <div class="rpt-brand">
+      <div class="rpt-brand-icon">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><polygon points="9 1 3 9 8 9 7 15 13 7 8 7" fill="rgba(255,255,255,0.95)"/></svg>
+      </div>
+      Ad<em>Hash</em>
+    </div>
+    <div style="margin-top:4px;font-size:12px;color:rgba(255,255,255,0.50);letter-spacing:.01em">${companyName}</div>
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <span class="badge badge-env">${cfg.environment || 'Unknown'}</span>
       <span class="badge badge-type">${cfg.scenarioType || 'Load Test'}</span>
-      <span class="badge" style="background:rgba(139,92,246,.15);color:#c4b5fd">Server-side Engine</span>
-      <span class="badge" style="background:rgba(139,92,246,.15);color:#c4b5fd">${cfg.mode === 'single' || !cfg.steps?.length || cfg.steps?.length === 1 ? 'Single API Test' : 'Workflow Scenario'}</span>
+      <span class="badge" style="background:rgba(129,140,248,.18);color:#a5b4fc;border:1px solid rgba(129,140,248,.30)">Server-side Engine</span>
+      <span class="badge" style="background:rgba(129,140,248,.18);color:#a5b4fc;border:1px solid rgba(129,140,248,.30)">${cfg.mode === 'single' || !cfg.steps?.length || cfg.steps?.length === 1 ? 'Single API Test' : 'Workflow Scenario'}</span>
     </div>
-    <div style="margin-top:16px">
-      <span class="verdict-badge">⬤ ${vd}</span>
+    <div style="margin-top:18px">
+      <span class="verdict-badge">${vd === 'PASS' ? '✓' : vd === 'RISK' ? '⚠' : '✗'} ${vd}</span>
     </div>
   </div>
   <div class="rpt-meta">
     <div class="title">${reportTitle}</div>
-    <div class="sub">Project: <strong>${cfg.projectName || '—'}</strong></div>
+    <div class="sub">Project: <strong style="color:#fff">${cfg.projectName || '—'}</strong></div>
     <div class="sub">Generated: ${genTime}</div>
     <div class="sub">Executed by: ${preparedBy}</div>
   </div>
@@ -2230,131 +2365,128 @@ ${show('showExecutiveSummary') ? `
 </div>
 
 ${show('showTestConfig') ? `
-<!-- TEST CONFIGURATION — Enterprise highlight -->
-<div style="background:#fff;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 24px rgba(30,64,175,.13);border:2px solid #1e40af;overflow:hidden">
-
-  <!-- Section header bar -->
-  <div style="background:linear-gradient(90deg,#1e3a8a 0%,#1d4ed8 60%,#2563eb 100%);padding:16px 28px;display:flex;align-items:center;gap:14px">
-    <div style="background:rgba(255,255,255,.15);border-radius:8px;padding:8px 10px;display:flex;align-items:center;justify-content:center">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M8.46 8.46a5 5 0 0 0 0 7.07"/></svg>
-    </div>
+<!-- TEST CONFIGURATION — Premium dark header -->
+<div class="section-hdr-bar" style="margin-bottom:20px">
+  <div class="section-hdr-bar-inner">
+    <div class="section-hdr-bar-icon">⚙️</div>
     <div>
-      <div style="font-size:15px;font-weight:800;color:#fff;letter-spacing:.2px">Test Configuration</div>
-      <div style="font-size:11px;color:#93c5fd;margin-top:2px">Defines the scope, load parameters, and acceptance criteria for this test run</div>
+      <div class="section-hdr-bar-title">Test Configuration</div>
+      <div class="section-hdr-bar-sub">Defines the scope, load parameters, and acceptance criteria for this test run</div>
     </div>
-    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <span style="background:rgba(255,255,255,.15);color:#fff;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid rgba(255,255,255,.25)">${cfg.scenarioType || 'Load Test'}</span>
-      <span style="background:rgba(139,92,246,.15);color:#c4b5fd;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid rgba(139,92,246,.3)">Server-side Engine</span>
-      <span style="background:${vd === 'PASS' ? 'rgba(16,185,129,.25)' : vd === 'RISK' ? 'rgba(245,158,11,.25)' : 'rgba(239,68,68,.25)'};color:${vdColor};padding:4px 14px;border-radius:20px;font-size:11px;font-weight:800;border:1px solid ${vdColor}66">${vd}</span>
+    <div class="section-hdr-bar-right">
+      <span class="badge-hdr badge-scenario">${cfg.scenarioType || 'Baseline Load Test'}</span>
+      <span class="badge-hdr badge-engine">Server-side Engine</span>
+      <span class="badge-hdr ${vd === 'PASS' ? 'badge-verdict-pass' : vd === 'RISK' ? 'badge-verdict-risk' : 'badge-verdict-fail'}">${vd}</span>
     </div>
   </div>
 
-  <!-- Row 1: Target & Identity -->
-  <div style="padding:0 28px">
-    <div style="border-bottom:1px solid #e2e8f0;padding:16px 0 14px">
-      <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">🎯 Test Target &amp; Identity</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+  <div class="section-hdr-bar-body">
+
+    <!-- Row 1: Target & Identity -->
+    <div style="border-bottom:1px solid #E5E7EB;padding-bottom:18px;margin-bottom:18px">
+      <div style="font-size:10px;font-weight:800;color:#2563EB;text-transform:uppercase;letter-spacing:.09em;margin-bottom:14px;display:flex;align-items:center;gap:6px">
+        <span style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:5px;padding:2px 7px;font-size:9px">🎯</span>
+        TEST TARGET &amp; IDENTITY
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 2fr;gap:16px;align-items:start">
         <div>
-          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Project</div>
-          <div style="font-size:15px;font-weight:800;color:#0f172a">${cfg.projectName || '—'}</div>
+          <div style="font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">Project</div>
+          <div style="font-size:16px;font-weight:800;color:#0D1224">${cfg.projectName || '—'}</div>
         </div>
         <div>
-          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Environment</div>
-          <div style="display:inline-block;font-size:13px;font-weight:700;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;padding:3px 12px;border-radius:20px">${cfg.environment || '—'}</div>
+          <div style="font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">Environment</div>
+          <span class="env-badge">${cfg.environment || '—'}</span>
         </div>
-        <div style="grid-column:span 2">
-          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Target URL</div>
-          <div style="font-size:13px;font-weight:600;color:#1e40af;font-family:monospace;background:#f0f9ff;border:1px solid #bae6fd;padding:6px 12px;border-radius:6px;word-break:break-all">${cfg.url || (cfg.steps?.[0]?.url) || '—'}</div>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">Target URL</div>
+          <div class="url-box">${cfg.url || (cfg.steps?.[0]?.url) || '—'}</div>
         </div>
       </div>
     </div>
 
-    <!-- Row 2: Load Parameters — the 4 most critical numbers -->
-    <div style="border-bottom:1px solid #e2e8f0;padding:16px 0 14px">
-      <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">⚡ Load Parameters</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
-        <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:10px;padding:14px;text-align:center">
-          <div style="font-size:28px;font-weight:900;color:#1d4ed8;line-height:1">${cfg.vus}</div>
-          <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-top:4px">Virtual Users</div>
-          <div style="font-size:10px;color:#64748b;margin-top:2px">concurrent</div>
+    <!-- Row 2: Load Parameters — colored large-number tiles matching screenshot -->
+    <div style="border-bottom:1px solid #E5E7EB;padding-bottom:18px;margin-bottom:18px">
+      <div style="font-size:10px;font-weight:800;color:#2563EB;text-transform:uppercase;letter-spacing:.09em;margin-bottom:14px;display:flex;align-items:center;gap:6px">
+        <span style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:5px;padding:2px 7px;font-size:9px">⚡</span>
+        LOAD PARAMETERS
+      </div>
+      <div class="lparam-grid">
+        <div class="lparam lparam-blue">
+          <div class="lparam-val">${cfg.vus}</div>
+          <div class="lparam-lbl">Virtual Users</div>
+          <div class="lparam-sub">concurrent</div>
         </div>
-        <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:14px;text-align:center">
-          <div style="font-size:28px;font-weight:900;color:#15803d;line-height:1">${cfg.duration}<span style="font-size:14px;font-weight:600">s</span></div>
-          <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.5px;margin-top:4px">Duration</div>
-          <div style="font-size:10px;color:#64748b;margin-top:2px">test window</div>
+        <div class="lparam lparam-green">
+          <div class="lparam-val">${cfg.duration}<span class="lparam-val-unit">s</span></div>
+          <div class="lparam-lbl">Duration</div>
+          <div class="lparam-sub">test window</div>
         </div>
-        <div style="background:linear-gradient(135deg,#fefce8,#fef9c3);border:1px solid #fde68a;border-radius:10px;padding:14px;text-align:center">
-          <div style="font-size:28px;font-weight:900;color:#b45309;line-height:1">${cfg.rampup || 0}<span style="font-size:14px;font-weight:600">s</span></div>
-          <div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.5px;margin-top:4px">Ramp-up</div>
-          <div style="font-size:10px;color:#64748b;margin-top:2px">warm-up period</div>
+        <div class="lparam lparam-amber">
+          <div class="lparam-val">${cfg.rampup || 0}<span class="lparam-val-unit">s</span></div>
+          <div class="lparam-lbl">Ramp-up</div>
+          <div class="lparam-sub">warm-up period</div>
         </div>
-        <div style="background:linear-gradient(135deg,#fdf4ff,#fae8ff);border:1px solid #e9d5ff;border-radius:10px;padding:14px;text-align:center">
-          <div style="font-size:28px;font-weight:900;color:#7e22ce;line-height:1">${cfg.steps && cfg.steps.filter(s=>s.enabled!==false).length > 0 ? cfg.steps.filter(s=>s.enabled!==false).length : 1}<span style="font-size:14px;font-weight:600"></span></div>
-          <div style="font-size:10px;font-weight:700;color:#9333ea;text-transform:uppercase;letter-spacing:.5px;margin-top:4px">API Steps</div>
-          <div style="font-size:10px;color:#64748b;margin-top:2px">per VU flow</div>
+        <div class="lparam lparam-purple">
+          <div class="lparam-val">${cfg.steps && cfg.steps.filter(s=>s.enabled!==false).length > 0 ? cfg.steps.filter(s=>s.enabled!==false).length : 1}</div>
+          <div class="lparam-lbl">API Steps</div>
+          <div class="lparam-sub">per VU flow</div>
         </div>
       </div>
     </div>
 
     <!-- Row 3: Acceptance Thresholds -->
-    <div style="border-bottom:1px solid #e2e8f0;padding:16px 0 14px">
-      <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">📏 Acceptance Thresholds &amp; Actuals</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px">
-          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">P95 Latency Threshold</div>
-          <div style="display:flex;align-items:baseline;gap:6px">
-            <span style="font-size:18px;font-weight:800;color:${p95ms <= p95Thr ? '#15803d' : '#dc2626'}">${p95ms}ms</span>
-            <span style="font-size:11px;color:#64748b">limit: ${cfg.p95Threshold || 3000}ms</span>
-          </div>
-          <div style="margin-top:6px;height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden">
-            <div style="height:100%;width:${Math.min(100,(p95ms/(cfg.p95Threshold||3000))*100).toFixed(1)}%;background:${p95ms <= p95Thr ? '#10b981' : '#ef4444'};border-radius:2px;transition:width .3s"></div>
-          </div>
-          <div style="font-size:10px;color:${p95ms <= p95Thr ? '#15803d' : '#dc2626'};font-weight:700;margin-top:4px">${p95ms <= p95Thr ? '✓ WITHIN THRESHOLD' : '✗ THRESHOLD BREACHED'}</div>
+    <div style="border-bottom:1px solid #E5E7EB;padding-bottom:18px;margin-bottom:18px">
+      <div style="font-size:10px;font-weight:800;color:#2563EB;text-transform:uppercase;letter-spacing:.09em;margin-bottom:14px;display:flex;align-items:center;gap:6px">
+        <span style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:5px;padding:2px 7px;font-size:9px">📏</span>
+        ACCEPTANCE THRESHOLDS &amp; ACTUALS
+      </div>
+      <div class="thresh-grid">
+        <div class="thresh">
+          <div class="thresh-lbl">P95 Latency Threshold</div>
+          <div class="thresh-val" style="color:${p95ms <= p95Thr ? '#059669' : '#DC2626'}">${p95ms}<span style="font-size:13px;font-weight:600">ms</span></div>
+          <div class="thresh-limit">limit: ${cfg.p95Threshold || 3000}ms</div>
+          <div class="thresh-progress"><div class="thresh-bar" style="width:${Math.min(100,(p95ms/(cfg.p95Threshold||3000))*100).toFixed(1)}%;background:${p95ms <= p95Thr ? '#10B981' : '#EF4444'}"></div></div>
+          <div class="thresh-status ${p95ms <= p95Thr ? 'thresh-ok' : 'thresh-bad'}">${p95ms <= p95Thr ? '✓ WITHIN THRESHOLD' : '✗ THRESHOLD BREACHED'}</div>
         </div>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px">
-          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Error Rate Limit</div>
-          <div style="display:flex;align-items:baseline;gap:6px">
-            <span style="font-size:18px;font-weight:800;color:${errPct < 1 ? '#15803d' : errPct < 5 ? '#b45309' : '#dc2626'}">${errRateDisp}%</span>
-            <span style="font-size:11px;color:#64748b">limit: &lt;1%</span>
-          </div>
-          <div style="margin-top:6px;height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden">
-            <div style="height:100%;width:${Math.min(100,errPct*10).toFixed(1)}%;background:${errPct < 1 ? '#10b981' : errPct < 5 ? '#f59e0b' : '#ef4444'};border-radius:2px"></div>
-          </div>
-          <div style="font-size:10px;color:${errPct < 1 ? '#15803d' : '#dc2626'};font-weight:700;margin-top:4px">${errPct < 1 ? '✓ WITHIN LIMIT' : '✗ LIMIT BREACHED'}</div>
+        <div class="thresh">
+          <div class="thresh-lbl">Error Rate Limit</div>
+          <div class="thresh-val" style="color:${errPct < 1 ? '#059669' : errPct < 5 ? '#D97706' : '#DC2626'}">${errRateDisp}<span style="font-size:13px;font-weight:600">%</span></div>
+          <div class="thresh-limit">limit: &lt;1%</div>
+          <div class="thresh-progress"><div class="thresh-bar" style="width:${Math.min(100,errPct*10).toFixed(1)}%;background:${errPct < 1 ? '#10B981' : errPct < 5 ? '#F59E0B' : '#EF4444'}"></div></div>
+          <div class="thresh-status ${errPct < 1 ? 'thresh-ok' : errPct < 5 ? 'thresh-warn' : 'thresh-bad'}">${errPct < 1 ? '✓ WITHIN LIMIT' : errPct < 5 ? '⚠ APPROACHING LIMIT' : '✗ LIMIT BREACHED'}</div>
         </div>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px">
-          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Request Timeout</div>
-          <div style="font-size:18px;font-weight:800;color:#0f172a">${cfg.timeout || 5000}ms</div>
-          <div style="font-size:10px;color:#64748b;margin-top:6px">Per-request hard timeout</div>
+        <div class="thresh">
+          <div class="thresh-lbl">Request Timeout</div>
+          <div class="thresh-val" style="color:#0D1224">${cfg.timeout || 5000}<span style="font-size:13px;font-weight:600">ms</span></div>
+          <div class="thresh-limit">Per-request hard timeout</div>
         </div>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px">
-          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Total Requests Executed</div>
-          <div style="font-size:18px;font-weight:800;color:#1d4ed8">${(m.totalReqs || 0).toLocaleString()}</div>
-          <div style="font-size:10px;color:#64748b;margin-top:6px">${m.rps || 0} avg RPS</div>
+        <div class="thresh">
+          <div class="thresh-lbl">Total Requests Executed</div>
+          <div class="thresh-val" style="color:#2563EB">${(m.totalReqs || 0).toLocaleString()}</div>
+          <div class="thresh-limit">${m.rps || 0} avg RPS</div>
         </div>
       </div>
     </div>
 
     <!-- Row 4: Timing -->
-    <div style="padding:14px 0 16px">
-      <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">🕐 Test Execution Window</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:36px;height:36px;background:#eff6ff;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </div>
+    <div>
+      <div style="font-size:10px;font-weight:800;color:#2563EB;text-transform:uppercase;letter-spacing:.09em;margin-bottom:14px;display:flex;align-items:center;gap:6px">
+        <span style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:5px;padding:2px 7px;font-size:9px">🕐</span>
+        TEST EXECUTION WINDOW
+      </div>
+      <div class="exec-grid">
+        <div class="exec-cell">
+          <div class="exec-cell-icon" style="background:#EFF6FF">🕐</div>
           <div>
-            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px">Start Time</div>
-            <div style="font-size:12px;font-weight:700;color:#1e293b">${cfg.startTime ? new Date(cfg.startTime).toLocaleString('en-IN') : '—'}</div>
+            <div class="exec-cell-lbl">Start Time</div>
+            <div class="exec-cell-val">${cfg.startTime ? new Date(cfg.startTime).toLocaleString('en-IN') : '—'}</div>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:36px;height:36px;background:#f0fdf4;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </div>
+        <div class="exec-cell">
+          <div class="exec-cell-icon" style="background:#ECFDF5">🕐</div>
           <div>
-            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px">End Time</div>
-            <div style="font-size:12px;font-weight:700;color:#1e293b">${state.endTime ? new Date(state.endTime).toLocaleString('en-IN') : '—'}</div>
+            <div class="exec-cell-lbl">End Time</div>
+            <div class="exec-cell-val">${state.endTime ? new Date(state.endTime).toLocaleString('en-IN') : '—'}</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
@@ -2382,13 +2514,15 @@ ${show('showTestConfig') ? `
 
 ${show('showMetricCards') ? `
 <!-- KEY METRICS -->
-<div style="background:#fff;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 24px rgba(30,41,59,.10);border:1px solid #e2e8f0;overflow:hidden">
-  <div style="background:linear-gradient(90deg,#0f172a,#1e293b,#334155);padding:14px 28px;display:flex;align-items:center;gap:12px">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-    <div style="font-size:14px;font-weight:800;color:#fff">Key Metrics</div>
-    <div style="font-size:11px;color:#94a3b8;margin-left:4px">Full performance measurement across the entire test run</div>
+<div class="section-hdr-bar" style="margin-bottom:20px">
+  <div class="section-hdr-bar-inner">
+    <div class="section-hdr-bar-icon">📊</div>
+    <div>
+      <div class="section-hdr-bar-title">Key Metrics</div>
+      <div class="section-hdr-bar-sub">Full performance measurement across the entire test run</div>
+    </div>
   </div>
-  <div style="padding:20px 28px">
+  <div class="section-hdr-bar-body">
     <!-- Row 1: Requests & Reliability -->
     <div style="font-size:10px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Requests &amp; Reliability</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px">
@@ -2467,13 +2601,15 @@ ${show('showMetricCards') ? `
 
 ${show('showCharts') ? `
 <!-- CHARTS -->
-<div style="background:#fff;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 24px rgba(30,41,59,.10);border:1px solid #e2e8f0;overflow:hidden">
-  <div style="background:linear-gradient(90deg,#0f172a,#1e293b,#334155);padding:14px 28px;display:flex;align-items:center;gap:12px">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-    <div style="font-size:14px;font-weight:800;color:#fff">Performance Charts</div>
-    <div style="font-size:11px;color:#94a3b8;margin-left:4px">Time-series and distribution data across the test window</div>
+<div class="section-hdr-bar" style="margin-bottom:20px">
+  <div class="section-hdr-bar-inner">
+    <div class="section-hdr-bar-icon">📈</div>
+    <div>
+      <div class="section-hdr-bar-title">Performance Charts</div>
+      <div class="section-hdr-bar-sub">Time-series and distribution data across the test window</div>
+    </div>
   </div>
-  <div style="padding:20px 28px">
+  <div class="section-hdr-bar-body">
     <div class="chart-grid">
       <div class="chart-box"><h4>RPS over Time</h4><canvas id="ch-rps" height="140"></canvas></div>
       <div class="chart-box"><h4>Avg Latency (ms) over Time</h4><canvas id="ch-lat" height="140"></canvas></div>
