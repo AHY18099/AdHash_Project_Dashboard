@@ -8,242 +8,375 @@
 <meta http-equiv="Expires" content="0">
 <title>AdHash — Dashboard Home</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial Black%2CArial%2Csans-serif' font-weight='900' font-size='13' fill='white' letter-spacing='-0.5'%3EQA%3C/text%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 
-/* ── LIGHT (default) ── */
-body{
-  --bg:#f0f4f8;
-  --card:#ffffff;
-  --card2:#f8fafc;
-  --border:rgba(148,163,184,0.2);
-  --border-hover:rgba(59,130,246,0.4);
-  --txt:#1e293b;
+/* ── DESIGN TOKENS — light ── */
+:root{
+  --bg:#F4F5F7;
+  --bg2:#ECEEF2;
+  --surface:#FFFFFF;
+  --surface2:#F7F8FA;
+  --border:rgba(15,23,42,0.09);
+  --border-strong:rgba(15,23,42,0.16);
+  --txt:#0F172A;
   --txt2:#334155;
-  --mut:#64748b;
-  --accent:#3b82f6;
-  --a2:#8b5cf6;
-  --pass:#10b981;
-  --grad-a:#3b82f6;
-  --grad-b:#8b5cf6;
-  --shadow:0 4px 20px rgba(100,116,139,0.12);
-  --shadow-hover:0 20px 50px rgba(100,116,139,0.2);
-  --glow-a:rgba(59,130,246,0.1);
-  --glow-b:rgba(139,92,246,0.07);
+  --muted:#64748B;
+  --muted2:#94A3B8;
+  --accent:#4F46E5;
+  --accent-soft:rgba(79,70,229,0.10);
+  --accent-border:rgba(79,70,229,0.22);
+  --shadow-sm:0 1px 3px rgba(15,23,42,0.07),0 1px 2px rgba(15,23,42,0.05);
+  --shadow-md:0 4px 16px rgba(15,23,42,0.09),0 2px 6px rgba(15,23,42,0.06);
+  --shadow-lg:0 12px 32px rgba(15,23,42,0.12),0 4px 12px rgba(15,23,42,0.08);
+  /* per-card accent colors */
+  --c-blue:#2563EB;   --c-blue-s:rgba(37,99,235,0.09);   --c-blue-b:rgba(37,99,235,0.20);
+  --c-teal:#0D9488;   --c-teal-s:rgba(13,148,136,0.09);   --c-teal-b:rgba(13,148,136,0.20);
+  --c-violet:#7C3AED; --c-violet-s:rgba(124,58,237,0.09); --c-violet-b:rgba(124,58,237,0.20);
+  --c-amber:#D97706;  --c-amber-s:rgba(217,119,6,0.09);   --c-amber-b:rgba(217,119,6,0.20);
+  --c-rose:#E11D48;   --c-rose-s:rgba(225,29,72,0.09);    --c-rose-b:rgba(225,29,72,0.20);
+  --c-emerald:#059669;--c-emerald-s:rgba(5,150,105,0.09); --c-emerald-b:rgba(5,150,105,0.20);
+  --c-indigo:#4F46E5; --c-indigo-s:rgba(79,70,229,0.09);  --c-indigo-b:rgba(79,70,229,0.22);
+  /* legacy aliases for overlays */
+  --grad-a:#4F46E5; --grad-b:#7C3AED;
+  --card:var(--surface); --card2:var(--surface2);
+  --border-hover:rgba(79,70,229,0.35);
+  --pass:#059669;
+  --a2:#7C3AED;
+  --glow-a:rgba(79,70,229,0.08);
+  --glow-b:rgba(124,58,237,0.05);
+  --shadow:var(--shadow-md);
+  --shadow-hover:var(--shadow-lg);
+}
+
+/* ── DARK TOKENS ── */
+body.dark{
+  --bg:#0B0E17;
+  --bg2:#111420;
+  --surface:#141828;
+  --surface2:#1A1F30;
+  --border:rgba(255,255,255,0.07);
+  --border-strong:rgba(255,255,255,0.13);
+  --txt:#F1F5F9;
+  --txt2:#CBD5E1;
+  --muted:#8B95A9;
+  --muted2:#4B5563;
+  --accent:#818CF8;
+  --accent-soft:rgba(129,140,248,0.12);
+  --accent-border:rgba(129,140,248,0.25);
+  --shadow-sm:0 1px 4px rgba(0,0,0,0.35);
+  --shadow-md:0 4px 20px rgba(0,0,0,0.45);
+  --shadow-lg:0 16px 48px rgba(0,0,0,0.6);
+  --c-blue:#60A5FA;   --c-blue-s:rgba(96,165,250,0.10);   --c-blue-b:rgba(96,165,250,0.22);
+  --c-teal:#2DD4BF;   --c-teal-s:rgba(45,212,191,0.10);   --c-teal-b:rgba(45,212,191,0.22);
+  --c-violet:#A78BFA; --c-violet-s:rgba(167,139,250,0.10); --c-violet-b:rgba(167,139,250,0.22);
+  --c-amber:#FCD34D;  --c-amber-s:rgba(252,211,77,0.10);   --c-amber-b:rgba(252,211,77,0.22);
+  --c-rose:#FB7185;   --c-rose-s:rgba(251,113,133,0.10);   --c-rose-b:rgba(251,113,133,0.22);
+  --c-emerald:#34D399;--c-emerald-s:rgba(52,211,153,0.10); --c-emerald-b:rgba(52,211,153,0.22);
+  --c-indigo:#818CF8; --c-indigo-s:rgba(129,140,248,0.12); --c-indigo-b:rgba(129,140,248,0.25);
+  --grad-a:#818CF8; --grad-b:#A78BFA;
+  --card:var(--surface); --card2:var(--surface2);
+  --border-hover:rgba(129,140,248,0.4);
+  --pass:#34D399;
+  --a2:#A78BFA;
+  --glow-a:rgba(129,140,248,0.10);
+  --glow-b:rgba(167,139,250,0.07);
+  --shadow:var(--shadow-md);
+  --shadow-hover:var(--shadow-lg);
+}
+
+/* ── BASE ── */
+body{
   font-family:'Inter','Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;
   background:var(--bg);
   color:var(--txt);
   min-height:100vh;
-  display:flex;
-  flex-direction:column;
-  transition:background .3s,color .3s;
-}
-
-/* ── DARK ── */
-body.dark{
-  --bg:#000000;
-  --card:#111111;
-  --card2:#161616;
-  --border:rgba(255,255,255,0.1);
-  --border-hover:rgba(0,212,255,0.4);
-  --txt:#ffffff;
-  --txt2:#e0e0e0;
-  --mut:#9ca3af;
-  --accent:#00d4ff;
-  --a2:#00ffc6;
-  --pass:#00ff88;
-  --grad-a:#00d4ff;
-  --grad-b:#00ffc6;
-  --shadow:0 4px 20px rgba(0,0,0,0.5);
-  --shadow-hover:0 20px 50px rgba(0,212,255,0.15);
-  --glow-a:rgba(0,212,255,0.1);
-  --glow-b:rgba(0,255,198,0.07);
+  display:flex;flex-direction:column;
+  transition:background .25s,color .25s;
+  -webkit-font-smoothing:antialiased;
 }
 
 /* ── TOPBAR ── */
 .topbar{
-  background:var(--card);
+  background:var(--surface);
   border-bottom:1px solid var(--border);
-  padding:12px 28px;
-  display:flex;align-items:center;gap:14px;
+  padding:0 32px;
+  height:56px;
+  display:flex;align-items:center;gap:16px;
   position:sticky;top:0;z-index:100;
-  backdrop-filter:blur(8px);
-  box-shadow:var(--shadow);
-  transition:background .3s,border-color .3s;
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  box-shadow:var(--shadow-sm);
+  transition:background .25s,border-color .25s;
 }
-.topbar-logo{font-size:20px;font-weight:800;letter-spacing:-.5px}
-.topbar-logo .wm{
-  background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+.topbar-logo{
+  display:flex;align-items:center;gap:10px;text-decoration:none;
 }
-.topbar-tagline{font-size:12px;color:var(--mut);margin-left:4px;font-weight:500}
-.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.topbar-logomark{
+  width:30px;height:30px;border-radius:8px;
+  background:linear-gradient(135deg,var(--c-indigo) 0%,var(--c-violet) 100%);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.topbar-logomark svg{display:block}
+.topbar-wordmark{
+  font-size:15px;font-weight:800;letter-spacing:-.4px;color:var(--txt);
+}
+.topbar-wordmark span{color:var(--accent)}
+.topbar-divider{
+  width:1px;height:20px;background:var(--border-strong);flex-shrink:0;
+}
+.topbar-tagline{
+  font-size:12px;font-weight:500;color:var(--muted);letter-spacing:.01em;
+}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
 
 /* ── THEME TOGGLE ── */
 .theme-toggle{
-  padding:6px 14px;border-radius:50px;
-  border:1.5px solid var(--border);
-  background:var(--card2);
-  color:var(--txt2);
-  cursor:pointer;font-size:13px;font-weight:600;
-  font-family:inherit;
-  transition:all .2s;
+  padding:5px 13px;border-radius:6px;
+  border:1px solid var(--border-strong);
+  background:transparent;
+  color:var(--muted);
+  cursor:pointer;font-size:12px;font-weight:600;
+  font-family:inherit;letter-spacing:.01em;
+  transition:all .18s;
   white-space:nowrap;
 }
-.theme-toggle:hover{border-color:var(--grad-a);color:var(--grad-a)}
+.theme-toggle:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
 
 /* ── USER CHIP ── */
 .user-chip{
   display:flex;align-items:center;gap:8px;
-  background:var(--card2);
-  border:1.5px solid var(--border);
-  border-radius:12px;padding:6px 14px;
-  cursor:pointer;transition:all .2s;position:relative;
+  background:var(--surface2);
+  border:1px solid var(--border-strong);
+  border-radius:8px;padding:5px 12px;
+  cursor:pointer;transition:all .18s;position:relative;
 }
-.user-chip:hover{border-color:var(--border-hover);box-shadow:var(--shadow)}
+.user-chip:hover{border-color:var(--accent-border);box-shadow:0 0 0 3px var(--accent-soft)}
 .user-avatar{
-  width:28px;height:28px;border-radius:50%;
-  background:linear-gradient(135deg,var(--grad-a),var(--grad-b));
+  width:26px;height:26px;border-radius:6px;
+  background:linear-gradient(135deg,var(--c-indigo),var(--c-violet));
   display:flex;align-items:center;justify-content:center;
-  font-size:11px;font-weight:700;color:#fff;flex-shrink:0;
+  font-size:10px;font-weight:800;color:#fff;flex-shrink:0;letter-spacing:.02em;
 }
-body.dark .user-avatar{color:#000}
-.user-info .name{font-size:12px;font-weight:600;color:var(--txt)}
-.user-info .role{font-size:10px;color:var(--mut)}
+.user-info .name{font-size:12px;font-weight:600;color:var(--txt);line-height:1.3}
+.user-info .role{font-size:10px;color:var(--muted);letter-spacing:.02em}
 .user-dd{
   position:absolute;top:calc(100% + 8px);right:0;
-  background:var(--card);
-  border:1.5px solid var(--border);
-  border-radius:12px;min-width:180px;
+  background:var(--surface);
+  border:1px solid var(--border-strong);
+  border-radius:10px;min-width:175px;
   z-index:200;
-  box-shadow:0 12px 36px rgba(0,0,0,.15);
+  box-shadow:var(--shadow-lg);
   display:none;overflow:hidden;
   animation:fadeIn .15s ease;
 }
-body.dark .user-dd{box-shadow:0 12px 36px rgba(0,0,0,.6)}
 .user-dd.open{display:block}
-@keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .user-dd-item{
-  padding:10px 16px;font-size:13px;cursor:pointer;
+  padding:9px 15px;font-size:13px;cursor:pointer;
   display:flex;align-items:center;gap:8px;
   transition:background .1s;color:var(--txt2);
 }
-.user-dd-item:hover{background:rgba(59,130,246,.06)}
-body.dark .user-dd-item:hover{background:rgba(0,212,255,.08)}
-.user-dd-item.danger{color:#ef4444}
-.user-dd-item.danger:hover{background:rgba(239,68,68,.08)}
+.user-dd-item:hover{background:var(--accent-soft)}
+.user-dd-item.danger{color:#E11D48}
+.user-dd-item.danger:hover{background:rgba(225,29,72,0.08)}
 
 /* ── HERO ── */
 .hero{
-  padding:28px 28px 16px;text-align:center;position:relative;overflow:hidden;
+  padding:48px 32px 32px;
+  max-width:1040px;width:100%;margin:0 auto;
+  position:relative;
 }
-.hero::before{
-  content:'';position:absolute;width:600px;height:360px;border-radius:50%;
-  background:radial-gradient(circle,var(--glow-a) 0%,transparent 70%);
-  top:-60px;left:50%;transform:translateX(-50%);pointer-events:none;
-  transition:background .3s;
+.hero-eyebrow{
+  display:inline-flex;align-items:center;gap:7px;
+  font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent);background:var(--accent-soft);
+  border:1px solid var(--accent-border);
+  padding:4px 12px;border-radius:20px;margin-bottom:18px;
 }
-.hero::after{
-  content:'';position:absolute;width:400px;height:280px;border-radius:50%;
-  background:radial-gradient(circle,var(--glow-b) 0%,transparent 70%);
-  bottom:-80px;right:10%;pointer-events:none;
-  transition:background .3s;
+.hero-eyebrow-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--accent);
+  animation:pulse-accent 2s ease-in-out infinite;
 }
-.hero h1{font-size:26px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;position:relative;z-index:1}
-.hero h1 .wm{
-  background:linear-gradient(135deg,var(--grad-a) 0%,var(--grad-b) 100%);
+@keyframes pulse-accent{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
+.hero h1{
+  font-size:32px;font-weight:800;letter-spacing:-.6px;
+  color:var(--txt);line-height:1.15;margin-bottom:10px;
+  text-wrap:balance;
+}
+.hero h1 em{
+  font-style:normal;
+  background:linear-gradient(95deg,var(--c-indigo) 0%,var(--c-violet) 60%);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
 }
-.hero p{color:var(--mut);font-size:14px;position:relative;z-index:1;font-weight:500}
+.hero-sub{
+  font-size:14px;color:var(--muted);font-weight:400;max-width:520px;line-height:1.65;
+}
+
+/* ── DOT-GRID background on hero ── */
+.hero::after{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
+  background-image:radial-gradient(var(--border-strong) 1px,transparent 1px);
+  background-size:24px 24px;
+  mask-image:radial-gradient(ellipse 70% 80% at 50% 0%,black 40%,transparent 100%);
+  -webkit-mask-image:radial-gradient(ellipse 70% 80% at 50% 0%,black 40%,transparent 100%);
+}
+.hero>*{position:relative;z-index:1}
 
 /* ── GRID ── */
 .grid-wrap{
   flex:1;display:grid;
   grid-template-columns:repeat(2,1fr);
   align-items:start;align-content:start;
-  max-width:960px;width:100%;margin:0 auto;
-  padding:12px 28px 24px;gap:18px;
+  max-width:1040px;width:100%;margin:0 auto;
+  padding:0 32px 48px;gap:16px;
 }
+
+/* ── CARD ── */
 .dash-card{
-  background:var(--card);
-  border:1.5px solid var(--border);
-  border-radius:16px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
   width:100%;
-  padding:24px 26px;
+  padding:0;
   cursor:pointer;
-  transition:transform .2s,border-color .2s,box-shadow .2s,background .3s;
+  transition:box-shadow .22s,border-color .22s,transform .22s;
   position:relative;overflow:hidden;
   text-decoration:none;
-  display:flex;flex-direction:column;gap:16px;
-  box-shadow:var(--shadow);
+  display:flex;flex-direction:column;
+  box-shadow:var(--shadow-sm);
 }
+/* left accent stripe — the distinguishing mark */
 .dash-card::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:3px;
-  background:linear-gradient(90deg,var(--grad-a),var(--grad-b));
-  opacity:0;transition:opacity .2s;
+  content:'';
+  position:absolute;left:0;top:16px;bottom:16px;width:3px;border-radius:0 3px 3px 0;
+  background:var(--card-accent,var(--accent));
+  opacity:0;transition:opacity .22s,top .22s,bottom .22s;
 }
-.dash-card:hover{transform:translateY(-5px);box-shadow:var(--shadow-hover);border-color:var(--border-hover)}
-.dash-card:hover::before{opacity:1}
+.dash-card:hover{
+  box-shadow:var(--shadow-lg);
+  border-color:var(--card-accent-border,var(--accent-border));
+  transform:translateY(-3px);
+}
+.dash-card:hover::before{opacity:1;top:12px;bottom:12px}
 
+.card-inner{padding:22px 24px 20px 28px;display:flex;flex-direction:column;gap:14px;flex:1}
+
+.card-head{display:flex;align-items:flex-start;gap:14px}
 .card-icon{
-  width:56px;height:56px;border-radius:14px;
+  width:44px;height:44px;border-radius:10px;
   display:flex;align-items:center;justify-content:center;
-  font-size:26px;flex-shrink:0;
-  transition:background .3s,border-color .3s;
+  font-size:20px;flex-shrink:0;
+  background:var(--card-icon-bg,var(--accent-soft));
+  border:1px solid var(--card-icon-border,var(--accent-border));
+  transition:background .22s;
 }
-.card-icon.blue{background:rgba(59,130,246,.1);border:1.5px solid rgba(59,130,246,.2)}
-.card-icon.green{background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.2)}
-body.dark .card-icon.blue{background:rgba(0,212,255,.12);border-color:rgba(0,212,255,.25)}
-body.dark .card-icon.green{background:rgba(0,255,136,.1);border-color:rgba(0,255,136,.2)}
+.card-meta{flex:1;min-width:0}
+.card-label{
+  font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.08em;margin-bottom:4px;
+  color:var(--card-accent,var(--accent));
+}
+.card-title{
+  font-size:16px;font-weight:700;line-height:1.25;
+  color:var(--txt);text-wrap:balance;
+}
+.card-desc{font-size:12.5px;color:var(--muted);line-height:1.65}
 
-.card-body{flex:1}
-.card-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
-.card-label.blue{color:var(--accent)}
-.card-label.green{color:var(--pass)}
-.card-title{font-size:20px;font-weight:800;margin-bottom:8px;line-height:1.2;color:var(--txt)}
-.card-desc{font-size:13px;color:var(--mut);line-height:1.6}
+.card-footer{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;flex-wrap:wrap;
+}
+.card-tags{display:flex;gap:5px;flex-wrap:wrap}
+.tag{
+  padding:2px 9px;border-radius:4px;font-size:10px;font-weight:600;
+  font-family:ui-monospace,'Cascadia Code','Consolas',monospace;
+  letter-spacing:.01em;
+  background:var(--card-tag-bg,var(--accent-soft));
+  color:var(--card-accent,var(--accent));
+  border:1px solid var(--card-tag-border,var(--accent-border));
+}
 
-.card-arrow{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
-.card-tags{display:flex;gap:6px;flex-wrap:wrap}
-.tag{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700}
-.tag.blue{background:rgba(59,130,246,.1);color:var(--accent);border:1px solid rgba(59,130,246,.2)}
-.tag.green{background:rgba(16,185,129,.1);color:var(--pass);border:1px solid rgba(16,185,129,.2)}
-.tag.purple{background:rgba(139,92,246,.1);color:var(--a2);border:1px solid rgba(139,92,246,.2)}
-body.dark .tag.blue{background:rgba(0,212,255,.12);border-color:rgba(0,212,255,.25)}
-body.dark .tag.green{background:rgba(0,255,136,.1);border-color:rgba(0,255,136,.2)}
-body.dark .tag.purple{background:rgba(0,255,198,.1);border-color:rgba(0,255,198,.2)}
-
+/* arrow */
 .arrow-btn{
-  width:36px;height:36px;border-radius:50%;
+  width:32px;height:32px;border-radius:7px;
   display:flex;align-items:center;justify-content:center;
-  font-size:16px;transition:transform .15s,background .15s,border-color .15s;
-  background:var(--card2);border:1.5px solid var(--border);color:var(--mut);
-  flex-shrink:0;
+  font-size:14px;
+  background:var(--surface2);
+  border:1px solid var(--border-strong);
+  color:var(--muted);flex-shrink:0;
+  transition:background .18s,border-color .18s,color .18s,transform .18s;
 }
 .dash-card:hover .arrow-btn{
-  background:linear-gradient(135deg,var(--grad-a),var(--grad-b));
-  border-color:transparent;color:#fff;transform:translateX(4px);
+  background:var(--card-accent,var(--accent));
+  border-color:transparent;color:#fff;transform:translateX(3px);
 }
-body.dark .dash-card:hover .arrow-btn{color:#000}
+
+/* ── COLOR VARIANTS ── */
+.card-blue  {--card-accent:var(--c-blue);  --card-accent-border:var(--c-blue-b);  --card-icon-bg:var(--c-blue-s);  --card-icon-border:var(--c-blue-b);  --card-tag-bg:var(--c-blue-s);  --card-tag-border:var(--c-blue-b)}
+.card-teal  {--card-accent:var(--c-teal);  --card-accent-border:var(--c-teal-b);  --card-icon-bg:var(--c-teal-s);  --card-icon-border:var(--c-teal-b);  --card-tag-bg:var(--c-teal-s);  --card-tag-border:var(--c-teal-b)}
+.card-violet{--card-accent:var(--c-violet);--card-accent-border:var(--c-violet-b);--card-icon-bg:var(--c-violet-s);--card-icon-border:var(--c-violet-b);--card-tag-bg:var(--c-violet-s);--card-tag-border:var(--c-violet-b)}
+.card-amber {--card-accent:var(--c-amber); --card-accent-border:var(--c-amber-b); --card-icon-bg:var(--c-amber-s); --card-icon-border:var(--c-amber-b); --card-tag-bg:var(--c-amber-s); --card-tag-border:var(--c-amber-b)}
+.card-rose  {--card-accent:var(--c-rose);  --card-accent-border:var(--c-rose-b);  --card-icon-bg:var(--c-rose-s);  --card-icon-border:var(--c-rose-b);  --card-tag-bg:var(--c-rose-s);  --card-tag-border:var(--c-rose-b)}
+.card-emerald{--card-accent:var(--c-emerald);--card-accent-border:var(--c-emerald-b);--card-icon-bg:var(--c-emerald-s);--card-icon-border:var(--c-emerald-b);--card-tag-bg:var(--c-emerald-s);--card-tag-border:var(--c-emerald-b)}
+.card-indigo{--card-accent:var(--c-indigo);--card-accent-border:var(--c-indigo-b);--card-icon-bg:var(--c-indigo-s);--card-icon-border:var(--c-indigo-b);--card-tag-bg:var(--c-indigo-s);--card-tag-border:var(--c-indigo-b)}
+
+/* legacy tag colour classes still used inside overlays */
+.tag.blue   {--card-accent:var(--c-blue);  --card-accent-border:var(--c-blue-b);  --card-tag-bg:var(--c-blue-s);  --card-tag-border:var(--c-blue-b)}
+.tag.green  {--card-accent:var(--c-emerald);--card-accent-border:var(--c-emerald-b);--card-tag-bg:var(--c-emerald-s);--card-tag-border:var(--c-emerald-b)}
+.tag.purple {--card-accent:var(--c-violet);--card-accent-border:var(--c-violet-b);--card-tag-bg:var(--c-violet-s);--card-tag-border:var(--c-violet-b)}
+.tag.orange {--card-accent:var(--c-amber); --card-accent-border:var(--c-amber-b); --card-tag-bg:var(--c-amber-s); --card-tag-border:var(--c-amber-b)}
+
+/* full-width "framework" banner card */
+.card-banner{
+  grid-column:1/-1;
+  flex-direction:row;align-items:center;
+  background:linear-gradient(100deg,var(--c-indigo-s) 0%,var(--c-violet-s) 100%);
+  border-color:var(--c-indigo-b);
+}
+.card-banner::before{display:none}
+.card-banner:hover{transform:translateY(-2px)}
+.card-banner .card-inner{flex-direction:row;align-items:center;justify-content:space-between;padding:18px 24px}
+.card-banner-text .eyebrow{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--c-indigo);margin-bottom:5px}
+.card-banner-text .title{font-size:15px;font-weight:700;color:var(--txt)}
+.card-banner-cta{
+  flex-shrink:0;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 18px;border-radius:7px;
+  background:var(--c-indigo);color:#fff;
+  font-size:13px;font-weight:700;text-decoration:none;
+  transition:opacity .18s,transform .18s;white-space:nowrap;
+}
+.card-banner-cta:hover{opacity:.88;transform:translateX(2px)}
 
 /* ── FOOTER ── */
 .footer{
-  padding:16px 28px;border-top:1px solid var(--border);
-  text-align:center;font-size:11px;color:var(--mut);font-weight:500;
-  transition:border-color .3s;
+  padding:16px 32px;border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:11px;color:var(--muted);font-weight:500;gap:12px;flex-wrap:wrap;
+}
+.footer-brand{display:flex;align-items:center;gap:7px}
+.footer-dot{width:4px;height:4px;border-radius:50%;background:var(--muted2)}
+
+/* ── RESPONSIVE ── */
+@media(max-width:780px){
+  .grid-wrap{grid-template-columns:1fr;padding:0 16px 40px}
+  .hero{padding:36px 16px 24px}
+  .hero h1{font-size:26px}
+  .topbar{padding:0 16px}
+  .card-banner .card-inner{flex-direction:column;align-items:flex-start;gap:12px}
 }
 
-@media(max-width:768px){.grid-wrap{grid-template-columns:1fr;padding:16px 16px 40px}.hero h1{font-size:24px}.dash-card{padding:26px 22px}}
-
-/* ── SYNCTRADE PANEL ── */
-.card-icon.orange{background:rgba(245,158,11,.1);border:1.5px solid rgba(245,158,11,.2)}
-body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3)}
-.card-label.orange{color:#f59e0b}
-.tag.orange{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#f59e0b}
-.dash-card.orange:hover{border-color:rgba(245,158,11,.5)}
+/* ── SYNCTRADE PANEL ── legacy colour aliases ── */
+.card-icon.blue{background:var(--c-blue-s);border:1px solid var(--c-blue-b)}
+.card-icon.green{background:var(--c-emerald-s);border:1px solid var(--c-emerald-b)}
+.card-icon.orange{background:var(--c-amber-s);border:1px solid var(--c-amber-b)}
+.card-label.blue{color:var(--c-blue)}
+.card-label.green{color:var(--c-emerald)}
+.card-label.orange{color:var(--c-amber)}
+.dash-card.orange:hover{border-color:var(--c-amber-b)}
 
 #synctrade-overlay{
   display:none;position:fixed;inset:0;z-index:9000;
@@ -277,17 +410,27 @@ body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(24
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="topbar-logo"><span class="wm">AdHash</span></div>
+  <div class="topbar-logo">
+    <div class="topbar-logomark">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="2" width="5" height="5" rx="1.2" fill="rgba(255,255,255,0.9)"/>
+        <rect x="9" y="2" width="5" height="5" rx="1.2" fill="rgba(255,255,255,0.6)"/>
+        <rect x="2" y="9" width="5" height="5" rx="1.2" fill="rgba(255,255,255,0.6)"/>
+        <rect x="9" y="9" width="5" height="5" rx="1.2" fill="rgba(255,255,255,0.9)"/>
+      </svg>
+    </div>
+    <span class="topbar-wordmark">Ad<span>Hash</span></span>
+  </div>
+  <div class="topbar-divider"></div>
   <div class="topbar-tagline">Project Control Center</div>
   <div class="topbar-right">
-    <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()">🌙 Dark</button>
+    <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()">Dark</button>
     <div class="user-chip" id="user-chip" onclick="toggleDD()">
       <div class="user-avatar" id="user-avatar">SA</div>
       <div class="user-info">
         <div class="name" id="user-name">Super Admin</div>
         <div class="role">super-admin</div>
       </div>
-      <span style="font-size:10px;color:var(--mut);margin-left:4px">▼</span>
       <div class="user-dd" id="user-dd">
         <div class="user-dd-item danger" onclick="doLogout()">⎋ &nbsp;Sign Out</div>
       </div>
@@ -297,133 +440,162 @@ body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(24
 
 <!-- HERO -->
 <div class="hero">
-  <h1>AdHash <span class="wm">Dashboard</span></h1>
-  <p>Select a workspace to continue</p>
+  <div class="hero-eyebrow"><span class="hero-eyebrow-dot"></span>Internal Operations Platform</div>
+  <h1>AdHash <em>Project Dashboard</em></h1>
+  <p class="hero-sub">Unified control center for monitoring, QA, load testing, and security across all AdHash projects.</p>
 </div>
 
 <!-- GRID -->
 <div class="grid-wrap">
 
-  <a class="dash-card blue" href="/project-dashboard">
-    <div class="card-icon blue">📊</div>
-    <div class="card-body">
-      <div class="card-label blue">Live Monitoring</div>
-      <div class="card-title">AdHash All Projects Working Status</div>
-      <div class="card-desc">Real-time health across all AdHash projects — servers, SSL, APIs, app status, and domain expiry monitoring in one unified view.</div>
-    </div>
-    <div class="card-arrow">
-      <div class="card-tags">
-        <span class="tag blue">API Tests</span>
-        <span class="tag blue">SSL</span>
-        <span class="tag purple">Server Health</span>
-        <span class="tag purple">Domains</span>
+  <a class="dash-card card-blue" href="/project-dashboard">
+    <div class="card-inner">
+      <div class="card-head">
+        <div class="card-icon">📊</div>
+        <div class="card-meta">
+          <div class="card-label">Live Monitoring</div>
+          <div class="card-title">All Projects Status</div>
+        </div>
       </div>
-      <div class="arrow-btn">→</div>
+      <div class="card-desc">Real-time health across all AdHash projects — servers, SSL, APIs, app status, and domain expiry in one unified view.</div>
+      <div class="card-footer">
+        <div class="card-tags">
+          <span class="tag">API Tests</span>
+          <span class="tag">SSL</span>
+          <span class="tag">Uptime</span>
+        </div>
+        <div class="arrow-btn">→</div>
+      </div>
     </div>
   </a>
 
-  <a class="dash-card green" href="/qa-dashboard">
-    <div class="card-icon green">🧪</div>
-    <div class="card-body">
-      <div class="card-label green">QA Reports</div>
-      <div class="card-title">AdHash All Project Test Report</div>
+  <a class="dash-card card-teal" href="/qa-dashboard">
+    <div class="card-inner">
+      <div class="card-head">
+        <div class="card-icon">🧪</div>
+        <div class="card-meta">
+          <div class="card-label">QA Reports</div>
+          <div class="card-title">Project Test Reports</div>
+        </div>
+      </div>
       <div class="card-desc">Comprehensive QA test case management — smoke tests, production checklists, release sign-off, and per-project test tracking.</div>
-    </div>
-    <div class="card-arrow">
-      <div class="card-tags">
-        <span class="tag green">Smoke Tests</span>
-        <span class="tag green">Prod Checks</span>
-        <span class="tag purple">Release Sign-off</span>
+      <div class="card-footer">
+        <div class="card-tags">
+          <span class="tag">Smoke Tests</span>
+          <span class="tag">Prod Checks</span>
+          <span class="tag">Sign-off</span>
+        </div>
+        <div class="arrow-btn">→</div>
       </div>
-      <div class="arrow-btn">→</div>
     </div>
   </a>
 
-  <div class="dash-card" style="cursor:pointer;border-color:rgba(16,185,129,.25)" onclick="openAutoCheckerPanel()">
-    <div class="card-icon" style="background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.25)">🔍</div>
-    <div class="card-body">
-      <div class="card-label" style="color:#10b981">AutoChecker Daily Task</div>
-      <div class="card-title">AutoChecker Production Tests</div>
-      <div class="card-desc">Run automated production test suite for AutoChecker — triggers GitHub Actions workflow, shows live progress and full HTML report.</div>
-    </div>
-    <div class="card-arrow">
-      <div class="card-tags">
-        <span class="tag" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">Run Tests</span>
-        <span class="tag" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">Live Status</span>
-        <span class="tag" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">HTML Report</span>
+  <div class="dash-card card-emerald" onclick="openAutoCheckerPanel()" style="cursor:pointer">
+    <div class="card-inner">
+      <div class="card-head">
+        <div class="card-icon">🔍</div>
+        <div class="card-meta">
+          <div class="card-label">AutoChecker Daily Task</div>
+          <div class="card-title">Production Test Suite</div>
+        </div>
       </div>
-      <div class="arrow-btn">→</div>
+      <div class="card-desc">Trigger GitHub Actions workflows, track live run progress, and view full HTML test reports for AutoChecker production tests.</div>
+      <div class="card-footer">
+        <div class="card-tags">
+          <span class="tag">Run Tests</span>
+          <span class="tag">Live Status</span>
+          <span class="tag">HTML Report</span>
+        </div>
+        <div class="arrow-btn">→</div>
+      </div>
     </div>
   </div>
 
-  <div class="dash-card orange" onclick="openSyncTradePanel()" style="cursor:pointer;text-decoration:none">
-    <div class="card-icon orange">📈</div>
-    <div class="card-body">
-      <div class="card-label orange">SyncTrade Daily Task</div>
-      <div class="card-title">Stock Filter &amp; API Tool</div>
-      <div class="card-desc">Daily workflow tool — filter stocks by price range, get AI-ranked top picks from GPT-4o, and send directly to Market Structure API.</div>
-    </div>
-    <div class="card-arrow">
-      <div class="card-tags">
-        <span class="tag orange">Stock Filter</span>
-        <span class="tag orange">GPT-4o</span>
-        <span class="tag orange">API Send</span>
+  <div class="dash-card card-amber" onclick="openSyncTradePanel()" style="cursor:pointer">
+    <div class="card-inner">
+      <div class="card-head">
+        <div class="card-icon">📈</div>
+        <div class="card-meta">
+          <div class="card-label">SyncTrade Daily Task</div>
+          <div class="card-title">Stock Filter &amp; API Tool</div>
+        </div>
       </div>
-      <div class="arrow-btn">→</div>
+      <div class="card-desc">Filter stocks by price range, get AI-ranked top picks from GPT-4o, and send selections directly to the Market Structure API.</div>
+      <div class="card-footer">
+        <div class="card-tags">
+          <span class="tag">Stock Filter</span>
+          <span class="tag">GPT-4o</span>
+          <span class="tag">API Send</span>
+        </div>
+        <div class="arrow-btn">→</div>
+      </div>
     </div>
   </div>
 
-  <!-- Load Test card -->
-  <div class="dash-card" style="cursor:pointer;border-color:rgba(239,68,68,.25)" onclick="window.location.href='/load-test'">
-    <div class="card-icon" style="background:rgba(239,68,68,.1);border:1.5px solid rgba(239,68,68,.25)">⚡</div>
-    <div class="card-body">
-      <div class="card-label" style="color:#ef4444">Load Testing</div>
-      <div class="card-title">AdHash Load Test Center</div>
-      <div class="card-desc">Run HTTP load tests against all AdHash projects — configure virtual users, duration, ramp-up, and view live RPS, latency, and error rate results.</div>
-    </div>
-    <div class="card-arrow">
-      <div class="card-tags">
-        <span class="tag" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">Virtual Users</span>
-        <span class="tag" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">RPS</span>
-        <span class="tag" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">Latency</span>
+  <div class="dash-card card-rose" onclick="window.location.href='/load-test'" style="cursor:pointer">
+    <div class="card-inner">
+      <div class="card-head">
+        <div class="card-icon">⚡</div>
+        <div class="card-meta">
+          <div class="card-label">Load Testing</div>
+          <div class="card-title">Load Test Center</div>
+        </div>
       </div>
-      <div class="arrow-btn">→</div>
+      <div class="card-desc">Run HTTP load tests — configure virtual users, duration, ramp-up, and view live RPS, latency, and error rate results in real time.</div>
+      <div class="card-footer">
+        <div class="card-tags">
+          <span class="tag">Virtual Users</span>
+          <span class="tag">RPS</span>
+          <span class="tag">Latency</span>
+        </div>
+        <div class="arrow-btn">→</div>
+      </div>
     </div>
   </div>
 
-  <!-- Security Test card -->
-  <div class="dash-card" style="cursor:pointer;border-color:rgba(16,185,129,.25)" onclick="window.location.href='/security-test'">
-    <div class="card-icon" style="background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.25)">🛡</div>
-    <div class="card-body">
-      <div class="card-label" style="color:#10b981">Security Testing</div>
-      <div class="card-title">AdHash Security Test Center</div>
-      <div class="card-desc">Scan your projects for security vulnerabilities — checks HTTPS headers, SSL/TLS, CORS, open redirects, exposed paths, cookie flags, rate limiting and more.</div>
-    </div>
-    <div class="card-arrow">
-      <div class="card-tags">
-        <span class="tag" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">Headers</span>
-        <span class="tag" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">SSL/TLS</span>
-        <span class="tag" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">CORS</span>
+  <div class="dash-card card-violet" onclick="window.location.href='/security-test'" style="cursor:pointer">
+    <div class="card-inner">
+      <div class="card-head">
+        <div class="card-icon">🛡️</div>
+        <div class="card-meta">
+          <div class="card-label">Security Testing</div>
+          <div class="card-title">Security Test Center</div>
+        </div>
       </div>
-      <div class="arrow-btn">→</div>
+      <div class="card-desc">Scan projects for vulnerabilities — HTTPS headers, SSL/TLS, CORS, open redirects, exposed paths, cookie flags, and rate limiting.</div>
+      <div class="card-footer">
+        <div class="card-tags">
+          <span class="tag">Headers</span>
+          <span class="tag">SSL/TLS</span>
+          <span class="tag">CORS</span>
+        </div>
+        <div class="arrow-btn">→</div>
+      </div>
     </div>
   </div>
 
-  <!-- 5th card — Fast-Track QA Workflow -->
-  <div class="dash-card" style="grid-column:1/-1;border-color:rgba(99,102,241,.3);background:linear-gradient(135deg,rgba(99,102,241,.04) 0%,rgba(168,85,247,.04) 100%);padding:0;overflow:hidden">
-    <div style="padding:18px 22px 12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-      <div>
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#6366f1;margin-bottom:3px">QA Process Framework</div>
-        <div style="font-size:17px;font-weight:800;color:#1e293b">Fast-Track QA Workflow</div>
+  <!-- Fast-Track QA Workflow banner -->
+  <div class="dash-card card-banner card-indigo">
+    <div class="card-inner">
+      <div class="card-banner-text">
+        <div class="eyebrow">QA Process Framework</div>
+        <div class="title">Fast-Track QA Workflow — Structured release pipeline for all AdHash projects</div>
       </div>
-      <a href="/fast-track" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;background:#6366f1;color:#fff;font-size:13px;font-weight:700;text-decoration:none;transition:opacity .2s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Open Dashboard →</a>
+      <a href="/fast-track" class="card-banner-cta">Open Dashboard →</a>
     </div>
   </div>
 
 </div>
 
 <!-- FOOTER -->
-<div class="footer">Ad-Hash Technolabs Pvt Ltd · Authorized Personnel Only</div>
+<div class="footer">
+  <div class="footer-brand">
+    <span>Ad-Hash Technolabs Pvt Ltd</span>
+    <span class="footer-dot"></span>
+    <span>Authorized Personnel Only</span>
+  </div>
+  <span>Internal Operations Platform</span>
+</div>
 
 <!-- AUTOCHECKER OVERLAY + PANEL -->
 <style>
@@ -782,14 +954,14 @@ body.dark .card-icon.orange{background:rgba(245,158,11,.12);border-color:rgba(24
 // ── THEME ──
 function initTheme(){
   const t=localStorage.getItem('adhash_theme');
-  if(t==='dark'){document.body.classList.add('dark');document.getElementById('theme-btn').textContent='☀ Light';}
-  else{document.body.classList.remove('dark');document.getElementById('theme-btn').textContent='🌙 Dark';}
+  if(t==='dark'){document.body.classList.add('dark');document.getElementById('theme-btn').textContent='Light';}
+  else{document.body.classList.remove('dark');document.getElementById('theme-btn').textContent='Dark';}
 }
 function toggleTheme(){
   document.body.classList.toggle('dark');
   const isDark=document.body.classList.contains('dark');
   localStorage.setItem('adhash_theme',isDark?'dark':'light');
-  document.getElementById('theme-btn').textContent=isDark?'☀ Light':'🌙 Dark';
+  document.getElementById('theme-btn').textContent=isDark?'Light':'Dark';
 }
 initTheme();
 
