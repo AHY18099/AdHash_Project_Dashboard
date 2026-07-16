@@ -363,6 +363,9 @@ input:focus,select:focus,textarea:focus{
 input:hover:not(:focus),select:hover:not(:focus){border-color:var(--brand-border)}
 select option{background:var(--bg2)}
 textarea{resize:vertical;min-height:80px;font-family:ui-monospace,'Cascadia Code','Consolas',monospace}
+/* compact inputs/selects with explicit height — reset padding so text isn't clipped */
+input[style*="height:"],select[style*="height:"]{padding:0 10px;box-sizing:border-box;line-height:normal}
+select[style*="height:"]{appearance:auto;-webkit-appearance:auto}
 .form-hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.55}
 #dynamic-panel code{background:var(--brand-soft);color:var(--brand);padding:1px 6px;border-radius:4px;font-size:10px;border:1px solid var(--brand-border)}
 .dyn-preview-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}
