@@ -2449,14 +2449,14 @@ function renderSteps() {
         // Assertions HTML
         const assertHtml = (s.assertions || []).map((a, ai) => `
           <div class="assertion-row" style="align-items:center;gap:8px;flex-wrap:nowrap">
-            <select style="width:140px;height:32px;font-size:12px;flex-shrink:0" onchange="_scenarioSteps[${i}].assertions[${ai}].type=this.value;renderSteps()">
+            <select style="width:140px;height:32px;font-size:12px;flex-shrink:0;padding:0 10px;line-height:32px;background:var(--input-bg);color:var(--text);border:1px solid var(--border2);border-radius:8px" onchange="_scenarioSteps[${i}].assertions[${ai}].type=this.value;renderSteps()">
               <option ${a.type==='status'?'selected':''} value="status">Status code =</option>
               <option ${a.type==='jsonPath'?'selected':''} value="jsonPath">Field exists</option>
               <option ${a.type==='contains'?'selected':''} value="contains">Body contains</option>
             </select>
-            ${a.type === 'status' ? `<input type="number" style="width:80px;height:32px;font-size:13px;font-weight:700;text-align:center" value="${a.expected||200}" oninput="_scenarioSteps[${i}].assertions[${ai}].expected=parseInt(this.value)" />` : ''}
-            ${a.type === 'jsonPath' ? `<input placeholder="e.g. data.token" style="flex:1;height:32px;font-size:12px" value="${_esc(a.path||'')}" oninput="_scenarioSteps[${i}].assertions[${ai}].path=this.value" />` : ''}
-            ${a.type === 'contains' ? `<input placeholder="expected text in response body" style="flex:1;height:32px;font-size:12px" value="${_esc(a.value||'')}" oninput="_scenarioSteps[${i}].assertions[${ai}].value=this.value" />` : ''}
+            ${a.type === 'status' ? `<input type="number" style="width:80px;height:32px;font-size:13px;font-weight:700;text-align:center;padding:0 8px;line-height:32px" value="${a.expected||200}" oninput="_scenarioSteps[${i}].assertions[${ai}].expected=parseInt(this.value)" />` : ''}
+            ${a.type === 'jsonPath' ? `<input placeholder="e.g. data.token" style="flex:1;height:32px;font-size:12px;padding:0 10px;line-height:32px" value="${_esc(a.path||'')}" oninput="_scenarioSteps[${i}].assertions[${ai}].path=this.value" />` : ''}
+            ${a.type === 'contains' ? `<input placeholder="expected text in response body" style="flex:1;height:32px;font-size:12px;padding:0 10px;line-height:32px" value="${_esc(a.value||'')}" oninput="_scenarioSteps[${i}].assertions[${ai}].value=this.value" />` : ''}
             <button class="step-remove" style="flex-shrink:0" onclick="removeAssertion(${i},${ai})" title="Remove assertion">✕</button>
           </div>`).join('');
 
