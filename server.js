@@ -3286,12 +3286,12 @@ function loadApiSuiteDefinitions() {
 }
 
 function loadDomainReportEntries() {
+    // Always read fresh from dashboard-state.json — never use a persistent cache.
+    // dashboard-state.json is written by run-all-tests after every full run, and its
+    // domain details are already enriched with live SSL cert data via enrichDomainDetailsWithSsl.
+    // godaddy/index.js also does a live TLS check and writes godaddy/report.html fresh each run.
+    // Stale static fallbacks (domain.html snapshots) are intentionally excluded here.
     const state = readDashboardState();
-    const stateGeneratedAt = state && state.generatedAt ? state.generatedAt : '';
-
-    if (suiteConfigCache.domains && suiteConfigCache.domainsCacheKey === stateGeneratedAt) {
-        return suiteConfigCache.domains;
-    }
 
     const domainDetails = state && state.suites && state.suites.domain && Array.isArray(state.suites.domain.details)
         ? state.suites.domain.details
@@ -3326,52 +3326,17 @@ function loadDomainReportEntries() {
         })
         .filter(Boolean);
 
+    // Also read godaddy/report.html — this is generated fresh by godaddy/index.js via live TLS on every run
     const htmlEntries = [];
     if (fs.existsSync(DOMAIN_REPORT_OUTPUT_PATH)) {
         const html = fs.readFileSync(DOMAIN_REPORT_OUTPUT_PATH, 'utf8');
-        const cardPattern = /<div class="domain-card(?: expiring-soon| error)?"[^>]*>[\s\S]*?<div class="days-remaining(?: [^"]+)?"[^>]*>[\s\S]*?<\/div>[\s\S]*?<\/div>[\s\S]*?<\/div>/gi;
-
-        for (const cardMatch of html.matchAll(cardPattern)) {
-            const cardHtml = cardMatch[0];
-            const nameMatch = cardHtml.match(/<div class="domain-name">([^<]+)<\/div>/i);
-            const domainMatch = cardHtml.match(/<div class="domain-url">([^<]+)<\/div>/i);
-            const badgeClassMatch = cardHtml.match(/<span class="status-badge ([^"]+)">/i);
-            const expiryDateMatch = cardHtml.match(/<div class="expiry-date">([^<]+)<\/div>/i);
-            const expiryDateISTMatch = cardHtml.match(/<div class="expiry-date-ist">([^<]+)<\/div>/i);
-            const daysTextMatch = cardHtml.match(/<div class="days-remaining(?: [^"]+)?"[^>]*>\s*([^<]+)\s*<\/div>/i);
-
-            if (!nameMatch || !domainMatch || !badgeClassMatch || !expiryDateMatch) {
-                continue;
-            }
-
-            const badgeClass = badgeClassMatch[1] || '';
-            const daysText = decodeHtml((daysTextMatch && daysTextMatch[1]) || '');
-            const daysRemaining = normalizeDaysRemaining(daysText);
-            const status = classifyExpiryStatus(daysRemaining, !badgeClass.includes('status-active'));
-
-            htmlEntries.push({
-                name: decodeHtml(nameMatch[1]),
-                domain: decodeHtml(domainMatch[1]),
-                status,
-                expiryDate: decodeHtml(expiryDateMatch[1]),
-                expiryDateIST: decodeHtml((expiryDateISTMatch && expiryDateISTMatch[1]) || '') || formatToIST(decodeHtml(expiryDateMatch[1])),
-                daysRemaining,
-                details: daysText
-            });
-        }
-    }
-
-    if (fs.existsSync(DOMAIN_MODULE_REPORT_PATH)) {
-        const html = fs.readFileSync(DOMAIN_MODULE_REPORT_PATH, 'utf8');
         const cardPattern = /<article class="report-card [^"]+">[\s\S]*?<\/article>/gi;
 
         for (const cardMatch of html.matchAll(cardPattern)) {
             const cardHtml = cardMatch[0];
             const nameMatch = cardHtml.match(/<h2>([^<]+)<\/h2>/i);
             const badgeMatch = cardHtml.match(/<span class="badge [^"]+">([^<]+)<\/span>/i);
-            if (!nameMatch) {
-                continue;
-            }
+            if (!nameMatch) continue;
 
             const fields = {};
             for (const fieldMatch of cardHtml.matchAll(/<div class="field(?: [^"]+)?">\s*<div class="field-label">([^<]+)<\/div>\s*<div class="field-value">([\s\S]*?)<\/div>\s*<\/div>/gi)) {
@@ -3393,20 +3358,14 @@ function loadDomainReportEntries() {
         }
     }
 
-    const entries = dedupeTrackedResults('domain', [...stateEntries, ...htmlEntries].map(normalizeDomainDetail));
-
-    suiteConfigCache.domains = entries;
-    suiteConfigCache.domainsCacheKey = stateGeneratedAt;
-    return suiteConfigCache.domains;
+    // dashboard-state entries (enriched with live SSL) take priority over godaddy/report.html entries
+    return dedupeTrackedResults('domain', [...stateEntries, ...htmlEntries].map(normalizeDomainDetail));
 }
 
 function loadSslReportEntries() {
+    // Always read fresh from dashboard-state.json — cert suite details come from live TLS
+    // checks run by cert-expiry.spec.ts. No persistent cache so stale data cannot linger.
     const state = readDashboardState();
-    const stateGeneratedAt = state && state.generatedAt ? state.generatedAt : '';
-
-    if (suiteConfigCache.ssl && suiteConfigCache.sslCacheKey === stateGeneratedAt) {
-        return suiteConfigCache.ssl;
-    }
 
     const stateDetails = state && state.suites && state.suites.cert && Array.isArray(state.suites.cert.details)
         ? state.suites.cert.details
@@ -3463,45 +3422,8 @@ function loadSslReportEntries() {
         }
     }
 
-    if (fs.existsSync(SSL_MODULE_REPORT_PATH)) {
-        const html = fs.readFileSync(SSL_MODULE_REPORT_PATH, 'utf8');
-        const cardPattern = /<article class="report-card [^"]+">[\s\S]*?<\/article>/gi;
-
-        for (const cardMatch of html.matchAll(cardPattern)) {
-            const cardHtml = cardMatch[0];
-            const nameMatch = cardHtml.match(/<h2>([^<]+)<\/h2>/i);
-            const badgeMatch = cardHtml.match(/<span class="badge [^"]+">([^<]+)<\/span>/i);
-            if (!nameMatch) {
-                continue;
-            }
-
-            const fields = {};
-            for (const fieldMatch of cardHtml.matchAll(/<div class="field(?: [^"]+)?">\s*<div class="field-label">([^<]+)<\/div>\s*<div class="field-value">([\s\S]*?)<\/div>\s*<\/div>/gi)) {
-                fields[decodeHtml(fieldMatch[1])] = stripHtml(fieldMatch[2]);
-            }
-
-            const domain = normalizeSslHost(decodeHtml(nameMatch[1]) || fields.URL);
-            const statusText = decodeHtml((badgeMatch && badgeMatch[1]) || '').toLowerCase();
-            const reasonText = fields['Reason'] || fields['Certificate Status'] || statusText;
-            const isTimeoutReason = /ETIMEDOUT|ECONNRESET|TCP.*timeout|timeout.*TCP|Unreachable.*machine/i.test(reasonText);
-            const resolvedStatus = isTimeoutReason ? 'warning' : (statusText === 'failed' ? 'failed' : statusText === 'warning' ? 'warning' : 'passed');
-            htmlEntries.push({
-                domain,
-                url: fields.URL || `https://${domain}`,
-                status: resolvedStatus,
-                expiryDate: fields['Expiry Date (UTC)'] || null,
-                expiryDateIST: fields['Expiry Date (IST)'] || formatToIST(fields['Expiry Date (UTC)']),
-                daysRemaining: normalizeDaysRemaining(fields['Days Remaining']),
-                reason: isTimeoutReason ? 'Unreachable from this machine (TCP timeout)' : (fields['Certificate Status'] || statusText)
-            });
-        }
-    }
-
-    const mergedEntries = dedupeTrackedResults('ssl', [...normalizedStateEntries, ...htmlEntries].map(normalizeSslDetail));
-
-    suiteConfigCache.ssl = mergedEntries;
-    suiteConfigCache.sslCacheKey = stateGeneratedAt;
-    return suiteConfigCache.ssl;
+    // Stale ssl.html snapshot intentionally excluded — only live cert-expiry.spec.ts data is used
+    return dedupeTrackedResults('ssl', [...normalizedStateEntries, ...htmlEntries].map(normalizeSslDetail));
 }
 
 function createEmptySuiteResult() {
