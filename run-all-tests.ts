@@ -621,13 +621,14 @@ function enrichDomainDetailsWithSsl(domainDetails: DomainDetail[], sslDetails: S
 
     const existingDetail = detailsByDomain.get(normalizedDomain);
     if (existingDetail) {
-      const daysRemaining = existingDetail.daysRemaining ?? detail.daysRemaining;
+      // SSL cert data is live and freshly checked — always prefer it over stale domain.html values
+      const daysRemaining = detail.daysRemaining ?? existingDetail.daysRemaining;
       detailsByDomain.set(normalizedDomain, {
         ...existingDetail,
         url: existingDetail.url || detail.url || `https://${normalizedDomain}`,
         status: classifyDomainStatus(daysRemaining, existingDetail.status === 'error' && (daysRemaining === null || daysRemaining === undefined)),
-        expiryDate: existingDetail.expiryDate || detail.expiryDate,
-        expiryDateIST: existingDetail.expiryDateIST !== 'N/A' ? existingDetail.expiryDateIST : detail.expiryDateIST,
+        expiryDate: detail.expiryDate || existingDetail.expiryDate,
+        expiryDateIST: (detail.expiryDateIST && detail.expiryDateIST !== 'N/A') ? detail.expiryDateIST : existingDetail.expiryDateIST,
         daysRemaining
       });
       return;
