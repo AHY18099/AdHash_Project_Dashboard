@@ -1319,6 +1319,27 @@ input:checked+.slider::before{transform:translateX(18px);background:var(--green)
       <div class="chart-card"><h4>Active Users</h4><canvas id="ch-live-vus" height="120"></canvas></div>
     </div>
 
+    <!-- Per-Step Breakdown -->
+    <div class="card" id="live-step-card" style="margin-bottom:14px;display:none">
+      <div class="card-title">🔢 Per-Step Breakdown — All VUs</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">
+              <th style="padding:8px 10px;text-align:left">Step</th>
+              <th style="padding:8px 10px;text-align:left">Name</th>
+              <th style="padding:8px 10px;text-align:center">VUs Passed</th>
+              <th style="padding:8px 10px;text-align:center">VUs Failed</th>
+              <th style="padding:8px 10px;text-align:center">Total</th>
+              <th style="padding:8px 10px;text-align:center">Pass Rate</th>
+              <th style="padding:8px 10px;text-align:left;min-width:140px">Progress</th>
+            </tr>
+          </thead>
+          <tbody id="live-step-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Timeline + log side by side -->
     <div class="row" style="align-items:flex-start">
       <div class="col" style="min-width:260px">
@@ -1377,6 +1398,25 @@ input:checked+.slider::before{transform:translateX(18px);background:var(--green)
     <div class="card">
       <div class="card-title">📋 Status Code Distribution</div>
       <div class="tbl-wrap"><table><thead><tr><th>Status</th><th>Count</th><th>%</th></tr></thead><tbody id="results-sc-tbody"></tbody></table></div>
+    </div>
+    <div id="results-step-card" class="card" style="display:none">
+      <div class="card-title">🔢 Per-Step Breakdown — All VUs</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">
+              <th style="padding:8px 10px;text-align:left">Step</th>
+              <th style="padding:8px 10px;text-align:left">Name</th>
+              <th style="padding:8px 10px;text-align:center">VUs Passed</th>
+              <th style="padding:8px 10px;text-align:center">VUs Failed</th>
+              <th style="padding:8px 10px;text-align:center">Total</th>
+              <th style="padding:8px 10px;text-align:center">Pass Rate</th>
+              <th style="padding:8px 10px;text-align:left;min-width:140px">Progress</th>
+            </tr>
+          </thead>
+          <tbody id="results-step-tbody"></tbody>
+        </table>
+      </div>
     </div>
     <div id="req-results-card" class="card" style="display:none">
       <div class="card-title" id="req-results-title">🧾 Per-Request Results (Dynamic Mode)</div>
@@ -3238,11 +3278,41 @@ function updateLiveUI(data) {
     pushChart(_liveCharts.err, ts, m.errRate || 0);
     pushChart(_liveCharts.vus, ts, cfg.vus || 0);
 
+    // Per-step breakdown
+    renderStepSummary(data.stepSummary || [], data.config);
+
     // Timeline
     renderTimeline(data.timeline || [], data.status);
 
     // Log
     renderLog(data.logs || []);
+}
+
+function renderStepSummary(summary, cfg) {
+    const card = document.getElementById('live-step-card');
+    const tbody = document.getElementById('live-step-tbody');
+    if (!summary || summary.length === 0) { card.style.display = 'none'; return; }
+    card.style.display = '';
+    const vus = (cfg && cfg.vus) || 0;
+    tbody.innerHTML = summary.map(s => {
+        const pct = s.passRate;
+        const barColor = pct === 100 ? '#10b981' : pct >= 80 ? '#f59e0b' : '#ef4444';
+        const passColor = s.fail === 0 ? 'var(--green)' : 'var(--amber)';
+        const failColor = s.fail > 0 ? 'var(--red)' : 'var(--muted)';
+        return `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:9px 10px"><span style="background:#1e293b;border:1px solid #334155;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:700">Step ${s.step}</span></td>
+          <td style="padding:9px 10px;font-size:12px;color:var(--text);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(s.stepName)}</td>
+          <td style="padding:9px 10px;text-align:center;font-weight:700;color:${passColor}">${s.pass}</td>
+          <td style="padding:9px 10px;text-align:center;font-weight:700;color:${failColor}">${s.fail}</td>
+          <td style="padding:9px 10px;text-align:center;color:var(--muted)">${s.total}${vus ? ' / ' + vus : ''}</td>
+          <td style="padding:9px 10px;text-align:center;font-weight:800;color:${barColor}">${pct}%</td>
+          <td style="padding:9px 10px">
+            <div style="background:var(--border);border-radius:99px;height:7px;overflow:hidden;min-width:100px">
+              <div style="height:100%;border-radius:99px;background:${barColor};width:${pct}%;transition:width .4s ease"></div>
+            </div>
+          </td>
+        </tr>`;
+    }).join('');
 }
 
 function renderTimeline(tl, status) {
@@ -3368,6 +3438,36 @@ function renderResults(data) {
         const c = code.startsWith('2') ? 'var(--green)' : code.startsWith('3') ? 'var(--accent2)' : code.startsWith('4') ? 'var(--amber)' : 'var(--red)';
         return `<tr><td style="color:${c};font-weight:700">${code}</td><td>${count.toLocaleString()}</td><td>${pct}%</td></tr>`;
     }).join('') || '<tr><td colspan="3" style="color:var(--muted)">No data</td></tr>';
+
+    // Per-step breakdown
+    const stepCard = document.getElementById('results-step-card');
+    const stepTbody = document.getElementById('results-step-tbody');
+    const stepSum = data.stepSummary || [];
+    if (stepSum.length > 0) {
+        stepCard.style.display = '';
+        const vus = cfg.vus || 0;
+        stepTbody.innerHTML = stepSum.map(s => {
+            const pct = s.passRate;
+            const barColor = pct === 100 ? '#10b981' : pct >= 80 ? '#f59e0b' : '#ef4444';
+            const passColor = s.fail === 0 ? 'var(--green)' : 'var(--amber)';
+            const failColor = s.fail > 0 ? 'var(--red)' : 'var(--muted)';
+            return `<tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:9px 10px"><span style="background:#1e293b;border:1px solid #334155;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:700">Step ${s.step}</span></td>
+              <td style="padding:9px 10px;font-size:12px;color:var(--text);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(s.stepName)}</td>
+              <td style="padding:9px 10px;text-align:center;font-weight:700;color:${passColor}">${s.pass}</td>
+              <td style="padding:9px 10px;text-align:center;font-weight:700;color:${failColor}">${s.fail}</td>
+              <td style="padding:9px 10px;text-align:center;color:var(--muted)">${s.total}${vus ? ' / ' + vus : ''}</td>
+              <td style="padding:9px 10px;text-align:center;font-weight:800;color:${barColor}">${pct}%</td>
+              <td style="padding:9px 10px">
+                <div style="background:var(--border);border-radius:99px;height:7px;overflow:hidden;min-width:100px">
+                  <div style="height:100%;border-radius:99px;background:${barColor};width:${pct}%;"></div>
+                </div>
+              </td>
+            </tr>`;
+        }).join('');
+    } else {
+        stepCard.style.display = 'none';
+    }
 
     // Per-request results (dynamic / flow mode)
     const perReq   = data.perRequestResults || [];

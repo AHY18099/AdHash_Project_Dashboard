@@ -377,6 +377,9 @@ function _saveResults(runId, state) {
 function _serializeState(state) {
     const s = { ...state };
     delete s.instance;
+    if (!s.stepSummary && s.perRequestResults) {
+        s.stepSummary = _buildStepSummary(s.perRequestResults, s.config);
+    }
     return s;
 }
 
@@ -431,6 +434,7 @@ router.get('/status/:runId', auth, (req, res) => {
         timeline:          state.timeline,
         phase:             state.timeline.length ? state.timeline[state.timeline.length - 1].phase : 'Initializing',
         perRequestResults: state.perRequestResults || [],
+        stepSummary:       _buildStepSummary(state.perRequestResults || [], state.config),
     });
 });
 
@@ -1555,6 +1559,24 @@ async function _executeK6Run(runId, cfg, state, addLog, addTimeline) {
         }
         _saveResults(runId_, state);
     }
+}
+
+// Build per-step summary from perRequestResults: [{step, stepName, pass, fail, total, passRate}]
+function _buildStepSummary(perReq, cfg) {
+    const steps = {};
+    const stepNames = {};
+    if (cfg && cfg.scenario && cfg.scenario.steps) {
+        cfg.scenario.steps.forEach((s, i) => { stepNames[i + 1] = s.name || `Step ${i + 1}`; });
+    }
+    for (const r of perReq) {
+        const n = r.step || 1;
+        if (!steps[n]) steps[n] = { step: n, stepName: stepNames[n] || `Step ${n}`, pass: 0, fail: 0 };
+        const ok = r.status >= 200 && r.status < 400;
+        if (ok) steps[n].pass++; else steps[n].fail++;
+    }
+    return Object.values(steps)
+        .sort((a, b) => a.step - b.step)
+        .map(s => ({ ...s, total: s.pass + s.fail, passRate: s.pass + s.fail > 0 ? Math.round((s.pass / (s.pass + s.fail)) * 100) : 0 }));
 }
 
 function _processK6MetricLines(lines, m, latencies, cfg) {
