@@ -1,67 +1,168 @@
 const fs = require('fs');
 const path = require('path');
-const tls = require('tls');
+const net = require('net');
+const https = require('https');
 
 const reportPath = path.join(__dirname, 'report.html');
 const mappingPath = path.join(__dirname, '..', 'config', 'project-mapping.json');
 
-function normalizeDomainHost(value) {
-    if (!value) return '';
-    return String(value).trim().toLowerCase()
-        .replace(/^https?:\/\//, '')
-        .replace(/\/.*$/, '')
-        .replace(/:\d+$/, '');
+// Extract root domain (e.g. spark.synctag.com -> synctag.com)
+function rootDomain(host) {
+    const parts = host.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').split('.');
+    if (parts.length <= 2) return parts.join('.');
+    // Handle two-part TLDs like .co.uk, .com.au
+    const twoPartTLDs = ['co.uk','com.au','com.br','co.in','net.au','org.uk','me.uk'];
+    const last2 = parts.slice(-2).join('.');
+    if (twoPartTLDs.includes(last2)) return parts.slice(-3).join('.');
+    return parts.slice(-2).join('.');
 }
 
-function formatToIST(utcStr) {
-    if (!utcStr) return 'N/A';
+function normalizeDomainHost(value) {
+    if (!value) return '';
+    return String(value).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
+}
+
+function formatToIST(date) {
+    if (!date) return 'N/A';
     try {
-        const d = new Date(utcStr);
+        const d = typeof date === 'string' ? new Date(date) : date;
+        if (isNaN(d.getTime())) return 'N/A';
         const ist = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
-        const day = String(ist.getUTCDate()).padStart(2, '0');
-        const mon = String(ist.getUTCMonth() + 1).padStart(2, '0');
-        const yr = ist.getUTCFullYear();
-        const hh = String(ist.getUTCHours()).padStart(2, '0');
-        const mm = String(ist.getUTCMinutes()).padStart(2, '0');
-        const ss = String(ist.getUTCSeconds()).padStart(2, '0');
-        const ampm = ist.getUTCHours() >= 12 ? 'pm' : 'am';
-        const hr12 = ist.getUTCHours() % 12 || 12;
-        return `${day}/${mon}/${yr}, ${String(hr12).padStart(2, '0')}:${mm}:${ss} ${ampm} IST`;
+        const pad = n => String(n).padStart(2, '0');
+        const day = pad(ist.getUTCDate()), mon = pad(ist.getUTCMonth() + 1), yr = ist.getUTCFullYear();
+        const hh = ist.getUTCHours(), mm = pad(ist.getUTCMinutes()), ss = pad(ist.getUTCSeconds());
+        const ampm = hh >= 12 ? 'pm' : 'am';
+        const hr12 = pad(hh % 12 || 12);
+        return `${day}/${mon}/${yr}, ${hr12}:${mm}:${ss} ${ampm} IST`;
     } catch { return 'N/A'; }
 }
 
-function checkCert(host) {
+// WHOIS server map for common TLDs
+const WHOIS_SERVERS = {
+    'com':   'whois.verisign-grs.com',
+    'net':   'whois.verisign-grs.com',
+    'org':   'whois.pir.org',
+    'io':    'whois.nic.io',
+    'ai':    'whois.nic.ai',
+    'app':   'whois.nic.google',
+    'us':    'whois.nic.us',
+    'co':    'whois.nic.co',
+    'in':    'whois.registry.in',
+    'info':  'whois.afilias.net',
+    'biz':   'whois.biz',
+};
+
+function getWhoisServer(domain) {
+    const tld = domain.split('.').pop();
+    return WHOIS_SERVERS[tld] || `whois.nic.${tld}`;
+}
+
+// Parse expiry date from WHOIS response text
+function parseWhoisExpiry(text) {
+    // Try common field names in order of preference
+    const patterns = [
+        /Registry Expiry Date:\s*([^\r\n]+)/i,
+        /Expiry Date:\s*([^\r\n]+)/i,
+        /Expiration Date:\s*([^\r\n]+)/i,
+        /Registrar Registration Expiration Date:\s*([^\r\n]+)/i,
+        /paid-till:\s*([^\r\n]+)/i,
+        /expire:\s*([^\r\n]+)/i,
+        /expires:\s*([^\r\n]+)/i,
+    ];
+    for (const pat of patterns) {
+        const m = text.match(pat);
+        if (m) {
+            const raw = m[1].trim();
+            const d = new Date(raw);
+            if (!isNaN(d.getTime())) return d;
+        }
+    }
+    return null;
+}
+
+// RDAP fallback: used when WHOIS is rate-limited or retired (e.g. .io, .co)
+const RDAP_SERVERS = {
+    'io':  'https://rdap.nic.io/domain/',
+    'co':  'https://rdap.nic.co/domain/',
+    'app': 'https://rdap.nic.google/domain/',
+    'ai':  'https://rdap.nic.ai/domain/',
+};
+
+function rdapLookup(domain, timeout = 10000) {
+    const tld = domain.split('.').pop();
+    const base = RDAP_SERVERS[tld] || `https://rdap.verisign.com/${tld}/v1/domain/`;
+    const url = base + domain;
     return new Promise((resolve) => {
-        const sock = tls.connect(
-            { host, port: 443, rejectUnauthorized: false, servername: host, timeout: 10000 },
-            () => {
-                const cert = sock.getPeerCertificate();
-                sock.destroy();
-                if (!cert || !cert.valid_to) {
-                    resolve({ host, expiryDate: null, expiryDateIST: null, daysRemaining: null, status: 'error' });
-                    return;
-                }
-                const expiry = new Date(cert.valid_to);
-                const days = Math.ceil((expiry.getTime() - Date.now()) / 86400000);
-                const expiryUTC = expiry.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC');
-                resolve({
-                    host,
-                    expiryDate: expiryUTC,
-                    expiryDateIST: formatToIST(expiry.toISOString()),
-                    daysRemaining: days,
-                    status: days <= 0 ? 'error' : days <= 30 ? 'expiring' : 'active'
-                });
-            }
-        );
-        sock.on('error', () => {
-            sock.destroy();
-            resolve({ host, expiryDate: null, expiryDateIST: null, daysRemaining: null, status: 'error' });
+        const req = https.get(url, { timeout }, (res) => {
+            let d = '';
+            res.on('data', c => { d += c; });
+            res.on('end', () => {
+                try { resolve(JSON.parse(d)); } catch { resolve(null); }
+            });
         });
-        sock.on('timeout', () => {
-            sock.destroy();
-            resolve({ host, expiryDate: null, expiryDateIST: null, daysRemaining: null, status: 'error' });
-        });
+        req.on('error', () => resolve(null));
+        req.on('timeout', () => { req.destroy(); resolve(null); });
     });
+}
+
+function parseRdapExpiry(obj) {
+    if (!obj || !Array.isArray(obj.events)) return null;
+    const ev = obj.events.find(e => e.eventAction === 'expiration');
+    if (!ev || !ev.eventDate) return null;
+    const d = new Date(ev.eventDate);
+    return isNaN(d.getTime()) ? null : d;
+}
+
+function whoisLookup(domain, server, timeout = 10000) {
+    return new Promise((resolve) => {
+        let data = '';
+        const sock = net.createConnection(43, server);
+        sock.setTimeout(timeout);
+        sock.on('connect', () => sock.write(domain + '\r\n'));
+        sock.on('data', chunk => { data += chunk.toString(); });
+        sock.on('end', () => resolve(data));
+        sock.on('error', () => resolve(''));
+        sock.on('timeout', () => { sock.destroy(); resolve(''); });
+    });
+}
+
+async function checkDomainRegistrar(host) {
+    const root = rootDomain(host);
+    const server = getWhoisServer(root);
+    console.log(`  [WHOIS] ${root} via ${server}`);
+
+    let text = await whoisLookup(root, server);
+
+    // Some registries refer to a registrar WHOIS server — follow one level
+    if (text) {
+        const referral = (text.match(/Registrar WHOIS Server:\s*([^\r\n]+)/i) || [])[1]?.trim();
+        if (referral && referral !== server && referral.includes('.')) {
+            text = await whoisLookup(root, referral) || text;
+        }
+    }
+
+    let expiry = text ? parseWhoisExpiry(text) : null;
+
+    // RDAP fallback: if WHOIS returned empty or unparseable (rate-limited / retired)
+    if (!expiry) {
+        const tld = root.split('.').pop();
+        if (RDAP_SERVERS[tld]) {
+            console.log(`  [RDAP]  ${root} (WHOIS failed, trying RDAP)...`);
+            const rdap = await rdapLookup(root);
+            expiry = rdap ? parseRdapExpiry(rdap) : null;
+        }
+    }
+
+    if (!expiry) {
+        console.log(`  [WHOIS] ${root}: could not parse expiry date`);
+        return { host, root, expiryDate: null, expiryDateIST: null, daysRemaining: null, status: 'error' };
+    }
+
+    const days = Math.ceil((expiry.getTime() - Date.now()) / 86400000);
+    const expiryUTC = expiry.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC');
+    const status = days <= 0 ? 'error' : days <= 30 ? 'expiring' : 'active';
+    console.log(`  [WHOIS] ${root}: expires ${expiryUTC} (${days}d) -> ${status}`);
+    return { host, root, expiryDate: expiryUTC, expiryDateIST: formatToIST(expiry), daysRemaining: days, status };
 }
 
 function buildReportHtml(results) {
@@ -75,43 +176,27 @@ function buildReportHtml(results) {
         const statusLabel = r.status === 'active' ? 'PASSED' : r.status === 'expiring' ? 'WARNING' : 'FAILED';
         const cardClass   = r.status === 'active' ? 'passed' : r.status === 'expiring' ? 'warning' : 'failed';
         const reasonBlock = r.status === 'expiring'
-            ? `\n        <div class="field wide">\n            <div class="field-label">Reason</div>\n            <div class="field-value">Expiry within warning window (${r.daysRemaining} days remaining)</div>\n        </div>`
+            ? `\n        <div class="field wide"><div class="field-label">Reason</div><div class="field-value">Domain registration expiry within warning window (${r.daysRemaining} days remaining)</div></div>`
             : r.status === 'error'
-            ? `\n        <div class="field wide">\n            <div class="field-label">Reason</div>\n            <div class="field-value">SSL certificate unreachable or missing</div>\n        </div>`
+            ? `\n        <div class="field wide"><div class="field-label">Reason</div><div class="field-value">Domain registrar expiry could not be determined</div></div>`
             : '';
         return `        <article class="report-card ${cardClass}">
             <div class="report-card-header">
-                <div><h2>${r.host}</h2></div>
+                <div><h2>${r.root || r.host}</h2></div>
                 <span class="badge ${cardClass}">${statusLabel}</span>
             </div>
             <div class="field-grid">
-        <div class="field wide">
-            <div class="field-label">URL</div>
-            <div class="field-value">https://${r.host}</div>
-        </div>
-        <div class="field">
-            <div class="field-label">Domain Status</div>
-            <div class="field-value">${statusLabel}</div>
-        </div>
-        <div class="field">
-            <div class="field-label">Expiry Date (UTC)</div>
-            <div class="field-value">${r.expiryDate || 'N/A'}</div>
-        </div>
-        <div class="field">
-            <div class="field-label">Expiry Date (IST)</div>
-            <div class="field-value">${r.expiryDateIST || 'N/A'}</div>
-        </div>
-        <div class="field">
-            <div class="field-label">Days Remaining</div>
-            <div class="field-value">${r.daysRemaining !== null ? r.daysRemaining : 'N/A'}</div>
-        </div>${reasonBlock}
+        <div class="field wide"><div class="field-label">URL</div><div class="field-value">https://${r.root || r.host}</div></div>
+        <div class="field"><div class="field-label">Domain Status</div><div class="field-value">${statusLabel}</div></div>
+        <div class="field"><div class="field-label">Expiry Date (UTC)</div><div class="field-value">${r.expiryDate || 'N/A'}</div></div>
+        <div class="field"><div class="field-label">Expiry Date (IST)</div><div class="field-value">${r.expiryDateIST || 'N/A'}</div></div>
+        <div class="field"><div class="field-label">Days Remaining</div><div class="field-value">${r.daysRemaining !== null ? r.daysRemaining : 'N/A'}</div></div>${reasonBlock}
             </div>
         </article>`;
     }).join('\n');
 
     return `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><title>Domain Expiry Monitoring</title>
+<html lang="en"><head><meta charset="UTF-8"><title>Domain Expiry Monitoring</title>
 <style>
 :root{color-scheme:dark;--bg:#04111f;--border:#1e293b;--text:#e2e8f0;--muted:#94a3b8;--pass:#10b981;--warn:#f59e0b;--fail:#ef4444}
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#04111f;color:var(--text)}
@@ -147,14 +232,14 @@ ${cards}
 }
 
 async function main() {
-    let domains = [];
+    let allDomains = [];
     try {
         const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
         const seen = new Set();
         for (const project of (mapping.projects || [])) {
             for (const d of (project.domains || [])) {
                 const h = normalizeDomainHost(d);
-                if (h && !seen.has(h)) { seen.add(h); domains.push(h); }
+                if (h && !seen.has(h)) { seen.add(h); allDomains.push(h); }
             }
         }
     } catch (e) {
@@ -162,18 +247,43 @@ async function main() {
         process.exit(1);
     }
 
-    if (!domains.length) {
-        console.log('[godaddy] No domains configured in project-mapping.json');
+    if (!allDomains.length) {
+        console.log('[godaddy] No domains configured');
         fs.writeFileSync(reportPath, buildReportHtml([]));
         process.exit(0);
     }
 
-    console.log(`[godaddy] Live TLS checking ${domains.length} domains...`);
-    const results = await Promise.all(domains.map(checkCert));
-    results.forEach(r => console.log(`  ${r.status.padEnd(8)} | ${String(r.daysRemaining ?? 'N/A').padStart(4)}d | ${r.host}`));
+    // Deduplicate to root domains — one WHOIS lookup per root domain covers all subdomains
+    const rootMap = new Map(); // root -> first host that mapped to it
+    for (const h of allDomains) {
+        const r = rootDomain(h);
+        if (!rootMap.has(r)) rootMap.set(r, h);
+    }
 
-    fs.writeFileSync(reportPath, buildReportHtml(results));
-    console.log(`[godaddy] report.html written (${results.length} domains, ${results.filter(r=>r.status==='expiring').length} warnings)`);
+    console.log(`[godaddy] WHOIS checking ${rootMap.size} root domains (from ${allDomains.length} configured)...`);
+    const whoisResults = await Promise.all(
+        Array.from(rootMap.entries()).map(([root, host]) => checkDomainRegistrar(host))
+    );
+
+    // Expand results back to all configured hosts: each subdomain inherits its root domain's expiry
+    const rootResultMap = new Map(whoisResults.map(r => [r.root, r]));
+    const results = allDomains.map(host => {
+        const r = rootDomain(host);
+        const base = rootResultMap.get(r);
+        if (!base) return { host, root: r, expiryDate: null, expiryDateIST: null, daysRemaining: null, status: 'error' };
+        return { ...base, host }; // keep host as-is but use root domain's expiry
+    });
+
+    // Deduplicate: only one entry per root domain in the report
+    const seenRoots = new Set();
+    const dedupedResults = results.filter(r => {
+        if (seenRoots.has(r.root)) return false;
+        seenRoots.add(r.root);
+        return true;
+    });
+
+    fs.writeFileSync(reportPath, buildReportHtml(dedupedResults));
+    console.log(`[godaddy] report.html written (${dedupedResults.length} root domains, ${dedupedResults.filter(r=>r.status==='expiring').length} warnings)`);
 }
 
 main().catch(e => { console.error('[godaddy] Fatal:', e); process.exit(1); });

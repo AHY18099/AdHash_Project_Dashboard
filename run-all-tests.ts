@@ -1075,57 +1075,20 @@ function writeDashboardState(finalResults: TestResult[]): void {
     sslResult.status = sslResult.failed > 0 ? 'failed' : sslResult.warnings > 0 ? 'warning' : 'success';
   }
 
-  if (sslResult) {
-    // Always enrich/build domain details from live SSL cert data.
-    // If the domain suite (godaddy/index.js) ran and produced results, merge them;
-    // if it produced nothing, synthesize domain details entirely from SSL cert data.
-    // This guarantees suites.domain.details is always populated with current cert expiry.
-    const existingDomainDetails = dedupeDomainDetails((domainResult?.details || []) as DomainDetail[]);
-    const sslAsDomainDetails: DomainDetail[] = dedupeSslDetails((sslResult.details || []) as SslDetail[]).map((ssl) => ({
-      domain: normalizeDomainHost(ssl.domain || ssl.url || ''),
-      url: ssl.url || `https://${normalizeDomainHost(ssl.domain || ssl.url || '')}`,
-      status: ssl.status === 'passed' ? 'active' : ssl.status === 'warning' ? 'expiring' : 'error',
-      expiryDate: ssl.expiryDate || null,
-      expiryDateIST: ssl.expiryDateIST || null,
-      daysRemaining: ssl.daysRemaining ?? null,
-    }));
-
-    const enrichedDetails = enrichDomainDetailsWithSsl(existingDomainDetails, dedupeSslDetails((sslResult.details || []) as SslDetail[]));
-
-    // For any domain present in SSL but absent in enriched domain details, add it directly
-    const enrichedHosts = new Set(enrichedDetails.map(d => normalizeDomainHost(d.domain)));
-    for (const sslDomain of sslAsDomainDetails) {
-      if (sslDomain.domain && !enrichedHosts.has(normalizeDomainHost(sslDomain.domain))) {
-        enrichedDetails.push(sslDomain);
-      }
-    }
-
-    if (domainResult) {
-      domainResult.details = enrichedDetails;
-    } else {
-      // No domain suite result at all — create one from SSL data so the email always has domain info
-      finalResults.push({
-        repository: 'AdHash_Domain_Report',
-        status: sslAsDomainDetails.some(d => d.status === 'error') ? 'failed'
-              : sslAsDomainDetails.some(d => d.status === 'expiring') ? 'warning' : 'success',
-        passed: sslAsDomainDetails.filter(d => d.status === 'active').length,
-        failed: sslAsDomainDetails.filter(d => d.status === 'error').length,
-        warnings: sslAsDomainDetails.filter(d => d.status === 'expiring').length,
-        total: sslAsDomainDetails.length,
-        details: enrichedDetails,
-        duration: 0,
-        reportPath: '',
-      } as TestResult);
-    }
-
-    const finalDomainResult = finalResults.find((entry) => entry.repository === 'AdHash_Domain_Report');
-    if (finalDomainResult) {
-      finalDomainResult.total = (finalDomainResult.details || []).length;
-      finalDomainResult.passed = ((finalDomainResult.details || []) as DomainDetail[]).filter(d => d.status === 'active').length;
-      finalDomainResult.warnings = ((finalDomainResult.details || []) as DomainDetail[]).filter(d => d.status === 'expiring').length;
-      finalDomainResult.failed = ((finalDomainResult.details || []) as DomainDetail[]).filter(d => d.status === 'error').length;
-      finalDomainResult.status = finalDomainResult.failed > 0 ? 'failed' : finalDomainResult.warnings > 0 ? 'warning' : 'success';
-    }
+  // Domain section and SSL section are kept strictly separate.
+  // Domain suite (godaddy/index.js) checks domain registrar/WHOIS expiry via live TLS on root domains.
+  // SSL suite (cert-expiry.spec.ts) checks SSL certificate expiry on subdomains.
+  // They must not be merged — doing so causes SSL cert dates to appear in the Domain Status email section.
+  if (domainResult && sslResult) {
+    domainResult.details = enrichDomainDetailsWithSsl(
+      dedupeDomainDetails((domainResult.details || []) as DomainDetail[]),
+      dedupeSslDetails((sslResult.details || []) as SslDetail[])
+    );
+    domainResult.total = domainResult.details.length;
+    domainResult.passed = domainResult.details.filter((detail) => (detail as DomainDetail).status === 'active').length;
+    domainResult.warnings = domainResult.details.filter((detail) => (detail as DomainDetail).status === 'expiring').length;
+    domainResult.failed = domainResult.details.filter((detail) => (detail as DomainDetail).status === 'error').length;
+    domainResult.status = domainResult.failed > 0 ? 'failed' : domainResult.warnings > 0 ? 'warning' : 'success';
   }
 
   try {

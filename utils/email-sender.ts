@@ -1336,28 +1336,10 @@ export function buildDashboardRenderModel(rootDir: string): DashboardEmailModel 
     const serverRows = readSuiteRows(rootDir, 'Adhash_AllProjects_Server');
     const apiRows = readSuiteRows(rootDir, 'AdHash_API_Test');
     const sslDetails = ((state.suites?.cert?.details || []) as SslDetail[]).map(normalizeSslDetail);
-
-    // Build domain details: start from state.suites.domain.details (written by run-all-tests),
-    // then fill in any domain that is missing or has no expiryDate with live SSL cert data.
-    // This ensures stale/absent domain suite data never reaches the email — SSL cert data
-    // (from live TLS checks in cert-expiry.spec.ts) always wins when available.
-    const rawDomainDetails = ((state.suites?.domain?.details || []) as DomainDetail[]).map(normalizeDomainDetail);
-    const domainByHost = new Map(rawDomainDetails.filter(d => d.domain).map(d => [d.domain.toLowerCase(), d]));
-    for (const ssl of sslDetails) {
-        const host = (ssl.domain || '').toLowerCase();
-        if (!host) continue;
-        const existing = domainByHost.get(host);
-        // Always overwrite with SSL cert data — it is the freshest source
-        domainByHost.set(host, {
-            domain: host,
-            url: ssl.url || `https://${host}`,
-            status: ssl.status === 'passed' ? 'active' : ssl.status === 'warning' ? 'expiring' : 'error',
-            expiryDate: ssl.expiryDate || (existing?.expiryDate ?? null),
-            expiryDateIST: ssl.expiryDateIST || (existing?.expiryDateIST ?? null),
-            daysRemaining: ssl.daysRemaining ?? (existing?.daysRemaining ?? null),
-        } as DomainDetail);
-    }
-    const domainDetails = Array.from(domainByHost.values());
+    // Domain details come exclusively from the domain suite (godaddy/report.html via run-all-tests).
+    // These are domain registrar/WHOIS expiry dates — completely separate from SSL cert expiry.
+    // Do NOT merge SSL cert data here; SSL has its own section in the email.
+    const domainDetails = ((state.suites?.domain?.details || []) as DomainDetail[]).map(normalizeDomainDetail);
     const apiDetails = dedupeApiResults((state.suites?.api?.details || []) as ApiTestItem[]);
     const baseModuleSections = buildModuleSections(state);
 
