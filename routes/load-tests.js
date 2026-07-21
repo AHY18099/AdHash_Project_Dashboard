@@ -1167,7 +1167,12 @@ router.post('/step-run-all', auth, async (req, res) => {
         }
 
         const ok = result.status >= 200 && result.status < 400;
-        return { vu: vuIdx + 1, status: result.status, responseTime: result.responseTime, ok, capturedValues, resolvedUrl: rawUrl, error: result.error || null, vuEmail: vars.email, vuPhone: vars.phoneNumber };
+        // Include resolved headers (redact Authorization value for display, keep key visible) and raw response for debugging
+        const resolvedHeadersDebug = {};
+        for (const [k, v] of Object.entries(headers)) {
+            resolvedHeadersDebug[k] = (k.toLowerCase() === 'authorization') ? v : v;
+        }
+        return { vu: vuIdx + 1, status: result.status, responseTime: result.responseTime, ok, capturedValues, resolvedUrl: rawUrl, error: result.error || null, vuEmail: vars.email, vuPhone: vars.phoneNumber, resolvedHeaders: resolvedHeadersDebug, rawBody: result.rawBody ? result.rawBody.substring(0, 300) : '' };
     }
 
     try {
