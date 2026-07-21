@@ -1140,19 +1140,25 @@ router.post('/step-run-all', auth, async (req, res) => {
         const decIv   = (dec?.enabled && dec.iv)  ? dec.iv  : (enc2?.enabled ? (enc2.iv || enc2.key) : decKey);
         const decAlgo = (dec?.enabled ? dec.algorithm : enc2?.algorithm) || 'AES-128-CBC';
         const decField = (dec?.enabled && dec.inputField) ? dec.inputField : (enc2?.outputField || 'encryptedData');
-        if (decKey && parsedRaw && typeof parsedRaw === 'object' && parsedRaw[decField]) {
-            try {
-                const cipher = parsedRaw[decField];
-                let plain;
-                if (decAlgo === 'AES-128-ECB') {
-                    const decipher = require('crypto').createDecipheriv('aes-128-ecb', Buffer.from(decKey, 'utf8').slice(0, 16), null);
-                    plain = Buffer.concat([decipher.update(Buffer.from(cipher, 'base64')), decipher.final()]).toString('utf8');
-                } else {
-                    plain = aesCbcDecrypt(cipher, decKey, decIv || decKey);
-                }
-                try { decryptedBody = JSON.parse(plain); } catch(_) { decryptedBody = plain; }
-            } catch(_) {}
+        if (decKey) {
+            // Cipher text: from JSON field, or raw body if response is not a JSON object
+            const cipher = (parsedRaw && typeof parsedRaw === 'object' && parsedRaw[decField])
+                ? parsedRaw[decField]
+                : (parsedRaw === null && result.rawBody && result.rawBody.trim() ? result.rawBody.trim() : null);
+            if (cipher) {
+                try {
+                    let plain;
+                    if (decAlgo === 'AES-128-ECB') {
+                        const decipher = require('crypto').createDecipheriv('aes-128-ecb', Buffer.from(decKey, 'utf8').slice(0, 16), null);
+                        plain = Buffer.concat([decipher.update(Buffer.from(cipher, 'base64')), decipher.final()]).toString('utf8');
+                    } else {
+                        plain = aesCbcDecrypt(cipher, decKey, decIv || decKey);
+                    }
+                    try { decryptedBody = JSON.parse(plain); } catch(_) { decryptedBody = plain; }
+                } catch(_) {}
+            }
         }
+        console.log('[step-run-all] VU', vuIdx+1, 'decField=', decField, 'parsedRaw type=', parsedRaw === null ? 'null' : typeof parsedRaw, 'decryptedBody keys=', decryptedBody && typeof decryptedBody === 'object' ? Object.keys(decryptedBody) : decryptedBody ? '(string)' : 'null');
 
         // Extract captures
         const capturedValues = {};
@@ -1169,8 +1175,7 @@ router.post('/step-run-all', auth, async (req, res) => {
         }
 
         const ok = result.status >= 200 && result.status < 400;
-        // Debug: log captured values per VU
-        console.log('[step-run-all] VU', vuIdx + 1, 'status=', result.status, 'capturedValues=', JSON.stringify(capturedValues), 'decryptedBody keys=', decryptedBody ? Object.keys(decryptedBody) : null);
+        console.log('[step-run-all] VU', vuIdx + 1, 'status=', result.status, 'capturedValues=', JSON.stringify(capturedValues));
         const resolvedHeadersDebug = {};
         for (const [k, v] of Object.entries(headers)) {
             resolvedHeadersDebug[k] = (k.toLowerCase() === 'authorization') ? v : v;
