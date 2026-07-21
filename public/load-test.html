@@ -692,6 +692,14 @@ input:checked+.slider::before{transform:translateX(18px);background:var(--green)
 }
 .step-run-btn:hover{box-shadow:0 6px 20px rgba(5,150,105,.50);transform:translateY(-2px)}
 .step-run-btn.running{opacity:.6;cursor:wait;transform:none}
+.step-run-all-btn{
+  padding:6px 14px;background:linear-gradient(135deg,#6366f1,#4f46e5);
+  color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;
+  cursor:pointer;display:inline-flex;align-items:center;gap:5px;
+  transition:all .18s;box-shadow:0 2px 10px rgba(99,102,241,.32);flex-shrink:0;
+}
+.step-run-all-btn:hover{box-shadow:0 6px 20px rgba(99,102,241,.50);transform:translateY(-2px)}
+.step-run-all-btn.running{opacity:.6;cursor:wait;transform:none}
 
 .step-result-panel{border-radius:12px;border:1px solid var(--border);overflow:hidden;margin-top:10px}
 .step-result-header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg3);border-bottom:1px solid var(--border);flex-wrap:wrap}
@@ -2453,6 +2461,115 @@ async function runStep(i) {
     if (newBtn) { newBtn.classList.remove('running'); newBtn.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run'; }
 }
 
+// ── Run this step with ALL configured VUs simultaneously ──
+async function runStepAllVUs(i) {
+    const s   = _scenarioSteps[i];
+    const btn = document.getElementById(`run-all-btn-${i}`);
+    const panel = document.getElementById(`step-result-${i}`);
+    if (!btn || !panel) return;
+
+    // Read VU count from Configure tab
+    const vus = parseInt(document.getElementById('scen-vus')?.value) || 1;
+
+    // Build globalVars
+    const globalVars = {};
+    for (const v of _globalVars) { if (v.name) globalVars[v.name] = v.value; }
+
+    // Build capturedVarsByVu — for each VU, gather captured vars from all prior steps
+    // Each prior step may have run only once (VU1), so all VUs share those captures
+    const sharedCaptured = {};
+    for (let j = 0; j < i; j++) {
+        const r = _scenarioSteps[j]._runResult;
+        if (r?.capturedValues) Object.assign(sharedCaptured, r.capturedValues);
+    }
+    // Pass same shared captures for all VUs (they all benefit from prior single-step runs)
+    const capturedVarsByVu = Array.from({ length: vus }, () => ({ ...sharedCaptured }));
+
+    // Dynamic data config
+    const dynData = {};
+    try {
+        dynData.emailPrefix  = document.getElementById('scen-dyn-email-prefix')?.value  || 'testuser';
+        dynData.emailDomain  = document.getElementById('scen-dyn-email-domain')?.value  || 'mailinator.com';
+        dynData.phoneBase    = document.getElementById('scen-dyn-phone-base')?.value    || '7100000000';
+        dynData.namePrefix   = document.getElementById('scen-dyn-name-prefix')?.value   || 'TestUser';
+        dynData.startIndex   = parseInt(document.getElementById('scen-dyn-start-index')?.value) || 1;
+    } catch(_) {}
+
+    btn.classList.add('running');
+    btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" opacity=".3"/><path d="M12 2a10 10 0 010 20A10 10 0 0112 2" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" class="spin-arc"/></svg> Running…';
+    panel.style.display = 'none';
+
+    try {
+        const data = await api('POST', '/api/load-test/step-run-all', {
+            step: s,
+            vus,
+            globalVars,
+            capturedVarsByVu,
+            dynamicData: dynData,
+        });
+
+        const sum = data.summary || {};
+        const results = data.results || [];
+        const passColor = sum.passRate === 100 ? '#10b981' : sum.passRate >= 80 ? '#f59e0b' : '#ef4444';
+        const barColor  = passColor;
+
+        const rowsHtml = results.map(r => {
+            const ok = r.ok;
+            const stColor = ok ? 'var(--green)' : 'var(--red)';
+            return `<tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:7px 10px;font-weight:700">VU ${r.vu}</td>
+              <td style="padding:7px 10px;font-family:monospace;font-size:11px;color:var(--muted)">${_esc(r.vuEmail||'—')}</td>
+              <td style="padding:7px 10px;font-family:monospace;font-size:11px;color:var(--muted)">${_esc(r.vuPhone||'—')}</td>
+              <td style="padding:7px 10px;font-weight:800;color:${stColor}">${r.status||'—'}</td>
+              <td style="padding:7px 10px;color:var(--muted)">${r.responseTime||0}ms</td>
+              <td style="padding:7px 10px">
+                ${r.ok
+                  ? '<span style="background:rgba(16,185,129,.15);color:#6ee7b7;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700">PASS</span>'
+                  : '<span style="background:rgba(239,68,68,.15);color:#fca5a5;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700">FAIL</span>'}
+              </td>
+              <td style="padding:7px 10px;font-size:11px;color:${r.error?'var(--red)':'var(--muted)'}">${r.error ? _esc(r.error) : (Object.keys(r.capturedValues||{}).length ? '📌 ' + Object.keys(r.capturedValues).join(', ') : '—')}</td>
+            </tr>`;
+        }).join('');
+
+        panel.innerHTML = `
+          <div class="step-result-panel">
+            <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+              <span style="font-size:13px;font-weight:800">Run All — ${vus} VUs</span>
+              <span style="font-weight:800;color:${passColor};font-size:15px">${sum.pass}/${sum.total} passed</span>
+              <span style="font-size:12px;color:var(--muted)">${sum.passRate}% pass rate</span>
+              <div style="flex:1;min-width:120px;background:var(--border);border-radius:99px;height:6px;overflow:hidden">
+                <div style="height:100%;background:${barColor};width:${sum.passRate}%;border-radius:99px;transition:width .4s"></div>
+              </div>
+              ${sum.fail > 0 ? `<span style="color:var(--red);font-size:12px;font-weight:700">${sum.fail} failed</span>` : ''}
+            </div>
+            <div style="overflow-x:auto">
+              <table style="width:100%;border-collapse:collapse;font-size:12px">
+                <thead>
+                  <tr style="color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">
+                    <th style="padding:7px 10px;text-align:left">VU</th>
+                    <th style="padding:7px 10px;text-align:left">Email</th>
+                    <th style="padding:7px 10px;text-align:left">Phone</th>
+                    <th style="padding:7px 10px;text-align:left">Status</th>
+                    <th style="padding:7px 10px;text-align:left">Time</th>
+                    <th style="padding:7px 10px;text-align:left">Result</th>
+                    <th style="padding:7px 10px;text-align:left">Captures / Error</th>
+                  </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+              </table>
+            </div>
+          </div>`;
+        panel.style.display = 'block';
+
+    } catch(e) {
+        panel.innerHTML = `<div class="step-result-panel"><div style="padding:12px;color:var(--red)">Run All failed: ${_esc(e.message)}</div></div>`;
+        panel.style.display = 'block';
+    } finally {
+        const nb = document.getElementById(`run-all-btn-${i}`);
+        if (nb) { nb.classList.remove('running'); nb.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/><line x1="19" y1="3" x2="19" y2="21"/></svg> Run All'; }
+    }
+}
+
 function _saveRunResponseToNextStep(i) {
     const result = _scenarioSteps[i]._runResult;
     if (!result) return;
@@ -2517,6 +2634,9 @@ function renderSteps() {
         </label>
         <button class="step-run-btn" id="run-btn-${i}" onclick="event.stopPropagation();runStep(${i})" title="Trial run this step with VU1">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run
+        </button>
+        <button class="step-run-all-btn" id="run-all-btn-${i}" onclick="event.stopPropagation();runStepAllVUs(${i})" title="Run this step with all configured VUs simultaneously">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/><line x1="19" y1="3" x2="19" y2="21"/></svg> Run All
         </button>
         <button class="btn btn-secondary btn-xs" onclick="event.stopPropagation();duplicateStep(${i})" title="Duplicate step">⧉</button>
         ${i > 0 ? `<button class="btn btn-secondary btn-xs" onclick="event.stopPropagation();moveStep(${i},-1)" title="Move up">↑</button>` : ''}

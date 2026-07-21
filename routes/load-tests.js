@@ -1026,6 +1026,163 @@ router.post('/step-run', auth, async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// POST /api/load-test/step-run-all — run a single step as all configured VUs
+// Body: { step, vus, globalVars, capturedVarsByVu, dynamicData }
+// capturedVarsByVu: array indexed by VU (0-based) — captured vars from prior steps per VU
+// Returns: { results: [{ vu, status, responseTime, capturedValues, ok, resolvedUrl }] }
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/step-run-all', auth, async (req, res) => {
+    const { step, vus = 1, globalVars = {}, capturedVarsByVu = [], dynamicData = {} } = req.body || {};
+    if (!step) return res.status(400).json({ error: 'step is required' });
+
+    const http  = require('http');
+    const https = require('https');
+    const { URL } = require('url');
+
+    const startIndex  = parseInt(dynamicData.startIndex) || 1;
+    const emailPrefix = dynamicData.emailPrefix  || 'testuser';
+    const emailDomain = dynamicData.emailDomain  || 'mailinator.com';
+    const phoneBase   = BigInt(dynamicData.phoneBase || '7100000000');
+    const namePrefix  = dynamicData.namePrefix   || 'TestUser';
+
+    // Run all VUs concurrently (capped at 50 to avoid overwhelming the server)
+    const vuCount = Math.min(Math.max(1, parseInt(vus) || 1), 50);
+
+    function buildVuData(vuIdx) {
+        const idx = startIndex + vuIdx;
+        return {
+            index:       String(idx),
+            email:       `${emailPrefix}${idx}@${emailDomain}`,
+            phoneNumber: String(phoneBase + BigInt(vuIdx)),
+            name:        `${namePrefix} ${idx}`,
+            timestamp:   String(Date.now()),
+            random:      String(Math.floor(Math.random() * 1e9)),
+            uuid:        crypto.randomUUID(),
+        };
+    }
+
+    async function runOneVu(vuIdx) {
+        const vuData      = buildVuData(vuIdx);
+        const capturedVars = capturedVarsByVu[vuIdx] || capturedVarsByVu[0] || {};
+        const vars = Object.assign({}, globalVars, vuData, capturedVars);
+
+        function resolveStr(s) {
+            if (typeof s !== 'string') return s;
+            return s.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] !== undefined ? vars[k] : `{{${k}}}`);
+        }
+        function resolveObj(o) {
+            if (typeof o === 'string') return resolveStr(o);
+            if (Array.isArray(o)) return o.map(resolveObj);
+            if (o !== null && typeof o === 'object') {
+                const out = {};
+                for (const k of Object.keys(o)) out[k] = resolveObj(o[k]);
+                return out;
+            }
+            return o;
+        }
+
+        const method  = (step.method || 'GET').toUpperCase();
+        const rawUrl  = resolveStr(step.url || '');
+        const headers = Object.assign({ 'Content-Type': 'application/json' }, resolveObj(step.headers || {}));
+
+        let bodyStr = null;
+        if (['POST','PUT','PATCH'].includes(method) && step.body) {
+            let bv = step.body;
+            if (typeof bv === 'object') bv = JSON.stringify(bv);
+            bv = resolveStr(bv);
+            const enc = step.requestEncryption;
+            if (enc?.enabled && enc.key) {
+                try {
+                    const encField = enc.outputField || 'encryptedData';
+                    const iv = enc.iv || enc.key;
+                    const encrypted = enc.algorithm === 'AES-128-ECB' ? aesEncrypt(bv, enc.key) : aesCbcEncrypt(bv, enc.key, iv);
+                    bodyStr = JSON.stringify({ [encField]: encrypted });
+                } catch(_) { bodyStr = bv; }
+            } else {
+                bodyStr = bv;
+            }
+        }
+
+        const result = await new Promise((resolve) => {
+            let parsed;
+            try { parsed = new URL(rawUrl); } catch(e) { return resolve({ error: 'Invalid URL', status: 0, responseTime: 0, rawBody: '' }); }
+            const lib  = parsed.protocol === 'https:' ? https : http;
+            const opts = {
+                hostname: parsed.hostname,
+                port:     parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+                path:     parsed.pathname + parsed.search,
+                method,
+                headers:  { ...headers },
+                timeout:  15000,
+            };
+            if (bodyStr) opts.headers['Content-Length'] = Buffer.byteLength(bodyStr);
+            const t0   = Date.now();
+            const req2 = lib.request(opts, (resp) => {
+                const chunks = [];
+                resp.on('data', c => chunks.push(c));
+                resp.on('end', () => resolve({ status: resp.statusCode, responseTime: Date.now() - t0, rawBody: Buffer.concat(chunks).toString('utf8') }));
+            });
+            req2.on('error', e => resolve({ error: e.message, status: 0, responseTime: Date.now() - t0, rawBody: '' }));
+            req2.on('timeout', () => { req2.destroy(); resolve({ error: 'Timeout', status: 0, responseTime: 15000, rawBody: '' }); });
+            if (bodyStr) req2.write(bodyStr);
+            req2.end();
+        });
+
+        // Decrypt response if configured
+        let parsedRaw = null;
+        try { parsedRaw = JSON.parse(result.rawBody); } catch(_) {}
+        let decryptedBody = null;
+        const dec  = step.responseDecryption;
+        const enc2 = step.requestEncryption;
+        const decKey  = (dec?.enabled && dec.key) ? dec.key : (enc2?.enabled ? enc2.key : null);
+        const decIv   = (dec?.enabled && dec.iv)  ? dec.iv  : (enc2?.enabled ? (enc2.iv || enc2.key) : decKey);
+        const decAlgo = (dec?.enabled ? dec.algorithm : enc2?.algorithm) || 'AES-128-CBC';
+        const decField = (dec?.enabled && dec.inputField) ? dec.inputField : (enc2?.outputField || 'encryptedData');
+        if (decKey && parsedRaw && typeof parsedRaw === 'object' && parsedRaw[decField]) {
+            try {
+                const cipher = parsedRaw[decField];
+                let plain;
+                if (decAlgo === 'AES-128-ECB') {
+                    const decipher = require('crypto').createDecipheriv('aes-128-ecb', Buffer.from(decKey, 'utf8').slice(0, 16), null);
+                    plain = Buffer.concat([decipher.update(Buffer.from(cipher, 'base64')), decipher.final()]).toString('utf8');
+                } else {
+                    plain = aesCbcDecrypt(cipher, decKey, decIv || decKey);
+                }
+                try { decryptedBody = JSON.parse(plain); } catch(_) { decryptedBody = plain; }
+            } catch(_) {}
+        }
+
+        // Extract captures
+        const capturedValues = {};
+        const src = decryptedBody || parsedRaw;
+        if (step.captures && src) {
+            for (const cap of step.captures) {
+                if (!cap.varName || !cap.jsonPath) continue;
+                try {
+                    const val = cap.jsonPath.replace(/^\$\.?/, '').split('.').filter(Boolean)
+                        .reduce((o, k) => (o != null ? o[k] : undefined), src);
+                    if (val !== undefined) capturedValues[cap.varName] = val;
+                } catch(_) {}
+            }
+        }
+
+        const ok = result.status >= 200 && result.status < 400;
+        return { vu: vuIdx + 1, status: result.status, responseTime: result.responseTime, ok, capturedValues, resolvedUrl: rawUrl, error: result.error || null, vuEmail: vars.email, vuPhone: vars.phoneNumber };
+    }
+
+    try {
+        const results = await Promise.all(
+            Array.from({ length: vuCount }, (_, i) => runOneVu(i))
+        );
+        const pass = results.filter(r => r.ok).length;
+        const fail = results.length - pass;
+        res.json({ ok: true, results, summary: { total: results.length, pass, fail, passRate: Math.round((pass / results.length) * 100) } });
+    } catch(e) {
+        res.status(500).json({ ok: false, error: e.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // POST /api/load-test/scenario/k6-script — generate downloadable k6 script
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/scenario/k6-script', auth, (req, res) => {
