@@ -1034,6 +1034,8 @@ router.post('/step-run', auth, async (req, res) => {
 router.post('/step-run-all', auth, async (req, res) => {
     const { step, vus = 1, globalVars = {}, capturedVarsByVu = [], dynamicData = {} } = req.body || {};
     if (!step) return res.status(400).json({ error: 'step is required' });
+    // Debug: log what captured vars came in
+    console.log('[step-run-all] step.name=', step.name, 'vus=', vus, 'capturedVarsByVu=', JSON.stringify(capturedVarsByVu));
 
     const http  = require('http');
     const https = require('https');
@@ -1167,7 +1169,8 @@ router.post('/step-run-all', auth, async (req, res) => {
         }
 
         const ok = result.status >= 200 && result.status < 400;
-        // Include resolved headers (redact Authorization value for display, keep key visible) and raw response for debugging
+        // Debug: log captured values per VU
+        console.log('[step-run-all] VU', vuIdx + 1, 'status=', result.status, 'capturedValues=', JSON.stringify(capturedValues), 'decryptedBody keys=', decryptedBody ? Object.keys(decryptedBody) : null);
         const resolvedHeadersDebug = {};
         for (const [k, v] of Object.entries(headers)) {
             resolvedHeadersDebug[k] = (k.toLowerCase() === 'authorization') ? v : v;

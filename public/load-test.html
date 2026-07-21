@@ -2540,16 +2540,23 @@ async function runStepAllVUs(i) {
                   : '<span style="background:rgba(239,68,68,.15);color:#fca5a5;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700">FAIL</span>'}
               </td>
               <td style="padding:7px 10px;font-size:11px;max-width:280px;word-break:break-all">
-                ${r.error ? `<span style="color:var(--red)">${_esc(r.error)}</span>` :
-                  Object.keys(r.capturedValues||{}).length ? `<span style="color:var(--muted)">📌 ${_esc(Object.keys(r.capturedValues).join(', '))}</span>` : ''}
-                ${!r.ok && r.rawBody ? `<details style="margin-top:4px"><summary style="cursor:pointer;color:var(--muted);font-size:10px">Response ▾</summary><pre style="margin:2px 0;font-size:10px;color:var(--amber);white-space:pre-wrap;word-break:break-all">${_esc(r.rawBody)}</pre></details>` : ''}
+                ${r.error ? `<span style="color:var(--red)">${_esc(r.error)}</span>` : ''}
+                ${Object.keys(r.capturedValues||{}).length ? `<span style="color:var(--green);font-weight:700">📌 ${_esc(Object.keys(r.capturedValues).join(', '))}</span>` : (r.ok ? `<span style="color:var(--amber);font-size:10px">⚠ no captures</span>` : '')}
+                ${r.rawBody ? `<details style="margin-top:4px"><summary style="cursor:pointer;color:var(--muted);font-size:10px">Response ▾</summary><pre style="margin:2px 0;font-size:10px;color:${r.ok ? 'var(--muted)' : 'var(--amber)'};white-space:pre-wrap;word-break:break-all">${_esc(r.rawBody)}</pre></details>` : ''}
                 ${r.resolvedHeaders?.Authorization ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">Auth: <code style="color:${r.resolvedHeaders.Authorization.includes('{{') ? 'var(--red)' : 'var(--accent2)'}">${_esc(r.resolvedHeaders.Authorization.substring(0,60))}</code></div>` : ''}
               </td>
             </tr>`;
         }).join('');
 
+        // Build debug line showing what capturedVarsByVu contained for each VU
+        const captureDebugHtml = capturedVarsByVu.map((cv, vi) => {
+            const keys = Object.keys(cv);
+            return `<span style="font-size:10px;color:var(--muted)">VU${vi+1}:[${keys.length ? _esc(keys.join(',')) : 'none'}]</span>`;
+        }).join(' ');
+
         panel.innerHTML = `
           <div class="step-result-panel">
+            ${capturedVarsByVu.length ? `<div style="padding:4px 14px;background:var(--bg3);font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Sent captures: ${captureDebugHtml}</div>` : ''}
             <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;flex-wrap:wrap">
               <span style="font-size:13px;font-weight:800">Run All — ${vus} VUs</span>
               <span style="font-weight:800;color:${passColor};font-size:15px">${sum.pass}/${sum.total} passed</span>
