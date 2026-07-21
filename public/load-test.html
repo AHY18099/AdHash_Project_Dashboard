@@ -2475,15 +2475,23 @@ async function runStepAllVUs(i) {
     const globalVars = {};
     for (const v of _globalVars) { if (v.name) globalVars[v.name] = v.value; }
 
-    // Build capturedVarsByVu — for each VU, gather captured vars from all prior steps
-    // Each prior step may have run only once (VU1), so all VUs share those captures
-    const sharedCaptured = {};
+    // Build capturedVarsByVu — per-VU captured vars from all prior steps.
+    // If a prior step was run with Run All, use its per-VU results (_runAllResults).
+    // If a prior step was run with single Run, its captures apply to all VUs.
+    const capturedVarsByVu = Array.from({ length: vus }, () => ({}));
     for (let j = 0; j < i; j++) {
-        const r = _scenarioSteps[j]._runResult;
-        if (r?.capturedValues) Object.assign(sharedCaptured, r.capturedValues);
+        const step_j = _scenarioSteps[j];
+        if (step_j._runAllResults && step_j._runAllResults.length > 0) {
+            // Per-VU captures from a prior Run All — each VU gets its own token etc.
+            for (let v = 0; v < vus; v++) {
+                const vuResult = step_j._runAllResults[v] || step_j._runAllResults[step_j._runAllResults.length - 1];
+                if (vuResult?.capturedValues) Object.assign(capturedVarsByVu[v], vuResult.capturedValues);
+            }
+        } else if (step_j._runResult?.capturedValues) {
+            // Single Run result — apply to all VUs
+            for (let v = 0; v < vus; v++) Object.assign(capturedVarsByVu[v], step_j._runResult.capturedValues);
+        }
     }
-    // Pass same shared captures for all VUs (they all benefit from prior single-step runs)
-    const capturedVarsByVu = Array.from({ length: vus }, () => ({ ...sharedCaptured }));
 
     // Dynamic data config
     const dynData = {};
@@ -2510,6 +2518,10 @@ async function runStepAllVUs(i) {
 
         const sum = data.summary || {};
         const results = data.results || [];
+
+        // Store per-VU results on the step so subsequent Run All calls can use per-VU captures
+        _scenarioSteps[i]._runAllResults = results;
+
         const passColor = sum.passRate === 100 ? '#10b981' : sum.passRate >= 80 ? '#f59e0b' : '#ef4444';
         const barColor  = passColor;
 
