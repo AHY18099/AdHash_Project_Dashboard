@@ -1063,26 +1063,8 @@ router.post('/step-run-all', auth, async (req, res) => {
         };
     }
 
-    async function runOneVu(vuIdx) {
-        const vuData      = buildVuData(vuIdx);
-        const capturedVars = capturedVarsByVu[vuIdx] || capturedVarsByVu[0] || {};
-        const vars = Object.assign({}, globalVars, vuData, capturedVars);
-
-        function resolveStr(s) {
-            if (typeof s !== 'string') return s;
-            return s.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] !== undefined ? vars[k] : `{{${k}}}`);
-        }
-        function resolveObj(o) {
-            if (typeof o === 'string') return resolveStr(o);
-            if (Array.isArray(o)) return o.map(resolveObj);
-            if (o !== null && typeof o === 'object') {
-                const out = {};
-                for (const k of Object.keys(o)) out[k] = resolveObj(o[k]);
-                return out;
-            }
-            return o;
-        }
-
+    // Execute a single HTTP request with vars already merged, return { status, responseTime, rawBody, error }
+    async function fireRequest(vars, resolveStr, resolveObj) {
         const method  = (step.method || 'GET').toUpperCase();
         const rawUrl  = resolveStr(step.url || '');
         const headers = Object.assign({ 'Content-Type': 'application/json' }, resolveObj(step.headers || {}));
@@ -1122,15 +1104,18 @@ router.post('/step-run-all', auth, async (req, res) => {
             const req2 = lib.request(opts, (resp) => {
                 const chunks = [];
                 resp.on('data', c => chunks.push(c));
-                resp.on('end', () => resolve({ status: resp.statusCode, responseTime: Date.now() - t0, rawBody: Buffer.concat(chunks).toString('utf8') }));
+                resp.on('end', () => resolve({ status: resp.statusCode, responseTime: Date.now() - t0, rawBody: Buffer.concat(chunks).toString('utf8'), resolvedUrl: rawUrl, headers }));
             });
-            req2.on('error', e => resolve({ error: e.message, status: 0, responseTime: Date.now() - t0, rawBody: '' }));
-            req2.on('timeout', () => { req2.destroy(); resolve({ error: 'Timeout', status: 0, responseTime: 15000, rawBody: '' }); });
+            req2.on('error', e => resolve({ error: e.message, status: 0, responseTime: Date.now() - t0, rawBody: '', resolvedUrl: rawUrl, headers }));
+            req2.on('timeout', () => { req2.destroy(); resolve({ error: 'Timeout', status: 0, responseTime: 15000, rawBody: '', resolvedUrl: rawUrl, headers }); });
             if (bodyStr) req2.write(bodyStr);
             req2.end();
         });
+        return result;
+    }
 
-        // Decrypt response if configured
+    // Decrypt response body and extract captures
+    function decryptAndCapture(result) {
         let parsedRaw = null;
         try { parsedRaw = JSON.parse(result.rawBody); } catch(_) {}
         let decryptedBody = null;
@@ -1141,7 +1126,6 @@ router.post('/step-run-all', auth, async (req, res) => {
         const decAlgo = (dec?.enabled ? dec.algorithm : enc2?.algorithm) || 'AES-128-CBC';
         const decField = (dec?.enabled && dec.inputField) ? dec.inputField : (enc2?.outputField || 'encryptedData');
         if (decKey) {
-            // Cipher text: from JSON field, or raw body if response is not a JSON object
             const cipher = (parsedRaw && typeof parsedRaw === 'object' && parsedRaw[decField])
                 ? parsedRaw[decField]
                 : (parsedRaw === null && result.rawBody && result.rawBody.trim() ? result.rawBody.trim() : null);
@@ -1158,9 +1142,6 @@ router.post('/step-run-all', auth, async (req, res) => {
                 } catch(_) {}
             }
         }
-        console.log('[step-run-all] VU', vuIdx+1, 'decField=', decField, 'parsedRaw type=', parsedRaw === null ? 'null' : typeof parsedRaw, 'decryptedBody keys=', decryptedBody && typeof decryptedBody === 'object' ? Object.keys(decryptedBody) : decryptedBody ? '(string)' : 'null');
-
-        // Extract captures
         const capturedValues = {};
         const src = decryptedBody || parsedRaw;
         if (step.captures && src) {
@@ -1173,14 +1154,85 @@ router.post('/step-run-all', auth, async (req, res) => {
                 } catch(_) {}
             }
         }
+        return capturedValues;
+    }
 
+    async function runOneVu(vuIdx) {
+        const vuData       = buildVuData(vuIdx);
+        const capturedVars = capturedVarsByVu[vuIdx] || capturedVarsByVu[0] || {};
+        const baseVars     = Object.assign({}, globalVars, vuData, capturedVars);
+
+        function makeResolvers(vars) {
+            const resolveStr = (s) => {
+                if (typeof s !== 'string') return s;
+                return s.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] !== undefined ? vars[k] : `{{${k}}}`);
+            };
+            const resolveObj = (o) => {
+                if (typeof o === 'string') return resolveStr(o);
+                if (Array.isArray(o)) return o.map(resolveObj);
+                if (o !== null && typeof o === 'object') {
+                    const out = {};
+                    for (const k of Object.keys(o)) out[k] = resolveObj(o[k]);
+                    return out;
+                }
+                return o;
+            };
+            return { resolveStr, resolveObj };
+        }
+
+        const fe = step.forEach;
+        if (fe?.enabled && fe.arrayVar && fe.injectAs) {
+            // forEach mode: iterate over a captured array, fire once per item
+            const arr = baseVars[fe.arrayVar];
+            if (!Array.isArray(arr) || arr.length === 0) {
+                return { vu: vuIdx + 1, status: 0, responseTime: 0, ok: false,
+                         capturedValues: {}, resolvedUrl: step.url || '', error: `forEach: {{${fe.arrayVar}}} is empty or not an array`,
+                         vuEmail: baseVars.email, vuPhone: baseVars.phoneNumber, resolvedHeaders: {}, rawBody: '',
+                         forEachResults: [] };
+            }
+            const forEachResults = [];
+            let totalTime = 0;
+            for (const item of arr) {
+                const itemVal = fe.itemPath
+                    ? fe.itemPath.split('.').reduce((o, k) => (o != null ? o[k] : undefined), item)
+                    : item;
+                const loopVars = Object.assign({}, baseVars, { [fe.injectAs]: itemVal });
+                const { resolveStr, resolveObj } = makeResolvers(loopVars);
+                const result = await fireRequest(loopVars, resolveStr, resolveObj);
+                const capturedValues = decryptAndCapture(result);
+                const ok = result.status >= 200 && result.status < 400;
+                totalTime += result.responseTime || 0;
+                forEachResults.push({ item: itemVal, status: result.status, responseTime: result.responseTime, ok,
+                                      rawBody: result.rawBody ? result.rawBody.substring(0, 200) : '', error: result.error || null });
+            }
+            const allOk = forEachResults.every(r => r.ok);
+            const passCount = forEachResults.filter(r => r.ok).length;
+            const resolvedHeadersDebug = {};
+            const { resolveStr: rs0, resolveObj: ro0 } = makeResolvers(baseVars);
+            for (const [k, v] of Object.entries(Object.assign({ 'Content-Type': 'application/json' }, ro0(step.headers || {})))) {
+                resolvedHeadersDebug[k] = v;
+            }
+            return { vu: vuIdx + 1, status: allOk ? 200 : forEachResults.find(r => !r.ok)?.status || 500,
+                     responseTime: totalTime, ok: allOk, capturedValues: {},
+                     resolvedUrl: step.url || '', error: allOk ? null : `${forEachResults.length - passCount}/${forEachResults.length} iterations failed`,
+                     vuEmail: baseVars.email, vuPhone: baseVars.phoneNumber,
+                     resolvedHeaders: resolvedHeadersDebug,
+                     rawBody: `forEach: ${passCount}/${forEachResults.length} passed`,
+                     forEachResults };
+        }
+
+        // Normal (non-forEach) mode
+        const { resolveStr, resolveObj } = makeResolvers(baseVars);
+        const result = await fireRequest(baseVars, resolveStr, resolveObj);
+        const capturedValues = decryptAndCapture(result);
         const ok = result.status >= 200 && result.status < 400;
         console.log('[step-run-all] VU', vuIdx + 1, 'status=', result.status, 'capturedValues=', JSON.stringify(capturedValues));
         const resolvedHeadersDebug = {};
-        for (const [k, v] of Object.entries(headers)) {
-            resolvedHeadersDebug[k] = (k.toLowerCase() === 'authorization') ? v : v;
-        }
-        return { vu: vuIdx + 1, status: result.status, responseTime: result.responseTime, ok, capturedValues, resolvedUrl: rawUrl, error: result.error || null, vuEmail: vars.email, vuPhone: vars.phoneNumber, resolvedHeaders: resolvedHeadersDebug, rawBody: result.rawBody ? result.rawBody.substring(0, 300) : '' };
+        for (const [k, v] of Object.entries(result.headers || {})) resolvedHeadersDebug[k] = v;
+        return { vu: vuIdx + 1, status: result.status, responseTime: result.responseTime, ok, capturedValues,
+                 resolvedUrl: result.resolvedUrl || '', error: result.error || null,
+                 vuEmail: baseVars.email, vuPhone: baseVars.phoneNumber,
+                 resolvedHeaders: resolvedHeadersDebug, rawBody: result.rawBody ? result.rawBody.substring(0, 300) : '' };
     }
 
     try {
