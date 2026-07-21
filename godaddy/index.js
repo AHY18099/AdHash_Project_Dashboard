@@ -72,7 +72,9 @@ function parseWhoisExpiry(text) {
     for (const pat of patterns) {
         const m = text.match(pat);
         if (m) {
-            const raw = m[1].trim();
+            let raw = m[1].trim();
+            // Some registries return date-only (YYYY-MM-DD) without time — append midnight UTC
+            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) raw += 'T00:00:00Z';
             const d = new Date(raw);
             if (!isNaN(d.getTime())) return d;
         }
@@ -81,6 +83,7 @@ function parseWhoisExpiry(text) {
 }
 
 // RDAP fallback: used when WHOIS is rate-limited or retired (e.g. .io, .co)
+// Registry-specific RDAP servers tried first; GoDaddy RDAP tried as universal fallback.
 const RDAP_SERVERS = {
     'io':  'https://rdap.nic.io/domain/',
     'co':  'https://rdap.nic.co/domain/',
@@ -88,16 +91,17 @@ const RDAP_SERVERS = {
     'ai':  'https://rdap.nic.ai/domain/',
 };
 
-function rdapLookup(domain, timeout = 10000) {
-    const tld = domain.split('.').pop();
-    const base = RDAP_SERVERS[tld] || `https://rdap.verisign.com/${tld}/v1/domain/`;
-    const url = base + domain;
+function rdapFetch(url, timeout = 10000) {
     return new Promise((resolve) => {
         const req = https.get(url, { timeout }, (res) => {
             let d = '';
             res.on('data', c => { d += c; });
             res.on('end', () => {
-                try { resolve(JSON.parse(d)); } catch { resolve(null); }
+                if (res.statusCode === 200) {
+                    try { resolve(JSON.parse(d)); } catch { resolve(null); }
+                } else {
+                    resolve(null);
+                }
             });
         });
         req.on('error', () => resolve(null));
@@ -105,15 +109,27 @@ function rdapLookup(domain, timeout = 10000) {
     });
 }
 
+async function rdapLookup(domain) {
+    const tld = domain.split('.').pop();
+    // Try TLD-specific RDAP first
+    if (RDAP_SERVERS[tld]) {
+        const obj = await rdapFetch(RDAP_SERVERS[tld] + domain);
+        if (obj) return obj;
+    }
+    // GoDaddy RDAP as universal fallback (covers GoDaddy-registered domains on any TLD)
+    return rdapFetch('https://rdap.godaddy.com/v1/domain/' + domain);
+}
+
 function parseRdapExpiry(obj) {
     if (!obj || !Array.isArray(obj.events)) return null;
-    const ev = obj.events.find(e => e.eventAction === 'expiration');
+    // Standard RDAP uses "expiration"; GoDaddy uses "registrar expiration"
+    const ev = obj.events.find(e => e.eventAction === 'expiration' || e.eventAction === 'registrar expiration');
     if (!ev || !ev.eventDate) return null;
     const d = new Date(ev.eventDate);
     return isNaN(d.getTime()) ? null : d;
 }
 
-function whoisLookup(domain, server, timeout = 10000) {
+function whoisLookup(domain, server, timeout = 10000, retries = 1) {
     return new Promise((resolve) => {
         let data = '';
         const sock = net.createConnection(43, server);
@@ -121,7 +137,14 @@ function whoisLookup(domain, server, timeout = 10000) {
         sock.on('connect', () => sock.write(domain + '\r\n'));
         sock.on('data', chunk => { data += chunk.toString(); });
         sock.on('end', () => resolve(data));
-        sock.on('error', () => resolve(''));
+        sock.on('error', (err) => {
+            // Retry once on transient DNS/connection errors
+            if (retries > 0 && (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT')) {
+                setTimeout(() => whoisLookup(domain, server, timeout, retries - 1).then(resolve), 2000);
+            } else {
+                resolve('');
+            }
+        });
         sock.on('timeout', () => { sock.destroy(); resolve(''); });
     });
 }
@@ -133,15 +156,17 @@ async function checkDomainRegistrar(host) {
 
     let text = await whoisLookup(root, server);
 
-    // Some registries refer to a registrar WHOIS server — follow one level
-    if (text) {
+    // Try to parse the registry response directly first (many registries include the expiry date)
+    let expiry = text ? parseWhoisExpiry(text) : null;
+
+    // If not found in registry response, follow the registrar WHOIS referral
+    if (!expiry && text) {
         const referral = (text.match(/Registrar WHOIS Server:\s*([^\r\n]+)/i) || [])[1]?.trim();
         if (referral && referral !== server && referral.includes('.')) {
-            text = await whoisLookup(root, referral) || text;
+            const referralText = await whoisLookup(root, referral);
+            expiry = referralText ? parseWhoisExpiry(referralText) : null;
         }
     }
-
-    let expiry = text ? parseWhoisExpiry(text) : null;
 
     // RDAP fallback: if WHOIS returned empty or unparseable (rate-limited / retired)
     if (!expiry) {
@@ -149,6 +174,18 @@ async function checkDomainRegistrar(host) {
         if (RDAP_SERVERS[tld]) {
             console.log(`  [RDAP]  ${root} (WHOIS failed, trying RDAP)...`);
             const rdap = await rdapLookup(root);
+            expiry = rdap ? parseRdapExpiry(rdap) : null;
+        }
+    }
+
+    // GoDaddy RDAP fallback: if registry WHOIS and TLD-specific RDAP both failed.
+    // rdapLookup() already tries GoDaddy RDAP as its second step, so this path only
+    // fires if we skipped RDAP entirely (no entry in RDAP_SERVERS for this TLD).
+    if (!expiry) {
+        const tld = root.split('.').pop();
+        if (!RDAP_SERVERS[tld]) {
+            console.log(`  [GD]    ${root} (trying GoDaddy RDAP)...`);
+            const rdap = await rdapFetch('https://rdap.godaddy.com/v1/domain/' + root);
             expiry = rdap ? parseRdapExpiry(rdap) : null;
         }
     }
