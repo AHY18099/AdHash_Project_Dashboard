@@ -621,19 +621,21 @@ function enrichDomainDetailsWithSsl(domainDetails: DomainDetail[], sslDetails: S
 
     const existingDetail = detailsByDomain.get(normalizedDomain);
     if (existingDetail) {
-      // SSL cert data is live and freshly checked — always prefer it over stale domain.html values
-      const daysRemaining = detail.daysRemaining ?? existingDetail.daysRemaining;
-      detailsByDomain.set(normalizedDomain, {
-        ...existingDetail,
-        url: existingDetail.url || detail.url || `https://${normalizedDomain}`,
-        status: classifyDomainStatus(daysRemaining, existingDetail.status === 'error' && (daysRemaining === null || daysRemaining === undefined)),
-        expiryDate: detail.expiryDate || existingDetail.expiryDate,
-        expiryDateIST: (detail.expiryDateIST && detail.expiryDateIST !== 'N/A') ? detail.expiryDateIST : existingDetail.expiryDateIST,
-        daysRemaining
-      });
+      // Domain already has WHOIS/registrar data — never overwrite it with SSL cert dates.
+      // SSL cert expiry is completely different from domain registrar expiry and must not bleed
+      // into the Domain Status section. Only fill in the URL if missing.
+      if (!existingDetail.url) {
+        detailsByDomain.set(normalizedDomain, {
+          ...existingDetail,
+          url: detail.url || `https://${normalizedDomain}`,
+        });
+      }
       return;
     }
 
+    // Domain not in WHOIS results — add a placeholder so the domain appears in the section.
+    // This only happens for subdomains that are in `domains` config but weren't checked by WHOIS
+    // (WHOIS only checks root domains; subdomains inherit from their root).
     detailsByDomain.set(normalizedDomain, {
       domain: normalizedDomain,
       url: detail.url || `https://${normalizedDomain}`,
