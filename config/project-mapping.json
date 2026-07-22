@@ -21,12 +21,10 @@
         }
       ],
       "domains": [
-        "www.ddphub.ai",
-        "twfnwlccyudfgqjmmdva.supabase.co"
+        "www.ddphub.ai"
       ],
       "sslCerts": [
-        "www.ddphub.ai",
-        "twfnwlccyudfgqjmmdva.supabase.co"
+        "www.ddphub.ai"
       ],
       "apis": [
         {
