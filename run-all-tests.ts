@@ -418,6 +418,16 @@ function normalizeDomainHost(value?: string | null): string {
     .toLowerCase();
 }
 
+// Extract registrable root domain (e.g. spark.synctag.com → synctag.com).
+// Mirrors the same logic in godaddy/index.js so subdomain→root mapping is consistent.
+function rootDomainOf(host: string): string {
+  const parts = normalizeDomainHost(host).split('.');
+  if (parts.length <= 2) return parts.join('.');
+  const twoPartTLDs = ['co.uk', 'com.au', 'com.br', 'co.in', 'net.au', 'org.uk', 'me.uk'];
+  if (twoPartTLDs.includes(parts.slice(-2).join('.'))) return parts.slice(-3).join('.');
+  return parts.slice(-2).join('.');
+}
+
 function buildTrackedDetailKey(type: 'ssl' | 'domain', domain?: string | null, url?: string | null): string {
   return `${type}::${normalizeDomainHost(domain || url || '')}`;
 }
@@ -613,6 +623,24 @@ function enrichDomainDetailsWithSsl(domainDetails: DomainDetail[], sslDetails: S
     });
   });
 
+  // Propagate root-domain WHOIS data to configured subdomains.
+  // godaddy/index.js runs WHOIS per root domain (e.g. synctag.com) and the parsed
+  // report.html card is keyed under the root. Configured `domains` entries like
+  // spark.synctag.com won't have their own WHOIS entry — inherit from the root.
+  for (const configuredDomain of configuredDomains) {
+    if (detailsByDomain.has(configuredDomain)) continue;
+    const root = rootDomainOf(configuredDomain);
+    if (root === configuredDomain) continue; // is already a root domain, nothing to inherit
+    const rootDetail = detailsByDomain.get(root);
+    if (rootDetail) {
+      detailsByDomain.set(configuredDomain, {
+        ...rootDetail,
+        domain: configuredDomain,
+        url: `https://${configuredDomain}`,
+      });
+    }
+  }
+
   dedupeSslDetails(sslDetails).forEach((detail) => {
     const normalizedDomain = normalizeDomainHost(detail.domain);
     if (!normalizedDomain || !configuredDomains.has(normalizedDomain)) {
@@ -621,29 +649,12 @@ function enrichDomainDetailsWithSsl(domainDetails: DomainDetail[], sslDetails: S
 
     const existingDetail = detailsByDomain.get(normalizedDomain);
     if (existingDetail) {
-      // Domain already has WHOIS/registrar data — never overwrite it with SSL cert dates.
-      // SSL cert expiry is completely different from domain registrar expiry and must not bleed
-      // into the Domain Status section. Only fill in the URL if missing.
-      if (!existingDetail.url) {
-        detailsByDomain.set(normalizedDomain, {
-          ...existingDetail,
-          url: detail.url || `https://${normalizedDomain}`,
-        });
-      }
+      // Domain already has WHOIS/registrar data — never overwrite with SSL cert dates.
       return;
     }
 
-    // Domain not in WHOIS results — add a placeholder so the domain appears in the section.
-    // This only happens for subdomains that are in `domains` config but weren't checked by WHOIS
-    // (WHOIS only checks root domains; subdomains inherit from their root).
-    detailsByDomain.set(normalizedDomain, {
-      domain: normalizedDomain,
-      url: detail.url || `https://${normalizedDomain}`,
-      status: classifyDomainStatus(detail.daysRemaining, detail.status === 'failed'),
-      expiryDate: detail.expiryDate,
-      expiryDateIST: detail.expiryDateIST,
-      daysRemaining: detail.daysRemaining
-    });
+    // Domain not in WHOIS results and no root to inherit from — leave it absent
+    // rather than populating it with SSL cert dates in the Domain Status section.
   });
 
   return dedupeDomainDetails(Array.from(detailsByDomain.values()))
@@ -846,21 +857,35 @@ function parseDomainSuiteReport(reportPath: string, fallbackTotal: number): Doma
     }
 
     const details: DomainDetail[] = [];
-    const cardPattern = /<div class="domain-card(?: expiring-soon| error)?"[^>]*>[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/gi;
 
+    // Extract a labelled field value from an article block.
+    // buildReportHtml() emits: <div class="field-label">Label</div><div class="field-value">Value</div>
+    function extractField(block: string, label: string): string {
+      const re = new RegExp(
+        `<div[^>]*class="field-label"[^>]*>[^<]*${label}[^<]*<\\/div>\\s*<div[^>]*class="field-value"[^>]*>([^<]+)<\\/div>`,
+        'i'
+      );
+      return (block.match(re) || [])[1]?.trim() || '';
+    }
+
+    // Match each <article class="report-card ..."> block — the format written by godaddy/index.js buildReportHtml()
+    const cardPattern = /<article\s+class="report-card[^"]*"[^>]*>([\s\S]*?)<\/article>/gi;
     for (const match of html.matchAll(cardPattern)) {
       const cardHtml = match[0];
-      const domain = normalizeDomainHost(cardHtml.match(/<div class="domain-url">([^<]+)<\/div>/i)?.[1]);
-      if (!domain) {
-        continue;
-      }
+      const block = match[1];
 
-      const badgeClass = cardHtml.match(/<span class="status-badge ([^"]+)">/i)?.[1] || '';
-      const daysText = cardHtml.match(/<div class="days-remaining(?: [^"]+)?"[^>]*>\s*([^<]+)\s*<\/div>/i)?.[1] || '';
-      const daysRemaining = parseDaysRemaining(daysText);
-      const expiryDate = parseDateValue(cardHtml.match(/<div class="expiry-date">([^<]+)<\/div>/i)?.[1]);
-      const expiryDateIST = cardHtml.match(/<div class="expiry-date-ist">([^<]+)<\/div>/i)?.[1]?.trim() || formatToIST(expiryDate);
-      const status = classifyDomainStatus(daysRemaining, !badgeClass.includes('status-active'));
+      // Domain name is in the <h2> inside the card header
+      const domain = normalizeDomainHost(block.match(/<h2>([^<]+)<\/h2>/i)?.[1]);
+      if (!domain) continue;
+
+      // Status comes from the article class: "report-card passed|warning|failed"
+      const rawStatus = (cardHtml.match(/class="report-card\s+(passed|warning|failed)"/i)?.[1] || 'failed').toLowerCase();
+      const status: DomainDetailStatus = rawStatus === 'passed' ? 'active' : rawStatus === 'warning' ? 'expiring' : 'error';
+
+      const expiryDateRaw = extractField(block, 'Expiry Date \\(UTC\\)');
+      const expiryDate = parseDateValue(expiryDateRaw) || expiryDateRaw || null;
+      const expiryDateIST = extractField(block, 'Expiry Date \\(IST\\)') || formatToIST(expiryDate);
+      const daysRemaining = parseDaysRemaining(extractField(block, 'Days Remaining'));
 
       details.push({
         domain,
@@ -868,29 +893,6 @@ function parseDomainSuiteReport(reportPath: string, fallbackTotal: number): Doma
         status,
         expiryDate,
         expiryDateIST,
-        daysRemaining
-      });
-    }
-
-    const rowPattern = /<div class="domain-row">([\s\S]*?)<\/div>/gi;
-    for (const match of html.matchAll(rowPattern)) {
-      const rowHtml = match[1] || '';
-      const domain = normalizeDomainHost(rowHtml.match(/domain-name">([^<]+)</i)?.[1]);
-      if (!domain || details.some((detail) => normalizeDomainHost(detail.domain) === domain)) {
-        continue;
-      }
-
-      const expiryDate = parseDateValue(rowHtml.match(/expiry-date">([^<]+)</i)?.[1]);
-      const daysRemaining = parseDaysRemaining(rowHtml.match(/days-remaining">([^<]+)</i)?.[1]);
-      const rawStatus = (rowHtml.match(/status\s+(active|expiring|error)/i)?.[1] || 'error').toLowerCase();
-      const status = classifyDomainStatus(daysRemaining, rawStatus === 'error');
-
-      details.push({
-        domain,
-        url: `https://${domain}`,
-        status,
-        expiryDate,
-        expiryDateIST: formatToIST(expiryDate),
         daysRemaining
       });
     }
