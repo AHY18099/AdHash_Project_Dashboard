@@ -574,10 +574,16 @@ router.post('/stop/:runId', auth, (req, res) => {
 router.get('/history', auth, async (req, res) => {
     try {
         // Primary: fetch all from MongoDB (survives redeploys)
-        const dbRows = await LTReport.find({}, {
-            runId:1, startTime:1, projectName:1, environment:1, scenarioType:1,
-            vus:1, duration:1, verdict:1, executedBy:1, successRate:1, p95:1, _id:0
-        }).sort({ startTime: -1 }).lean();
+        // Use a 8s timeout so a slow/disconnected MongoDB doesn't hang the page
+        let dbRows = [];
+        try {
+            dbRows = await LTReport.find({}, {
+                runId:1, startTime:1, projectName:1, environment:1, scenarioType:1,
+                vus:1, duration:1, verdict:1, executedBy:1, successRate:1, p95:1, _id:0
+            }).sort({ startTime: -1 }).maxTimeMS(8000).lean();
+        } catch (dbErr) {
+            console.warn('[load-test] MongoDB history query failed, using disk only:', dbErr.message);
+        }
 
         const seen = new Set(dbRows.map(r => r.runId));
         const rows = dbRows.map(r => ({ ...r, hasReport: true }));
