@@ -89,6 +89,9 @@ const RDAP_SERVERS = {
     'co':  'https://rdap.nic.co/domain/',
     'app': 'https://rdap.nic.google/domain/',
     'ai':  'https://rdap.nic.ai/domain/',
+    'com': 'https://rdap.verisign.com/com/v1/domain/',
+    'net': 'https://rdap.verisign.com/net/v1/domain/',
+    'org': 'https://rdap.publicinterestregistry.org/rdap/domain/',
 };
 
 function rdapFetch(url, timeout = 10000) {
@@ -114,10 +117,16 @@ async function rdapLookup(domain) {
     // Try TLD-specific RDAP first
     if (RDAP_SERVERS[tld]) {
         const obj = await rdapFetch(RDAP_SERVERS[tld] + domain);
-        if (obj) return obj;
+        if (obj && parseRdapExpiry(obj)) return obj;
     }
-    // GoDaddy RDAP as universal fallback (covers GoDaddy-registered domains on any TLD)
-    return rdapFetch('https://rdap.godaddy.com/v1/domain/' + domain);
+    // rdap.org — public aggregator, works for all TLDs
+    const rdapOrg = await rdapFetch('https://rdap.org/domain/' + domain);
+    if (rdapOrg && parseRdapExpiry(rdapOrg)) return rdapOrg;
+    // GoDaddy RDAP (covers GoDaddy-registered domains on any TLD)
+    const gdap = await rdapFetch('https://rdap.godaddy.com/v1/domain/' + domain);
+    if (gdap && parseRdapExpiry(gdap)) return gdap;
+    // IANA bootstrap RDAP as last resort
+    return rdapFetch('https://rdap.iana.org/domain/' + domain);
 }
 
 function parseRdapExpiry(obj) {
@@ -168,26 +177,11 @@ async function checkDomainRegistrar(host) {
         }
     }
 
-    // RDAP fallback: if WHOIS returned empty or unparseable (rate-limited / retired)
+    // RDAP fallback: if WHOIS returned empty or unparseable (rate-limited / retired / port 43 blocked)
     if (!expiry) {
-        const tld = root.split('.').pop();
-        if (RDAP_SERVERS[tld]) {
-            console.log(`  [RDAP]  ${root} (WHOIS failed, trying RDAP)...`);
-            const rdap = await rdapLookup(root);
-            expiry = rdap ? parseRdapExpiry(rdap) : null;
-        }
-    }
-
-    // GoDaddy RDAP fallback: if registry WHOIS and TLD-specific RDAP both failed.
-    // rdapLookup() already tries GoDaddy RDAP as its second step, so this path only
-    // fires if we skipped RDAP entirely (no entry in RDAP_SERVERS for this TLD).
-    if (!expiry) {
-        const tld = root.split('.').pop();
-        if (!RDAP_SERVERS[tld]) {
-            console.log(`  [GD]    ${root} (trying GoDaddy RDAP)...`);
-            const rdap = await rdapFetch('https://rdap.godaddy.com/v1/domain/' + root);
-            expiry = rdap ? parseRdapExpiry(rdap) : null;
-        }
+        console.log(`  [RDAP]  ${root} (WHOIS failed, trying RDAP chain)...`);
+        const rdap = await rdapLookup(root);
+        expiry = rdap ? parseRdapExpiry(rdap) : null;
     }
 
     if (!expiry) {
