@@ -90,22 +90,17 @@ const RDAP_SERVERS = {
     'net': 'https://rdap.verisign.com/net/v1/domain/',
     'org': 'https://rdap.publicinterestregistry.org/rdap/domain/',
     'ai':  'https://rdap.identitydigital.services/rdap/domain/',
+    'io':  'https://rdap.identitydigital.services/rdap/domain/',
     'app': 'https://pubapi.registry.google/rdap/domain/',
 };
 
-function rdapFetch(url, timeout = 10000, _redirects = 0, _retries = 1) {
+function rdapFetch(url, timeout = 10000, _redirects = 0) {
     return new Promise((resolve) => {
         const req = https.get(url, { timeout }, (res) => {
             // Follow redirects (rdap.org uses 301/302)
             if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location && _redirects < 3) {
                 res.resume();
                 rdapFetch(res.headers.location, timeout, _redirects + 1, _retries).then(resolve);
-                return;
-            }
-            // Retry once on 429 rate-limit after 6s
-            if (res.statusCode === 429 && _retries > 0) {
-                res.resume();
-                setTimeout(() => rdapFetch(url, timeout, _redirects, _retries - 1).then(resolve), 6000);
                 return;
             }
             let d = '';
@@ -123,21 +118,24 @@ function rdapFetch(url, timeout = 10000, _redirects = 0, _retries = 1) {
     });
 }
 
+async function rdapLookupWithGodaddy(domain, attempt = 0) {
+    const delays = [0, 8000, 20000]; // 0s, 8s, 20s backoff on 429
+    if (attempt > 0) await new Promise(r => setTimeout(r, delays[attempt] || 20000));
+    const obj = await rdapFetch('https://rdap.godaddy.com/v1/domain/' + domain);
+    if (obj === null && attempt < 2) return rdapLookupWithGodaddy(domain, attempt + 1);
+    return obj;
+}
+
 async function rdapLookup(domain) {
     const tld = domain.split('.').pop();
-    // Try TLD-specific RDAP first
+    // Try TLD-specific registry RDAP first (no rate limits)
     if (RDAP_SERVERS[tld]) {
         const obj = await rdapFetch(RDAP_SERVERS[tld] + domain);
         if (obj && parseRdapExpiry(obj)) return obj;
     }
-    // rdap.org — public aggregator, works for all TLDs
-    const rdapOrg = await rdapFetch('https://rdap.org/domain/' + domain);
-    if (rdapOrg && parseRdapExpiry(rdapOrg)) return rdapOrg;
-    // GoDaddy RDAP (covers GoDaddy-registered domains on any TLD)
-    const gdap = await rdapFetch('https://rdap.godaddy.com/v1/domain/' + domain);
-    if (gdap && parseRdapExpiry(gdap)) return gdap;
-    // IANA bootstrap RDAP as last resort
-    return rdapFetch('https://rdap.iana.org/domain/' + domain);
+    // GoDaddy RDAP — fallback for .co, .io and any unknown TLD
+    // Uses exponential backoff to handle GitHub Actions rate limiting
+    return rdapLookupWithGodaddy(domain);
 }
 
 function parseRdapExpiry(obj) {
