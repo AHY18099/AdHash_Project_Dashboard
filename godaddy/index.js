@@ -82,21 +82,23 @@ function parseWhoisExpiry(text) {
     return null;
 }
 
-// RDAP fallback: used when WHOIS is rate-limited or retired (e.g. .io, .co)
-// Registry-specific RDAP servers tried first; GoDaddy RDAP tried as universal fallback.
+// RDAP fallback servers — only servers confirmed reachable (no ENOTFOUND).
+// GoDaddy RDAP is tried as the universal fallback for all TLDs.
 const RDAP_SERVERS = {
-    'io':  'https://rdap.nic.io/domain/',
-    'co':  'https://rdap.nic.co/domain/',
-    'app': 'https://rdap.nic.google/domain/',
-    'ai':  'https://rdap.nic.ai/domain/',
     'com': 'https://rdap.verisign.com/com/v1/domain/',
     'net': 'https://rdap.verisign.com/net/v1/domain/',
     'org': 'https://rdap.publicinterestregistry.org/rdap/domain/',
 };
 
-function rdapFetch(url, timeout = 10000) {
+function rdapFetch(url, timeout = 10000, _redirects = 0) {
     return new Promise((resolve) => {
         const req = https.get(url, { timeout }, (res) => {
+            // Follow redirects (rdap.org uses 301/302)
+            if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location && _redirects < 3) {
+                res.resume();
+                rdapFetch(res.headers.location, timeout, _redirects + 1).then(resolve);
+                return;
+            }
             let d = '';
             res.on('data', c => { d += c; });
             res.on('end', () => {
