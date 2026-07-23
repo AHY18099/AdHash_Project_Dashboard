@@ -83,11 +83,14 @@ function parseWhoisExpiry(text) {
 }
 
 // RDAP fallback servers — only servers confirmed reachable (no ENOTFOUND).
-// GoDaddy RDAP is tried as the universal fallback for all TLDs.
+// Confirmed-working RDAP servers per TLD (tested 2026-07).
+// GoDaddy RDAP is the fallback for .co/.io and any unknown TLD.
 const RDAP_SERVERS = {
     'com': 'https://rdap.verisign.com/com/v1/domain/',
     'net': 'https://rdap.verisign.com/net/v1/domain/',
     'org': 'https://rdap.publicinterestregistry.org/rdap/domain/',
+    'ai':  'https://rdap.identitydigital.services/rdap/domain/',
+    'app': 'https://pubapi.registry.google/rdap/domain/',
 };
 
 function rdapFetch(url, timeout = 10000, _redirects = 0, _retries = 1) {
@@ -99,10 +102,10 @@ function rdapFetch(url, timeout = 10000, _redirects = 0, _retries = 1) {
                 rdapFetch(res.headers.location, timeout, _redirects + 1, _retries).then(resolve);
                 return;
             }
-            // Retry once on 429 rate-limit after 3s
+            // Retry once on 429 rate-limit after 6s
             if (res.statusCode === 429 && _retries > 0) {
                 res.resume();
-                setTimeout(() => rdapFetch(url, timeout, _redirects, _retries - 1).then(resolve), 3000);
+                setTimeout(() => rdapFetch(url, timeout, _redirects, _retries - 1).then(resolve), 6000);
                 return;
             }
             let d = '';
@@ -300,11 +303,11 @@ async function main() {
     }
 
     console.log(`[godaddy] WHOIS checking ${rootMap.size} root domains (from ${allDomains.length} configured)...`);
-    // Run sequentially with a delay — GoDaddy RDAP rate-limits when all domains hit concurrently.
+    // Run sequentially with a delay — GoDaddy RDAP rate-limits when domains hit concurrently.
     const whoisResults = [];
     const entries = Array.from(rootMap.entries());
     for (let i = 0; i < entries.length; i++) {
-        if (i > 0) await new Promise(r => setTimeout(r, 800));
+        if (i > 0) await new Promise(r => setTimeout(r, 2000));
         whoisResults.push(await checkDomainRegistrar(entries[i][1]));
     }
 
