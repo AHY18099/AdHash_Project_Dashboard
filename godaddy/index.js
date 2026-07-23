@@ -90,13 +90,19 @@ const RDAP_SERVERS = {
     'org': 'https://rdap.publicinterestregistry.org/rdap/domain/',
 };
 
-function rdapFetch(url, timeout = 10000, _redirects = 0) {
+function rdapFetch(url, timeout = 10000, _redirects = 0, _retries = 1) {
     return new Promise((resolve) => {
         const req = https.get(url, { timeout }, (res) => {
             // Follow redirects (rdap.org uses 301/302)
             if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location && _redirects < 3) {
                 res.resume();
-                rdapFetch(res.headers.location, timeout, _redirects + 1).then(resolve);
+                rdapFetch(res.headers.location, timeout, _redirects + 1, _retries).then(resolve);
+                return;
+            }
+            // Retry once on 429 rate-limit after 3s
+            if (res.statusCode === 429 && _retries > 0) {
+                res.resume();
+                setTimeout(() => rdapFetch(url, timeout, _redirects, _retries - 1).then(resolve), 3000);
                 return;
             }
             let d = '';
@@ -294,9 +300,13 @@ async function main() {
     }
 
     console.log(`[godaddy] WHOIS checking ${rootMap.size} root domains (from ${allDomains.length} configured)...`);
-    const whoisResults = await Promise.all(
-        Array.from(rootMap.entries()).map(([root, host]) => checkDomainRegistrar(host))
-    );
+    // Run sequentially with a delay — GoDaddy RDAP rate-limits when all domains hit concurrently.
+    const whoisResults = [];
+    const entries = Array.from(rootMap.entries());
+    for (let i = 0; i < entries.length; i++) {
+        if (i > 0) await new Promise(r => setTimeout(r, 800));
+        whoisResults.push(await checkDomainRegistrar(entries[i][1]));
+    }
 
     // Expand results back to all configured hosts: each subdomain inherits its root domain's expiry
     const rootResultMap = new Map(whoisResults.map(r => [r.root, r]));
