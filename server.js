@@ -5881,7 +5881,11 @@ app.get('/api/events', (req, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
+    res.setHeader('Transfer-Encoding', 'chunked');
     res.flushHeaders();
+
+    // Tell client to wait 5s before reconnecting after a drop (not 1s default)
+    res.write('retry: 5000\n\n');
 
     // Send client its own ID so it can skip its own broadcasts
     res.write(`event: connected\ndata: ${JSON.stringify({ ok: true, clientId, userId, userName })}\n\n`);
@@ -5889,11 +5893,11 @@ app.get('/api/events', (req, res) => {
     _sseClients.set(clientId, { res, userId, userName, connectedAt: new Date() });
     console.log(`[SSE] ${userName} connected (${clientId}). Total: ${_sseClients.size}`);
 
-    // Keepalive ping every 25s — prevents Railway/proxy timeouts
+    // Keepalive ping every 15s — Railway proxy drops idle connections around 30s
     const ping = setInterval(() => {
         try { res.write(': ping\n\n'); }
         catch (_) { clearInterval(ping); _sseClients.delete(clientId); }
-    }, 25000);
+    }, 15000);
 
     req.on('close', () => {
         clearInterval(ping);

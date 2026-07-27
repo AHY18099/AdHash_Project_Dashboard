@@ -8265,7 +8265,8 @@ function initSseListener(){
       console.log('[sse] connected as',d.userName,'clientId=',d.clientId);
     }catch(_){}
     _sseConnectedAt=Date.now(); // mark connect time for grace period
-    _sseReconnectDelay=1000; // reset backoff on successful connect
+    // Reset backoff only after connection has been stable for 10s (prevents rapid reconnect storms)
+    setTimeout(()=>{if(_sseSource&&_sseSource.readyState===EventSource.OPEN)_sseReconnectDelay=1000;},10000);
     _setSyncDot('green','Live');
     // Poll active user count once on connect
     _pollActiveUsers();
