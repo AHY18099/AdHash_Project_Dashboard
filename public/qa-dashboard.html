@@ -2587,7 +2587,7 @@ function renderTopBar(){
         <div class="qa-uava" style="background:${avaGrad}">${initials}</div>
         <div><div class="qa-uname">${u.name}</div><div class="qa-urole">${u.role==='super_admin'?'super-admin':'member'}</div></div>
         <div class="qa-udd" id="udd">
-          ${isAdmin()?`<div class="qa-udd-item" onclick="showUsers()">👥 User Management</div><hr>`:''}
+          ${isAdmin()?`<div class="qa-udd-item" onclick="showUsers()">👥 User Management</div><div class="qa-udd-item" onclick="showSlackSettings()">🔔 Slack Settings</div><hr>`:''}
           <div class="qa-udd-item danger" onclick="doLogout()">⎋ Sign Out</div>
         </div>
       </div>
@@ -2595,6 +2595,70 @@ function renderTopBar(){
 }
 function toggleUDD(){const d=document.getElementById('udd');d&&d.classList.toggle('open');}
 document.addEventListener('click',e=>{const d=document.getElementById('udd');if(d&&d.classList.contains('open')&&!e.target.closest('.uchip'))d.classList.remove('open');});
+
+async function showSlackSettings(){
+  document.getElementById('udd')?.classList.remove('open');
+  // Fetch current status
+  let status={configured:false,tokenHint:'(not set)',channel:'#testing-team',enabled:false};
+  try{
+    const r=await fetch('/api/admin/slack-status',{headers:{'Authorization':'Bearer '+_getToken()}});
+    if(r.ok)status=await r.json();
+  }catch(_){}
+  const statusBadge=status.configured
+    ?`<span style="color:#10b981;font-weight:700">✓ Configured</span> <span style="color:var(--mut);font-size:11px">(${status.tokenHint})</span>`
+    :`<span style="color:#ef4444;font-weight:700">✗ Not configured</span>`;
+  const body=`
+    <div style="margin-bottom:14px">
+      <div style="font-size:12px;color:var(--mut);margin-bottom:4px">Current Status</div>
+      <div style="font-size:14px">${statusBadge}</div>
+      <div style="font-size:12px;color:var(--mut);margin-top:4px">Channel: <b>${status.channel}</b> &nbsp;|&nbsp; Enabled: <b>${status.enabled?'Yes':'No'}</b></div>
+    </div>
+    <div class="fg" style="margin-bottom:10px">
+      <label class="flbl">Slack Bot Token <span style="color:var(--mut);font-weight:400">(starts with xoxb-)</span></label>
+      <input class="finp" id="slack-token-inp" type="password" placeholder="xoxb-..." autocomplete="off">
+      <div style="font-size:11px;color:var(--mut);margin-top:3px">Get this from your Slack App → OAuth & Permissions → Bot User OAuth Token</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="qa-btn" id="slack-save-btn" onclick="saveSlackToken()">💾 Save Token</button>
+      <button class="qa-btn" id="slack-test-btn" onclick="testSlackNotification()" style="background:var(--card2);color:var(--txt)">📨 Send Test</button>
+    </div>
+    <div id="slack-result" style="margin-top:10px;font-size:13px"></div>`;
+  openModal('🔔 Slack Notification Settings',body,null,'Cancel');
+}
+
+async function saveSlackToken(){
+  const token=(document.getElementById('slack-token-inp')?.value||'').trim();
+  if(!token.startsWith('xoxb-')){toast('Token must start with xoxb-','err');return;}
+  const btn=document.getElementById('slack-save-btn');
+  if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  try{
+    const r=await fetch('/api/admin/set-slack-token',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_getToken()},body:JSON.stringify({token})});
+    const j=await r.json();
+    if(j.success){toast('✅ Slack token saved successfully');closeModal();}
+    else{document.getElementById('slack-result').innerHTML=`<span style="color:#ef4444">Error: ${j.error||'Unknown error'}</span>`;}
+  }catch(e){document.getElementById('slack-result').innerHTML=`<span style="color:#ef4444">Error: ${e.message}</span>`;}
+  finally{if(btn){btn.disabled=false;btn.textContent='💾 Save Token';}}
+}
+
+async function testSlackNotification(){
+  const btn=document.getElementById('slack-test-btn');
+  const result=document.getElementById('slack-result');
+  if(btn){btn.disabled=true;btn.textContent='Sending…';}
+  if(result)result.innerHTML='';
+  try{
+    const r=await fetch('/api/admin/test-slack',{method:'POST',headers:{'Authorization':'Bearer '+_getToken()}});
+    const j=await r.json();
+    if(j.success){
+      if(result)result.innerHTML=`<span style="color:#10b981">✅ Test message sent to <b>${j.channel}</b>. Check Slack!</span>`;
+    }else{
+      if(result)result.innerHTML=`<span style="color:#ef4444">❌ ${j.error}</span>`;
+    }
+  }catch(e){
+    if(result)result.innerHTML=`<span style="color:#ef4444">❌ ${e.message}</span>`;
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='📨 Send Test';}
+  }
+}
 
 // ══ THEME ══
 function initTheme(){

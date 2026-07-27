@@ -2314,6 +2314,36 @@ app.post('/api/admin/set-slack-token', requireAdmin, async (req, res) => {
     res.json({ success: true });
 });
 
+// GET /api/admin/slack-status — returns whether token is configured (never exposes the token itself)
+app.get('/api/admin/slack-status', requireAdmin, (req, res) => {
+    const token = process.env.SLACK_BOT_TOKEN || '';
+    const channel = process.env.SLACK_CHANNEL || '#testing-team';
+    const enabled = process.env.SLACK_ENABLED === 'true';
+    res.json({
+        configured: token.startsWith('xoxb-'),
+        tokenHint: token ? token.slice(0, 12) + '...' : '(not set)',
+        channel,
+        enabled,
+    });
+});
+
+// POST /api/admin/test-slack — sends a test message to confirm the token and channel work
+app.post('/api/admin/test-slack', requireAdmin, async (req, res) => {
+    const token = process.env.SLACK_BOT_TOKEN || '';
+    if (!token.startsWith('xoxb-')) return res.status(400).json({ error: 'SLACK_BOT_TOKEN not configured or invalid. Set it via Settings → Slack Token.' });
+    try {
+        await sendSlackNotification({
+            type: 'teamtask',
+            projectName: 'AdHash QA Dashboard',
+            assignedBy: 'Admin (Test)',
+            details: [{ label: 'Message', value: '✅ Slack integration is working correctly.' }],
+        });
+        res.json({ success: true, channel: process.env.SLACK_CHANNEL || '#testing-team' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Clear all cached per-project run results
 app.post('/api/clear-results', (req, res) => {
     // Wipe in-memory override cache
