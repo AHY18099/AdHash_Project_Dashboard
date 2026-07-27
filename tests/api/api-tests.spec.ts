@@ -482,7 +482,7 @@ test.describe('API Tests', () => {
         
         // Skip test if it's a connection issue (might be test environment)
         if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-          test.skip();
+          test.skip(true, `Skipped in CI: host unreachable (${error.code})`);
         } else {
           throw error;
         }

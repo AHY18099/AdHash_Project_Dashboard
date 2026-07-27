@@ -836,7 +836,7 @@ function buildApiFailureReason(
     }
 
     if (status === 'skipped') {
-        return detailText || 'Skipped in CI: SUPABASE_API_KEY secret is not configured';
+        return detailText || 'Skipped in CI: host unreachable or credentials unavailable';
     }
 
     if (detailText) {
