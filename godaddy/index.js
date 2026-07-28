@@ -92,6 +92,7 @@ const RDAP_SERVERS = {
     'ai':  'https://rdap.identitydigital.services/rdap/domain/',
     'io':  'https://rdap.identitydigital.services/rdap/domain/',
     'app': 'https://pubapi.registry.google/rdap/domain/',
+    'co':  'https://rdap.registry.co/domain/',  // .co registry RDAP — works for some registrars; GoDaddy fallback for rest
 };
 
 function rdapFetch(url, timeout = 10000, _redirects = 0) {
@@ -119,8 +120,8 @@ function rdapFetch(url, timeout = 10000, _redirects = 0) {
 }
 
 async function rdapLookupWithGodaddy(domain, attempt = 0) {
-    const delays = [0, 8000, 20000]; // 0s, 8s, 20s backoff on 429
-    if (attempt > 0) await new Promise(r => setTimeout(r, delays[attempt] || 20000));
+    const delays = [0, 15000, 40000]; // 0s, 15s, 40s backoff — GoDaddy rate-limits CI IPs aggressively
+    if (attempt > 0) await new Promise(r => setTimeout(r, delays[attempt] || 40000));
     const obj = await rdapFetch('https://rdap.godaddy.com/v1/domain/' + domain);
     if (obj === null && attempt < 2) return rdapLookupWithGodaddy(domain, attempt + 1);
     return obj;

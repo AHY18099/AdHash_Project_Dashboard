@@ -15,6 +15,8 @@ interface ApiEndpoint {
   expectedStatus?: number;
   timeout?: number;
   capture?: Record<string, string>;
+  skipInCi?: boolean;
+  skipInCiReason?: string;
 }
 
 interface ProjectApiConfig {
@@ -26,6 +28,8 @@ interface ProjectApiConfig {
   expectedStatus?: number;
   timeout?: number;
   capture?: Record<string, string>;
+  skipInCi?: boolean;
+  skipInCiReason?: string;
 }
 
 interface ProjectConfig {
@@ -414,7 +418,9 @@ function loadApiEndpoints(): ApiEndpoint[] {
       body: api.body,
       expectedStatus: api.expectedStatus,
       timeout: api.timeout || 10000,
-      capture: api.capture
+      capture: api.capture,
+      skipInCi: api.skipInCi,
+      skipInCiReason: api.skipInCiReason,
     }));
 }
 
@@ -426,6 +432,7 @@ test.describe('API Tests', () => {
   for (const endpoint of apiEndpoints) {
     test(`${endpoint.method} ${endpoint.name}`, async () => {
       test.skip(isDdpSupabaseAuthFlowRequest(endpoint) && isCiDdpSecretMissing(), SKIPPED_SUPABASE_MESSAGE);
+      test.skip(Boolean(endpoint.skipInCi) && Boolean(process.env.CI), endpoint.skipInCiReason || 'Skipped in CI: host not reachable from GitHub Actions');
 
       const startTime = Date.now();
       

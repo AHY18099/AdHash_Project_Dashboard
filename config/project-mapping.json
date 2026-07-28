@@ -1113,13 +1113,17 @@
           "name": "Website",
           "url": "https://zaptrade.ai",
           "method": "GET",
-          "expectedStatus": 200
+          "expectedStatus": 200,
+          "skipInCi": true,
+          "skipInCiReason": "Skipped in CI: zaptrade.ai blocks GitHub Actions IPs"
         },
         {
           "name": "Dashboard",
           "url": "https://algo.zaptrade.ai",
           "method": "GET",
-          "expectedStatus": 200
+          "expectedStatus": 200,
+          "skipInCi": true,
+          "skipInCiReason": "Skipped in CI: algo.zaptrade.ai blocks GitHub Actions IPs"
         }
       ]
     }
