@@ -274,10 +274,18 @@ ${cards}
 
 async function main() {
     let allDomains = [];
+    // domainExpiryOverrides: root domain -> ISO date string set manually in project-mapping.json
+    // Used for domains whose registrar RDAP is unreachable from CI (e.g. .co via GoDaddy)
+    const domainExpiryOverrides = new Map();
     try {
         const mapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
         const seen = new Set();
         for (const project of (mapping.projects || [])) {
+            // Load per-project domainExpiry overrides: { "algomax.co": "2027-03-03" }
+            for (const [dom, expStr] of Object.entries(project.domainExpiry || {})) {
+                const root = rootDomain(normalizeDomainHost(dom));
+                if (root && expStr) domainExpiryOverrides.set(root, expStr);
+            }
             for (const d of (project.domains || [])) {
                 const h = normalizeDomainHost(d);
                 if (h && !seen.has(h)) { seen.add(h); allDomains.push(h); }
@@ -306,8 +314,19 @@ async function main() {
     const whoisResults = [];
     const entries = Array.from(rootMap.entries());
     for (let i = 0; i < entries.length; i++) {
+        const [root, host] = entries[i];
+        // Use manual override if set — skips WHOIS/RDAP entirely for rate-limited registrars (e.g. .co via GoDaddy)
+        if (domainExpiryOverrides.has(root)) {
+            const expiry = new Date(domainExpiryOverrides.get(root));
+            const days = Math.ceil((expiry.getTime() - Date.now()) / 86400000);
+            const expiryUTC = expiry.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC');
+            const status = days <= 0 ? 'error' : days <= 30 ? 'expiring' : 'active';
+            console.log(`  [OVERRIDE] ${root}: expires ${expiryUTC} (${days}d) -> ${status}`);
+            whoisResults.push({ host, root, expiryDate: expiryUTC, expiryDateIST: formatToIST(expiry), daysRemaining: days, status });
+            continue;
+        }
         if (i > 0) await new Promise(r => setTimeout(r, 2000));
-        whoisResults.push(await checkDomainRegistrar(entries[i][1]));
+        whoisResults.push(await checkDomainRegistrar(host));
     }
 
     // Expand results back to all configured hosts: each subdomain inherits its root domain's expiry

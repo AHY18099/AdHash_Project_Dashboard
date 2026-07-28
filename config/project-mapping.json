@@ -587,6 +587,9 @@
         "gopocket.algomax.co",
         "prosky.algomax.co"
       ],
+      "domainExpiry": {
+        "algomax.co": "2027-03-03"
+      },
       "sslCerts": [
         "prosky.algomax.co",
         "gopocket.algomax.co"
