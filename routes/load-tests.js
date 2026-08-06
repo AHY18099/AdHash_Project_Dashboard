@@ -1538,10 +1538,11 @@ function _generateStepCode(step, idx) {
         // (API responses are encrypted with the same key when request encryption is on)
         const enc = step.requestEncryption;
         const decKey  = (dec?.enabled && dec.key)  ? dec.key  : (enc?.enabled && enc.key  ? enc.key  : null);
-        const decIv   = (dec?.enabled && dec.iv)   ? dec.iv   : (enc?.enabled && enc.iv   ? enc.iv   : null);
+        // IV defaults to key when not explicitly set — matches server-side: iv = enc.iv || enc.key
+        const decIv   = (dec?.enabled && dec.iv)   ? dec.iv   : (enc?.enabled && enc.iv   ? enc.iv   : decKey);
         const decField = (dec?.enabled && dec.inputField) ? dec.inputField : (enc?.enabled ? (enc.outputField || 'encryptedData') : 'encryptedData');
 
-        if (decKey && decIv) {
+        if (decKey) {
             // Decrypt response in-process via k6 crypto.subtle (no proxy round-trip)
             captureCode = step.captures.map(cap => {
                 if (!cap.varName || !cap.jsonPath) return '';
