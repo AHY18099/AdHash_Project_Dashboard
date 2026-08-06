@@ -1397,54 +1397,46 @@ const DATA = ${dataStr};
 const GLOBAL_VARS = ${varsStr};
 
 // ── Native k6 AES-128-CBC crypto (no proxy round-trips) ──
-// k6 v0.42+ exposes crypto.subtle with AES-CBC support.
-// Hex ↔ ArrayBuffer helpers
+// crypto.subtle is globally available in k6 v1.x; all calls are async (await required).
+// No TextEncoder, btoa, or atob in k6 goja runtime — use manual implementations.
 function _hexToBytes(hex) {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.slice(i*2, i*2+2), 16);
-  return bytes.buffer;
+  const arr = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < arr.length; i++) arr[i] = parseInt(hex.slice(i*2, i*2+2), 16);
+  return arr.buffer;
 }
-function _bytesToHex(buf) {
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+function _strToBytes(str) {
+  const arr = new Uint8Array(str.length);
+  for (let i = 0; i < str.length; i++) arr[i] = str.charCodeAt(i) & 0xff;
+  return arr.buffer;
 }
-function _bytesToUtf8(buf) {
+function _bytesToStr(buf) {
   return String.fromCharCode(...new Uint8Array(buf));
 }
-function _utf8ToBytes(str) {
-  const enc = new TextEncoder();
-  return enc.encode(str).buffer;
+const _B64C = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function _bytesToBase64(buf) {
+  const b = new Uint8Array(buf); let out = '', i = 0;
+  for (; i + 2 < b.length; i += 3) { const n=(b[i]<<16)|(b[i+1]<<8)|b[i+2]; out+=_B64C[(n>>18)&63]+_B64C[(n>>12)&63]+_B64C[(n>>6)&63]+_B64C[n&63]; }
+  if (i+1===b.length){const n=b[i]<<16;out+=_B64C[(n>>18)&63]+_B64C[(n>>12)&63]+'==';}
+  else if(i+2===b.length){const n=(b[i]<<16)|(b[i+1]<<8);out+=_B64C[(n>>18)&63]+_B64C[(n>>12)&63]+_B64C[(n>>6)&63]+'=';}
+  return out;
 }
 function _base64ToBytes(b64) {
-  const bin = atob(b64);
-  const buf = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-  return buf.buffer;
-}
-function _bytesToBase64(buf) {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const lk={}; for(let i=0;i<64;i++) lk[_B64C[i]]=i;
+  b64=b64.replace(/=+$/,''); const out=new Uint8Array(Math.floor(b64.length*3/4)); let bi=0;
+  for(let i=0;i<b64.length;i+=4){const a=lk[b64[i]]||0,bv=lk[b64[i+1]]||0,c=lk[b64[i+2]]||0,d=lk[b64[i+3]]||0,n=(a<<18)|(bv<<12)|(c<<6)|d;out[bi++]=(n>>16)&0xff;if(b64[i+2]!=null)out[bi++]=(n>>8)&0xff;if(b64[i+3]!=null)out[bi++]=n&0xff;}
+  return out.buffer;
 }
 
-function _aesEncrypt(plaintext, keyHex, ivHex) {
-  const keyBytes = _hexToBytes(keyHex);
-  const ivBytes  = _hexToBytes(ivHex);
-  const key = crypto.subtle.importKey('raw', keyBytes, { name: 'AES-CBC' }, false, ['encrypt']);
-  const enc = crypto.subtle.encrypt({ name: 'AES-CBC', iv: ivBytes }, key, _utf8ToBytes(plaintext));
+async function _aesEncrypt(plaintext, keyHex, ivHex) {
+  const key = await crypto.subtle.importKey('raw', _hexToBytes(keyHex), { name: 'AES-CBC' }, false, ['encrypt']);
+  const enc = await crypto.subtle.encrypt({ name: 'AES-CBC', iv: _hexToBytes(ivHex) }, key, _strToBytes(plaintext));
   return _bytesToBase64(enc);
 }
 
-function _aesDecrypt(ciphertextB64OrHex, keyHex, ivHex) {
-  const keyBytes = _hexToBytes(keyHex);
-  const ivBytes  = _hexToBytes(ivHex);
-  // Accept both base64 and hex ciphertext
-  let ctBytes;
-  try {
-    ctBytes = _base64ToBytes(ciphertextB64OrHex);
-  } catch {
-    ctBytes = _hexToBytes(ciphertextB64OrHex);
-  }
-  const key = crypto.subtle.importKey('raw', keyBytes, { name: 'AES-CBC' }, false, ['decrypt']);
-  const dec = crypto.subtle.decrypt({ name: 'AES-CBC', iv: ivBytes }, key, ctBytes);
-  return _bytesToUtf8(dec);
+async function _aesDecrypt(ciphertextB64, keyHex, ivHex) {
+  const key = await crypto.subtle.importKey('raw', _hexToBytes(keyHex), { name: 'AES-CBC' }, false, ['decrypt']);
+  const dec = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: _hexToBytes(ivHex) }, key, _base64ToBytes(ciphertextB64));
+  return _bytesToStr(dec);
 }
 
 function _get(obj, path) {
@@ -1468,7 +1460,7 @@ function _resolveObj(obj, vars) {
   return obj;
 }
 
-export default function () {
+export default async function () {
   // With shared-iterations (1 iteration per VU), __VU is 1-based and unique per VU.
   // __ITER resets to 0 for each VU so all VUs pick the same row — use __VU-1 instead.
   const vuIdx = (__VU - 1) % DATA.length;
@@ -1515,7 +1507,7 @@ function _generateStepCode(step, idx) {
                 bodyCode = [
                     `  const _plainBody${idx+1} = _resolveVars(${JSON.stringify(bodyStr)}, vars);`,
                     `  console.log('VU=' + __VU + ' STEP${idx+1} PLAIN_REQ=' + _plainBody${idx+1});`,
-                    `  const _encVal${idx+1} = _aesEncrypt(_plainBody${idx+1}, ${JSON.stringify(enc.key)}, ${JSON.stringify(enc.iv || '')});`,
+                    `  const _encVal${idx+1} = await _aesEncrypt(_plainBody${idx+1}, ${JSON.stringify(enc.key)}, ${JSON.stringify(enc.iv || '')});`,
                     `  const _body${idx+1} = JSON.stringify({ ${JSON.stringify(enc.outputField || 'encryptedData')}: _encVal${idx+1} });`,
                     `  console.log('VU=' + __VU + ' STEP${idx+1} ENC_REQ=' + _body${idx+1}.substring(0,100));`,
                 ].join('\n') + '\n';
@@ -1579,7 +1571,7 @@ function _generateStepCode(step, idx) {
                     `  try {`,
                     `    const _raw${idx+1} = ${varName}.json();`,
                     `    const _encField${idx+1} = (_raw${idx+1} && _raw${idx+1}['${decField}']) || '';`,
-                    `    const _decText${idx+1} = _aesDecrypt(_encField${idx+1}, ${JSON.stringify(decKey)}, ${JSON.stringify(decIv)});`,
+                    `    const _decText${idx+1} = await _aesDecrypt(_encField${idx+1}, ${JSON.stringify(decKey)}, ${JSON.stringify(decIv)});`,
                     `    const _decJson${idx+1} = JSON.parse(_decText${idx+1});`,
                     `    vars['${cap.varName}'] = _get(_decJson${idx+1}, '${cap.jsonPath}') || '';`,
                     `    console.log('VU=' + __VU + ' STEP${idx+1} captured ${cap.varName}=' + String(vars['${cap.varName}']).substring(0,60));`,
