@@ -1396,48 +1396,25 @@ ${optionsStr}
 const DATA = ${dataStr};
 const GLOBAL_VARS = ${varsStr};
 
-// ── Native k6 AES-128-CBC crypto (no proxy round-trips) ──
-// crypto.subtle is globally available in k6 v1.x; all calls are async (await required).
-// No TextEncoder, btoa, or atob in k6 goja runtime — use manual implementations.
-function _hexToBytes(hex) {
-  const arr = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < arr.length; i++) arr[i] = parseInt(hex.slice(i*2, i*2+2), 16);
-  return arr.buffer;
-}
-function _strToBytes(str) {
-  const arr = new Uint8Array(str.length);
-  for (let i = 0; i < str.length; i++) arr[i] = str.charCodeAt(i) & 0xff;
-  return arr.buffer;
-}
-function _bytesToStr(buf) {
-  return String.fromCharCode(...new Uint8Array(buf));
-}
-const _B64C = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-function _bytesToBase64(buf) {
-  const b = new Uint8Array(buf); let out = '', i = 0;
-  for (; i + 2 < b.length; i += 3) { const n=(b[i]<<16)|(b[i+1]<<8)|b[i+2]; out+=_B64C[(n>>18)&63]+_B64C[(n>>12)&63]+_B64C[(n>>6)&63]+_B64C[n&63]; }
-  if (i+1===b.length){const n=b[i]<<16;out+=_B64C[(n>>18)&63]+_B64C[(n>>12)&63]+'==';}
-  else if(i+2===b.length){const n=(b[i]<<16)|(b[i+1]<<8);out+=_B64C[(n>>18)&63]+_B64C[(n>>12)&63]+_B64C[(n>>6)&63]+'=';}
-  return out;
-}
-function _base64ToBytes(b64) {
-  const lk={}; for(let i=0;i<64;i++) lk[_B64C[i]]=i;
-  b64=b64.replace(/=+$/,''); const out=new Uint8Array(Math.floor(b64.length*3/4)); let bi=0;
-  for(let i=0;i<b64.length;i+=4){const a=lk[b64[i]]||0,bv=lk[b64[i+1]]||0,c=lk[b64[i+2]]||0,d=lk[b64[i+3]]||0,n=(a<<18)|(bv<<12)|(c<<6)|d;out[bi++]=(n>>16)&0xff;if(b64[i+2]!=null)out[bi++]=(n>>8)&0xff;if(b64[i+3]!=null)out[bi++]=n&0xff;}
-  return out.buffer;
-}
-
-async function _aesEncrypt(plaintext, keyHex, ivHex) {
-  const key = await crypto.subtle.importKey('raw', _hexToBytes(keyHex), { name: 'AES-CBC' }, false, ['encrypt']);
-  const enc = await crypto.subtle.encrypt({ name: 'AES-CBC', iv: _hexToBytes(ivHex) }, key, _strToBytes(plaintext));
-  return _bytesToBase64(enc);
-}
-
-async function _aesDecrypt(ciphertextB64, keyHex, ivHex) {
-  const key = await crypto.subtle.importKey('raw', _hexToBytes(keyHex), { name: 'AES-CBC' }, false, ['decrypt']);
-  const dec = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: _hexToBytes(ivHex) }, key, _base64ToBytes(ciphertextB64));
-  return _bytesToStr(dec);
-}
+// ── Pure-JS AES-128-CBC — synchronous, no WebCrypto, verified against Node.js crypto ──
+// k6's http module deadlocks inside async functions; crypto.subtle requires await.
+// Solution: full AES in pure JS so the default function stays synchronous.
+function _gmul(a,b){let p=0;for(let i=0;i<8;i++){if(b&1)p^=a;const h=a&0x80;a=(a<<1)&0xff;if(h)a^=0x1b;b>>=1;}return p;}
+const _S=(function(){const s=new Uint8Array(256);let p=1,q=1;do{p=p^(p<<1)^(p&0x80?0x1b:0);p&=0xff;q^=q<<1;q^=q<<2;q^=q<<4;q^=(q&0x80?0x09:0);q&=0xff;s[p]=(q^((q<<1|q>>7)&0xff)^((q<<2|q>>6)&0xff)^((q<<3|q>>5)&0xff)^((q<<4|q>>4)&0xff)^0x63)&0xff;}while(p!==1);s[0]=0x63;return s;})();
+const _Si=new Uint8Array(256);for(let i=0;i<256;i++)_Si[_S[i]]=i;
+const _Rc=[0,1,2,4,8,16,32,64,128,27,54];
+function _expKey(k){const w=new Uint32Array(44);for(let i=0;i<4;i++)w[i]=(k[4*i]<<24|k[4*i+1]<<16|k[4*i+2]<<8|k[4*i+3])>>>0;for(let i=4;i<44;i++){let t=w[i-1];if(i%4===0)t=(((_S[(t>>16)&0xff]<<24)|(_S[(t>>8)&0xff]<<16)|(_S[t&0xff]<<8)|_S[(t>>24)&0xff])^(_Rc[i/4]<<24))>>>0;w[i]=(w[i-4]^t)>>>0;}return w;}
+function _ark(s,w,rd){for(let c=0;c<4;c++){const k=w[rd*4+c];s[0][c]^=(k>>24)&0xff;s[1][c]^=(k>>16)&0xff;s[2][c]^=(k>>8)&0xff;s[3][c]^=k&0xff;}}
+function _encBlk(src,w){const s=[[src[0],src[4],src[8],src[12]],[src[1],src[5],src[9],src[13]],[src[2],src[6],src[10],src[14]],[src[3],src[7],src[11],src[15]]];_ark(s,w,0);for(let rd=1;rd<10;rd++){for(let r=0;r<4;r++)for(let c=0;c<4;c++)s[r][c]=_S[s[r][c]];[s[1][0],s[1][1],s[1][2],s[1][3]]=[s[1][1],s[1][2],s[1][3],s[1][0]];[s[2][0],s[2][1],s[2][2],s[2][3]]=[s[2][2],s[2][3],s[2][0],s[2][1]];[s[3][0],s[3][1],s[3][2],s[3][3]]=[s[3][3],s[3][0],s[3][1],s[3][2]];for(let c=0;c<4;c++){const a=s[0][c],b=s[1][c],cc=s[2][c],d=s[3][c];s[0][c]=_gmul(2,a)^_gmul(3,b)^cc^d;s[1][c]=a^_gmul(2,b)^_gmul(3,cc)^d;s[2][c]=a^b^_gmul(2,cc)^_gmul(3,d);s[3][c]=_gmul(3,a)^b^cc^_gmul(2,d);}_ark(s,w,rd);}for(let r=0;r<4;r++)for(let c=0;c<4;c++)s[r][c]=_S[s[r][c]];[s[1][0],s[1][1],s[1][2],s[1][3]]=[s[1][1],s[1][2],s[1][3],s[1][0]];[s[2][0],s[2][1],s[2][2],s[2][3]]=[s[2][2],s[2][3],s[2][0],s[2][1]];[s[3][0],s[3][1],s[3][2],s[3][3]]=[s[3][3],s[3][0],s[3][1],s[3][2]];_ark(s,w,10);return[s[0][0],s[1][0],s[2][0],s[3][0],s[0][1],s[1][1],s[2][1],s[3][1],s[0][2],s[1][2],s[2][2],s[3][2],s[0][3],s[1][3],s[2][3],s[3][3]];}
+function _decBlk(src,w){const s=[[src[0],src[4],src[8],src[12]],[src[1],src[5],src[9],src[13]],[src[2],src[6],src[10],src[14]],[src[3],src[7],src[11],src[15]]];_ark(s,w,10);for(let rd=9;rd>0;rd--){[s[1][0],s[1][1],s[1][2],s[1][3]]=[s[1][3],s[1][0],s[1][1],s[1][2]];[s[2][0],s[2][1],s[2][2],s[2][3]]=[s[2][2],s[2][3],s[2][0],s[2][1]];[s[3][0],s[3][1],s[3][2],s[3][3]]=[s[3][1],s[3][2],s[3][3],s[3][0]];for(let r=0;r<4;r++)for(let c=0;c<4;c++)s[r][c]=_Si[s[r][c]];_ark(s,w,rd);for(let c=0;c<4;c++){const a=s[0][c],b=s[1][c],cc=s[2][c],d=s[3][c];s[0][c]=_gmul(14,a)^_gmul(11,b)^_gmul(13,cc)^_gmul(9,d);s[1][c]=_gmul(9,a)^_gmul(14,b)^_gmul(11,cc)^_gmul(13,d);s[2][c]=_gmul(13,a)^_gmul(9,b)^_gmul(14,cc)^_gmul(11,d);s[3][c]=_gmul(11,a)^_gmul(13,b)^_gmul(9,cc)^_gmul(14,d);}}[s[1][0],s[1][1],s[1][2],s[1][3]]=[s[1][3],s[1][0],s[1][1],s[1][2]];[s[2][0],s[2][1],s[2][2],s[2][3]]=[s[2][2],s[2][3],s[2][0],s[2][1]];[s[3][0],s[3][1],s[3][2],s[3][3]]=[s[3][1],s[3][2],s[3][3],s[3][0]];for(let r=0;r<4;r++)for(let c=0;c<4;c++)s[r][c]=_Si[s[r][c]];_ark(s,w,0);return[s[0][0],s[1][0],s[2][0],s[3][0],s[0][1],s[1][1],s[2][1],s[3][1],s[0][2],s[1][2],s[2][2],s[3][2],s[0][3],s[1][3],s[2][3],s[3][3]];}
+function _hexToBytes(h){const a=new Uint8Array(h.length/2);for(let i=0;i<a.length;i++)a[i]=parseInt(h.slice(i*2,i*2+2),16);return a;}
+function _strToBytes(s){const a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i)&255;return a;}
+function _bytesToStr(a){return String.fromCharCode(...a);}
+const _B64='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function _b64enc(d){let o='',i=0;for(;i+2<d.length;i+=3){const n=(d[i]<<16)|(d[i+1]<<8)|d[i+2];o+=_B64[(n>>18)&63]+_B64[(n>>12)&63]+_B64[(n>>6)&63]+_B64[n&63];}if(i+1===d.length){const n=d[i]<<16;o+=_B64[(n>>18)&63]+_B64[(n>>12)&63]+'==';}else if(i+2===d.length){const n=(d[i]<<16)|(d[i+1]<<8);o+=_B64[(n>>18)&63]+_B64[(n>>12)&63]+_B64[(n>>6)&63]+'=';}return o;}
+function _b64dec(s){const lk={};for(let i=0;i<64;i++)lk[_B64[i]]=i;s=s.replace(/=+$/,'');const o=new Uint8Array(Math.floor(s.length*3/4));let bi=0;for(let i=0;i<s.length;i+=4){const a=lk[s[i]]||0,b=lk[s[i+1]]||0,c=lk[s[i+2]]||0,d=lk[s[i+3]]||0,n=(a<<18)|(b<<12)|(c<<6)|d;o[bi++]=(n>>16)&255;if(s[i+2]!=null)o[bi++]=(n>>8)&255;if(s[i+3]!=null)o[bi++]=n&255;}return o;}
+function _aesEncrypt(plain,keyHex,ivHex){const key=_hexToBytes(keyHex),iv=_hexToBytes(ivHex),w=_expKey(key),raw=_strToBytes(plain),pad=16-(raw.length%16),data=new Uint8Array(raw.length+pad);data.set(raw);for(let i=raw.length;i<data.length;i++)data[i]=pad;const out=new Uint8Array(data.length);let prev=Array.from(iv);for(let i=0;i<data.length;i+=16){const blk=[];for(let j=0;j<16;j++)blk[j]=data[i+j]^prev[j];const enc=_encBlk(blk,w);for(let j=0;j<16;j++)out[i+j]=enc[j];prev=enc;}return _b64enc(out);}
+function _aesDecrypt(b64ct,keyHex,ivHex){const key=_hexToBytes(keyHex),iv=_hexToBytes(ivHex),w=_expKey(key),data=_b64dec(b64ct),out=new Uint8Array(data.length);let prev=Array.from(iv);for(let i=0;i<data.length;i+=16){const blk=Array.from(data.slice(i,i+16)),dec=_decBlk(blk,w);for(let j=0;j<16;j++)out[i+j]=dec[j]^prev[j];prev=blk;}const pad=out[out.length-1];return _bytesToStr(out.slice(0,out.length-pad));}
 
 function _get(obj, path) {
   return path.replace(/^\$\.?/, '').split('.').filter(Boolean)
@@ -1460,7 +1437,7 @@ function _resolveObj(obj, vars) {
   return obj;
 }
 
-export default async function () {
+export default function () {
   // With shared-iterations (1 iteration per VU), __VU is 1-based and unique per VU.
   // __ITER resets to 0 for each VU so all VUs pick the same row — use __VU-1 instead.
   const vuIdx = (__VU - 1) % DATA.length;
@@ -1507,7 +1484,7 @@ function _generateStepCode(step, idx) {
                 bodyCode = [
                     `  const _plainBody${idx+1} = _resolveVars(${JSON.stringify(bodyStr)}, vars);`,
                     `  console.log('VU=' + __VU + ' STEP${idx+1} PLAIN_REQ=' + _plainBody${idx+1});`,
-                    `  const _encVal${idx+1} = await _aesEncrypt(_plainBody${idx+1}, ${JSON.stringify(enc.key)}, ${JSON.stringify(enc.iv || '')});`,
+                    `  const _encVal${idx+1} = _aesEncrypt(_plainBody${idx+1}, ${JSON.stringify(enc.key)}, ${JSON.stringify(enc.iv || '')});`,
                     `  const _body${idx+1} = JSON.stringify({ ${JSON.stringify(enc.outputField || 'encryptedData')}: _encVal${idx+1} });`,
                     `  console.log('VU=' + __VU + ' STEP${idx+1} ENC_REQ=' + _body${idx+1}.substring(0,100));`,
                 ].join('\n') + '\n';
@@ -1571,7 +1548,7 @@ function _generateStepCode(step, idx) {
                     `  try {`,
                     `    const _raw${idx+1} = ${varName}.json();`,
                     `    const _encField${idx+1} = (_raw${idx+1} && _raw${idx+1}['${decField}']) || '';`,
-                    `    const _decText${idx+1} = await _aesDecrypt(_encField${idx+1}, ${JSON.stringify(decKey)}, ${JSON.stringify(decIv)});`,
+                    `    const _decText${idx+1} = _aesDecrypt(_encField${idx+1}, ${JSON.stringify(decKey)}, ${JSON.stringify(decIv)});`,
                     `    const _decJson${idx+1} = JSON.parse(_decText${idx+1});`,
                     `    vars['${cap.varName}'] = _get(_decJson${idx+1}, '${cap.jsonPath}') || '';`,
                     `    console.log('VU=' + __VU + ' STEP${idx+1} captured ${cap.varName}=' + String(vars['${cap.varName}']).substring(0,60));`,
