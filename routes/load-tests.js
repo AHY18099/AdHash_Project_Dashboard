@@ -193,7 +193,7 @@ function _scenariosCol() {
 }
 
 async function _dbLoadScenarios() {
-    const docs = await _scenariosCol().find({}).sort({ updatedAt: -1 }).toArray();
+    const docs = await _scenariosCol().find({}).sort({ updatedAt: -1 }).maxTimeMS(8000).toArray();
     return docs.map(({ _id, ...d }) => d);
 }
 
@@ -742,7 +742,9 @@ router.get('/scenarios', auth, async (req, res) => {
         const scenarios = await _dbLoadScenarios();
         res.json({ scenarios });
     } catch (e) {
-        res.status(500).json({ error: 'Failed to load scenarios: ' + e.message });
+        console.error('[load-test] scenarios fetch error:', e.message);
+        // Return empty list so the UI renders gracefully instead of showing "Error:"
+        res.json({ scenarios: [], _warning: 'Could not load scenarios: ' + e.message });
     }
 });
 
