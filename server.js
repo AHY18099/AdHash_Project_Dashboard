@@ -5300,7 +5300,7 @@ app.delete('/api/wfdocs/:projectId/:fileId', async (req, res) => {
 
 // GET /api/qa-data — return all shared keys (deduped before sending)
 // _DEPLOY_VERSION is checked by client to detect stale deploys
-const _DEPLOY_VERSION = 'v20260806-scenarios-timeout-fix';
+const _DEPLOY_VERSION = 'v20260806-k6-native-crypto';
 app.get('/api/qa-data', (req, res) => {
     const raw = readQaData();
     // Apply dedup to all per-project objects before sending to client

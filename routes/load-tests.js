@@ -1333,7 +1333,7 @@ function _scenarioToK6Script(scenario) {
     if (isWorkflow) {
         // shared-iterations: exactly vus iterations total, spread across vus VUs
         // Each VU runs the full Step1→Step2→Step3→Step4 flow exactly once
-        const graceTime = Math.max(30, duration);
+        const graceTime = Math.max(60, duration + 60);
         optionsStr = `export const options = {
   scenarios: {
     registration_flow: {
@@ -1396,10 +1396,56 @@ ${optionsStr}
 const DATA = ${dataStr};
 const GLOBAL_VARS = ${varsStr};
 
-// Server-side crypto proxies — Node.js AES-CBC (avoids k6 WebCrypto limitations)
-const _BASE_URL = '${process.env.DASHBOARD_URL || 'https://adhashprojectdashboard-production.up.railway.app'}';
-const DECRYPT_URL = _BASE_URL + '/api/load-test/decrypt';
-const ENCRYPT_URL = _BASE_URL + '/api/load-test/encrypt';
+// ── Native k6 AES-128-CBC crypto (no proxy round-trips) ──
+// k6 v0.42+ exposes crypto.subtle with AES-CBC support.
+// Hex ↔ ArrayBuffer helpers
+function _hexToBytes(hex) {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.slice(i*2, i*2+2), 16);
+  return bytes.buffer;
+}
+function _bytesToHex(buf) {
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+function _bytesToUtf8(buf) {
+  return String.fromCharCode(...new Uint8Array(buf));
+}
+function _utf8ToBytes(str) {
+  const enc = new TextEncoder();
+  return enc.encode(str).buffer;
+}
+function _base64ToBytes(b64) {
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return buf.buffer;
+}
+function _bytesToBase64(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+
+function _aesEncrypt(plaintext, keyHex, ivHex) {
+  const keyBytes = _hexToBytes(keyHex);
+  const ivBytes  = _hexToBytes(ivHex);
+  const key = crypto.subtle.importKey('raw', keyBytes, { name: 'AES-CBC' }, false, ['encrypt']);
+  const enc = crypto.subtle.encrypt({ name: 'AES-CBC', iv: ivBytes }, key, _utf8ToBytes(plaintext));
+  return _bytesToBase64(enc);
+}
+
+function _aesDecrypt(ciphertextB64OrHex, keyHex, ivHex) {
+  const keyBytes = _hexToBytes(keyHex);
+  const ivBytes  = _hexToBytes(ivHex);
+  // Accept both base64 and hex ciphertext
+  let ctBytes;
+  try {
+    ctBytes = _base64ToBytes(ciphertextB64OrHex);
+  } catch {
+    ctBytes = _hexToBytes(ciphertextB64OrHex);
+  }
+  const key = crypto.subtle.importKey('raw', keyBytes, { name: 'AES-CBC' }, false, ['decrypt']);
+  const dec = crypto.subtle.decrypt({ name: 'AES-CBC', iv: ivBytes }, key, ctBytes);
+  return _bytesToUtf8(dec);
+}
 
 function _get(obj, path) {
   return path.replace(/^\$\.?/, '').split('.').filter(Boolean)
@@ -1465,13 +1511,13 @@ function _generateStepCode(step, idx) {
             // These cannot be pre-encrypted — must encrypt at runtime via proxy
             const hasRuntimeVars = /\{\{[^}]+\}\}/.test(bodyStr);
             if (hasRuntimeVars) {
-                // Runtime encrypt: resolve vars first, then call /api/load-test/encrypt
+                // Runtime encrypt: resolve vars first, then encrypt in-process via k6 crypto.subtle
                 bodyCode = [
                     `  const _plainBody${idx+1} = _resolveVars(${JSON.stringify(bodyStr)}, vars);`,
                     `  console.log('VU=' + __VU + ' STEP${idx+1} PLAIN_REQ=' + _plainBody${idx+1});`,
-                    `  const _encResp${idx+1} = http.post(ENCRYPT_URL, JSON.stringify({ plaintext: _plainBody${idx+1}, key: ${JSON.stringify(enc.key)}, iv: ${JSON.stringify(enc.iv || '')}, outputField: ${JSON.stringify(enc.outputField || 'encryptedData')} }), { headers: { 'Content-Type': 'application/json' }, tags: { isProxy: 'true' }, timeout: '5s' });`,
-                    `  const _body${idx+1} = ((_encResp${idx+1}.json() || {}).body) || '{}';`,
-                    `  console.log('VU=' + __VU + ' STEP${idx+1} ENC_REQ=' + _body${idx+1});`,
+                    `  const _encVal${idx+1} = _aesEncrypt(_plainBody${idx+1}, ${JSON.stringify(enc.key)}, ${JSON.stringify(enc.iv || '')});`,
+                    `  const _body${idx+1} = JSON.stringify({ ${JSON.stringify(enc.outputField || 'encryptedData')}: _encVal${idx+1} });`,
+                    `  console.log('VU=' + __VU + ' STEP${idx+1} ENC_REQ=' + _body${idx+1}.substring(0,100));`,
                 ].join('\n') + '\n';
                 bodyRef = `_body${idx+1}`;
             } else {
@@ -1526,19 +1572,16 @@ function _generateStepCode(step, idx) {
         const decField = (dec?.enabled && dec.inputField) ? dec.inputField : (enc?.enabled ? (enc.outputField || 'encryptedData') : 'encryptedData');
 
         if (decKey && decIv) {
-            // Decrypt response via server-side proxy, then extract jsonPath
+            // Decrypt response in-process via k6 crypto.subtle (no proxy round-trip)
             captureCode = step.captures.map(cap => {
                 if (!cap.varName || !cap.jsonPath) return '';
                 return [
                     `  try {`,
                     `    const _raw${idx+1} = ${varName}.json();`,
                     `    const _encField${idx+1} = (_raw${idx+1} && _raw${idx+1}['${decField}']) || '';`,
-                    `    const _decResp${idx+1} = http.post(`,
-                    `      DECRYPT_URL,`,
-                    `      JSON.stringify({ ciphertext: _encField${idx+1}, key: ${JSON.stringify(decKey)}, iv: ${JSON.stringify(decIv)}, jsonPath: '${cap.jsonPath}' }),`,
-                    `      { headers: { 'Content-Type': 'application/json' }, tags: { isProxy: 'true' }, timeout: '5s' }`,
-                    `    );`,
-                    `    vars['${cap.varName}'] = (_decResp${idx+1}.json() || {}).value || '';`,
+                    `    const _decText${idx+1} = _aesDecrypt(_encField${idx+1}, ${JSON.stringify(decKey)}, ${JSON.stringify(decIv)});`,
+                    `    const _decJson${idx+1} = JSON.parse(_decText${idx+1});`,
+                    `    vars['${cap.varName}'] = _get(_decJson${idx+1}, '${cap.jsonPath}') || '';`,
                     `    console.log('VU=' + __VU + ' STEP${idx+1} captured ${cap.varName}=' + String(vars['${cap.varName}']).substring(0,60));`,
                     `  } catch(e) { vars['${cap.varName}'] = ''; console.log('VU=' + __VU + ' STEP${idx+1} capture error: ' + e); }`,
                 ].join('\n');
