@@ -1465,7 +1465,7 @@ function _generateStepCode(step, idx) {
     // Build params
     const paramsObj = {
         tags:    { step: step.name || `Step${idx+1}`, stepId: step.id || `step${idx+1}` },
-        timeout: Math.round((step.timeout || 5000) / 1000) + 's',
+        timeout: Math.round(Math.max(5000, step.timeout || 5000) / 1000) + 's',
     };
 
     // Build headers resolution
@@ -1588,7 +1588,7 @@ function _generateStepCode(step, idx) {
         bodyCode,
         retryWrapStart,
         httpCall + '\n',
-        `  console.log('VU=' + __VU + ' STEP${idx+1}[' + ${varName}.status + '] ENC_RES=' + ${varName}.body.substring(0,400));\n`,
+        `  console.log('VU=' + __VU + ' STEP${idx+1}[' + ${varName}.status + '] ENC_RES=' + (${varName}.body || '').substring(0,400));\n`,
         assertCode,
         captureCode,
         retryWrapEnd,
