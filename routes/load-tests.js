@@ -837,7 +837,9 @@ router.post('/encrypt', (req, res) => {
 // Returns: { status, responseTime, rawBody, decryptedBody, headers, capturedValues, error }
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/step-run', auth, async (req, res) => {
-    const { step, globalVars = {}, capturedVars = {}, dynamicData = {} } = req.body || {};
+    const { step, globalVars: _rawGlobalVars = {}, capturedVars = {}, dynamicData = {}, baseUrl: _baseUrl = '' } = req.body || {};
+    // Inject baseUrl so {{baseUrl}} resolves in step URLs; strip trailing slash to avoid double-slash
+    const globalVars = _baseUrl ? Object.assign({ baseUrl: _baseUrl.replace(/\/+$/, '') }, _rawGlobalVars) : _rawGlobalVars;
     if (!step) return res.status(400).json({ error: 'step is required' });
 
     const http = require('http');
@@ -1040,7 +1042,9 @@ router.post('/step-run', auth, async (req, res) => {
 // Returns: { results: [{ vu, status, responseTime, capturedValues, ok, resolvedUrl }] }
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/step-run-all', auth, async (req, res) => {
-    const { step, vus = 1, globalVars = {}, capturedVarsByVu = [], dynamicData = {} } = req.body || {};
+    const { step, vus = 1, globalVars: _rawGlobalVars = {}, capturedVarsByVu = [], dynamicData = {}, baseUrl: _baseUrl = '' } = req.body || {};
+    // Inject baseUrl so {{baseUrl}} resolves in step URLs; strip trailing slash
+    const globalVars = _baseUrl ? Object.assign({ baseUrl: _baseUrl.replace(/\/+$/, '') }, _rawGlobalVars) : _rawGlobalVars;
     if (!step) return res.status(400).json({ error: 'step is required' });
     // Debug: log what captured vars came in
     console.log('[step-run-all] step.name=', step.name, 'vus=', vus, 'capturedVarsByVu=', JSON.stringify(capturedVarsByVu));
@@ -1374,8 +1378,10 @@ function _scenarioToK6Script(scenario) {
     // Build data array string
     const dataStr = JSON.stringify(dataArray, null, 2);
 
-    // Build global vars
-    const varsStr = JSON.stringify(globalVars, null, 2);
+    // Build global vars — inject baseUrl from scenario.url so {{baseUrl}} resolves in step URLs
+    const baseUrl = (scenario.url || '').replace(/\/+$/, ''); // strip trailing slash
+    const effectiveGlobalVars = baseUrl ? Object.assign({ baseUrl }, globalVars) : globalVars;
+    const varsStr = JSON.stringify(effectiveGlobalVars, null, 2);
 
     // Build steps code
     const stepsCode = enabledSteps.map((step, idx) => _generateStepCode(step, idx)).join('\n\n');

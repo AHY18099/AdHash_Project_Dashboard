@@ -1729,7 +1729,8 @@ function _showActiveScenario(scenario) {
     const steps = scenario.steps || [];
     card.style.display = '';
     document.getElementById('active-scenario-name').textContent = scenario.scenarioName || scenario.name || 'Unnamed Scenario';
-    document.getElementById('active-scenario-summary').textContent = `${steps.length} step(s) · ${scenario.vus || 10} VUs · ${scenario.duration || 30}s · ${scenario.projectName || ''} ${scenario.environment || ''}`.trim();
+    const enabledStepCount = steps.filter(s => s.enabled !== false).length;
+    document.getElementById('active-scenario-summary').textContent = `${enabledStepCount} step(s) · ${scenario.vus || 10} VUs · ${scenario.duration || 30}s · ${scenario.projectName || ''} ${scenario.environment || ''}`.trim();
     // Sync execution config to Configure tab
     if (scenario.vus)          { const el = document.getElementById('cfg-vus');          if (el) el.value = scenario.vus; }
     if (scenario.duration)     { const el = document.getElementById('cfg-duration');     if (el) el.value = scenario.duration; }
@@ -1932,13 +1933,14 @@ function startTest() {
     _pendingConfig = cfg;
 
     const isProd         = cfg.environment === 'Production';
-    const isWorkflow     = !!(cfg.steps && cfg.steps.length > 1);
+    const _cfgEnabledSteps = (cfg.steps || []).filter(s => s.enabled !== false);
+    const isWorkflow     = !!(_cfgEnabledSteps.length > 1);
     const summary        = document.getElementById('confirm-summary');
     summary.innerHTML = `
       <strong>Project:</strong> ${_esc(cfg.projectName)} · <strong>Env:</strong> ${_esc(cfg.environment)} · <strong>Engine:</strong> Server-side<br>
       ${isWorkflow
-        ? `<strong>Scenario:</strong> ${_esc(cfg.scenarioName || 'Unnamed')} · <strong>Steps:</strong> ${cfg.steps.length}<br>`
-        : `<strong>URL:</strong> ${_esc(cfg.url || cfg.steps?.[0]?.url || '—')}<br>`}
+        ? `<strong>Scenario:</strong> ${_esc(cfg.scenarioName || 'Unnamed')} · <strong>Steps:</strong> ${_cfgEnabledSteps.length}<br>`
+        : `<strong>URL:</strong> ${_esc(cfg.url || _cfgEnabledSteps[0]?.url || '—')}<br>`}
       <strong>VUs:</strong> ${cfg.vus} · <strong>Duration:</strong> ${cfg.duration}s · <strong>Ramp-up:</strong> ${cfg.rampup || 0}s
     `;
     document.getElementById('confirm-warn').style.display = isProd ? '' : 'none';
@@ -2323,6 +2325,7 @@ async function runStep(i) {
     // Build globalVars
     const globalVars = {};
     for (const v of _globalVars) { if (v.name) globalVars[v.name] = v.value; }
+    const baseUrl = (document.getElementById('scen-base-url')?.value || '').trim();
 
     // Dynamic data config
     const dynData = {};
@@ -2361,7 +2364,7 @@ async function runStep(i) {
             if (btn2) btn2.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" opacity=".3"/><path d="M12 2a10 10 0 010 20A10 10 0 0112 2" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" class="spin-arc"/></svg> ${idx+1}/${arr.length}…`;
             let r;
             try {
-                r = await api('POST', '/api/load-test/step-run', { step: s, globalVars, capturedVars: loopVars, dynamicData: dynData });
+                r = await api('POST', '/api/load-test/step-run', { step: s, globalVars, capturedVars: loopVars, dynamicData: dynData, baseUrl });
             } catch(e) {
                 r = { ok: false, error: e.message, status: 0, responseTime: 0 };
             }
@@ -2407,6 +2410,7 @@ async function runStep(i) {
             globalVars,
             capturedVars,
             dynamicData: dynData,
+            baseUrl,
         });
     } catch(e) {
         result = { ok: false, error: e.message, status: 0, responseTime: 0 };
@@ -2474,6 +2478,7 @@ async function runStepAllVUs(i) {
     // Build globalVars
     const globalVars = {};
     for (const v of _globalVars) { if (v.name) globalVars[v.name] = v.value; }
+    const baseUrl = (document.getElementById('scen-base-url')?.value || '').trim();
 
     // Build capturedVarsByVu — per-VU captured vars from all prior steps.
     // If a prior step was run with Run All, use its per-VU results (_runAllResults).
@@ -2514,6 +2519,7 @@ async function runStepAllVUs(i) {
             globalVars,
             capturedVarsByVu,
             dynamicData: dynData,
+            baseUrl,
         });
 
         const sum = data.summary || {};
@@ -2979,7 +2985,7 @@ async function loadScenariosPanel() {
             <tbody>${_savedScenarios.map(s => `
               <tr>
                 <td style="font-weight:700">${_esc(s.scenarioName || s.name || '—')}</td>
-                <td>${(s.steps||[]).length}</td>
+                <td>${(s.steps||[]).filter(st => st.enabled !== false).length}</td>
                 <td>${_esc(s.projectName||'—')}</td>
                 <td style="color:var(--muted);font-size:11px">${s.updatedAt ? new Date(s.updatedAt).toLocaleDateString('en-IN') : '—'}</td>
                 <td>
@@ -3316,9 +3322,10 @@ function clearScenario() {
 function initLiveView(cfg) {
     document.getElementById('live-empty').style.display    = 'none';
     document.getElementById('live-content').style.display  = '';
-    const isWorkflow = !!(cfg.steps && cfg.steps.length > 1);
+    const _liveEnabledSteps = (cfg.steps || []).filter(s => s.enabled !== false);
+    const isWorkflow = !!(_liveEnabledSteps.length > 1);
     document.getElementById('run-project-name').textContent = `${cfg.projectName} — ${cfg.environment}`;
-    document.getElementById('run-url-display').textContent  = isWorkflow ? `Workflow: ${cfg.scenarioName || 'Unnamed'} (${cfg.steps.length} steps)` : (cfg.url || cfg.steps?.[0]?.url || '—');
+    document.getElementById('run-url-display').textContent  = isWorkflow ? `Workflow: ${cfg.scenarioName || 'Unnamed'} (${_liveEnabledSteps.length} steps)` : (cfg.url || _liveEnabledSteps[0]?.url || '—');
     document.getElementById('btn-stop').disabled = false;
 
     const runBadge = document.getElementById('ltc-run-badge');
