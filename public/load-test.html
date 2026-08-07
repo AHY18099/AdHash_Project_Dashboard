@@ -808,6 +808,10 @@ input:checked+.slider::before{transform:translateX(18px);background:var(--green)
   <button class="tab-btn" onclick="switchTab('template')">
     <span class="tab-btn-icon">🗂️</span>Report Template
   </button>
+  <div class="tab-btn-sep"></div>
+  <button class="tab-btn" onclick="switchTab('servercfg')">
+    <span class="tab-btn-icon">🖥️</span>Server Config
+  </button>
 </div>
 
 <!-- ══════════════════════════ TAB 1: CONFIGURE ══════════════════════════ -->
@@ -1580,6 +1584,10 @@ input:checked+.slider::before{transform:translateX(18px);background:var(--green)
             <div><div class="toggle-lbl">Recommendations</div><div class="toggle-sub">QA recommendation and release decision</div></div>
             <label class="switch"><input type="checkbox" id="tmpl-showRecs" checked><span class="slider"></span></label>
           </div>
+          <div class="toggle-row">
+            <div><div class="toggle-lbl">Server Configuration</div><div class="toggle-sub">Instance specs and sizing recommendation</div></div>
+            <label class="switch"><input type="checkbox" id="tmpl-showServerConfig" checked><span class="slider"></span></label>
+          </div>
         </div>
       </div>
 
@@ -1588,6 +1596,53 @@ input:checked+.slider::before{transform:translateX(18px);background:var(--green)
         <p style="font-size:13px;color:var(--muted);line-height:1.7">After saving, the next generated report will use these settings. Generate a demo report to preview the full output.</p>
         <button class="btn btn-secondary btn-sm" style="margin-top:12px" onclick="generateDemo()">🧪 Preview Demo Report</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ TAB 7: SERVER CONFIG ══════════════════════════ -->
+<div id="tab-servercfg" class="tab-pane">
+  <div class="info-box-blue" style="margin-bottom:20px">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+    <span>Record the AWS EC2 specs for this project's Production and Staging servers. This data is reused in the generated Load Test Report's Server Configuration section, together with an automatic sizing recommendation compared against observed test results.</span>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">📁 Project</div>
+    <div class="row">
+      <div class="col">
+        <label>Select Project</label>
+        <select id="sc-project" onchange="loadServerConfigs()">
+          <option value="">— Select Project —</option>
+          <option value="Ad-Hash">Ad-Hash</option>
+          <option value="Ai Sign Pro">Ai Sign Pro</option>
+          <option value="Algomax">Algomax</option>
+          <option value="Auto Checker">Auto Checker</option>
+          <option value="DDP">DDP</option>
+          <option value="Humee">Humee</option>
+          <option value="Metcalf">Metcalf</option>
+          <option value="SMC">SMC</option>
+          <option value="Spark me">Spark me</option>
+          <option value="SyncTag">SyncTag</option>
+          <option value="SyncTrade">SyncTrade</option>
+          <option value="WavedIn">WavedIn</option>
+          <option value="ZapCRM">ZapCRM</option>
+          <option value="ZapTrade">ZapTrade</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div id="sc-empty-project" class="empty">
+    <div class="empty-icon">🖥️</div>
+    <h3>Select a Project</h3>
+    <p>Choose a project above to view or edit its server configuration.</p>
+  </div>
+
+  <div id="sc-content" style="display:none">
+    <div class="row" style="align-items:flex-start">
+      <div class="col" id="sc-card-production"></div>
+      <div class="col" id="sc-card-staging"></div>
     </div>
   </div>
 </div>
@@ -1663,11 +1718,12 @@ function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('tab-' + name)?.classList.add('active');
     const btns = document.querySelectorAll('.tab-btn');
-    const names = ['configure','scenario','live','results','reports','template'];
+    const names = ['configure','scenario','live','results','reports','template','servercfg'];
     const idx = names.indexOf(name);
     if (btns[idx]) btns[idx].classList.add('active');
     if (name === 'reports') loadHistory();
     if (name === 'template') loadTemplate();
+    if (name === 'servercfg') loadServerConfigs();
 }
 
 // ── Init ──
@@ -3760,6 +3816,7 @@ async function loadTemplate() {
         if (t.showErrorSummary     !== undefined) document.getElementById('tmpl-showErrors').checked  = t.showErrorSummary;
         if (t.showTimeline         !== undefined) document.getElementById('tmpl-showTimeline').checked= t.showTimeline;
         if (t.showRecommendations  !== undefined) document.getElementById('tmpl-showRecs').checked    = t.showRecommendations;
+        if (t.showServerConfig     !== undefined) document.getElementById('tmpl-showServerConfig').checked = t.showServerConfig;
     } catch {}
 }
 
@@ -3785,11 +3842,135 @@ async function saveTemplate() {
         showErrorSummary:     document.getElementById('tmpl-showErrors').checked,
         showTimeline:         document.getElementById('tmpl-showTimeline').checked,
         showRecommendations:  document.getElementById('tmpl-showRecs').checked,
+        showServerConfig:     document.getElementById('tmpl-showServerConfig').checked,
     };
     try {
         await api('POST', '/api/load-test/save-template', tmpl);
         showNotif('Template saved! Future reports will use these settings.', 'success');
     } catch (e) { showNotif('Save failed: ' + e.message, 'error'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SERVER CONFIG TAB
+// ══════════════════════════════════════════════════════════════════════════════
+let _serverConfigs = { production: null, staging: null };
+
+const SC_FIELDS = [
+    { key: 'serverName',    label: 'Server Name',    type: 'text' },
+    { key: 'cloudProvider', label: 'Cloud Provider', type: 'text', placeholder: 'AWS' },
+    { key: 'publicIp',      label: 'Public IP Address', type: 'text' },
+    { key: 'instanceType',  label: 'Instance Type',  type: 'text', placeholder: 't3.medium' },
+    { key: 'vcpu',          label: 'vCPU',           type: 'number' },
+    { key: 'memoryGb',      label: 'Memory (RAM) GB', type: 'number' },
+    { key: 'storageGb',     label: 'Storage (EBS) GB', type: 'number' },
+    { key: 'os',            label: 'Operating System', type: 'text', placeholder: 'Ubuntu' },
+    { key: 'region',        label: 'AWS Region',     type: 'text', placeholder: 'ap-south-1 (Mumbai)' },
+];
+
+function _scCardHtml(envType) {
+    const sc = _serverConfigs[envType] || {};
+    const isProd = envType === 'production';
+    const label = isProd ? 'Production (Live) Server' : 'Staging Server';
+    const icon  = isProd ? '🔴' : '🟡';
+
+    const fieldsHtml = SC_FIELDS.map(f => `
+      <div class="col" style="min-width:140px">
+        <label>${f.label}</label>
+        <input id="sc-${envType}-${f.key}" type="${f.type}" placeholder="${f.placeholder || ''}" value="${_esc(sc[f.key] ?? '')}" />
+      </div>`).join('');
+
+    return `
+    <div class="card">
+      <div class="card-title"><span class="card-title-icon">${icon}</span>${label}</div>
+      <div class="row" style="flex-wrap:wrap">${fieldsHtml}</div>
+      <div class="row" style="margin-top:12px;flex-wrap:wrap">
+        <div class="col" style="min-width:140px">
+          <label>Elastic IP</label>
+          <select id="sc-${envType}-elasticIp">
+            <option value="false" ${!sc.elasticIp ? 'selected' : ''}>No</option>
+            <option value="true" ${sc.elasticIp ? 'selected' : ''}>Yes</option>
+          </select>
+        </div>
+        <div class="col" style="min-width:140px">
+          <label>Current Status</label>
+          <select id="sc-${envType}-status">
+            <option value="Running" ${sc.status==='Running'||!sc.status?'selected':''}>Running</option>
+            <option value="Stopped" ${sc.status==='Stopped'?'selected':''}>Stopped</option>
+            <option value="Degraded" ${sc.status==='Degraded'?'selected':''}>Degraded</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <label>Notes</label>
+        <textarea id="sc-${envType}-notes" rows="2" placeholder="Any additional context...">${_esc(sc.notes ?? '')}</textarea>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px">
+        <button class="btn btn-primary btn-sm" onclick="saveServerConfig('${envType}')">💾 Save ${isProd ? 'Production' : 'Staging'}</button>
+        ${sc._id ? `<button class="btn btn-secondary btn-sm" onclick="deleteServerConfig('${envType}')">🗑 Delete</button>` : ''}
+      </div>
+      ${sc.updatedAt ? `<div style="margin-top:10px;font-size:11px;color:var(--muted)">Last updated: ${new Date(sc.updatedAt).toLocaleString('en-IN')}</div>` : ''}
+    </div>`;
+}
+
+function renderServerConfigCards() {
+    document.getElementById('sc-card-production').innerHTML = _scCardHtml('production');
+    document.getElementById('sc-card-staging').innerHTML    = _scCardHtml('staging');
+}
+
+async function loadServerConfigs() {
+    const project = document.getElementById('sc-project').value;
+    if (!project) {
+        document.getElementById('sc-empty-project').style.display = '';
+        document.getElementById('sc-content').style.display = 'none';
+        return;
+    }
+    document.getElementById('sc-empty-project').style.display = 'none';
+    document.getElementById('sc-content').style.display = '';
+    _serverConfigs = { production: null, staging: null };
+    try {
+        const data = await api('GET', `/api/load-test/server-config?projectName=${encodeURIComponent(project)}`);
+        for (const cfg of (data.configs || [])) _serverConfigs[cfg.envType] = cfg;
+    } catch (e) {
+        showNotif('Failed to load server config: ' + e.message, 'error');
+    }
+    renderServerConfigCards();
+}
+
+async function saveServerConfig(envType) {
+    const project = document.getElementById('sc-project').value;
+    if (!project) { showNotif('Select a project first.', 'error'); return; }
+    const payload = { projectName: project, envType };
+    for (const f of SC_FIELDS) {
+        const el = document.getElementById(`sc-${envType}-${f.key}`);
+        const v = el.value.trim();
+        payload[f.key] = f.type === 'number' ? (v ? parseFloat(v) : null) : v;
+    }
+    payload.elasticIp = document.getElementById(`sc-${envType}-elasticIp`).value === 'true';
+    payload.status    = document.getElementById(`sc-${envType}-status`).value;
+    payload.notes     = document.getElementById(`sc-${envType}-notes`).value;
+
+    try {
+        const saved = await api('POST', '/api/load-test/server-config', payload);
+        _serverConfigs[envType] = saved;
+        renderServerConfigCards();
+        showNotif(`${envType === 'production' ? 'Production' : 'Staging'} server config saved.`, 'success');
+    } catch (e) {
+        showNotif('Save failed: ' + e.message, 'error');
+    }
+}
+
+async function deleteServerConfig(envType) {
+    const sc = _serverConfigs[envType];
+    if (!sc || !sc._id) return;
+    if (!confirm(`Delete the ${envType} server configuration for this project?`)) return;
+    try {
+        await api('DELETE', `/api/load-test/server-config/${sc._id}`);
+        _serverConfigs[envType] = null;
+        renderServerConfigCards();
+        showNotif('Server config deleted.', 'success');
+    } catch (e) {
+        showNotif('Delete failed: ' + e.message, 'error');
+    }
 }
 
 // ── Utility ──

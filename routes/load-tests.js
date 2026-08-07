@@ -28,6 +28,108 @@ const _ltReportSchema = new mongoose.Schema({
 }, { collection: 'load_test_reports' });
 const LTReport = mongoose.models.LTReport || mongoose.model('LTReport', _ltReportSchema);
 
+// ── MongoDB schema for per-project/per-environment server configuration ──
+const _ltServerConfigSchema = new mongoose.Schema({
+    projectName:   { type: String, required: true },
+    envType:       { type: String, required: true, enum: ['production', 'staging'] },
+    serverName:    String,
+    cloudProvider: String,
+    publicIp:      String,
+    instanceType:  String,
+    vcpu:          Number,
+    memoryGb:      Number,
+    storageGb:     Number,
+    os:            String,
+    region:        String,
+    elasticIp:     { type: Boolean, default: false },
+    status:        { type: String, default: 'Running' },
+    notes:         String,
+    updatedAt:     { type: Date, default: Date.now },
+}, { collection: 'load_test_server_configs' });
+_ltServerConfigSchema.index({ projectName: 1, envType: 1 }, { unique: true });
+const LTServerConfig = mongoose.models.LTServerConfig || mongoose.model('LTServerConfig', _ltServerConfigSchema);
+
+// ── In-memory server-config cache ──
+// _generateHtml() runs synchronously from several call sites (some not async),
+// so it reads server configs from this cache rather than querying Mongo inline.
+// The cache is refreshed on every server-config write/delete and lazily warmed
+// on first read after a cold start.
+const _serverConfigCache = new Map(); // key: `${projectName}::${envType}` -> doc
+let _serverConfigCacheWarmed = false;
+
+async function _warmServerConfigCache() {
+    try {
+        const docs = await LTServerConfig.find({}).lean();
+        for (const doc of docs) _serverConfigCache.set(`${doc.projectName}::${doc.envType}`, doc);
+        _serverConfigCacheWarmed = true;
+    } catch (e) {
+        console.error('[load-test] server-config cache warm failed:', e.message);
+    }
+}
+
+function getServerConfigsForProject(projectName) {
+    if (!_serverConfigCacheWarmed) _warmServerConfigCache(); // fire-and-forget; next report will see it
+    const out = {};
+    for (const doc of _serverConfigCache.values()) {
+        if (doc.projectName === projectName) out[doc.envType] = doc;
+    }
+    return out;
+}
+
+// ── Server sizing recommendation ─────────────────────────────────────────────
+// Compares the configured EC2 instance (vCPU/RAM) against observed load test
+// results (VUs, RPS, P95 latency, error rate) and flags under-/over-provisioning.
+// AWS t3 burstable family reference: t3.medium (2vCPU/4GB) is comfortable up to
+// roughly 50-80 concurrent VUs / ~150 RPS for typical Node/PHP CRUD workloads
+// before CPU credits exhaust and latency/error rate degrade — used as the
+// baseline heuristic below.
+function computeServerRecommendation(serverCfg, metrics, testCfg) {
+    if (!serverCfg) {
+        return { level: 'unknown', title: 'No server configuration on file', detail: 'Add this environment’s server specs in the Server Config tab to get a sizing recommendation.' };
+    }
+    const vcpu   = serverCfg.vcpu   || 0;
+    const ramGb  = serverCfg.memoryGb || 0;
+    if (!vcpu) {
+        return { level: 'unknown', title: 'Server specs incomplete', detail: 'vCPU count is not set for this environment — fill it in on the Server Config tab to get an accurate sizing recommendation.' };
+    }
+    const vus    = testCfg?.vus || 0;
+    const rps    = metrics?.rps || 0;
+    const p95    = metrics?.p95 || 0;
+    const p95Thr = testCfg?.p95Threshold || 3000;
+    const errPct = metrics?.totalReqs > 0 ? ((metrics.errReqs || 0) / metrics.totalReqs) * 100 : 0;
+
+    // Rough capacity ceiling per vCPU for a t3-class burstable instance under sustained load.
+    const vusPerVcpu = 30;
+    const estCapacity = vcpu * vusPerVcpu;
+    const saturationPct = estCapacity > 0 ? Math.min(999, (vus / estCapacity) * 100) : 0;
+
+    const latencyBreached = p95 > p95Thr;
+    const highError       = errPct > 5;
+    const nearCapacity     = saturationPct >= 80;
+    const overCapacity     = saturationPct >= 100;
+
+    if (overCapacity || (latencyBreached && highError)) {
+        const nextTier = vcpu <= 2 ? 't3.large (2 vCPU → upgrade to 2/8GB or 4 vCPU)' : vcpu <= 4 ? 't3.xlarge (4 vCPU / 16GB)' : 't3.2xlarge (8 vCPU / 32GB) or move to a load-balanced multi-instance setup';
+        return {
+            level: 'upgrade',
+            title: `Upgrade recommended — current instance is under-provisioned for ${vus} VUs`,
+            detail: `At ${vus} concurrent VUs (~${rps} RPS) against a ${vcpu}-vCPU/${ramGb}GB instance, estimated CPU saturation is ~${saturationPct.toFixed(0)}%. Observed P95 latency (${p95}ms) ${latencyBreached ? `exceeded the ${p95Thr}ms threshold` : 'was within threshold'} and error rate was ${errPct.toFixed(2)}%. Consider upgrading to ${nextTier}, or scale horizontally behind a load balancer if traffic is expected to grow further.`,
+        };
+    }
+    if (nearCapacity || latencyBreached || errPct > 1) {
+        return {
+            level: 'watch',
+            title: 'Monitor — instance is approaching its comfortable capacity',
+            detail: `Estimated CPU saturation ~${saturationPct.toFixed(0)}% at ${vus} VUs on a ${vcpu}-vCPU/${ramGb}GB instance. P95 latency was ${p95}ms (threshold ${p95Thr}ms) with a ${errPct.toFixed(2)}% error rate. Current sizing is adequate for this test, but re-test at higher VU counts before assuming headroom for production peak traffic.`,
+        };
+    }
+    return {
+        level: 'ok',
+        title: 'Current instance sizing is adequate',
+        detail: `At ${vus} VUs (~${rps} RPS), estimated CPU saturation is only ~${saturationPct.toFixed(0)}% of the ${vcpu}-vCPU/${ramGb}GB instance's comfortable capacity. P95 latency (${p95}ms) was within the ${p95Thr}ms threshold and the error rate (${errPct.toFixed(2)}%) was low. No sizing change needed for this load profile.`,
+    };
+}
+
 // ── AES-128-ECB encryption (PKCS7 padding via Node crypto) ──
 function aesEncrypt(plaintext, key) {
     const keyBuf = Buffer.from(key, 'utf8').slice(0, 16);
@@ -791,6 +893,60 @@ router.delete('/scenarios/:id', auth, async (req, res) => {
         res.json({ ok: true });
     } catch (e) {
         res.status(500).json({ error: 'Failed to delete scenario: ' + e.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SERVER CONFIG CRUD  /api/load-test/server-config
+// One document per (projectName, envType) pair — envType is 'production' or 'staging'.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/load-test/server-config?projectName=SyncTag — list configs (optionally filtered by project)
+router.get('/server-config', auth, async (req, res) => {
+    try {
+        const filter = {};
+        if (req.query.projectName) filter.projectName = req.query.projectName;
+        const configs = await LTServerConfig.find(filter).sort({ projectName: 1, envType: 1 }).lean();
+        res.json({ configs });
+    } catch (e) {
+        console.error('[load-test] server-config fetch error:', e.message);
+        res.json({ configs: [], _warning: 'Could not load server configs: ' + e.message });
+    }
+});
+
+// POST /api/load-test/server-config — create or update (upsert by projectName+envType)
+router.post('/server-config', auth, async (req, res) => {
+    try {
+        const { projectName, envType } = req.body || {};
+        if (!projectName) return res.status(400).json({ error: 'projectName is required' });
+        if (!['production', 'staging'].includes(envType)) return res.status(400).json({ error: 'envType must be "production" or "staging"' });
+
+        const data = { ...req.body, updatedAt: new Date() };
+        const doc = await LTServerConfig.findOneAndUpdate(
+            { projectName, envType },
+            { $set: data },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        ).lean();
+        _serverConfigCache.set(`${projectName}::${envType}`, doc);
+        res.status(201).json(doc);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to save server config: ' + e.message });
+    }
+});
+
+// DELETE /api/load-test/server-config/:id — delete
+router.delete('/server-config/:id', auth, async (req, res) => {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ error: 'Invalid server config id' });
+    }
+    try {
+        const existing = await LTServerConfig.findById(req.params.id).lean();
+        const result = await LTServerConfig.deleteOne({ _id: req.params.id });
+        if (!result.deletedCount) return res.status(404).json({ error: 'Server config not found' });
+        if (existing) _serverConfigCache.delete(`${existing.projectName}::${existing.envType}`);
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to delete server config: ' + e.message });
     }
 });
 
@@ -2797,6 +2953,65 @@ ${show('showTestConfig') ? `
     </div>
   </div>
 </div>` : ''}
+
+${show('showServerConfig') ? (() => {
+    const envKey = /prod/i.test(cfg.environment || '') ? 'production' : 'staging';
+    const projConfigs = getServerConfigsForProject(cfg.projectName || '');
+    const sc = projConfigs[envKey];
+    const rec = computeServerRecommendation(sc, m, cfg);
+    const recColor = rec.level === 'upgrade' ? '#DC2626' : rec.level === 'watch' ? '#D97706' : rec.level === 'ok' ? '#059669' : '#6B7280';
+    const recBg    = rec.level === 'upgrade' ? '#FEF2F2' : rec.level === 'watch' ? '#FFFBEB' : rec.level === 'ok' ? '#F0FDF4' : '#F3F4F6';
+    const recIcon  = rec.level === 'upgrade' ? '🔺' : rec.level === 'watch' ? '⚠️' : rec.level === 'ok' ? '✅' : 'ℹ️';
+
+    const specTile = (label, val, icon) => `
+      <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:16px">${icon}</div>
+        <div style="font-size:15px;font-weight:800;color:#0D1224;margin-top:4px">${val}</div>
+        <div style="font-size:9px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.4px;margin-top:2px">${label}</div>
+      </div>`;
+
+    const serverCard = sc ? `
+      <div style="border:1px solid #E5E7EB;border-radius:12px;padding:16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span class="env-badge" style="${envKey==='production' ? 'background:#FEF2F2;color:#DC2626;border-color:#FECACA' : ''}">${envKey === 'production' ? 'PRODUCTION' : 'STAGING'}</span>
+          <span style="font-size:13px;font-weight:800;color:#0D1224">${sc.serverName || '—'}</span>
+          <span style="margin-left:auto;font-size:10px;font-weight:700;color:${sc.status==='Running'?'#059669':'#DC2626'}">● ${sc.status || 'Unknown'}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px">
+          ${specTile('Cloud', sc.cloudProvider || '—', '☁️')}
+          ${specTile('Instance Type', sc.instanceType || '—', '🖥️')}
+          ${specTile('vCPU', sc.vcpu || '—', '⚙️')}
+          ${specTile('Memory', sc.memoryGb ? sc.memoryGb + ' GB' : '—', '🧠')}
+          ${specTile('Storage', sc.storageGb ? sc.storageGb + ' GB' : '—', '💾')}
+          ${specTile('OS', sc.os || '—', '🐧')}
+          ${specTile('Region', sc.region || '—', '🌍')}
+          ${specTile('Elastic IP', sc.elasticIp ? 'Yes' : 'No', '📌')}
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:#64748B">Public IP: <strong style="color:#334155">${sc.publicIp || '—'}</strong></div>
+      </div>` : `
+      <div class="info-box-amber" style="margin-bottom:14px">
+        <span>No server configuration on file for <strong>${envKey === 'production' ? 'Production' : 'Staging'}</strong> — add it in the Server Config tab to include full specs and get a sizing recommendation here.</span>
+      </div>`;
+
+    return `
+<!-- SERVER CONFIGURATION -->
+<div class="section-hdr-bar" style="margin-bottom:20px">
+  <div class="section-hdr-bar-inner">
+    <div class="section-hdr-bar-icon">🖥️</div>
+    <div>
+      <div class="section-hdr-bar-title">Server Configuration</div>
+      <div class="section-hdr-bar-sub">Infrastructure specs for the environment under test, with a sizing recommendation based on observed results</div>
+    </div>
+  </div>
+  <div class="section-hdr-bar-body">
+    ${serverCard}
+    <div style="background:${recBg};border:1px solid ${recColor}33;border-radius:10px;padding:14px 16px;margin-top:4px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:${recColor}">${recIcon} ${rec.title}</div>
+      <div style="font-size:12px;color:#374151;margin-top:6px;line-height:1.6">${rec.detail}</div>
+    </div>
+  </div>
+</div>`;
+})() : ''}
 
 ${show('showMetricCards') ? `
 <!-- KEY METRICS -->
