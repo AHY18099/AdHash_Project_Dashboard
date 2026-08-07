@@ -569,6 +569,15 @@ tr:hover td{background:var(--bg3)}
 .step-divider-btn.paste-btn{color:var(--green);border-color:rgba(5,150,105,.25)}
 .step-divider-btn.paste-btn:hover{background:rgba(5,150,105,.08);border-color:var(--green)}
 .step-body.collapsed{display:none}
+
+/* ── Body Type tabs ── */
+.body-type-tabs{display:flex;gap:4px;flex-wrap:wrap}
+.body-type-tab{
+  padding:5px 11px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;
+  border:1px solid var(--border2);background:var(--card);color:var(--muted);transition:.15s;
+}
+.body-type-tab:hover{border-color:var(--brand-border);color:var(--brand)}
+.body-type-tab.active{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border-color:transparent}
 .method-badge{padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;font-family:ui-monospace,'Consolas',monospace}
 .method-GET{background:rgba(37,99,235,.10);color:var(--accent2);border:1px solid rgba(37,99,235,.22)}
 .method-POST{background:rgba(5,150,105,.10);color:var(--green);border:1px solid rgba(5,150,105,.22)}
@@ -2105,6 +2114,8 @@ function _newStep() {
         enabled: true,
         method: 'GET', url: '',
         headers: {}, queryParams: {}, body: null,
+        bodyType: 'json', // 'none' | 'json' | 'form-urlencoded' | 'multipart' | 'raw'
+        multipartFields: [], // [{ type:'text'|'file', name, value, filename, mimeType, dataBase64 }]
         assertions: [{ type: 'status', expected: 200 }],
         captures: [],
         forEach: { enabled: false, arrayVar: '', itemPath: '', injectAs: '' },
@@ -2121,6 +2132,110 @@ function _newStep() {
 function addStep() {
     _scenarioSteps.push(_newStep());
     renderSteps();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BODY TYPE — none / json / form-urlencoded / multipart / raw
+// ══════════════════════════════════════════════════════════════════════════════
+const _BODY_TYPE_LABELS = { none: 'None', json: 'JSON', 'form-urlencoded': 'Form URL Encoded', multipart: 'Multipart Form Data', raw: 'Raw Text' };
+const MULTIPART_MAX_FILE_BYTES = 5 * 1024 * 1024; // 5MB per file — keeps scenario JSON/Mongo docs reasonable
+
+// Legacy steps saved before bodyType existed default to 'json' if they have a body, else 'none'.
+function _bodyType(s) {
+    if (s.bodyType) return s.bodyType;
+    return s.body ? 'json' : 'none';
+}
+
+function setBodyType(i, bodyType) {
+    const s = _scenarioSteps[i];
+    s.bodyType = bodyType;
+    if (bodyType === 'multipart') {
+        if (!s.multipartFields) s.multipartFields = [];
+        // Multipart bodies are never whole-body AES-encrypted (binary can't be wrapped in encryptedData).
+        if (s.requestEncryption) s.requestEncryption.enabled = false;
+    } else if (bodyType === 'none') {
+        s.body = null;
+    }
+    renderSteps();
+}
+
+function addMultipartField(i, type) {
+    const s = _scenarioSteps[i];
+    if (!s.multipartFields) s.multipartFields = [];
+    s.multipartFields.push(type === 'file' ? { type: 'file', name: '', filename: '', mimeType: '', dataBase64: '' } : { type: 'text', name: '', value: '' });
+    renderSteps();
+}
+
+function removeMultipartField(i, fi) {
+    _scenarioSteps[i].multipartFields.splice(fi, 1);
+    renderSteps();
+}
+
+// Reads the chosen File into base64 and stores it on the multipart field.
+function onMultipartFileChosen(i, fi, inputEl) {
+    const file = inputEl.files && inputEl.files[0];
+    if (!file) return;
+    if (file.size > MULTIPART_MAX_FILE_BYTES) {
+        showNotif(`File too large (${(file.size/1048576).toFixed(1)}MB). Max ${MULTIPART_MAX_FILE_BYTES/1048576}MB for load test file uploads.`, 'error');
+        inputEl.value = '';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+        // reader.result is a data URL: "data:<mime>;base64,<data>"
+        const base64 = String(reader.result).split(',')[1] || '';
+        const f = _scenarioSteps[i].multipartFields[fi];
+        f.filename = file.name;
+        f.mimeType = file.type || 'application/octet-stream';
+        f.dataBase64 = base64;
+        if (!f.name) f.name = 'file';
+        renderSteps();
+    };
+    reader.onerror = () => showNotif('Failed to read file: ' + reader.error, 'error');
+    reader.readAsDataURL(file);
+}
+
+function _renderMultipartBuilder(i, s) {
+    const fields = s.multipartFields || [];
+    const rows = fields.map((f, fi) => `
+      <div class="row" style="gap:8px;align-items:flex-end;margin-bottom:8px">
+        <div style="width:100px;flex-shrink:0">
+          <label style="font-size:10px">Type</label>
+          <select style="height:32px;font-size:12px" onchange="_scenarioSteps[${i}].multipartFields[${fi}].type=this.value;renderSteps()">
+            <option value="text" ${f.type==='text'?'selected':''}>Text</option>
+            <option value="file" ${f.type==='file'?'selected':''}>File</option>
+          </select>
+        </div>
+        <div style="width:140px;flex-shrink:0">
+          <label style="font-size:10px">Field Name</label>
+          <input value="${_esc(f.name||'')}" placeholder="e.g. files" oninput="_scenarioSteps[${i}].multipartFields[${fi}].name=this.value" style="height:32px;font-size:12px" />
+        </div>
+        <div style="flex:1;min-width:160px">
+          <label style="font-size:10px">Value</label>
+          ${f.type === 'file' ? `
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="file" style="height:32px;font-size:12px;padding:5px" onchange="onMultipartFileChosen(${i},${fi},this)" />
+              ${f.filename ? `<span style="font-size:11px;color:var(--green);white-space:nowrap">✓ ${_esc(f.filename)}</span>` : ''}
+            </div>
+          ` : `
+            <input value="${_esc(f.value||'')}" placeholder="value or {{varName}}" oninput="_scenarioSteps[${i}].multipartFields[${fi}].value=this.value" style="height:32px;font-size:12px" />
+          `}
+        </div>
+        <button class="step-remove" style="flex-shrink:0" onclick="removeMultipartField(${i},${fi})" title="Remove field">✕</button>
+      </div>`).join('');
+
+    return `
+      <div style="border:1px solid var(--border2);border-radius:10px;padding:12px;background:var(--input-bg)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${fields.length?'8px':'0'}">
+          <label style="margin:0;font-size:11px;font-weight:700">Multipart Fields</label>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-secondary btn-xs" onclick="addMultipartField(${i},'text')">+ Text Field</button>
+            <button class="btn btn-secondary btn-xs" onclick="addMultipartField(${i},'file')">+ File Field</button>
+          </div>
+        </div>
+        ${rows || '<div style="font-size:11px;color:var(--muted)">No fields yet. Add a text or file field above.</div>'}
+        <div class="form-hint" style="margin-top:6px">The browser/runtime automatically sets <code>Content-Type: multipart/form-data</code> with a boundary. Never set this header manually.</div>
+      </div>`;
 }
 
 // Copy step i to the clipboard (does not modify the step list).
@@ -2820,8 +2935,28 @@ function renderSteps() {
         <!-- Row 3: Body -->
         ${hasBody ? `
         <div style="margin-bottom:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+            <label style="margin:0">Body Type</label>
+            <div class="body-type-tabs">
+              ${['none','json','form-urlencoded','multipart','raw'].map(bt => `
+                <button type="button" class="body-type-tab ${(_bodyType(s))===bt?'active':''}" onclick="event.stopPropagation();setBodyType(${i},'${bt}')">${_BODY_TYPE_LABELS[bt]}</button>
+              `).join('')}
+            </div>
+          </div>
+          ${_bodyType(s) === 'json' ? `
           <label>Body (JSON)</label>
           <textarea rows="4" style="font-size:12px;font-family:monospace" placeholder='{"email":"{{email}}","password":"test123"}' oninput="_scenarioSteps[${i}].body=_tryParseJSON(this.value,this.value)">${_esc(bodyStr)}</textarea>
+          ` : ''}
+          ${_bodyType(s) === 'raw' ? `
+          <label>Body (Raw Text)</label>
+          <textarea rows="4" style="font-size:12px;font-family:monospace" placeholder="raw request body text" oninput="_scenarioSteps[${i}].body=this.value">${_esc(typeof s.body==='string'?s.body:bodyStr)}</textarea>
+          ` : ''}
+          ${_bodyType(s) === 'form-urlencoded' ? `
+          <label>Form Fields (JSON — sent as application/x-www-form-urlencoded)</label>
+          <textarea rows="4" style="font-size:12px;font-family:monospace" placeholder='{"username":"{{username}}","password":"test123"}' oninput="_scenarioSteps[${i}].body=_tryParseJSON(this.value,this.value)">${_esc(bodyStr)}</textarea>
+          ` : ''}
+          ${_bodyType(s) === 'none' ? `<div style="font-size:11px;color:var(--muted)">No request body will be sent.</div>` : ''}
+          ${_bodyType(s) === 'multipart' ? _renderMultipartBuilder(i, s) : ''}
         </div>` : ''}
 
         <!-- Row 4: Assertions -->
@@ -2889,12 +3024,15 @@ function renderSteps() {
         <div class="step-section" style="margin-bottom:8px">
           <div class="step-section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
             <span>🔒 Request Encryption</span>
+            ${_bodyType(s) !== 'multipart' ? `
             <div style="display:flex;align-items:center;gap:10px">
               ${!s.requestEncryption?.enabled ? `<button onclick="_swApplyWavedInEncPreset(${i})" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1px solid var(--purple);color:var(--purple);background:rgba(139,92,246,.07);cursor:pointer;font-weight:700;white-space:nowrap" title="Auto-fill AES-128-CBC key=IV=xfnr3PVyckouBZxW, output field=key (WavedIn / SyncTag API format)">⚡ WavedIn Preset</button>` : ''}
               <label class="switch"><input type="checkbox" ${s.requestEncryption?.enabled?'checked':''} onchange="_scenarioSteps[${i}].requestEncryption.enabled=this.checked;renderSteps()"><span class="slider"></span></label>
-            </div>
+            </div>` : ''}
           </div>
-          ${s.requestEncryption?.enabled ? `
+          ${_bodyType(s) === 'multipart' ? `
+          <div class="form-hint" style="margin-top:4px">🚫 Multipart uploads cannot be encrypted because binary files cannot be wrapped inside <code>encryptedData</code>.</div>
+          ` : s.requestEncryption?.enabled ? `
           <div style="margin-top:4px;margin-bottom:8px;padding:7px 12px;background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.2);border-radius:7px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span>Preset:</span>
             <button onclick="_swApplyWavedInEncPreset(${i})" style="font-size:10px;padding:2px 10px;border-radius:5px;border:1px solid var(--purple);color:var(--purple);background:rgba(139,92,246,.07);cursor:pointer;font-weight:700">⚡ WavedIn / SyncTag</button>
@@ -3392,7 +3530,12 @@ function previewScenario() {
             const s = steps[si];
             if (s.enabled === false) { html += `<div style="color:var(--muted);font-size:11px;padding:4px 0">Step ${si+1}: ${_esc(s.name)} — DISABLED</div>`; continue; }
             const resolvedUrl = resolveVars(s.url || '', vars);
-            const bodyStr = s.body ? resolveObj(s.body, vars) : null;
+            const isMultipart = _bodyType(s) === 'multipart';
+            const bodyStr = (!isMultipart && s.body) ? resolveObj(s.body, vars) : null;
+            const headerLines = Object.entries(s.headers || {}).map(([k, v]) => `${k} = ${resolveVars(String(v), vars)}`);
+            const multipartLines = isMultipart ? (s.multipartFields || []).map(f =>
+                f.type === 'file' ? `${f.name || '(unnamed)'} = ${f.filename || '(no file chosen)'}` : `${f.name || '(unnamed)'} = ${resolveVars(f.value || '', vars)}`
+            ) : [];
             const captureds = (s.captures || []).map(c => `<code style="color:var(--green);font-size:10px">captures: {{${c.varName}}} ← ${c.jsonPath}</code>`).join(' ');
             html += `<div style="padding:8px 0;border-bottom:1px solid #1e293b">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
@@ -3400,6 +3543,7 @@ function previewScenario() {
                 <span style="font-size:12px;font-weight:700;color:var(--text)">${_esc(s.name)}</span>
               </div>
               <div style="font-family:monospace;font-size:11px;color:var(--accent2);word-break:break-all">${_esc(resolvedUrl)}</div>
+              ${isMultipart ? `<pre style="margin:4px 0 0;font-size:10px;color:var(--muted);background:#1e293b;padding:6px;border-radius:4px;white-space:pre-wrap;max-height:120px;overflow-y:auto">Multipart/Form-Data\n${_esc(multipartLines.join('\n'))}${headerLines.length ? '\n' + _esc(headerLines.join('\n')) : ''}</pre>` : ''}
               ${bodyStr ? `<pre style="margin:4px 0 0;font-size:10px;color:var(--muted);background:#1e293b;padding:6px;border-radius:4px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${_esc(bodyStr.substring(0,300))}</pre>` : ''}
               ${captureds ? `<div style="margin-top:4px">${captureds}</div>` : ''}
             </div>`;

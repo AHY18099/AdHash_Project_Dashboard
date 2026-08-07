@@ -255,6 +255,47 @@ function maskHeaders(headers = {}) {
     return out;
 }
 
+// ── Build a multipart/form-data request body from step.multipartFields ──
+// Used by the trial-run handlers (step-run, step-run-all), which talk to the
+// target server directly via Node's http/https rather than through k6.
+// Returns { buffer, contentType } — contentType includes the boundary and must
+// be set verbatim as the request's Content-Type header (never set manually
+// by the caller beyond this).
+// RFC 7578 §4.2: a value inside a quoted Content-Disposition parameter must not
+// itself contain CR, LF, or an unescaped double-quote — strip CR/LF and escape
+// quotes/backslashes so a crafted field name/filename can't break out of the
+// header line (which busboy/multer would otherwise silently mis-parse or drop).
+function _mpHeaderValue(s) {
+    return String(s).replace(/[\r\n]/g, '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function buildMultipartBody(fields, resolveStr) {
+    const boundary = '----AdHashLoadTest' + crypto.randomBytes(12).toString('hex');
+    const parts = [];
+    for (const f of (fields || [])) {
+        if (!f.name) continue;
+        const safeName = _mpHeaderValue(f.name);
+        if (f.type === 'file') {
+            if (!f.dataBase64) continue; // no file chosen yet — skip rather than send an empty part
+            const fileBuf = Buffer.from(f.dataBase64, 'base64');
+            const filename = _mpHeaderValue(f.filename || 'file');
+            const mime = f.mimeType || 'application/octet-stream';
+            parts.push(Buffer.from(
+                `--${boundary}\r\nContent-Disposition: form-data; name="${safeName}"; filename="${filename}"\r\nContent-Type: ${mime}\r\n\r\n`
+            ));
+            parts.push(fileBuf);
+            parts.push(Buffer.from('\r\n'));
+        } else {
+            const value = resolveStr ? resolveStr(f.value || '') : (f.value || '');
+            parts.push(Buffer.from(
+                `--${boundary}\r\nContent-Disposition: form-data; name="${safeName}"\r\n\r\n${value}\r\n`
+            ));
+        }
+    }
+    parts.push(Buffer.from(`--${boundary}--\r\n`));
+    return { buffer: Buffer.concat(parts), contentType: `multipart/form-data; boundary=${boundary}` };
+}
+
 // ── Percentile helper ──
 function pct(arr, p) {
     if (!arr.length) return 0;
@@ -1041,12 +1082,25 @@ router.post('/step-run', auth, async (req, res) => {
     try {
         const method  = (step.method || 'GET').toUpperCase();
         const rawUrl  = resolveStr(step.url || '');
-        const headers = Object.assign({ 'Content-Type': 'application/json' }, resolveObj(step.headers || {}));
+        const isMultipart = step.bodyType === 'multipart';
+        const baseHeaders = isMultipart
+            ? Object.fromEntries(Object.entries(resolveObj(step.headers || {})).filter(([k]) => k.toLowerCase() !== 'content-type'))
+            : Object.assign({ 'Content-Type': 'application/json' }, resolveObj(step.headers || {}));
+        const headers = baseHeaders;
 
         // Build body
-        let bodyStr = null;
+        let bodyStr = null;   // string body (JSON/form-urlencoded/raw)
+        let bodyBuf = null;   // Buffer body (multipart) — takes precedence over bodyStr when set
         let resolvedBodyPlain = null; // pre-encryption resolved body for debug display
-        if (['POST','PUT','PATCH'].includes(method) && step.body) {
+        if (isMultipart && ['POST','PUT','PATCH'].includes(method)) {
+            const mp = buildMultipartBody(step.multipartFields || [], resolveStr);
+            bodyBuf = mp.buffer;
+            headers['Content-Type'] = mp.contentType;
+            resolvedBodyPlain = `Multipart/Form-Data\n` + (step.multipartFields || [])
+                .filter(f => f.name)
+                .map(f => f.type === 'file' ? `${f.name} = ${f.filename || '(no file chosen)'}` : `${f.name} = ${resolveStr(f.value || '')}`)
+                .join('\n');
+        } else if (['POST','PUT','PATCH'].includes(method) && step.body) {
             let bv = step.body;
             if (typeof bv === 'object') bv = JSON.stringify(bv);
             bv = resolveStr(bv);
@@ -1077,6 +1131,7 @@ router.post('/step-run', auth, async (req, res) => {
             let parsed;
             try { parsed = new URL(rawUrl); } catch(e) { return resolve({ error: 'Invalid URL: ' + rawUrl }); }
             const lib = parsed.protocol === 'https:' ? https : http;
+            const outBody = bodyBuf || (bodyStr ? Buffer.from(bodyStr) : null);
             const opts = {
                 hostname: parsed.hostname,
                 port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
@@ -1085,8 +1140,8 @@ router.post('/step-run', auth, async (req, res) => {
                 headers: { ...headers },
                 timeout: 10000,
             };
-            if (bodyStr) {
-                opts.headers['Content-Length'] = Buffer.byteLength(bodyStr);
+            if (outBody) {
+                opts.headers['Content-Length'] = outBody.length;
             }
             const t0 = Date.now();
             const req2 = lib.request(opts, (resp) => {
@@ -1104,7 +1159,7 @@ router.post('/step-run', auth, async (req, res) => {
             });
             req2.on('error', e => resolve({ error: e.message, status: 0, responseTime: Date.now() - t0, rawBody: '' }));
             req2.on('timeout', () => { req2.destroy(); resolve({ error: 'Request timed out', status: 0, responseTime: 10000, rawBody: '' }); });
-            if (bodyStr) req2.write(bodyStr);
+            if (outBody) req2.write(outBody);
             req2.end();
         });
 
@@ -1235,10 +1290,18 @@ router.post('/step-run-all', auth, async (req, res) => {
     async function fireRequest(vars, resolveStr, resolveObj) {
         const method  = (step.method || 'GET').toUpperCase();
         const rawUrl  = resolveStr(step.url || '');
-        const headers = Object.assign({ 'Content-Type': 'application/json' }, resolveObj(step.headers || {}));
+        const isMultipart = step.bodyType === 'multipart';
+        const headers = isMultipart
+            ? Object.fromEntries(Object.entries(resolveObj(step.headers || {})).filter(([k]) => k.toLowerCase() !== 'content-type'))
+            : Object.assign({ 'Content-Type': 'application/json' }, resolveObj(step.headers || {}));
 
         let bodyStr = null;
-        if (['POST','PUT','PATCH'].includes(method) && step.body) {
+        let bodyBuf = null;
+        if (isMultipart && ['POST','PUT','PATCH'].includes(method)) {
+            const mp = buildMultipartBody(step.multipartFields || [], resolveStr);
+            bodyBuf = mp.buffer;
+            headers['Content-Type'] = mp.contentType;
+        } else if (['POST','PUT','PATCH'].includes(method) && step.body) {
             let bv = step.body;
             if (typeof bv === 'object') bv = JSON.stringify(bv);
             bv = resolveStr(bv);
@@ -1259,6 +1322,7 @@ router.post('/step-run-all', auth, async (req, res) => {
             let parsed;
             try { parsed = new URL(rawUrl); } catch(e) { return resolve({ error: 'Invalid URL', status: 0, responseTime: 0, rawBody: '' }); }
             const lib  = parsed.protocol === 'https:' ? https : http;
+            const outBody = bodyBuf || (bodyStr ? Buffer.from(bodyStr) : null);
             const opts = {
                 hostname: parsed.hostname,
                 port:     parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
@@ -1267,7 +1331,7 @@ router.post('/step-run-all', auth, async (req, res) => {
                 headers:  { ...headers },
                 timeout:  15000,
             };
-            if (bodyStr) opts.headers['Content-Length'] = Buffer.byteLength(bodyStr);
+            if (outBody) opts.headers['Content-Length'] = outBody.length;
             const t0   = Date.now();
             const req2 = lib.request(opts, (resp) => {
                 const chunks = [];
@@ -1276,7 +1340,7 @@ router.post('/step-run-all', auth, async (req, res) => {
             });
             req2.on('error', e => resolve({ error: e.message, status: 0, responseTime: Date.now() - t0, rawBody: '', resolvedUrl: rawUrl, headers }));
             req2.on('timeout', () => { req2.destroy(); resolve({ error: 'Timeout', status: 0, responseTime: 15000, rawBody: '', resolvedUrl: rawUrl, headers }); });
-            if (bodyStr) req2.write(bodyStr);
+            if (outBody) req2.write(outBody);
             req2.end();
         });
         return result;
@@ -1624,17 +1688,39 @@ function _generateStepCode(step, idx) {
         timeout: Math.round(Math.max(5000, step.timeout || 5000) / 1000) + 's',
     };
 
-    // Build headers resolution
+    const isMultipart = step.bodyType === 'multipart';
+
+    // Build headers resolution — for multipart, strip any user-set Content-Type so k6
+    // can set its own multipart/form-data boundary (never set it manually).
     let headersCode = '';
-    if (step.headers && Object.keys(step.headers).length > 0) {
-        headersCode = `  const _headers${idx+1} = _resolveObj(${JSON.stringify(step.headers)}, vars);\n`;
+    const stepHeaders = isMultipart && step.headers
+        ? Object.fromEntries(Object.entries(step.headers).filter(([k]) => k.toLowerCase() !== 'content-type'))
+        : step.headers;
+    if (stepHeaders && Object.keys(stepHeaders).length > 0) {
+        headersCode = `  const _headers${idx+1} = _resolveObj(${JSON.stringify(stepHeaders)}, vars);\n`;
         paramsObj.headers = `__HEADERS_REF_${idx+1}__`;
     }
 
     // Build body resolution
     let bodyCode = '';
     let bodyRef  = 'null';
-    if (['POST','PUT','PATCH'].includes(method) && step.body) {
+    if (isMultipart && ['POST','PUT','PATCH'].includes(method)) {
+        // Multipart bodies are never AES-encrypted (see UI: Request Encryption is disabled
+        // for multipart steps) and never JSON.stringify'd — k6 recognizes a plain object
+        // containing http.file() results and sets multipart/form-data + boundary itself.
+        const fields = step.multipartFields || [];
+        const fieldLines = fields.map((f, fi) => {
+            if (!f.name) return '';
+            if (f.type === 'file') {
+                if (!f.dataBase64) return ''; // no file chosen yet — skip rather than send an empty part
+                const mime = f.mimeType || 'application/octet-stream';
+                return `    ${JSON.stringify(f.name)}: http.file(_b64dec(${JSON.stringify(f.dataBase64)}).buffer, ${JSON.stringify(f.filename || 'file')}, ${JSON.stringify(mime)}),`;
+            }
+            return `    ${JSON.stringify(f.name)}: _resolveVars(${JSON.stringify(f.value || '')}, vars),`;
+        }).filter(Boolean).join('\n');
+        bodyCode = `  const _body${idx+1} = {\n${fieldLines}\n  };\n`;
+        bodyRef  = `_body${idx+1}`;
+    } else if (['POST','PUT','PATCH'].includes(method) && step.body) {
         let bodyVal = step.body;
         const enc = step.requestEncryption;
         if (enc?.enabled) {
@@ -1786,9 +1872,10 @@ function _buildK6DataArray(scenario, count) {
             Object.assign(vuData, dynamicData.customData[i]);
         }
 
-        // Pre-encrypt step bodies if requestEncryption is enabled
+        // Pre-encrypt step bodies if requestEncryption is enabled (never for multipart — binary
+        // files can't be wrapped inside encryptedData, and the UI disables this toggle for it).
         for (const step of steps) {
-            if (step.requestEncryption?.enabled && step.body) {
+            if (step.bodyType !== 'multipart' && step.requestEncryption?.enabled && step.body) {
                 try {
                     let bodyStr = typeof step.body === 'string' ? step.body : JSON.stringify(step.body);
                     // Resolve vars in body
