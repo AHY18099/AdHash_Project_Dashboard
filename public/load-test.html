@@ -545,6 +545,29 @@ tr:hover td{background:var(--bg3)}
 .step-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px;transition:.15s}
 .step-remove:hover{color:var(--red);background:rgba(220,38,38,.1)}
 .step-body{margin-top:16px}
+
+/* ── Step divider — hover reveals insert/paste controls between step cards ── */
+.step-divider{
+  position:relative;height:20px;margin:-8px 0;display:flex;align-items:center;justify-content:center;
+}
+.step-divider-line{
+  position:absolute;left:0;right:0;top:50%;height:1px;background:var(--border2);
+  opacity:0;transition:opacity .15s;
+}
+.step-divider:hover .step-divider-line{opacity:1}
+.step-divider-actions{
+  display:flex;gap:6px;opacity:0;transform:translateY(-2px);
+  transition:all .15s;z-index:2;background:var(--bg);padding:0 4px;
+}
+.step-divider:hover .step-divider-actions{opacity:1;transform:translateY(0)}
+.step-divider-btn{
+  display:flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;
+  font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border2);
+  background:var(--card);color:var(--muted);transition:.15s;box-shadow:var(--shadow);
+}
+.step-divider-btn:hover{border-color:var(--brand-border);color:var(--brand);background:var(--brand-soft)}
+.step-divider-btn.paste-btn{color:var(--green);border-color:rgba(5,150,105,.25)}
+.step-divider-btn.paste-btn:hover{background:rgba(5,150,105,.08);border-color:var(--green)}
 .step-body.collapsed{display:none}
 .method-badge{padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;font-family:ui-monospace,'Consolas',monospace}
 .method-GET{background:rgba(37,99,235,.10);color:var(--accent2);border:1px solid rgba(37,99,235,.22)}
@@ -1672,6 +1695,7 @@ let _currentRunId = null;
 let _pollTimer    = null;
 let _liveCharts   = {};
 let _scenarioSteps = [];
+let _stepClipboard = null; // deep-cloned step object, set by copyStep()
 let _globalVars    = [];
 let _pendingConfig = null;
 let _maxVUs = 50;
@@ -2099,11 +2123,25 @@ function addStep() {
     renderSteps();
 }
 
-function duplicateStep(i) {
-    const clone = JSON.parse(JSON.stringify(_scenarioSteps[i]));
+// Copy step i to the clipboard (does not modify the step list).
+function copyStep(i) {
+    _stepClipboard = JSON.parse(JSON.stringify(_scenarioSteps[i]));
+    showNotif(`Step "${_scenarioSteps[i].name || 'Step ' + (i+1)}" copied. Use Paste to insert it anywhere.`, 'success');
+    renderSteps();
+}
+
+// Insert a brand-new blank step at position `at` (0 = before first step, length = after last).
+function insertStepAt(at) {
+    _scenarioSteps.splice(at, 0, _newStep());
+    renderSteps();
+}
+
+// Paste the clipboard step at position `at`.
+function pasteStepAt(at) {
+    if (!_stepClipboard) return;
+    const clone = JSON.parse(JSON.stringify(_stepClipboard));
     clone.id = 'step_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
-    clone.name = clone.name + ' (copy)';
-    _scenarioSteps.splice(i + 1, 0, clone);
+    _scenarioSteps.splice(at, 0, clone);
     renderSteps();
 }
 
@@ -2671,10 +2709,29 @@ function _saveRunResponseToNextStep(i) {
     }
 }
 
+// Divider bar between step cards (and above the first / below the last), offering
+// "+ Insert Step" and, when a step has been copied, "📋 Paste Here" at position `at`.
+function _stepDividerHtml(at) {
+    const pasteBtn = _stepClipboard
+        ? `<button class="step-divider-btn paste-btn" onclick="pasteStepAt(${at})" title="Paste copied step here">📋 Paste "${_esc(_stepClipboard.name || 'Step')}"</button>`
+        : '';
+    return `
+    <div class="step-divider">
+      <div class="step-divider-line"></div>
+      <div class="step-divider-actions">
+        <button class="step-divider-btn" onclick="insertStepAt(${at})" title="Insert a new blank step here">+ Insert Step</button>
+        ${pasteBtn}
+      </div>
+    </div>`;
+}
+
 function renderSteps() {
     const c = document.getElementById('steps-container');
     if (!_scenarioSteps.length) {
-        c.innerHTML = '<div class="empty" style="padding:30px"><div class="empty-icon">🔀</div><h3>No Steps Yet</h3><p>Click "+ Add Step" below to build your test scenario.</p></div>';
+        const pasteHint = _stepClipboard
+            ? `<button class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="pasteStepAt(0)">📋 Paste "${_esc(_stepClipboard.name || 'Step')}"</button>`
+            : '';
+        c.innerHTML = `<div class="empty" style="padding:30px"><div class="empty-icon">🔀</div><h3>No Steps Yet</h3><p>Click "+ Add Step" below to build your test scenario.</p>${pasteHint}</div>`;
         return;
     }
     // Preserve any open result panels before wiping DOM
@@ -2683,7 +2740,7 @@ function renderSteps() {
         const p = document.getElementById(`step-result-${i}`);
         if (p && p.style.display !== 'none' && p.innerHTML.trim()) savedPanels[i] = p.innerHTML;
     });
-    c.innerHTML = _scenarioSteps.map((s, i) => {
+    c.innerHTML = _stepDividerHtml(0) + _scenarioSteps.map((s, i) => {
         // Ensure forEach exists on steps created before this feature
         if (!s.forEach) s.forEach = { enabled: false, arrayVar: '', itemPath: '', injectAs: '' };
         const isCollapsed = !!s._collapsed;
@@ -2725,7 +2782,7 @@ function renderSteps() {
         <button class="step-run-all-btn" id="run-all-btn-${i}" onclick="event.stopPropagation();runStepAllVUs(${i})" title="Run this step with all configured VUs simultaneously">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/><line x1="19" y1="3" x2="19" y2="21"/></svg> Run All
         </button>
-        <button class="btn btn-secondary btn-xs" onclick="event.stopPropagation();duplicateStep(${i})" title="Duplicate step">⧉</button>
+        <button class="btn btn-secondary btn-xs" onclick="event.stopPropagation();copyStep(${i})" title="Copy step (paste it anywhere via the dividers between steps)">⧉</button>
         ${i > 0 ? `<button class="btn btn-secondary btn-xs" onclick="event.stopPropagation();moveStep(${i},-1)" title="Move up">↑</button>` : ''}
         ${i < _scenarioSteps.length-1 ? `<button class="btn btn-secondary btn-xs" onclick="event.stopPropagation();moveStep(${i},1)" title="Move down">↓</button>` : ''}
         <button class="step-remove" onclick="event.stopPropagation();_scenarioSteps.splice(${i},1);renderSteps()" title="Delete step">🗑</button>
@@ -2940,7 +2997,7 @@ function renderSteps() {
         <!-- Step Run Result Panel (shown after clicking Run) -->
         <div id="step-result-${i}" style="display:none;margin-top:12px"></div>
       </div>
-    </div>`;
+    </div>` + _stepDividerHtml(i + 1);
     }).join('');
     // Restore result panels that were open before re-render
     Object.entries(savedPanels).forEach(([idx, html]) => {
