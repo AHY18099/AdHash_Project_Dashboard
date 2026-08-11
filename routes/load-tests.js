@@ -255,6 +255,31 @@ function maskHeaders(headers = {}) {
     return out;
 }
 
+// ── Typed value resolution for JSON request bodies (Node-side, used by the
+// trial-run handlers: step-run, step-run-all) ──
+// A string that is EXACTLY "{{varName}}" (nothing else) resolves to the captured
+// variable's real JSON type (object/array/number/boolean/null) instead of being
+// stringified. A string with embedded text around {{varName}} (e.g. "Bearer {{token}}")
+// keeps the existing scalar string-interpolation behavior via resolveStr — this is
+// what preserves backward compatibility with every existing scenario.
+function resolveValueTyped(value, vars, resolveStr) {
+    if (typeof value === 'string') {
+        const m = value.match(/^\{\{(\w+)\}\}$/);
+        if (m) {
+            const v = vars[m[1]];
+            return v !== undefined ? v : value;
+        }
+        return resolveStr(value);
+    }
+    if (Array.isArray(value)) return value.map(v => resolveValueTyped(v, vars, resolveStr));
+    if (value !== null && typeof value === 'object') {
+        const out = {};
+        for (const k of Object.keys(value)) out[k] = resolveValueTyped(value[k], vars, resolveStr);
+        return out;
+    }
+    return value;
+}
+
 // ── Build a multipart/form-data request body from step.multipartFields ──
 // Used by the trial-run handlers (step-run, step-run-all), which talk to the
 // target server directly via Node's http/https rather than through k6.
@@ -1101,13 +1126,14 @@ router.post('/step-run', auth, async (req, res) => {
                 .map(f => f.type === 'file' ? `${f.name} = ${f.filename || '(no file chosen)'}` : `${f.name} = ${resolveStr(f.value || '')}`)
                 .join('\n');
         } else if (['POST','PUT','PATCH'].includes(method) && step.body) {
-            let bv = step.body;
-            if (typeof bv === 'object') bv = JSON.stringify(bv);
-            bv = resolveStr(bv);
-            resolvedBodyPlain = bv;
-
             const enc = step.requestEncryption;
             if (enc?.enabled && enc.key) {
+                // Encryption requires a plaintext string — typed object/array injection
+                // doesn't apply here (whole-value {{var}} placeholders stringify as before).
+                let bv = step.body;
+                if (typeof bv === 'object') bv = JSON.stringify(bv);
+                bv = resolveStr(bv);
+                resolvedBodyPlain = bv;
                 try {
                     const encField = enc.outputField || 'encryptedData';
                     const algo     = enc.algorithm || 'AES-128-CBC';
@@ -1121,8 +1147,17 @@ router.post('/step-run', auth, async (req, res) => {
                     }
                     bodyStr = JSON.stringify({ [encField]: encrypted });
                 } catch(e) { bodyStr = bv; }
+            } else if (typeof step.body === 'object' && step.body !== null) {
+                // Object/array-typed body: resolve the TEMPLATE via resolveValueTyped so a
+                // whole-value "{{captured}}" placeholder injects a real captured object/array
+                // (from an Object/Array capture) instead of stringifying to "[object Object]".
+                // JSON.stringify happens only after resolution.
+                const resolved = resolveValueTyped(step.body, vars, resolveStr);
+                bodyStr = JSON.stringify(resolved);
+                resolvedBodyPlain = bodyStr;
             } else {
-                bodyStr = bv;
+                bodyStr = resolveStr(step.body);
+                resolvedBodyPlain = bodyStr;
             }
         }
 
@@ -1302,19 +1337,26 @@ router.post('/step-run-all', auth, async (req, res) => {
             bodyBuf = mp.buffer;
             headers['Content-Type'] = mp.contentType;
         } else if (['POST','PUT','PATCH'].includes(method) && step.body) {
-            let bv = step.body;
-            if (typeof bv === 'object') bv = JSON.stringify(bv);
-            bv = resolveStr(bv);
             const enc = step.requestEncryption;
             if (enc?.enabled && enc.key) {
+                // Encryption requires a plaintext string — typed object/array injection
+                // doesn't apply here (whole-value {{var}} placeholders stringify as before).
+                let bv = step.body;
+                if (typeof bv === 'object') bv = JSON.stringify(bv);
+                bv = resolveStr(bv);
                 try {
                     const encField = enc.outputField || 'encryptedData';
                     const iv = enc.iv || enc.key;
                     const encrypted = enc.algorithm === 'AES-128-ECB' ? aesEncrypt(bv, enc.key) : aesCbcEncrypt(bv, enc.key, iv);
                     bodyStr = JSON.stringify({ [encField]: encrypted });
                 } catch(_) { bodyStr = bv; }
+            } else if (typeof step.body === 'object' && step.body !== null) {
+                // Object/array-typed body: resolve the TEMPLATE via resolveValueTyped so a
+                // whole-value "{{captured}}" placeholder injects a real captured object/array
+                // instead of stringifying to "[object Object]". JSON.stringify happens after.
+                bodyStr = JSON.stringify(resolveValueTyped(step.body, vars, resolveStr));
             } else {
-                bodyStr = bv;
+                bodyStr = resolveStr(step.body);
             }
         }
 
@@ -1609,6 +1651,12 @@ function _scenarioToK6Script(scenario) {
     // Check if any step uses response decryption
     const needsDecrypt = enabledSteps.some(s => s.responseDecryption?.enabled && s.responseDecryption?.key);
 
+    // NOTE on the doubled backslashes in regex literals below (e.g. \\{\\{...\\}\\}):
+    // this entire return value is a JS template literal — its text gets parsed a SECOND
+    // time, by k6/goja, when the generated script runs. Each \\ here collapses to a single
+    // \ in the generated script's source, which is what produces a normal, working regex
+    // like /\{\{(\w+)\}\}/g there. Do not "simplify" these to single backslashes — that
+    // would remove the escaping in the generated script and break the regex.
     return `import http from 'k6/http';
 import { sleep, check } from 'k6';
 import { Rate, Counter, Trend } from 'k6/metrics';
@@ -1662,6 +1710,30 @@ function _resolveObj(obj, vars) {
     return out;
   }
   return obj;
+}
+
+// ── Typed value resolution for JSON request bodies ──
+// A string that is EXACTLY "{{varName}}" (nothing else) resolves to the captured
+// variable's real JSON type (object/array/number/boolean/null) rather than being
+// stringified. A string with embedded text around {{varName}} (e.g. "Bearer {{token}}")
+// keeps the existing scalar string-interpolation behavior — this is what preserves
+// backward compatibility with every existing scenario.
+function _resolveValue(value, vars) {
+  if (typeof value === 'string') {
+    const m = value.match(/^\\{\\{(\\w+)\\}\\}$/);
+    if (m) {
+      const v = vars[m[1]];
+      return v !== undefined ? v : value;
+    }
+    return _resolveVars(value, vars);
+  }
+  if (Array.isArray(value)) return value.map(v => _resolveValue(v, vars));
+  if (value !== null && typeof value === 'object') {
+    const out = {};
+    for (const k of Object.keys(value)) out[k] = _resolveValue(value[k], vars);
+    return out;
+  }
+  return value;
 }
 
 export default function () {
@@ -1742,8 +1814,15 @@ function _generateStepCode(step, idx) {
                 // No runtime vars — use pre-encrypted body from DATA array (faster)
                 bodyRef = `vuData._encryptedBody_step${idx+1} || null`;
             }
+        } else if (typeof bodyVal === 'object' && bodyVal !== null) {
+            // Object/array-typed request body: resolve the TEMPLATE (not a stringified copy) via
+            // _resolveValue so a whole-value "{{captured}}" placeholder can inject a real captured
+            // object/array (from an Object/Array capture) instead of stringifying to "[object Object]".
+            // JSON.stringify happens only after resolution, at the HTTP-call boundary.
+            bodyCode = `  const _bodyTemplate${idx+1} = ${JSON.stringify(bodyVal)};\n` +
+                       `  const _body${idx+1} = JSON.stringify(_resolveValue(_bodyTemplate${idx+1}, vars));\n`;
+            bodyRef  = `_body${idx+1}`;
         } else {
-            if (typeof bodyVal === 'object') bodyVal = JSON.stringify(bodyVal);
             bodyCode = `  const _body${idx+1} = _resolveVars(${JSON.stringify(bodyVal)}, vars);\n`;
             bodyRef  = `_body${idx+1}`;
         }

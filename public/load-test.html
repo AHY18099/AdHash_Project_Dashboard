@@ -2286,6 +2286,13 @@ function addArrayCapture(i) {
     _scenarioSteps[i].captures.push({ varName: '', jsonPath: '', _isArray: true });
     renderSteps();
 }
+// Object captures preserve a captured JSON object as a real object at runtime (not stringified),
+// so it can be re-injected into a later step's JSON body as an actual JSON value — see resolveValue().
+function addObjectCapture(i) {
+    if (!_scenarioSteps[i].captures) _scenarioSteps[i].captures = [];
+    _scenarioSteps[i].captures.push({ varName: '', jsonPath: '', _isObject: true });
+    renderSteps();
+}
 function addAssertion(i) {
     if (!_scenarioSteps[i].assertions) _scenarioSteps[i].assertions = [];
     _scenarioSteps[i].assertions.push({ type: 'status', expected: 200 });
@@ -2339,10 +2346,11 @@ function _renderCaptureMapper(i, s) {
 
     const captures = s.captures || [];
 
-    // Split into drag-mapped captures (have _bodyField sentinel), array captures, and manual ones
-    const dragCaptures   = captures.filter(c => c._bodyField && !c._isArray);
+    // Split into drag-mapped captures (have _bodyField sentinel), array captures, object captures, and manual ones
+    const dragCaptures   = captures.filter(c => c._bodyField && !c._isArray && !c._isObject);
     const arrayCaptures  = captures.filter(c => c._isArray);
-    const manualCaptures = captures.filter(c => !c._bodyField && !c._isArray);
+    const objectCaptures = captures.filter(c => c._isObject);
+    const manualCaptures = captures.filter(c => !c._bodyField && !c._isArray && !c._isObject);
 
     // Build response field chips (drag source)
     const resChips = ownKeys.map((k, ki) => {
@@ -2400,13 +2408,14 @@ function _renderCaptureMapper(i, s) {
         </div>`;
     }).join('');
 
-    const hasAnything = dragCaptures.length > 0 || manualCaptures.length > 0;
+    const hasAnything = dragCaptures.length > 0 || manualCaptures.length > 0 || objectCaptures.length > 0 || arrayCaptures.length > 0;
 
     return `
     <div class="step-section" style="margin-bottom:8px">
       <div class="step-section-title">
         <span>📌 Captures — extract from <em>this</em> step's response for next steps</span>
         <div style="display:flex;gap:6px">
+          <button class="btn btn-secondary btn-xs" onclick="addObjectCapture(${i})" title="Capture a JSON object, preserved as a real object for reuse in a later step's JSON body">+ Object</button>
           <button class="btn btn-secondary btn-xs" onclick="addArrayCapture(${i})" title="Capture entire array for use in a For Each step">+ Array</button>
           <button class="btn btn-secondary btn-xs" onclick="addCapture(${i})" title="Add manual capture (type path manually)">+ Manual</button>
         </div>
@@ -2448,6 +2457,24 @@ function _renderCaptureMapper(i, s) {
                      placeholder="varName"
                      oninput="_scenarioSteps[${i}].captures[${realCi}].varName=this.value" />
               <span style="font-size:10px;color:var(--muted2)">→ <code>{{${_esc(cap.varName||'arrayVar')}}}</code> (array)</span>
+              <button class="step-remove" style="margin-left:auto" onclick="removeCapture(${i},${realCi})" title="Remove">✕</button>
+            </div>`;
+          }).join('')}
+        </div>` : ''}
+
+      ${objectCaptures.length > 0 ? `
+        <div style="margin-top:6px">
+          ${objectCaptures.map((cap) => {
+            const realCi = captures.indexOf(cap);
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.25);border-radius:8px;margin-bottom:5px">
+              <span style="font-size:10px;background:rgba(124,58,237,.15);color:#7c3aed;padding:2px 7px;border-radius:5px;font-weight:700;flex-shrink:0">OBJECT</span>
+              <input style="width:180px;height:26px;font-size:11px;font-family:monospace" value="${_esc(cap.jsonPath||'')}" placeholder="e.g. files.0"
+                     oninput="_scenarioSteps[${i}].captures[${realCi}].jsonPath=this.value" />
+              <span style="font-size:10px;color:var(--muted)">→</span>
+              <input style="width:130px;height:26px;font-size:11px;font-family:monospace" value="${_esc(cap.varName||'')}"
+                     placeholder="varName"
+                     oninput="_scenarioSteps[${i}].captures[${realCi}].varName=this.value" />
+              <span style="font-size:10px;color:var(--muted2)">→ <code>{{${_esc(cap.varName||'objectVar')}}}</code> (object — insert as a bare <code>{{var}}</code> value in a JSON body to inject the real object)</span>
               <button class="step-remove" style="margin-left:auto" onclick="removeCapture(${i},${realCi})" title="Remove">✕</button>
             </div>`;
           }).join('')}
@@ -3150,6 +3177,69 @@ function _tryParseJSON(str, fallback) {
 }
 
 // ── Scenario CRUD ──
+// ══════════════════════════════════════════════════════════════════════════════
+// TYPED VARIABLE VALIDATION
+// Detects an Object/Array-typed variable (from an Object/Array capture) used
+// EMBEDDED inside a larger string (e.g. "file-{{stagedFile}}-suffix") in a later
+// step's JSON body — that usage would silently serialize to "[object Object]"
+// or a comma-joined array string. A variable used as the WHOLE value of a body
+// field (e.g. "files": "{{stagedFile}}") is fine — the runtime injects the real
+// object/array there. This only flags the invalid embedded case.
+// ══════════════════════════════════════════════════════════════════════════════
+function _collectTypedCaptureNames(steps) {
+    const objectVars = new Set(), arrayVars = new Set();
+    for (const s of steps) {
+        for (const cap of (s.captures || [])) {
+            if (!cap.varName) continue;
+            if (cap._isObject) objectVars.add(cap.varName);
+            else if (cap._isArray) arrayVars.add(cap.varName);
+        }
+    }
+    return { objectVars, arrayVars };
+}
+
+// Walk a body template (string/object/array) and collect any {{varName}} reference
+// that is NOT a whole-value match (i.e. embedded in a larger string) where varName
+// is a known Object/Array capture.
+function _findEmbeddedTypedVarMisuse(value, typedVars, path, errors) {
+    if (typeof value === 'string') {
+        const wholeMatch = /^\{\{(\w+)\}\}$/.test(value);
+        if (!wholeMatch) {
+            const re = /\{\{(\w+)\}\}/g;
+            let m;
+            while ((m = re.exec(value))) {
+                const name = m[1];
+                if (typedVars.objectVars.has(name) || typedVars.arrayVars.has(name)) {
+                    const kind = typedVars.objectVars.has(name) ? 'Object' : 'Array';
+                    errors.push(`${path}: "{{${name}}}" is a captured ${kind} variable but is embedded inside a larger string ("${value}") — an ${kind} can only be injected as the WHOLE value of a field, e.g. "${path.split('.').pop()}": "{{${name}}}", not embedded in other text.`);
+                }
+            }
+        }
+        return;
+    }
+    if (Array.isArray(value)) {
+        value.forEach((v, i) => _findEmbeddedTypedVarMisuse(v, typedVars, `${path}[${i}]`, errors));
+        return;
+    }
+    if (value !== null && typeof value === 'object') {
+        for (const k of Object.keys(value)) _findEmbeddedTypedVarMisuse(value[k], typedVars, path ? `${path}.${k}` : k, errors);
+    }
+}
+
+// Validates that no step's JSON body embeds an Object/Array-typed variable inside
+// a larger string. Returns an array of human-readable error strings (empty = valid).
+function validateTypedBodyUsage(steps) {
+    const typedVars = _collectTypedCaptureNames(steps);
+    if (!typedVars.objectVars.size && !typedVars.arrayVars.size) return [];
+    const errors = [];
+    steps.forEach((s, i) => {
+        if (s.bodyType === 'multipart' || s.bodyType === 'none') return;
+        if (!s.body) return;
+        _findEmbeddedTypedVarMisuse(s.body, typedVars, `Step ${i + 1} (${s.name || 'Step'}) body`, errors);
+    });
+    return errors;
+}
+
 function _buildScenarioObject() {
     // Collect dynamic data config from the builder panel
     const dynEnabled = document.getElementById('scen-dyn-enable')?.checked || false;
@@ -3392,6 +3482,8 @@ function toggleScenDynSource() {
 // ── Export ──
 async function exportK6Script() {
     const scenario = _buildScenarioObject();
+    const typeErrors = validateTypedBodyUsage(scenario.steps || []);
+    if (typeErrors.length) { showNotif('Validation error: ' + typeErrors[0], 'error', 8000); return; }
     try {
         const token = getToken();
         const res = await fetch('/api/load-test/scenario/k6-script', {
@@ -3475,6 +3567,8 @@ async function runScenarioFromBuilder() {
 async function dryRun() {
     const scenario = _buildScenarioObject();
     if (!scenario.steps || !scenario.steps.length) { showNotif('Add at least one step first.', 'error'); return; }
+    const typeErrors = validateTypedBodyUsage(scenario.steps);
+    if (typeErrors.length) { showNotif('Validation error: ' + typeErrors[0], 'error', 8000); return; }
     scenario.vus = 1;
     scenario.duration = 30;
     showNotif('Starting dry run (1 VU)…', 'info');
@@ -3560,6 +3654,8 @@ function previewScenario() {
 function applyScenario() {
     const scenario = _buildScenarioObject();
     if (!scenario.steps || !scenario.steps.length) { showNotif('Add at least one step first.', 'error'); return; }
+    const typeErrors = validateTypedBodyUsage(scenario.steps);
+    if (typeErrors.length) { showNotif('Validation error: ' + typeErrors[0], 'error', 8000); return; }
     _showActiveScenario(scenario);
     showNotif(`Scenario "${scenario.scenarioName}" applied. Switch to Configure tab and click "Start Load Test".`, 'success', 6000);
     switchTab('configure');
