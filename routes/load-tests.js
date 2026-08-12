@@ -1811,8 +1811,21 @@ function _generateStepCode(step, idx) {
                 ].join('\n') + '\n';
                 bodyRef = `_body${idx+1}`;
             } else {
-                // No runtime vars — use pre-encrypted body from DATA array (faster)
-                bodyRef = `vuData._encryptedBody_step${idx+1} || null`;
+                // No runtime vars — use pre-encrypted body from DATA array (faster).
+                // Safety check: a missing key here means _buildK6DataArray's precompute
+                // pass and this step's numbering diverged (a generator bug), or the DATA
+                // array genuinely wasn't built for this step. Fail loudly with the exact
+                // step number and expected key instead of silently sending a null body —
+                // a null body previously produced a confusing downstream HTTP 400 with no
+                // indication that the request body was never generated at all.
+                const bodyKey = `_encryptedBody_step${idx+1}`;
+                bodyCode = [
+                    `  if (vuData['${bodyKey}'] === undefined) {`,
+                    `    throw new Error('MISSING PRECOMPUTED REQUEST BODY\\nStep: ${idx+1}\\nVariable: vuData.${bodyKey}\\nReason: this step is configured for pre-encrypted request-body injection, but no matching entry was generated in the per-VU DATA array. Sending null would silently break this request.');`,
+                    `  }`,
+                    `  const _body${idx+1} = vuData['${bodyKey}'];`,
+                ].join('\n') + '\n';
+                bodyRef = `_body${idx+1}`;
             }
         } else if (typeof bodyVal === 'object' && bodyVal !== null) {
             // Object/array-typed request body: resolve the TEMPLATE (not a stringified copy) via
@@ -1921,6 +1934,15 @@ function _generateStepCode(step, idx) {
 
 function _buildK6DataArray(scenario, count) {
     const { dynamicData = {}, globalVars = {}, steps = [] } = scenario;
+    // Precomputed body keys (_encryptedBody_stepN) are numbered by position among
+    // ENABLED steps only — this must exactly match _generateStepCode's numbering,
+    // which iterates `enabledSteps = steps.filter(s => s.enabled !== false)` and
+    // keys each generated request as `_encryptedBody_step${idx+1}` using that
+    // filtered array's index. Numbering from the unfiltered `steps` array here
+    // (as before) diverges the moment ANY step before this one is disabled —
+    // e.g. a disabled Step 10 shifts every subsequent step's full-array position
+    // away from its enabled-only position, silently orphaning later steps' keys.
+    const enabledSteps = steps.filter(s => s.enabled !== false);
     // If no explicit startIndex, derive one from current minute so each run uses
     // fresh emails automatically (e.g. run at 14:37 → starts at loadtest14370001)
     const defaultStart = parseInt(String(Date.now()).slice(-6)); // last 6 digits of ms timestamp
@@ -1953,7 +1975,11 @@ function _buildK6DataArray(scenario, count) {
 
         // Pre-encrypt step bodies if requestEncryption is enabled (never for multipart — binary
         // files can't be wrapped inside encryptedData, and the UI disables this toggle for it).
-        for (const step of steps) {
+        // Iterate enabledSteps (not the raw steps array) and key by ITS index — this must stay
+        // structurally identical to _generateStepCode's `enabledSteps.map((step, idx) => ...)`
+        // numbering, or a disabled step anywhere in the scenario silently orphans every
+        // precomputed-body key for every enabled step that comes after it.
+        enabledSteps.forEach((step, stepIdx) => {
             if (step.bodyType !== 'multipart' && step.requestEncryption?.enabled && step.body) {
                 try {
                     let bodyStr = typeof step.body === 'string' ? step.body : JSON.stringify(step.body);
@@ -1969,10 +1995,10 @@ function _buildK6DataArray(scenario, count) {
                         encrypted = aesEncrypt(bodyStr, enc.key || '');
                     }
                     const field = enc.outputField || 'encryptedData';
-                    vuData[`_encryptedBody_step${steps.indexOf(step) + 1}`] = JSON.stringify({ [field]: encrypted });
+                    vuData[`_encryptedBody_step${stepIdx + 1}`] = JSON.stringify({ [field]: encrypted });
                 } catch {}
             }
-        }
+        });
 
         result.push(vuData);
     }
