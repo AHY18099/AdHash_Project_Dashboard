@@ -57,6 +57,7 @@ const LTServerConfig = mongoose.models.LTServerConfig || mongoose.model('LTServe
 const _serverConfigCache = new Map(); // key: `${projectName}::${envType}` -> doc
 let _serverConfigCacheWarmed = false;
 
+let _serverConfigWarmPromise = null;
 async function _warmServerConfigCache() {
     try {
         const docs = await LTServerConfig.find({}).lean();
@@ -64,11 +65,30 @@ async function _warmServerConfigCache() {
         _serverConfigCacheWarmed = true;
     } catch (e) {
         console.error('[load-test] server-config cache warm failed:', e.message);
+        // Allow the NEXT call to retry the DB fetch instead of permanently reusing
+        // this failed attempt's promise — otherwise a transient Mongo hiccup (a
+        // known recurring incident for this app) on the very first warm would
+        // silently disable the cache for the rest of the process's lifetime.
+        _serverConfigWarmPromise = null;
     }
 }
 
+// Ensures the cache is warm before any report reads it. Previously the cache warm
+// was fire-and-forget on first read, so the very first report generated after a
+// cold start/Railway restart would see an empty cache and silently render no
+// Server Configuration section — self-healing on the NEXT report, which made it
+// look like "the report only works if Server Config was opened first" when it was
+// really just a boot-order race. Callers that can await (all report-generation
+// call sites, which run inside async route handlers) should use this; callers
+// that cannot (none currently) fall back to the old fire-and-forget behavior.
+async function ensureServerConfigCacheWarm() {
+    if (_serverConfigCacheWarmed) return;
+    if (!_serverConfigWarmPromise) _serverConfigWarmPromise = _warmServerConfigCache();
+    await _serverConfigWarmPromise;
+}
+
 function getServerConfigsForProject(projectName) {
-    if (!_serverConfigCacheWarmed) _warmServerConfigCache(); // fire-and-forget; next report will see it
+    if (!_serverConfigCacheWarmed) _warmServerConfigCache(); // fire-and-forget fallback for sync callers
     const out = {};
     for (const doc of _serverConfigCache.values()) {
         if (doc.projectName === projectName) out[doc.envType] = doc;
@@ -146,36 +166,237 @@ function classifyFailureRootCause(metrics, testCfg) {
     return causes;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// CAPACITY ENGINE — configuration-driven reference data + verdict thresholds.
+// Kept independent of the report template so it can be reused/edited without
+// touching HTML-generation code, and so recommendations aren't hand-authored
+// per report.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Instance tier reference table — vCPU/RAM/comfortable & max VU guidance per
+// instance type. These are conservative planning heuristics for a typical
+// Node/PHP CRUD-style workload (burstable t3 family vs. compute-optimized c6i),
+// NOT a guarantee for any specific application — always validate with a real
+// load test at each tier. Edit this table to reflect your own benchmarked
+// numbers as real data becomes available; it is the single source of truth
+// for every scaling suggestion in the report (nothing is hardcoded per-report).
+const INSTANCE_TIER_TABLE = [
+    { instanceType: 't3.medium',    vcpu: 2,  ramGb: 4,   comfortableMaxVUs: 35,   recommendedMaxVUs: 50,    estMaxConnections: 512,   tier: 'Tier 1', use: 'Small workload / dev-staging' },
+    { instanceType: 't3.large',     vcpu: 2,  ramGb: 8,   comfortableMaxVUs: 60,   recommendedMaxVUs: 90,    estMaxConnections: 1024,  tier: 'Tier 1', use: 'Small-medium workload' },
+    { instanceType: 'c6i.xlarge',   vcpu: 4,  ramGb: 8,   comfortableMaxVUs: 140,  recommendedMaxVUs: 200,   estMaxConnections: 2048,  tier: 'Tier 2', use: 'Medium workload' },
+    { instanceType: 'c6i.2xlarge',  vcpu: 8,  ramGb: 16,  comfortableMaxVUs: 320,  recommendedMaxVUs: 450,   estMaxConnections: 4096,  tier: 'Tier 2', use: 'Medium-high workload' },
+    { instanceType: 'c6i.4xlarge',  vcpu: 16, ramGb: 32,  comfortableMaxVUs: 700,  recommendedMaxVUs: 1000,  estMaxConnections: 8192,  tier: 'Tier 3', use: 'High workload, single node' },
+    { instanceType: 'c6i.8xlarge',  vcpu: 32, ramGb: 64,  comfortableMaxVUs: 1500, recommendedMaxVUs: 2200,  estMaxConnections: 16384, tier: 'Tier 3', use: 'High workload, single node ceiling' },
+];
+
+// Verdict thresholds — configurable rather than hardcoded inline at each call
+// site. CPU saturation bands, per the feature spec: 0-70 comfortable, 70-85
+// RISK, 85-100 high risk (still FAIL-banded for the table's PASS/RISK/FAIL
+// labeling), >100 FAIL/capacity exceeded.
+const CAPACITY_VERDICT_THRESHOLDS = {
+    cpuComfortableMaxPct: 70,
+    cpuRiskMaxPct:         85,
+    // Beyond this multiple of the highest ACTUALLY TESTED VU count, a projection
+    // is far enough from validated data that it should read as "Requires Re-test"
+    // rather than a numeric PASS/RISK/FAIL — extrapolating 50x past a single data
+    // point is not a meaningful estimate.
+    retestBeyondMultipleOfTestedVus: 20,
+};
+
+// Estimate the comfortable/recommended max VUs for an arbitrary (vcpu, ramGb)
+// pair by finding the closest-or-better matching tier in INSTANCE_TIER_TABLE.
+// Falls back to the simple vusPerVcpu heuristic if nothing in the table fits.
+function _lookupTierForSpec(vcpu, ramGb) {
+    const exact = INSTANCE_TIER_TABLE.find(t => t.vcpu === vcpu && t.ramGb === ramGb);
+    if (exact) return exact;
+    // Closest tier at or below this vCPU count (conservative — never assume more capacity
+    // than benchmarked). Multiple tiers can tie on vCPU (e.g. t3.medium and t3.large both
+    // have 2 vCPU) — break the tie by RAM proximity so a server with more RAM at the same
+    // vCPU doesn't silently resolve to the smaller-RAM tier, which could otherwise produce
+    // a self-contradictory report (e.g. "current: t3.large" immediately followed by a
+    // scaling step recommending an upgrade TO t3.large).
+    const atOrBelowVcpu = INSTANCE_TIER_TABLE.filter(t => t.vcpu <= vcpu);
+    if (!atOrBelowVcpu.length) return null;
+    const maxVcpu = Math.max(...atOrBelowVcpu.map(t => t.vcpu));
+    const candidates = atOrBelowVcpu.filter(t => t.vcpu === maxVcpu);
+    candidates.sort((a, b) => Math.abs(a.ramGb - ramGb) - Math.abs(b.ramGb - ramGb));
+    return candidates[0] || null;
+}
+
 // ── Capacity table: which VU levels are likely to PASS/RISK/FAIL on the
 // current server spec, extrapolated from the observed saturation at the tested
-// VU count. This is a heuristic estimate, not a guarantee — always re-test.
-function buildCapacityTable(vcpu, testedVus, saturationPct) {
-    if (!vcpu || !testedVus || saturationPct <= 0) return [];
-    // Estimate the VU count at which saturation would reach 100%, then derive
-    // PASS/RISK/FAIL bands around it for a few common reference points.
-    const vusAt100Pct = testedVus / (saturationPct / 100);
-    const levels = [25, 50, 100, 200, 300].filter((v, i, arr) => v !== testedVus);
-    if (!levels.includes(testedVus)) levels.push(testedVus);
-    levels.sort((a, b) => a - b);
+// VU count. Extended to enterprise scale (50 through 10,000 VUs) with CPU/RAM/
+// P95/error-rate projections. This is a heuristic estimate, not a guarantee —
+// always re-test at each tier before treating it as validated capacity.
+function buildCapacityTable(serverCfg, testedMetrics, testCfg) {
+    const vcpu  = serverCfg?.vcpu || 0;
+    const ramGb = serverCfg?.memoryGb || 0;
+    const testedVus = testCfg?.vus || 0;
+    if (!vcpu || !testedVus) return [];
+
+    const tier = _lookupTierForSpec(vcpu, ramGb);
+    const vusPerVcpu = 30; // fallback heuristic if no table tier matches at all
+    const comfortableMaxVUs = tier ? tier.comfortableMaxVUs : vcpu * vusPerVcpu * (CAPACITY_VERDICT_THRESHOLDS.cpuComfortableMaxPct / 100);
+    // CPU per VU, derived from THIS test's own observed load — the whole basis for
+    // every projection below is "what did we actually measure at the tested VU count."
+    const estCapacityAt100Pct = comfortableMaxVUs / (CAPACITY_VERDICT_THRESHOLDS.cpuComfortableMaxPct / 100);
+    const cpuPerVu = 100 / estCapacityAt100Pct; // % CPU saturation contributed by one VU
+
+    const testedP95 = testedMetrics?.p95 || null;
+    const testedErrPct = testedMetrics?.totalReqs > 0 ? ((testedMetrics.errReqs || 0) / testedMetrics.totalReqs) * 100 : null;
+    const hasRamData = false; // no RAM-utilization monitoring is wired into this k6 runner yet — never fabricate it
+
+    const REQUIRED_LEVELS = [50, 100, 250, 500, 1000, 2500, 5000, 10000];
+    const levels = [...new Set([...REQUIRED_LEVELS, testedVus])].sort((a, b) => a - b);
+    const retestBeyond = testedVus * CAPACITY_VERDICT_THRESHOLDS.retestBeyondMultipleOfTestedVus;
 
     return levels.map(v => {
-        const projectedSaturation = (v / vusAt100Pct) * 100;
-        let label, color;
-        if (projectedSaturation < 70)       { label = 'PASS'; color = '#059669'; }
-        else if (projectedSaturation < 100) { label = 'RISK'; color = '#D97706'; }
-        else                                  { label = 'FAIL'; color = '#DC2626'; }
-        return { vus: v, projectedSaturation: Math.min(999, projectedSaturation), label, color, isTested: v === testedVus };
+        const isTested = v === testedVus;
+        const cpuPercent = Math.min(999, cpuPerVu * v);
+
+        // P95 latency projection: only a documented, simple linear-with-saturation
+        // model — explicitly NOT claimed to be accurate, only directionally useful.
+        // Latency tends to degrade faster than linearly as saturation approaches
+        // 100%, so beyond the comfortable band we apply a step-up multiplier —
+        // this is a heuristic, clearly labeled as an estimate in the report.
+        let projectedP95 = null;
+        if (testedP95 !== null) {
+            if (isTested) {
+                projectedP95 = testedP95;
+            } else {
+                const saturationRatio = cpuPercent / 100;
+                const degradeMultiplier = saturationRatio <= 0.7 ? 1 + saturationRatio * 0.5
+                    : saturationRatio <= 1 ? 1.35 + (saturationRatio - 0.7) * 3
+                    : 2.25 + (saturationRatio - 1) * 5; // steep beyond 100% modeled saturation
+                projectedP95 = Math.round(testedP95 * degradeMultiplier);
+            }
+        }
+
+        let verdict, verdictColor, dataType;
+        if (!isTested && v > retestBeyond) {
+            verdict = 'REQUIRES RE-TEST'; verdictColor = '#6B7280';
+        } else if (cpuPercent > 100) {
+            verdict = 'FAIL'; verdictColor = '#DC2626';
+        } else if (cpuPercent >= CAPACITY_VERDICT_THRESHOLDS.cpuRiskMaxPct) {
+            verdict = 'RISK'; verdictColor = '#D97706'; // 85-100%: high risk, still RISK-banded verdict per spec
+        } else if (cpuPercent >= CAPACITY_VERDICT_THRESHOLDS.cpuComfortableMaxPct) {
+            verdict = 'RISK'; verdictColor = '#D97706';
+        } else {
+            verdict = 'PASS'; verdictColor = '#059669';
+        }
+        // A tested run's verdict must reflect what actually happened, not just the
+        // CPU-heuristic projection — a high error rate or blown P95 threshold is
+        // ground truth and overrides the model for that one row.
+        if (isTested && testCfg?.p95Threshold) {
+            if (testedErrPct > 5 || (testedP95 && testedP95 > testCfg.p95Threshold * 2)) { verdict = 'FAIL'; verdictColor = '#DC2626'; }
+            else if (testedErrPct > 1 || (testedP95 && testedP95 > testCfg.p95Threshold)) { verdict = 'RISK'; verdictColor = '#D97706'; }
+        }
+
+        return {
+            vus: v,
+            isTested,
+            dataType: isTested ? 'TESTED' : 'PROJECTED',
+            cpuPercent,
+            cpuNA: false,
+            ramPercent: null,
+            ramNA: !hasRamData,
+            p95: projectedP95,
+            p95NA: projectedP95 === null,
+            errorRatePct: isTested ? testedErrPct : null,
+            errorRateNA: isTested ? testedErrPct === null : true,
+            verdict, verdictColor,
+        };
     });
+}
+
+// ── Scaling Recommendation Path ──────────────────────────────────────────────
+// Walks INSTANCE_TIER_TABLE from the current tier forward until the target VU
+// level is covered, recommending the next instance type at each step and
+// horizontal scaling once a single node can no longer reasonably serve the
+// target load. Entirely config-driven — no per-report hardcoding.
+function buildScalingRecommendationPath(serverCfg, targetVus) {
+    const vcpu = serverCfg?.vcpu || 0;
+    const ramGb = serverCfg?.memoryGb || 0;
+    if (!vcpu || !targetVus) return null;
+
+    const currentTier = _lookupTierForSpec(vcpu, ramGb);
+    const comfortableMaxVUs = currentTier ? currentTier.comfortableMaxVUs : vcpu * 30 * 0.7;
+    if (targetVus <= comfortableMaxVUs) return null; // already within comfortable capacity — nothing to recommend
+
+    const steps = [];
+    const sortedTiers = [...INSTANCE_TIER_TABLE].sort((a, b) => a.vcpu - b.vcpu);
+    const startIdx = currentTier ? sortedTiers.findIndex(t => t.instanceType === currentTier.instanceType) : -1;
+    let coveredUpTo = comfortableMaxVUs;
+    let lowerBound = comfortableMaxVUs;
+
+    for (let i = startIdx + 1; i < sortedTiers.length && coveredUpTo < targetVus; i++) {
+        const t = sortedTiers[i];
+        steps.push({
+            rangeLow: Math.round(lowerBound), rangeHigh: Math.round(t.comfortableMaxVUs),
+            recommendation: `${t.instanceType} (${t.vcpu} vCPU / ${t.ramGb} GB)`,
+            note: t.tier,
+        });
+        lowerBound = t.comfortableMaxVUs;
+        coveredUpTo = t.comfortableMaxVUs;
+    }
+
+    // Beyond the largest single-node tier in the table, recommend horizontal scaling.
+    if (coveredUpTo < targetVus) {
+        const largest = sortedTiers[sortedTiers.length - 1];
+        const nodesNeeded = Math.ceil(targetVus / largest.comfortableMaxVUs);
+        steps.push({
+            rangeLow: Math.round(lowerBound), rangeHigh: targetVus,
+            recommendation: `${nodesNeeded}+ × ${largest.instanceType} behind a load balancer (horizontal scale-out)`,
+            note: 'Multi-node',
+        });
+    }
+
+    // High-scale infrastructure considerations — CPU is rarely the only bottleneck
+    // once a single node's comfortable ceiling is exceeded by a wide margin.
+    const highScaleWarnings = [];
+    if (targetVus >= 1000) {
+        highScaleWarnings.push(
+            'Database connections and DB-server CPU — a connection pool sized for one node will exhaust well before application CPU does across multiple app instances.',
+            'Application-level connection pooling and per-instance file descriptor / worker-thread limits.',
+        );
+    }
+    if (targetVus >= 2500) {
+        highScaleWarnings.push(
+            'Network throughput between app instances and the database/cache layer.',
+            'Read replicas or a caching layer (e.g. Redis) in front of the database to offload read traffic.',
+        );
+    }
+    if (targetVus >= 5000) {
+        highScaleWarnings.push(
+            'Load balancer capacity and connection limits — verify the LB tier itself scales to this concurrency.',
+            'External/third-party API rate limits — downstream dependencies may cap out before your own infrastructure does.',
+            'Session storage strategy — in-memory sessions do not scale horizontally without a shared store.',
+        );
+    }
+    if (targetVus >= 10000) {
+        highScaleWarnings.push(
+            'CDN for static content to keep app instances free for dynamic request handling.',
+            'Disk I/O on database/cache nodes at sustained high write volume.',
+        );
+    }
+
+    return {
+        currentInstanceType: serverCfg.instanceType || `${vcpu} vCPU / ${ramGb}GB`,
+        comfortableMaxVUs: Math.round(comfortableMaxVUs),
+        targetVus,
+        steps,
+        highScaleWarnings,
+    };
 }
 
 function computeServerRecommendation(serverCfg, metrics, testCfg) {
     if (!serverCfg) {
-        return { level: 'unknown', title: 'No server configuration on file', detail: 'Add this environment’s server specs in the Server Config tab to get a sizing recommendation.', rootCauses: [], capacityTable: [] };
+        return { level: 'unknown', title: 'No server configuration on file', detail: 'Add this environment’s server specs in the Server Config tab to get a sizing recommendation.', rootCauses: [], capacityTable: [], scalingPath: null };
     }
     const vcpu   = serverCfg.vcpu   || 0;
     const ramGb  = serverCfg.memoryGb || 0;
     if (!vcpu) {
-        return { level: 'unknown', title: 'Server specs incomplete', detail: 'vCPU count is not set for this environment — fill it in on the Server Config tab to get an accurate sizing recommendation.', rootCauses: [], capacityTable: [] };
+        return { level: 'unknown', title: 'Server specs incomplete', detail: 'vCPU count is not set for this environment — fill it in on the Server Config tab to get an accurate sizing recommendation.', rootCauses: [], capacityTable: [], scalingPath: null };
     }
     const vus    = testCfg?.vus || 0;
     const rps    = metrics?.rps || 0;
@@ -193,8 +414,11 @@ function computeServerRecommendation(serverCfg, metrics, testCfg) {
     const nearCapacity     = saturationPct >= 80;
     const overCapacity     = saturationPct >= 100;
 
-    const rootCauses   = classifyFailureRootCause(metrics, testCfg);
-    const capacityTable = buildCapacityTable(vcpu, vus, saturationPct);
+    const rootCauses    = classifyFailureRootCause(metrics, testCfg);
+    const capacityTable = buildCapacityTable(serverCfg, metrics, testCfg);
+    // Scaling path targets the VU level actually validated by this test — the
+    // report answers "how do I safely reach the load I just tested/plan to test."
+    const scalingPath   = buildScalingRecommendationPath(serverCfg, vus);
 
     if (overCapacity || (latencyBreached && highError)) {
         const nextTier = vcpu <= 2 ? 't3.large (2 vCPU → upgrade to 2/8GB or 4 vCPU)' : vcpu <= 4 ? 't3.xlarge (4 vCPU / 16GB)' : 't3.2xlarge (8 vCPU / 32GB) or move to a load-balanced multi-instance setup';
@@ -202,7 +426,7 @@ function computeServerRecommendation(serverCfg, metrics, testCfg) {
             level: 'upgrade',
             title: `Upgrade recommended — current instance is under-provisioned for ${vus} VUs`,
             detail: `At ${vus} concurrent VUs (~${rps} RPS) against a ${vcpu}-vCPU/${ramGb}GB instance, estimated CPU saturation is ~${saturationPct.toFixed(0)}%. Observed P95 latency (${p95}ms) ${latencyBreached ? `exceeded the ${p95Thr}ms threshold` : 'was within threshold'} and error rate was ${errPct.toFixed(2)}%. Consider upgrading to ${nextTier}, or scale horizontally behind a load balancer if traffic is expected to grow further.`,
-            rootCauses, capacityTable,
+            rootCauses, capacityTable, scalingPath,
         };
     }
     if (nearCapacity || latencyBreached || errPct > 1) {
@@ -210,14 +434,14 @@ function computeServerRecommendation(serverCfg, metrics, testCfg) {
             level: 'watch',
             title: 'Monitor — instance is approaching its comfortable capacity',
             detail: `Estimated CPU saturation ~${saturationPct.toFixed(0)}% at ${vus} VUs on a ${vcpu}-vCPU/${ramGb}GB instance. P95 latency was ${p95}ms (threshold ${p95Thr}ms) with a ${errPct.toFixed(2)}% error rate. Current sizing is adequate for this test, but re-test at higher VU counts before assuming headroom for production peak traffic.`,
-            rootCauses, capacityTable,
+            rootCauses, capacityTable, scalingPath,
         };
     }
     return {
         level: 'ok',
         title: 'Current instance sizing is adequate',
         detail: `At ${vus} VUs (~${rps} RPS), estimated CPU saturation is only ~${saturationPct.toFixed(0)}% of the ${vcpu}-vCPU/${ramGb}GB instance's comfortable capacity. P95 latency (${p95}ms) was within the ${p95Thr}ms threshold and the error rate (${errPct.toFixed(2)}%) was low. No sizing change needed for this load profile.`,
-        rootCauses, capacityTable,
+        rootCauses, capacityTable, scalingPath,
     };
 }
 
@@ -593,12 +817,13 @@ router.post('/start', auth, async (req, res) => {
 });
 
 // ── Save JSON + HTML report (disk + MongoDB) ──
-function _saveResults(runId, state) {
+async function _saveResults(runId, state) {
     try {
         const jsonPath = path.join(REPORTS_DIR, `${runId}.json`);
         const htmlPath = path.join(REPORTS_DIR, `${runId}.html`);
         const template = _loadTemplate();
         const serialized = _serializeState(state);
+        await ensureServerConfigCacheWarm();
         const htmlStr    = _generateHtml(state, template);
         fs.writeFileSync(jsonPath, JSON.stringify(serialized, null, 2));
         fs.writeFileSync(htmlPath, htmlStr);
@@ -732,6 +957,7 @@ router.get('/report/:runId', auth, async (req, res) => {
         if (doc?.jsonData) {
             const state = JSON.parse(doc.jsonData);
             const template = _loadTemplate();
+            await ensureServerConfigCacheWarm();
             const html = _generateHtml(state, template);
             fs.writeFileSync(htmlPath, html);
             // Also persist htmlData so next time is instant
@@ -756,6 +982,7 @@ router.get('/report/:runId/download', auth, async (req, res) => {
                 fs.writeFileSync(htmlPath, doc.htmlData);
             } else if (doc?.jsonData) {
                 const state = JSON.parse(doc.jsonData);
+                await ensureServerConfigCacheWarm();
                 const html = _generateHtml(state, _loadTemplate());
                 fs.writeFileSync(htmlPath, html);
                 LTReport.updateOne({ runId: req.params.runId }, { $set: { htmlData: html } }).catch(() => {});
@@ -810,7 +1037,7 @@ router.get('/report/:runId/download', auth, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/load-test/stop/:runId
 // ══════════════════════════════════════════════════════════════════════════════
-router.post('/stop/:runId', auth, (req, res) => {
+router.post('/stop/:runId', auth, async (req, res) => {
     const state = _runs.get(req.params.runId);
     if (!state) return res.status(404).json({ error: 'Run not found' });
     if (state.status !== 'running') return res.json({ ok: true, status: state.status });
@@ -823,7 +1050,7 @@ router.post('/stop/:runId', auth, (req, res) => {
     state.endTime = new Date().toISOString();
     state.timeline.push({ time: state.endTime, event: 'Stopped by user', phase: 'Stopped' });
     state.verdict = verdict(state.metrics, state.config);
-    _saveResults(req.params.runId, state);
+    await _saveResults(req.params.runId, state);
     res.json({ ok: true, runId: req.params.runId, status: 'stopped' });
 });
 
@@ -899,7 +1126,7 @@ router.delete('/history/:runId', auth, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/load-test/demo-report
 // ══════════════════════════════════════════════════════════════════════════════
-router.post('/demo-report', auth, (req, res) => {
+router.post('/demo-report', auth, async (req, res) => {
     const runId = 'lt_demo_' + Date.now();
     const startTime = new Date(Date.now() - 65000).toISOString();
     const endTime   = new Date().toISOString();
@@ -950,7 +1177,7 @@ router.post('/demo-report', auth, (req, res) => {
     };
 
     _runs.set(runId, state);
-    _saveResults(runId, state);
+    await _saveResults(runId, state);
     res.json({ runId, status: 'completed', verdict: 'PASS' });
 });
 
@@ -2249,7 +2476,7 @@ async function _executeK6Run(runId, cfg, state, addLog, addTimeline) {
         state.verdict = verdict(state.metrics, cfg);
         addLog(`Load test completed — ${state.metrics.totalReqs} reqs · P95 ${state.metrics.p95}ms`, 'Completed');
         addTimeline('Test completed', 'Completed');
-        _saveResults(runId_, state);
+        await _saveResults(runId_, state);
 
     } catch (err) {
         state.status  = 'failed';
@@ -2260,7 +2487,7 @@ async function _executeK6Run(runId, cfg, state, addLog, addTimeline) {
         } else {
             state.logs.push({ time: new Date().toISOString(), event: 'k6 run failed: ' + err.message, phase: 'Failed' });
         }
-        _saveResults(runId_, state);
+        await _saveResults(runId_, state);
     }
 }
 
@@ -3272,8 +3499,12 @@ ${show('showServerConfig') ? (() => {
         </div>
         <div style="margin-top:10px;font-size:11px;color:#64748B">Public IP: <strong style="color:#334155">${sc.publicIp || '—'}</strong></div>
       </div>` : `
-      <div class="info-box-amber" style="margin-bottom:14px">
-        <span>No server configuration on file for <strong>${envKey === 'production' ? 'Production' : 'Staging'}</strong> — add it in the Server Config tab to include full specs and get a sizing recommendation here.</span>
+      <div style="border:1px solid #FCD34D;background:#FFFBEB;border-radius:10px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:flex-start;gap:10px">
+        <span style="font-size:16px;line-height:1">⚠️</span>
+        <div>
+          <div style="font-size:12px;font-weight:800;color:#92400E;text-transform:uppercase;letter-spacing:.4px">WARNING</div>
+          <div style="font-size:12.5px;color:#78350F;margin-top:3px;line-height:1.6">No server configuration found for <strong>${cfg.projectName || 'this project'} / ${envKey === 'production' ? 'Production' : 'Staging'}</strong>. Please add a server configuration in Server Config. No CPU, RAM, instance type, region, or capacity/scaling figures are shown below because none are on file for this project + environment — they are never estimated or fabricated.</div>
+        </div>
       </div>`;
 
     // ── Root cause of failure/degradation (only rendered when something is actually wrong) ──
@@ -3289,19 +3520,72 @@ ${show('showServerConfig') ? (() => {
       </div>` : '';
 
     // ── Capacity table: which VU levels are likely to pass on this server ──
+    // Tested rows get a solid border + stronger fill (matches existing report card
+    // treatment); projected rows use a dashed border + lighter fill — the visual
+    // distinction this feature requires, built from the app's existing design
+    // system (same border/radius/color tokens used throughout this report) rather
+    // than an unrelated new style.
+    const fmtPct = (v) => v === null || v === undefined ? 'N/A' : `${v.toFixed(0)}%`;
     const capacityTableHtml = (rec.capacityTable || []).length ? `
       <div style="margin-top:14px">
-        <div style="font-size:11px;font-weight:800;color:#0D1224;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📐 Estimated Capacity by Virtual Users (based on this server's spec)</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
-          ${rec.capacityTable.map(row => `
-            <div style="border:1px solid ${row.isTested ? '#94A3B8' : '#E5E7EB'};${row.isTested ? 'box-shadow:0 0 0 2px rgba(148,163,184,.25);' : ''}border-radius:10px;padding:10px;text-align:center;background:#FFFFFF">
-              <div style="font-size:15px;font-weight:900;color:#0D1224">${row.vus}<span style="font-size:9px;font-weight:700;color:#94A3B8"> VUs</span></div>
-              <div style="font-size:10px;font-weight:800;color:${row.color};margin-top:3px">${row.label}</div>
-              <div style="font-size:9px;color:#94A3B8;margin-top:1px">~${row.projectedSaturation.toFixed(0)}% load</div>
-              ${row.isTested ? '<div style="font-size:8px;color:#64748B;margin-top:2px;font-weight:700">TESTED</div>' : ''}
-            </div>`).join('')}
+        <div style="font-size:11px;font-weight:800;color:#0D1224;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📐 Estimated Capacity by Virtual Users</div>
+        <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:11.5px;min-width:640px">
+          <thead>
+            <tr style="border-bottom:2px solid #E5E7EB">
+              <th style="text-align:left;padding:6px 8px;color:#64748B;font-weight:800;text-transform:uppercase;font-size:9.5px">VU Level</th>
+              <th style="text-align:left;padding:6px 8px;color:#64748B;font-weight:800;text-transform:uppercase;font-size:9.5px">Data Type</th>
+              <th style="text-align:center;padding:6px 8px;color:#64748B;font-weight:800;text-transform:uppercase;font-size:9.5px">CPU</th>
+              <th style="text-align:center;padding:6px 8px;color:#64748B;font-weight:800;text-transform:uppercase;font-size:9.5px">RAM</th>
+              <th style="text-align:center;padding:6px 8px;color:#64748B;font-weight:800;text-transform:uppercase;font-size:9.5px">P95 Latency</th>
+              <th style="text-align:center;padding:6px 8px;color:#64748B;font-weight:800;text-transform:uppercase;font-size:9.5px">Error Rate</th>
+              <th style="text-align:center;padding:6px 8px;color:#64748B;font-weight:800;text-transform:uppercase;font-size:9.5px">Verdict</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rec.capacityTable.map(row => `
+            <tr style="border-bottom:1px solid ${row.isTested ? '#CBD5E1' : '#F1F5F9'};background:${row.isTested ? '#F8FAFC' : '#FFFFFF'};border-left:3px ${row.isTested ? 'solid #334155' : 'dashed #CBD5E1'}">
+              <td style="padding:8px;font-weight:800;color:#0D1224">${row.vus.toLocaleString()}</td>
+              <td style="padding:8px">
+                <span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:5px;${row.isTested ? 'background:#0D1224;color:#fff' : 'background:#F1F5F9;color:#64748B;border:1px dashed #CBD5E1'}">${row.isTested ? '● TESTED' : '○ PROJECTED'}</span>
+              </td>
+              <td style="padding:8px;text-align:center;color:${row.cpuNA ? '#94A3B8' : row.cpuPercent > 100 ? '#DC2626' : row.cpuPercent >= 70 ? '#D97706' : '#059669'};font-weight:700">${row.cpuNA ? 'N/A' : fmtPct(row.cpuPercent)}</td>
+              <td style="padding:8px;text-align:center;color:#94A3B8">${row.ramNA ? 'N/A' : fmtPct(row.ramPercent)}</td>
+              <td style="padding:8px;text-align:center;color:#334155">${row.p95NA ? 'N/A' : row.p95 + 'ms'}${!row.isTested && !row.p95NA ? ' <span style="font-size:8px;color:#94A3B8">(est.)</span>' : ''}</td>
+              <td style="padding:8px;text-align:center;color:#334155">${row.errorRateNA ? 'N/A' : row.errorRatePct.toFixed(2) + '%'}</td>
+              <td style="padding:8px;text-align:center"><span style="font-size:9.5px;font-weight:800;color:${row.verdictColor}">${row.verdict}</span></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
         </div>
-        <div style="font-size:10px;color:#94A3B8;margin-top:8px;line-height:1.5">Estimated from the observed saturation at ${cfg.vus || 0} VUs — an extrapolation, not a guarantee. Always re-test directly at the VU level you plan to rely on before treating it as validated capacity.</div>
+        <div style="font-size:9px;color:#94A3B8;margin-top:6px">RAM shown as N/A: no RAM-utilization monitoring is wired into this test runner — RAM is never estimated or fabricated. P95 marked "(est.)" is a projection from a documented linear-with-saturation model, not a measurement.</div>
+      </div>` : '';
+
+    // ── Scaling Recommendation Path ──
+    const scalingPathHtml = rec.scalingPath ? `
+      <div style="margin-top:14px;border:1px solid #E5E7EB;border-radius:10px;padding:14px 16px">
+        <div style="font-size:11px;font-weight:800;color:#0D1224;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🛣️ Scaling Recommendation Path</div>
+        <div style="font-size:12px;color:#374151;margin-bottom:10px">
+          Current: <strong>${rec.scalingPath.currentInstanceType}</strong> — comfortable up to ~<strong>${rec.scalingPath.comfortableMaxVUs.toLocaleString()} VUs</strong>. Validated test: <strong>${rec.scalingPath.targetVus.toLocaleString()} VUs</strong>.
+        </div>
+        ${rec.scalingPath.steps.map(s => `
+          <div style="display:flex;gap:10px;align-items:baseline;padding:6px 0;border-top:1px dashed #E5E7EB">
+            <div style="font-size:11px;font-weight:800;color:#64748B;white-space:nowrap;min-width:120px">${s.rangeLow.toLocaleString()}–${s.rangeHigh.toLocaleString()} VUs</div>
+            <div style="font-size:12px;color:#0D1224">→ <strong>${s.recommendation}</strong> <span style="color:#94A3B8;font-size:10px">(${s.note})</span></div>
+          </div>`).join('')}
+        ${rec.scalingPath.highScaleWarnings.length ? `
+        <div style="margin-top:12px;background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px">
+          <div style="font-size:10.5px;font-weight:800;color:#92400E;text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px">⚠️ At this scale, CPU is not necessarily the primary bottleneck</div>
+          <ul style="margin:0;padding-left:18px;font-size:11px;color:#78350F;line-height:1.7">
+            ${rec.scalingPath.highScaleWarnings.map(w => `<li>${w}</li>`).join('')}
+          </ul>
+        </div>` : ''}
+      </div>` : '';
+
+    // ── Mandatory capacity disclaimer (always shown alongside a capacity table) ──
+    const capacityDisclaimerHtml = (rec.capacityTable || []).length ? `
+      <div style="margin-top:10px;font-size:10px;color:#94A3B8;line-height:1.6;border-top:1px solid #F1F5F9;padding-top:8px">
+        <strong>Disclaimer:</strong> Capacity values above the highest load-tested level are projections, not validated production capacity. Extrapolation is not a guarantee. Actual capacity may be limited by database connections, network throughput, disk I/O, file descriptors, external dependencies, connection pools, or other application/infrastructure bottlenecks before CPU reaches its estimated limit. Re-test at each scaling tier before treating the result as validated capacity.
       </div>` : '';
 
     return `
@@ -3322,6 +3606,8 @@ ${show('showServerConfig') ? (() => {
     </div>
     ${rootCauseHtml}
     ${capacityTableHtml}
+    ${capacityDisclaimerHtml}
+    ${scalingPathHtml}
   </div>
 </div>`;
 })() : ''}

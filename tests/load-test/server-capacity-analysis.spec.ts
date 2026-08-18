@@ -82,11 +82,14 @@ test.describe('Server capacity analysis (root cause + capacity table)', () => {
     expect(tested).toBeTruthy();
     expect(tested.vus).toBe(200);
 
-    // Sorted ascending by VUs, and saturation must be monotonically non-decreasing.
+    // Sorted ascending by VUs, and CPU saturation must be monotonically non-decreasing.
+    // (Field renamed from `projectedSaturation` to `cpuPercent` when the capacity
+    // engine was extended to enterprise scale — see capacity-scaling-analysis.spec.ts
+    // for the full extended-table test coverage.)
     const vusSorted = rec.capacityTable.map((r: any) => r.vus);
     expect(vusSorted).toEqual([...vusSorted].sort((a, b) => a - b));
     for (let i = 1; i < rec.capacityTable.length; i++) {
-      expect(rec.capacityTable[i].projectedSaturation).toBeGreaterThanOrEqual(rec.capacityTable[i - 1].projectedSaturation);
+      expect(rec.capacityTable[i].cpuPercent).toBeGreaterThanOrEqual(rec.capacityTable[i - 1].cpuPercent);
     }
   });
 
