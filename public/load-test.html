@@ -4164,6 +4164,16 @@ const SC_FIELDS = [
     { key: 'region',        label: 'AWS Region',     type: 'text', placeholder: 'ap-south-1 (Mumbai)' },
 ];
 
+// Architecture flags — drive the report's "What this configuration means" explanation
+// and the onboarding-scale gap detection in the Recommendation section. Unchecked/absent
+// is treated as "not present," never assumed.
+const ARCH_FLAGS = [
+    { key: 'hasLoadBalancer', label: 'Load Balancer' },
+    { key: 'hasReadReplica',  label: 'Read Replica' },
+    { key: 'hasCacheLayer',   label: 'Cache Layer (Redis/Memcached)' },
+    { key: 'hasAutoScaling',  label: 'Auto-scaling' },
+];
+
 function _scCardHtml(envType) {
     const sc = _serverConfigs[envType] || {};
     const isProd = envType === 'production';
@@ -4195,6 +4205,16 @@ function _scCardHtml(envType) {
             <option value="Stopped" ${sc.status==='Stopped'?'selected':''}>Stopped</option>
             <option value="Degraded" ${sc.status==='Degraded'?'selected':''}>Degraded</option>
           </select>
+        </div>
+      </div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border)">
+        <label style="display:block;margin-bottom:8px">Architecture — feeds the report's capacity explanation &amp; scaling recommendations</label>
+        <div class="row" style="flex-wrap:wrap;gap:14px">
+          ${ARCH_FLAGS.map(f => `
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;min-width:150px">
+            <input type="checkbox" id="sc-${envType}-${f.key}" ${sc[f.key] ? 'checked' : ''} style="width:15px;height:15px" />
+            ${f.label}
+          </label>`).join('')}
         </div>
       </div>
       <div style="margin-top:12px">
@@ -4245,6 +4265,9 @@ async function saveServerConfig(envType) {
     payload.elasticIp = document.getElementById(`sc-${envType}-elasticIp`).value === 'true';
     payload.status    = document.getElementById(`sc-${envType}-status`).value;
     payload.notes     = document.getElementById(`sc-${envType}-notes`).value;
+    for (const f of ARCH_FLAGS) {
+        payload[f.key] = document.getElementById(`sc-${envType}-${f.key}`).checked;
+    }
 
     try {
         const saved = await api('POST', '/api/load-test/server-config', payload);

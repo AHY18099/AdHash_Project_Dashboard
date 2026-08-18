@@ -44,6 +44,14 @@ const _ltServerConfigSchema = new mongoose.Schema({
     elasticIp:     { type: Boolean, default: false },
     status:        { type: String, default: 'Running' },
     notes:         String,
+    // Architecture flags — drive the "What this configuration means" explanation
+    // and the onboarding-scale recommendation's gap detection. Optional/unknown
+    // (undefined) is treated as "not present" everywhere these are read, never
+    // silently assumed true.
+    hasLoadBalancer: { type: Boolean, default: false },
+    hasReadReplica:  { type: Boolean, default: false },
+    hasCacheLayer:   { type: Boolean, default: false },
+    hasAutoScaling:  { type: Boolean, default: false },
     updatedAt:     { type: Date, default: Date.now },
 }, { collection: 'load_test_server_configs' });
 _ltServerConfigSchema.index({ projectName: 1, envType: 1 }, { unique: true });
@@ -199,8 +207,21 @@ const CAPACITY_VERDICT_THRESHOLDS = {
     // Beyond this multiple of the highest ACTUALLY TESTED VU count, a projection
     // is far enough from validated data that it should read as "Requires Re-test"
     // rather than a numeric PASS/RISK/FAIL — extrapolating 50x past a single data
-    // point is not a meaningful estimate.
+    // point is not a meaningful estimate. On its own this under-serves a LOW-VU
+    // tested run (e.g. tested at 10 VUs — 20x is only 200, so most of the required
+    // 50..10,000 tiers would show nothing but "beyond model range," gutting the
+    // enterprise-scale table for exactly the smoke-test runs QA repeats most
+    // often). retestBeyondSaturationMultiple below provides a second, independent
+    // ceiling based on the SERVER's own comfortable capacity rather than the one
+    // test's VU count — the effective boundary is whichever is more permissive,
+    // so a low-VU test on a capable server still gets numeric projections across
+    // the full required range, while a genuinely wild extrapolation (e.g. 10,000
+    // VUs projected from a 2-VU smoke test) still gets flagged.
     retestBeyondMultipleOfTestedVus: 20,
+    // Beyond this multiple of comfortable-capacity-implied saturation (i.e. this
+    // many times the VU count that would reach ~100% modeled CPU), treat the
+    // projection as beyond range regardless of how low the tested VU count was.
+    retestBeyondSaturationMultiple: 50,
 };
 
 // Estimate the comfortable/recommended max VUs for an arbitrary (vcpu, ramGb)
@@ -248,38 +269,59 @@ function buildCapacityTable(serverCfg, testedMetrics, testCfg) {
 
     const REQUIRED_LEVELS = [50, 100, 250, 500, 1000, 2500, 5000, 10000];
     const levels = [...new Set([...REQUIRED_LEVELS, testedVus])].sort((a, b) => a - b);
-    const retestBeyond = testedVus * CAPACITY_VERDICT_THRESHOLDS.retestBeyondMultipleOfTestedVus;
+    // Two independent ceilings, whichever is more permissive wins — see the
+    // comment on CAPACITY_VERDICT_THRESHOLDS for why a single VU-multiple bound
+    // would gut the table for low-VU tested runs on a capable server.
+    const retestBeyondByTestedVus  = testedVus * CAPACITY_VERDICT_THRESHOLDS.retestBeyondMultipleOfTestedVus;
+    const retestBeyondBySaturation = estCapacityAt100Pct * CAPACITY_VERDICT_THRESHOLDS.retestBeyondSaturationMultiple;
+    const retestBeyond = Math.max(retestBeyondByTestedVus, retestBeyondBySaturation);
 
     return levels.map(v => {
         const isTested = v === testedVus;
-        const cpuPercent = Math.min(999, cpuPerVu * v);
+        // Real, UNCAPPED saturation — never clamp this. A hard cap (e.g. min(999, ...))
+        // makes every VU level past the cap threshold collapse to the identical clamped
+        // number, so 500 and 10,000 VUs looked indistinguishable in the report. The
+        // model keeps scaling internally; only the DISPLAY switches to a qualitative
+        // label once we're far enough past the tested baseline that a numeric estimate
+        // would be misleadingly precise (see beyondModelRange below).
+        const cpuPercentRaw = cpuPerVu * v;
+        // Beyond this many multiples of the tested VU count, treat the projection as
+        // "beyond model range" rather than printing a number nobody should trust —
+        // this reuses the same boundary as the REQUIRES RE-TEST verdict band, since
+        // both represent "too far from validated data to extrapolate meaningfully."
+        const beyondModelRange = !isTested && v > retestBeyond;
 
         // P95 latency projection: only a documented, simple linear-with-saturation
         // model — explicitly NOT claimed to be accurate, only directionally useful.
         // Latency tends to degrade faster than linearly as saturation approaches
         // 100%, so beyond the comfortable band we apply a step-up multiplier —
-        // this is a heuristic, clearly labeled as an estimate in the report.
+        // this is a heuristic, clearly labeled as an estimate in the report. The
+        // multiplier itself is UNCAPPED (no ceiling on saturationRatio) so latency
+        // keeps growing distinguishably at every tier instead of flat-lining.
         let projectedP95 = null;
         if (testedP95 !== null) {
             if (isTested) {
                 projectedP95 = testedP95;
             } else {
-                const saturationRatio = cpuPercent / 100;
+                const saturationRatio = cpuPercentRaw / 100;
                 const degradeMultiplier = saturationRatio <= 0.7 ? 1 + saturationRatio * 0.5
                     : saturationRatio <= 1 ? 1.35 + (saturationRatio - 0.7) * 3
-                    : 2.25 + (saturationRatio - 1) * 5; // steep beyond 100% modeled saturation
+                    : 2.25 + (saturationRatio - 1) * 5; // uncapped — keeps rising past 100% saturation
                 projectedP95 = Math.round(testedP95 * degradeMultiplier);
             }
         }
 
-        let verdict, verdictColor, dataType;
-        if (!isTested && v > retestBeyond) {
+        let verdict, verdictColor;
+        if (beyondModelRange) {
+            // Qualitative, not numeric — an extrapolation this far past the last
+            // validated data point isn't a meaningful estimate, so the report says
+            // so plainly instead of printing a fake precise CPU%/latency number.
             verdict = 'REQUIRES RE-TEST'; verdictColor = '#6B7280';
-        } else if (cpuPercent > 100) {
+        } else if (cpuPercentRaw > 100) {
             verdict = 'FAIL'; verdictColor = '#DC2626';
-        } else if (cpuPercent >= CAPACITY_VERDICT_THRESHOLDS.cpuRiskMaxPct) {
+        } else if (cpuPercentRaw >= CAPACITY_VERDICT_THRESHOLDS.cpuRiskMaxPct) {
             verdict = 'RISK'; verdictColor = '#D97706'; // 85-100%: high risk, still RISK-banded verdict per spec
-        } else if (cpuPercent >= CAPACITY_VERDICT_THRESHOLDS.cpuComfortableMaxPct) {
+        } else if (cpuPercentRaw >= CAPACITY_VERDICT_THRESHOLDS.cpuComfortableMaxPct) {
             verdict = 'RISK'; verdictColor = '#D97706';
         } else {
             verdict = 'PASS'; verdictColor = '#059669';
@@ -296,17 +338,216 @@ function buildCapacityTable(serverCfg, testedMetrics, testCfg) {
             vus: v,
             isTested,
             dataType: isTested ? 'TESTED' : 'PROJECTED',
-            cpuPercent,
+            beyondModelRange,
+            // cpuPercent/p95 stay as real (uncapped, still-distinguishable) numbers for
+            // internal use/testing even when beyondModelRange is true — the REPORT
+            // TEMPLATE is what switches to the qualitative label for display, so the
+            // underlying data is never silently discarded, just not shown as a false-
+            // precision figure.
+            cpuPercent: cpuPercentRaw,
             cpuNA: false,
             ramPercent: null,
             ramNA: !hasRamData,
-            p95: projectedP95,
+            p95: beyondModelRange ? null : projectedP95,
+            p95Raw: projectedP95,
             p95NA: projectedP95 === null,
             errorRatePct: isTested ? testedErrPct : null,
             errorRateNA: isTested ? testedErrPct === null : true,
             verdict, verdictColor,
         };
     });
+}
+
+// ── "What This Configuration Means" — plain-language capacity explanation ───
+// Ties the raw spec (vCPU/RAM/instance type) and named architecture gaps
+// (load balancer / read replica / cache / auto-scaling, read straight from
+// Server Config — never guessed) to the actual tested ceiling, so the report
+// explains WHY the number is what it is rather than just stating it.
+function buildConfigExplanation(serverCfg, capacityTable, testedVus, testedMetrics, testCfg) {
+    if (!serverCfg || !serverCfg.vcpu) return null;
+    const vcpu = serverCfg.vcpu;
+    const ramGb = serverCfg.memoryGb || 0;
+    const tier = _lookupTierForSpec(vcpu, ramGb);
+    const comfortableMaxVUs = tier ? tier.comfortableMaxVUs : Math.round(vcpu * 30 * (CAPACITY_VERDICT_THRESHOLDS.cpuComfortableMaxPct / 100));
+    const recommendedMaxVUs = tier ? tier.recommendedMaxVUs : Math.round(comfortableMaxVUs * 1.4);
+
+    // "At-risk zone" is bounded by the comfortable ceiling and the point the
+    // tested run itself showed real trouble (or the recommended max if the
+    // test didn't reach it) — grounded in the actual capacity table rows,
+    // not a second, disconnected heuristic.
+    const testedRow = (capacityTable || []).find(r => r.isTested);
+    const failsAt = testedRow && (testedRow.verdict === 'FAIL' || testedRow.verdict === 'RISK') ? testedVus : recommendedMaxVUs;
+
+    const p95 = testedMetrics?.p95 || null;
+    const p50 = testedMetrics?.p50 || null;
+    const p99 = testedMetrics?.p99 || null;
+    const p95Thr = testCfg?.p95Threshold || 3000;
+
+    const archFlags = {
+        loadBalancer: !!serverCfg.hasLoadBalancer,
+        readReplica:  !!serverCfg.hasReadReplica,
+        cacheLayer:   !!serverCfg.hasCacheLayer,
+        autoScaling:  !!serverCfg.hasAutoScaling,
+    };
+
+    const reasons = [];
+    reasons.push(`${vcpu} vCPU means only ${vcpu} request${vcpu === 1 ? '' : 's'} can execute CPU-bound work in true parallel — everything else queues${p50 !== null && p99 !== null ? `, which is why the P50→P99 latency spread (${p50}ms → ${p99}ms) ${(p99 - p50) > p95Thr ? 'is already wide' : 'widens'} at just ${testedVus} VUs` : ''}.`);
+    if (ramGb > 0 && ramGb <= 8) {
+        reasons.push(`${ramGb}GB RAM leaves limited headroom for the application heap, database connection buffers, and OS overhead once concurrent connections climb into the hundreds.`);
+    }
+    if (!archFlags.loadBalancer) {
+        reasons.push(`Single instance with no load balancer on file — this is both a single point of failure and a hard resource ceiling: there's no second node to fail over to or share load with.`);
+    }
+    if (!archFlags.cacheLayer) {
+        reasons.push(`No cache layer (Redis/Memcached) on file — every request likely re-hits the database directly, which is typically the first real bottleneck, often before CPU itself maxes out.`);
+    }
+    if (!archFlags.readReplica) {
+        reasons.push(`No read replica on file — all reads and writes compete for the same database instance's capacity.`);
+    }
+    if (!archFlags.autoScaling) {
+        reasons.push(`No auto-scaling on file — capacity is fixed regardless of real-time demand.`);
+    }
+
+    return {
+        instanceType: serverCfg.instanceType || `${vcpu} vCPU / ${ramGb}GB`,
+        comfortableMaxVUs,
+        atRiskLow: comfortableMaxVUs,
+        atRiskHigh: Math.max(comfortableMaxVUs, testedVus),
+        failsAt: Math.round(failsAt),
+        archFlags,
+        reasons,
+        testedVus,
+    };
+}
+
+// ── Onboarding action library — keyed by detected "gap type," not a single
+// hardcoded paragraph. Each entry only fires when the corresponding condition
+// is true for the run's actual server config/test data, so the assembled
+// recommendation reflects real gaps rather than a canned script. Edit this
+// table to adjust wording/ownership/timeline guidance without touching the
+// report template or the gap-detection logic below.
+const ONBOARDING_ACTION_LIBRARY = {
+    retestAtIntermediateTiers: {
+        phase: 'immediate',
+        owner: 'QA/Perf team',
+        timeline: 'This week, before any onboarding',
+        text: (ctx) => `Re-test at 100, 250, and 500 VUs on the CURRENT box to get real (not projected) data — projections above ${ctx.testedVus} VUs (the highest tier actually tested) are not reliable enough to plan against.`,
+    },
+    enableApm: {
+        phase: 'immediate',
+        owner: 'Platform/DevOps',
+        timeline: 'This week, before any onboarding',
+        text: () => `Turn on APM (Datadog, New Relic, or self-hosted Prometheus/Grafana) so CPU, RAM, DB connections, and event-loop lag are visible during the next test, not just latency.`,
+    },
+    dbSlowQueryLogging: {
+        phase: 'immediate',
+        owner: 'Backend team',
+        timeline: 'This week, before any onboarding',
+        text: () => `Add database slow-query logging and run EXPLAIN on the top 10 most-hit queries.`,
+    },
+    addLoadBalancerMultiInstance: {
+        phase: 'shortTerm',
+        owner: 'Platform/DevOps',
+        timeline: '3-5 business days minimum for provisioning + testing',
+        // Only fires when hasLoadBalancer is false — skips this step entirely if
+        // a load balancer is already on file, per the "skip what's already in place" requirement.
+        gap: (ctx) => !ctx.archFlags.loadBalancer,
+        text: (ctx) => `Move off single-instance: minimum 2-3× ${ctx.nextTierHint || 'c6i.xlarge (4 vCPU/8GB)'} behind a load balancer (AWS ALB), health-checked, with sticky sessions only if session state requires it.`,
+    },
+    addCacheLayer: {
+        phase: 'shortTerm',
+        owner: 'Backend team',
+        timeline: 'Can start in parallel today',
+        gap: (ctx) => !ctx.archFlags.cacheLayer,
+        text: () => `Add a caching layer (Redis) in front of read-heavy endpoints — this typically removes the largest chunk of DB load before any other change.`,
+    },
+    increaseDbPoolSize: {
+        phase: 'shortTerm',
+        owner: 'Backend team',
+        timeline: 'Can start in parallel today',
+        text: () => `Increase the MongoDB/SQL connection pool size and confirm connections are released (check for leaks via db.serverStatus().connections or the equivalent for your database).`,
+    },
+    moveSessionOffPath: {
+        phase: 'shortTerm',
+        owner: 'Backend team',
+        timeline: 'Can start in parallel today',
+        text: () => `Move session/auth checks off the synchronous request path where possible.`,
+    },
+    autoScalingGroup: {
+        phase: 'mediumTerm',
+        owner: 'Platform/DevOps',
+        timeline: 'Design + provision alongside DB scaling',
+        gap: (ctx) => !ctx.archFlags.autoScaling,
+        text: () => `Auto-scaling group: 4-12 application nodes scaling on CPU/request-queue-depth, not a fixed fleet — traffic during onboarding is rarely flat.`,
+    },
+    dbReadReplica: {
+        phase: 'mediumTerm',
+        owner: 'Backend team / DBA',
+        timeline: 'Size alongside app tier, not after',
+        gap: (ctx) => !ctx.archFlags.readReplica,
+        text: () => `Database: move to a managed cluster with at least one read replica; route reads there. If using MongoDB Atlas/RDS, size the instance class alongside the app tier, not after.`,
+    },
+    cdn: {
+        phase: 'mediumTerm',
+        owner: 'Platform/DevOps',
+        timeline: 'Design + provision alongside DB scaling',
+        text: () => `CDN (CloudFront/Cloudflare) for static assets and cacheable API responses to cut origin load.`,
+    },
+    rateLimitingQueue: {
+        phase: 'mediumTerm',
+        owner: 'Backend team',
+        timeline: 'Design + provision alongside DB scaling',
+        text: () => `Rate limiting / queueing (e.g. a job queue for non-critical writes) so a traffic spike degrades gracefully instead of cascading into a full outage.`,
+    },
+    retestEachTier: {
+        phase: 'mediumTerm',
+        owner: 'QA/Perf team',
+        timeline: 'One re-test per tier — do not skip tiers',
+        text: () => `Re-test at each tier (250 → 500 → 1,000 → 2,500 → 5,000 → 10,000) as infrastructure is added — do NOT go live at high concurrency on the basis of a projection alone.`,
+    },
+};
+
+// Assembles the "If Onboarding 1,000-10,000+ Concurrent Users" recommendation
+// from real detected gaps (config explanation's archFlags + the capacity
+// table's verdict at the target range) rather than one fixed paragraph.
+// Returns null when the current config already comfortably covers the range
+// (nothing to recommend).
+function buildOnboardingRecommendation(configExplanation, capacityTable, scalingPath) {
+    if (!configExplanation) return null;
+    const targetVus = 1000; // low end of the "1,000-10,000+" range this section addresses
+    if (configExplanation.comfortableMaxVUs >= targetVus) return null; // already comfortable at this scale — nothing to recommend
+
+    const ctx = {
+        testedVus: configExplanation.testedVus,
+        archFlags: configExplanation.archFlags,
+        nextTierHint: scalingPath?.steps?.[0]?.recommendation,
+    };
+
+    const gapMultiple = targetVus / Math.max(1, configExplanation.comfortableMaxVUs);
+
+    const actionsByPhase = { immediate: [], shortTerm: [], mediumTerm: [] };
+    for (const [key, action] of Object.entries(ONBOARDING_ACTION_LIBRARY)) {
+        if (action.gap && !action.gap(ctx)) continue; // skip actions for gaps that don't apply — infra already in place
+        actionsByPhase[action.phase].push({ key, owner: action.owner, timeline: action.timeline, text: action.text(ctx) });
+    }
+
+    // High-scale infrastructure warnings for 1,000+ reuse the same threshold-gated
+    // list the Scaling Recommendation Path already computed for this target, so
+    // the two sections never disagree on what "beyond CPU" means at this scale.
+    const highScaleWarnings = scalingPath?.highScaleWarnings || [];
+
+    return {
+        currentInstanceType: configExplanation.instanceType,
+        comfortableMaxVUs: configExplanation.comfortableMaxVUs,
+        gapMultiple: Math.round(gapMultiple),
+        actionsByPhase,
+        highScaleWarnings,
+        // If none of the immediate/short-term work can realistically happen before
+        // a hard deadline, the honest fallback is to throttle onboarding rather than
+        // let uncontrolled load hit infrastructure that's already shown risk at a
+        // much lower tier than the target.
+        fallbackAdvice: `If "tomorrow" is a hard deadline and none of the above can be done in time: the honest recommendation is to cap registration/onboarding (staged rollout, waitlist, or a concurrency limiter) rather than let uncontrolled load hit an infrastructure that has already shown ${configExplanation.atRiskLow < configExplanation.testedVus ? 'RISK-level' : 'capacity'} degradation at just ${configExplanation.testedVus} VUs.`,
+    };
 }
 
 // ── Scaling Recommendation Path ──────────────────────────────────────────────
@@ -391,12 +632,12 @@ function buildScalingRecommendationPath(serverCfg, targetVus) {
 
 function computeServerRecommendation(serverCfg, metrics, testCfg) {
     if (!serverCfg) {
-        return { level: 'unknown', title: 'No server configuration on file', detail: 'Add this environment’s server specs in the Server Config tab to get a sizing recommendation.', rootCauses: [], capacityTable: [], scalingPath: null };
+        return { level: 'unknown', title: 'No server configuration on file', detail: 'Add this environment’s server specs in the Server Config tab to get a sizing recommendation.', rootCauses: [], capacityTable: [], scalingPath: null, configExplanation: null, onboardingRecommendation: null };
     }
     const vcpu   = serverCfg.vcpu   || 0;
     const ramGb  = serverCfg.memoryGb || 0;
     if (!vcpu) {
-        return { level: 'unknown', title: 'Server specs incomplete', detail: 'vCPU count is not set for this environment — fill it in on the Server Config tab to get an accurate sizing recommendation.', rootCauses: [], capacityTable: [], scalingPath: null };
+        return { level: 'unknown', title: 'Server specs incomplete', detail: 'vCPU count is not set for this environment — fill it in on the Server Config tab to get an accurate sizing recommendation.', rootCauses: [], capacityTable: [], scalingPath: null, configExplanation: null, onboardingRecommendation: null };
     }
     const vus    = testCfg?.vus || 0;
     const rps    = metrics?.rps || 0;
@@ -419,6 +660,8 @@ function computeServerRecommendation(serverCfg, metrics, testCfg) {
     // Scaling path targets the VU level actually validated by this test — the
     // report answers "how do I safely reach the load I just tested/plan to test."
     const scalingPath   = buildScalingRecommendationPath(serverCfg, vus);
+    const configExplanation = buildConfigExplanation(serverCfg, capacityTable, vus, metrics, testCfg);
+    const onboardingRecommendation = buildOnboardingRecommendation(configExplanation, capacityTable, scalingPath);
 
     if (overCapacity || (latencyBreached && highError)) {
         const nextTier = vcpu <= 2 ? 't3.large (2 vCPU → upgrade to 2/8GB or 4 vCPU)' : vcpu <= 4 ? 't3.xlarge (4 vCPU / 16GB)' : 't3.2xlarge (8 vCPU / 32GB) or move to a load-balanced multi-instance setup';
@@ -426,7 +669,7 @@ function computeServerRecommendation(serverCfg, metrics, testCfg) {
             level: 'upgrade',
             title: `Upgrade recommended — current instance is under-provisioned for ${vus} VUs`,
             detail: `At ${vus} concurrent VUs (~${rps} RPS) against a ${vcpu}-vCPU/${ramGb}GB instance, estimated CPU saturation is ~${saturationPct.toFixed(0)}%. Observed P95 latency (${p95}ms) ${latencyBreached ? `exceeded the ${p95Thr}ms threshold` : 'was within threshold'} and error rate was ${errPct.toFixed(2)}%. Consider upgrading to ${nextTier}, or scale horizontally behind a load balancer if traffic is expected to grow further.`,
-            rootCauses, capacityTable, scalingPath,
+            rootCauses, capacityTable, scalingPath, configExplanation, onboardingRecommendation,
         };
     }
     if (nearCapacity || latencyBreached || errPct > 1) {
@@ -434,14 +677,14 @@ function computeServerRecommendation(serverCfg, metrics, testCfg) {
             level: 'watch',
             title: 'Monitor — instance is approaching its comfortable capacity',
             detail: `Estimated CPU saturation ~${saturationPct.toFixed(0)}% at ${vus} VUs on a ${vcpu}-vCPU/${ramGb}GB instance. P95 latency was ${p95}ms (threshold ${p95Thr}ms) with a ${errPct.toFixed(2)}% error rate. Current sizing is adequate for this test, but re-test at higher VU counts before assuming headroom for production peak traffic.`,
-            rootCauses, capacityTable, scalingPath,
+            rootCauses, capacityTable, scalingPath, configExplanation, onboardingRecommendation,
         };
     }
     return {
         level: 'ok',
         title: 'Current instance sizing is adequate',
         detail: `At ${vus} VUs (~${rps} RPS), estimated CPU saturation is only ~${saturationPct.toFixed(0)}% of the ${vcpu}-vCPU/${ramGb}GB instance's comfortable capacity. P95 latency (${p95}ms) was within the ${p95Thr}ms threshold and the error rate (${errPct.toFixed(2)}%) was low. No sizing change needed for this load profile.`,
-        rootCauses, capacityTable, scalingPath,
+        rootCauses, capacityTable, scalingPath, configExplanation, onboardingRecommendation,
     };
 }
 
@@ -2612,6 +2855,13 @@ function _generateHtml(state, tmpl = {}) {
 
     const fmtBytes = (b) => b > 1048576 ? (b / 1048576).toFixed(2) + ' MB' : b > 1024 ? (b / 1024).toFixed(1) + ' KB' : (b || 0) + ' B';
 
+    // ── Server capacity/scaling analysis — computed once here so both the Server
+    // Configuration section AND the Recommendation section (onboarding sub-section)
+    // can reference the same result without recomputing it. ──
+    const _serverEnvKey = /prod/i.test(cfg.environment || '') ? 'production' : 'staging';
+    const _serverCfgForRun = getServerConfigsForProject(cfg.projectName || '')[_serverEnvKey];
+    const serverRec = computeServerRecommendation(_serverCfgForRun, m, cfg);
+
     // ── Certified Performance Tester level QA Recommendation ──
     let recText = '', qaRec = '', recColor = '';
     const p95ms    = m.p95 || 0;
@@ -3465,10 +3715,9 @@ ${show('showTestConfig') ? `
 </div>` : ''}
 
 ${show('showServerConfig') ? (() => {
-    const envKey = /prod/i.test(cfg.environment || '') ? 'production' : 'staging';
-    const projConfigs = getServerConfigsForProject(cfg.projectName || '');
-    const sc = projConfigs[envKey];
-    const rec = computeServerRecommendation(sc, m, cfg);
+    const envKey = _serverEnvKey;
+    const sc = _serverCfgForRun;
+    const rec = serverRec; // computed once at the top of _generateHtml — see _serverEnvKey/_serverCfgForRun
     const recColor = rec.level === 'upgrade' ? '#DC2626' : rec.level === 'watch' ? '#D97706' : rec.level === 'ok' ? '#059669' : '#6B7280';
     const recBg    = rec.level === 'upgrade' ? '#FEF2F2' : rec.level === 'watch' ? '#FFFBEB' : rec.level === 'ok' ? '#F0FDF4' : '#F3F4F6';
     const recIcon  = rec.level === 'upgrade' ? '🔺' : rec.level === 'watch' ? '⚠️' : rec.level === 'ok' ? '✅' : 'ℹ️';
@@ -3507,6 +3756,40 @@ ${show('showServerConfig') ? (() => {
         </div>
       </div>`;
 
+    // ── "What This Configuration Means" — plain-language capacity explanation ──
+    const ce = rec.configExplanation;
+    const archLine = (label, present) => `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;border-radius:12px;background:${present ? '#F0FDF4' : '#FEF2F2'};color:${present ? '#166534' : '#991B1B'};border:1px solid ${present ? '#BBF7D0' : '#FECACA'}">${present ? '✓' : '✗'} ${label}</span>`;
+    const configExplanationHtml = ce ? `
+      <div style="margin-top:14px;border:1px solid #E5E7EB;border-radius:10px;padding:14px 16px">
+        <div style="font-size:11px;font-weight:800;color:#0D1224;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📋 What This Configuration Means</div>
+        <div style="font-size:12px;color:#374151;margin-bottom:10px;line-height:1.6">
+          Current setup: <strong>${ce.instanceType}</strong>, single instance, ${[
+            archLine('Load Balancer', ce.archFlags.loadBalancer),
+            archLine('Read Replica', ce.archFlags.readReplica),
+            archLine('Cache Layer', ce.archFlags.cacheLayer),
+            archLine('Auto-scaling', ce.archFlags.autoScaling),
+          ].join(' ')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:12px">
+          <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px">
+            <div style="font-size:10px;font-weight:800;color:#166534">✅ Comfortably supports</div>
+            <div style="font-size:13px;font-weight:800;color:#0D1224;margin-top:3px">up to ~${ce.comfortableMaxVUs.toLocaleString()} concurrent VUs</div>
+          </div>
+          <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 12px">
+            <div style="font-size:10px;font-weight:800;color:#92400E">⚠️ Tested &amp; at-risk zone</div>
+            <div style="font-size:13px;font-weight:800;color:#0D1224;margin-top:3px">${ce.atRiskLow.toLocaleString()}–${ce.atRiskHigh.toLocaleString()} VUs</div>
+          </div>
+          <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px 12px">
+            <div style="font-size:10px;font-weight:800;color:#991B1B">✗ Will fail without changes</div>
+            <div style="font-size:13px;font-weight:800;color:#0D1224;margin-top:3px">above ~${ce.failsAt.toLocaleString()} VUs</div>
+          </div>
+        </div>
+        <div style="font-size:11px;font-weight:800;color:#0D1224;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Why it caps out here</div>
+        <ul style="margin:0;padding-left:18px;font-size:12px;color:#374151;line-height:1.8">
+          ${ce.reasons.map(r => `<li>${r}</li>`).join('')}
+        </ul>
+      </div>` : '';
+
     // ── Root cause of failure/degradation (only rendered when something is actually wrong) ──
     const rootCauseSevColor = { critical: '#DC2626', high: '#DC2626', medium: '#D97706', info: '#2563EB' };
     const rootCauseHtml = (rec.rootCauses || []).length ? `
@@ -3543,22 +3826,35 @@ ${show('showServerConfig') ? (() => {
             </tr>
           </thead>
           <tbody>
-            ${rec.capacityTable.map(row => `
-            <tr style="border-bottom:1px solid ${row.isTested ? '#CBD5E1' : '#F1F5F9'};background:${row.isTested ? '#F8FAFC' : '#FFFFFF'};border-left:3px ${row.isTested ? 'solid #334155' : 'dashed #CBD5E1'}">
+            ${rec.capacityTable.map(row => {
+              // Beyond the model's sane extrapolation range (>20x the tested VU count),
+              // show a qualitative label instead of a numeric CPU%/latency figure — a
+              // projection this far past the last validated data point is not a
+              // meaningful estimate, and printing a fake-precise number (or worse, a
+              // clamped value identical across multiple tiers) misrepresents it as one.
+              const cpuCell = row.beyondModelRange
+                  ? `<span style="font-weight:800;color:#DC2626">⚠ Beyond model range</span>`
+                  : `<span style="color:${row.cpuNA ? '#94A3B8' : row.cpuPercent > 100 ? '#DC2626' : row.cpuPercent >= 70 ? '#D97706' : '#059669'};font-weight:700">${row.cpuNA ? 'N/A' : fmtPct(row.cpuPercent)}</span>`;
+              const p95Cell = row.beyondModelRange
+                  ? `<span style="color:#94A3B8;font-style:italic">Severe overload expected — not load-tested</span>`
+                  : `${row.p95NA ? 'N/A' : row.p95 + 'ms'}${!row.isTested && !row.p95NA ? ' <span style="font-size:8px;color:#94A3B8">(est.)</span>' : ''}`;
+              return `
+            <tr style="border-bottom:1px solid ${row.isTested ? '#CBD5E1' : '#F1F5F9'};background:${row.isTested ? '#F8FAFC' : row.beyondModelRange ? '#FAFAFA' : '#FFFFFF'};border-left:3px ${row.isTested ? 'solid #334155' : 'dashed #CBD5E1'}">
               <td style="padding:8px;font-weight:800;color:#0D1224">${row.vus.toLocaleString()}</td>
               <td style="padding:8px">
                 <span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:5px;${row.isTested ? 'background:#0D1224;color:#fff' : 'background:#F1F5F9;color:#64748B;border:1px dashed #CBD5E1'}">${row.isTested ? '● TESTED' : '○ PROJECTED'}</span>
               </td>
-              <td style="padding:8px;text-align:center;color:${row.cpuNA ? '#94A3B8' : row.cpuPercent > 100 ? '#DC2626' : row.cpuPercent >= 70 ? '#D97706' : '#059669'};font-weight:700">${row.cpuNA ? 'N/A' : fmtPct(row.cpuPercent)}</td>
+              <td style="padding:8px;text-align:center;font-size:${row.beyondModelRange ? '9.5px' : '11.5px'}">${cpuCell}</td>
               <td style="padding:8px;text-align:center;color:#94A3B8">${row.ramNA ? 'N/A' : fmtPct(row.ramPercent)}</td>
-              <td style="padding:8px;text-align:center;color:#334155">${row.p95NA ? 'N/A' : row.p95 + 'ms'}${!row.isTested && !row.p95NA ? ' <span style="font-size:8px;color:#94A3B8">(est.)</span>' : ''}</td>
+              <td style="padding:8px;text-align:center;color:#334155;font-size:${row.beyondModelRange ? '9.5px' : '11.5px'}">${p95Cell}</td>
               <td style="padding:8px;text-align:center;color:#334155">${row.errorRateNA ? 'N/A' : row.errorRatePct.toFixed(2) + '%'}</td>
               <td style="padding:8px;text-align:center"><span style="font-size:9.5px;font-weight:800;color:${row.verdictColor}">${row.verdict}</span></td>
-            </tr>`).join('')}
+            </tr>`;
+            }).join('')}
           </tbody>
         </table>
         </div>
-        <div style="font-size:9px;color:#94A3B8;margin-top:6px">RAM shown as N/A: no RAM-utilization monitoring is wired into this test runner — RAM is never estimated or fabricated. P95 marked "(est.)" is a projection from a documented linear-with-saturation model, not a measurement.</div>
+        <div style="font-size:9px;color:#94A3B8;margin-top:6px">RAM shown as N/A: no RAM-utilization monitoring is wired into this test runner — RAM is never estimated or fabricated. P95 marked "(est.)" is a projection from a documented linear-with-saturation model, not a measurement. Rows marked "Beyond model range" are more than ${CAPACITY_VERDICT_THRESHOLDS.retestBeyondMultipleOfTestedVus}× the tested VU count — far enough past validated data that a numeric estimate would be misleading; expect severe overload/service collapse, not a specific latency figure.</div>
       </div>` : '';
 
     // ── Scaling Recommendation Path ──
@@ -3604,6 +3900,7 @@ ${show('showServerConfig') ? (() => {
       <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:${recColor}">${recIcon} ${rec.title}</div>
       <div style="font-size:12px;color:#374151;margin-top:6px;line-height:1.6">${rec.detail}</div>
     </div>
+    ${configExplanationHtml}
     ${rootCauseHtml}
     ${capacityTableHtml}
     ${capacityDisclaimerHtml}
@@ -3831,6 +4128,39 @@ ${show('showRecommendations') ? `
   <!-- Content -->
   <div style="padding:24px 28px;font-size:13px;line-height:1.85;color:#1e293b">
     ${recText}
+    ${(() => {
+        const onb = serverRec.onboardingRecommendation;
+        if (!onb) return '';
+        const phaseLabel = { immediate: 'Immediate (this week) — before any onboarding', shortTerm: 'Short-term (before 1,000 users)', mediumTerm: 'Medium-term (to sustain 1,000-10,000+ users)' };
+        const phaseOrder = ['immediate', 'shortTerm', 'mediumTerm'];
+        return `
+    <div style="margin-top:24px;border:2px solid #4338CA33;border-radius:12px;overflow:hidden">
+      <div style="background:linear-gradient(90deg,#312e81,#4338ca,#4f46e5);padding:14px 20px">
+        <div style="font-size:14px;font-weight:800;color:#fff">🚀 If Onboarding 1,000-10,000+ Concurrent Users</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:2px">Capacity/architecture planning — distinct from this run's bug triage above</div>
+      </div>
+      <div style="padding:18px 20px;background:#fff">
+        <div style="font-size:12.5px;color:#1e293b;margin-bottom:16px;padding:10px 14px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px">
+          <strong>Bottom line:</strong> current infrastructure (single ${onb.currentInstanceType}, comfortable to ~${onb.comfortableMaxVUs.toLocaleString()} VUs) is undersized by roughly ${onb.gapMultiple}× for the 1,000+ range. This is a capacity/architecture gap, not a bug to patch — treat it as a scaling project, not a hotfix.
+        </div>
+        ${phaseOrder.filter(p => onb.actionsByPhase[p].length).map((p, idx) => `
+        <div style="margin-bottom:14px">
+          <div style="font-size:11px;font-weight:800;color:#4338CA;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">${phaseLabel[p]}</div>
+          <ol style="margin:0;padding-left:20px;font-size:12.5px;color:#374151;line-height:1.9">
+            ${onb.actionsByPhase[p].map(a => `<li>${a.text} <span style="font-size:10px;color:#94A3B8">— ${a.owner}, ${a.timeline}</span></li>`).join('')}
+          </ol>
+        </div>`).join('')}
+        ${onb.highScaleWarnings.length ? `
+        <div style="margin-top:14px;background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:10px 14px">
+          <div style="font-size:10.5px;font-weight:800;color:#92400E;text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px">⚠️ At this scale, CPU is not necessarily the primary bottleneck</div>
+          <ul style="margin:0;padding-left:18px;font-size:11.5px;color:#78350F;line-height:1.8">
+            ${onb.highScaleWarnings.map(w => `<li>${w}</li>`).join('')}
+          </ul>
+        </div>` : ''}
+        <div style="margin-top:14px;font-size:12px;color:#78350F;background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:10px 14px">⚠️ ${onb.fallbackAdvice}</div>
+      </div>
+    </div>`;
+    })()}
   </div>
 </div>
 

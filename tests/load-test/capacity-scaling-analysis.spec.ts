@@ -107,13 +107,31 @@ test.describe('Capacity table — extended VU levels + tested/projected distinct
     expect(['FAIL', 'REQUIRES RE-TEST']).toContain(row10000.verdict); // far beyond a t3.medium
   });
 
-  test('a VU level far beyond the tested baseline (>20x) is labeled "Requires Re-test" rather than a numeric verdict', () => {
-    const serverCfg = { vcpu: 8, memoryGb: 16, instanceType: 'c6i.2xlarge' };
+  test('a VU level far beyond BOTH the tested-VU-multiple ceiling AND the saturation-based ceiling is labeled "Requires Re-test"', () => {
+    // The "beyond model range" boundary is the MORE PERMISSIVE of two independent
+    // ceilings (see CAPACITY_VERDICT_THRESHOLDS): testedVus * 20, and
+    // comfortable-capacity-implied-100%-VUs * 50. A small server tested at a VU
+    // count that's already a meaningful fraction of ITS OWN comfortable capacity
+    // triggers both ceilings at a reachable VU level, unlike a big server tested
+    // at a tiny fraction of its own capacity (see the low-VU-on-capable-server
+    // test below, which must stay numeric all the way to 10,000).
+    const serverCfg = { vcpu: 2, memoryGb: 4, instanceType: 't3.medium' }; // comfortable ~35 VUs
     const metrics = { totalReqs: 1000, okReqs: 1000, errReqs: 0, statusCodes: { '200': 1000 }, p95: 500, rps: 40 };
-    const rec = computeServerRecommendation(serverCfg, metrics, { vus: 50, p95Threshold: 3000 }); // 50 * 20 = 1000 retest boundary
+    const rec = computeServerRecommendation(serverCfg, metrics, { vus: 50, p95Threshold: 3000 });
 
     const row10000 = rec.capacityTable.find((r: any) => r.vus === 10000);
     expect(row10000.verdict).toBe('REQUIRES RE-TEST');
+  });
+
+  test('a low-VU test on a CAPABLE server still gets numeric projections across the full required range (does not collapse to "beyond range" just because the tested VU count was small)', () => {
+    const serverCfg = { vcpu: 8, memoryGb: 16, instanceType: 'c6i.2xlarge' }; // comfortable ~320 VUs
+    const metrics = { totalReqs: 500, okReqs: 498, errReqs: 2, statusCodes: { '200': 498, '404': 2 }, p95: 300, rps: 8 };
+    const rec = computeServerRecommendation(serverCfg, metrics, { vus: 10, p95Threshold: 3000 });
+
+    const beyondRangeRows = rec.capacityTable.filter((r: any) => r.beyondModelRange);
+    expect(beyondRangeRows.length).toBe(0); // every required tier stays numeric for this capable server
+    const cpuValues = rec.capacityTable.map((r: any) => r.cpuPercent.toFixed(2));
+    expect(new Set(cpuValues).size).toBe(cpuValues.length); // still all distinguishable
   });
 
   test('missing vCPU/server config produces an empty capacity table and null scaling path (never fabricated)', () => {
