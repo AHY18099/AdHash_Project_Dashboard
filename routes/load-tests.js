@@ -83,14 +83,99 @@ function getServerConfigsForProject(projectName) {
 // roughly 50-80 concurrent VUs / ~150 RPS for typical Node/PHP CRUD workloads
 // before CPU credits exhaust and latency/error rate degrade — used as the
 // baseline heuristic below.
+// ── Root-cause classification from status-code distribution ─────────────────
+// k6 reports status 0 for requests that never got an HTTP response at all
+// (connection refused/reset, DNS failure, TCP-level timeout) — this is the
+// strongest signal of server-side resource exhaustion (out of file descriptors,
+// connection backlog full, process OOM-killed) as opposed to an application-level
+// error (4xx/5xx), which the app itself is still alive to generate.
+function classifyFailureRootCause(metrics, testCfg) {
+    const causes = [];
+    const total = metrics?.totalReqs || 0;
+    if (!total) return causes;
+
+    const sc = metrics.statusCodes || {};
+    const connFailures = sc['0'] || 0;
+    const serverErrors = Object.entries(sc).reduce((s, [code, n]) => code.startsWith('5') ? s + n : s, 0);
+    const clientErrors  = Object.entries(sc).reduce((s, [code, n]) => code.startsWith('4') ? s + n : s, 0);
+    const connPct   = (connFailures / total) * 100;
+    const serverPct = (serverErrors / total) * 100;
+    const clientPct = (clientErrors / total) * 100;
+
+    const p95 = metrics.p95 || 0;
+    const p95Thr = testCfg?.p95Threshold || 3000;
+    const avgLat = metrics.avgLatency || 0;
+    const vus = testCfg?.vus || 0;
+    const rps = metrics.rps || 0;
+
+    if (connPct > 1) {
+        causes.push({
+            severity: connPct > 10 ? 'critical' : 'high',
+            title: `Connection-level failures (${connPct.toFixed(1)}% of requests)`,
+            detail: `${connFailures.toLocaleString()} of ${total.toLocaleString()} requests never received an HTTP response (connection refused/reset, or a TCP-level timeout) at ${vus} concurrent VUs. This is a server resource-exhaustion signal, not an application bug — the OS/process ran out of capacity to accept or complete connections (exhausted file descriptors, full listen backlog, worker process crash/OOM, or the reverse proxy/load balancer rejecting connections).`,
+        });
+    }
+    if (serverPct > 1) {
+        causes.push({
+            severity: serverPct > 10 ? 'critical' : 'high',
+            title: `Server-side errors — HTTP 5xx (${serverPct.toFixed(1)}% of requests)`,
+            detail: `${serverErrors.toLocaleString()} requests received a 5xx response, meaning the application process was still running and responding, but failed to complete the request — commonly caused by database connection pool exhaustion, an unhandled exception under concurrent load, or a downstream dependency (DB/cache/third-party API) timing out under the added concurrency.`,
+        });
+    }
+    if (clientPct > 5) {
+        causes.push({
+            severity: 'info',
+            title: `Client-side errors — HTTP 4xx (${clientPct.toFixed(1)}% of requests)`,
+            detail: `${clientErrors.toLocaleString()} requests received a 4xx response. This is usually a test-data or auth-token issue (expired/invalid token, duplicate unique-key conflicts under concurrent VUs) rather than a server capacity problem — review the scenario configuration before concluding the server needs more capacity.`,
+        });
+    }
+    if (p95 > p95Thr * 1.5 && connPct <= 1 && serverPct <= 1) {
+        causes.push({
+            severity: p95 > p95Thr * 3 ? 'high' : 'medium',
+            title: `Severe latency degradation without hard errors (P95 ${p95}ms vs ${p95Thr}ms threshold)`,
+            detail: `Requests are mostly succeeding, but queuing well beyond the acceptance threshold. This points to CPU/event-loop saturation or a slow downstream dependency (database, third-party API) rather than outright resource exhaustion — the server is still up, but too slow under this concurrency level to meet the latency SLA.`,
+        });
+    }
+    if (!causes.length && rps > 0 && vus > 0 && (rps / vus) < 0.3) {
+        causes.push({
+            severity: 'medium',
+            title: 'Low throughput-per-VU without explicit errors',
+            detail: `Only ~${(rps / vus).toFixed(2)} requests/sec per virtual user — most VUs are spending their time waiting rather than completing requests. Often caused by slow per-request processing (unoptimized queries, synchronous I/O) rather than a hard capacity ceiling; worth profiling the endpoint under test directly before scaling infrastructure.`,
+        });
+    }
+    return causes;
+}
+
+// ── Capacity table: which VU levels are likely to PASS/RISK/FAIL on the
+// current server spec, extrapolated from the observed saturation at the tested
+// VU count. This is a heuristic estimate, not a guarantee — always re-test.
+function buildCapacityTable(vcpu, testedVus, saturationPct) {
+    if (!vcpu || !testedVus || saturationPct <= 0) return [];
+    // Estimate the VU count at which saturation would reach 100%, then derive
+    // PASS/RISK/FAIL bands around it for a few common reference points.
+    const vusAt100Pct = testedVus / (saturationPct / 100);
+    const levels = [25, 50, 100, 200, 300].filter((v, i, arr) => v !== testedVus);
+    if (!levels.includes(testedVus)) levels.push(testedVus);
+    levels.sort((a, b) => a - b);
+
+    return levels.map(v => {
+        const projectedSaturation = (v / vusAt100Pct) * 100;
+        let label, color;
+        if (projectedSaturation < 70)       { label = 'PASS'; color = '#059669'; }
+        else if (projectedSaturation < 100) { label = 'RISK'; color = '#D97706'; }
+        else                                  { label = 'FAIL'; color = '#DC2626'; }
+        return { vus: v, projectedSaturation: Math.min(999, projectedSaturation), label, color, isTested: v === testedVus };
+    });
+}
+
 function computeServerRecommendation(serverCfg, metrics, testCfg) {
     if (!serverCfg) {
-        return { level: 'unknown', title: 'No server configuration on file', detail: 'Add this environment’s server specs in the Server Config tab to get a sizing recommendation.' };
+        return { level: 'unknown', title: 'No server configuration on file', detail: 'Add this environment’s server specs in the Server Config tab to get a sizing recommendation.', rootCauses: [], capacityTable: [] };
     }
     const vcpu   = serverCfg.vcpu   || 0;
     const ramGb  = serverCfg.memoryGb || 0;
     if (!vcpu) {
-        return { level: 'unknown', title: 'Server specs incomplete', detail: 'vCPU count is not set for this environment — fill it in on the Server Config tab to get an accurate sizing recommendation.' };
+        return { level: 'unknown', title: 'Server specs incomplete', detail: 'vCPU count is not set for this environment — fill it in on the Server Config tab to get an accurate sizing recommendation.', rootCauses: [], capacityTable: [] };
     }
     const vus    = testCfg?.vus || 0;
     const rps    = metrics?.rps || 0;
@@ -108,12 +193,16 @@ function computeServerRecommendation(serverCfg, metrics, testCfg) {
     const nearCapacity     = saturationPct >= 80;
     const overCapacity     = saturationPct >= 100;
 
+    const rootCauses   = classifyFailureRootCause(metrics, testCfg);
+    const capacityTable = buildCapacityTable(vcpu, vus, saturationPct);
+
     if (overCapacity || (latencyBreached && highError)) {
         const nextTier = vcpu <= 2 ? 't3.large (2 vCPU → upgrade to 2/8GB or 4 vCPU)' : vcpu <= 4 ? 't3.xlarge (4 vCPU / 16GB)' : 't3.2xlarge (8 vCPU / 32GB) or move to a load-balanced multi-instance setup';
         return {
             level: 'upgrade',
             title: `Upgrade recommended — current instance is under-provisioned for ${vus} VUs`,
             detail: `At ${vus} concurrent VUs (~${rps} RPS) against a ${vcpu}-vCPU/${ramGb}GB instance, estimated CPU saturation is ~${saturationPct.toFixed(0)}%. Observed P95 latency (${p95}ms) ${latencyBreached ? `exceeded the ${p95Thr}ms threshold` : 'was within threshold'} and error rate was ${errPct.toFixed(2)}%. Consider upgrading to ${nextTier}, or scale horizontally behind a load balancer if traffic is expected to grow further.`,
+            rootCauses, capacityTable,
         };
     }
     if (nearCapacity || latencyBreached || errPct > 1) {
@@ -121,12 +210,14 @@ function computeServerRecommendation(serverCfg, metrics, testCfg) {
             level: 'watch',
             title: 'Monitor — instance is approaching its comfortable capacity',
             detail: `Estimated CPU saturation ~${saturationPct.toFixed(0)}% at ${vus} VUs on a ${vcpu}-vCPU/${ramGb}GB instance. P95 latency was ${p95}ms (threshold ${p95Thr}ms) with a ${errPct.toFixed(2)}% error rate. Current sizing is adequate for this test, but re-test at higher VU counts before assuming headroom for production peak traffic.`,
+            rootCauses, capacityTable,
         };
     }
     return {
         level: 'ok',
         title: 'Current instance sizing is adequate',
         detail: `At ${vus} VUs (~${rps} RPS), estimated CPU saturation is only ~${saturationPct.toFixed(0)}% of the ${vcpu}-vCPU/${ramGb}GB instance's comfortable capacity. P95 latency (${p95}ms) was within the ${p95Thr}ms threshold and the error rate (${errPct.toFixed(2)}%) was low. No sizing change needed for this load profile.`,
+        rootCauses, capacityTable,
     };
 }
 
@@ -3185,6 +3276,34 @@ ${show('showServerConfig') ? (() => {
         <span>No server configuration on file for <strong>${envKey === 'production' ? 'Production' : 'Staging'}</strong> — add it in the Server Config tab to include full specs and get a sizing recommendation here.</span>
       </div>`;
 
+    // ── Root cause of failure/degradation (only rendered when something is actually wrong) ──
+    const rootCauseSevColor = { critical: '#DC2626', high: '#DC2626', medium: '#D97706', info: '#2563EB' };
+    const rootCauseHtml = (rec.rootCauses || []).length ? `
+      <div style="margin-top:14px">
+        <div style="font-size:11px;font-weight:800;color:#0D1224;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">🔍 Root Cause Analysis</div>
+        ${rec.rootCauses.map(c => `
+          <div style="border-left:3px solid ${rootCauseSevColor[c.severity] || '#6B7280'};background:#F8FAFC;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:8px">
+            <div style="font-size:12px;font-weight:800;color:#0D1224">${c.title}</div>
+            <div style="font-size:11.5px;color:#475569;margin-top:4px;line-height:1.6">${c.detail}</div>
+          </div>`).join('')}
+      </div>` : '';
+
+    // ── Capacity table: which VU levels are likely to pass on this server ──
+    const capacityTableHtml = (rec.capacityTable || []).length ? `
+      <div style="margin-top:14px">
+        <div style="font-size:11px;font-weight:800;color:#0D1224;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📐 Estimated Capacity by Virtual Users (based on this server's spec)</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
+          ${rec.capacityTable.map(row => `
+            <div style="border:1px solid ${row.isTested ? '#94A3B8' : '#E5E7EB'};${row.isTested ? 'box-shadow:0 0 0 2px rgba(148,163,184,.25);' : ''}border-radius:10px;padding:10px;text-align:center;background:#FFFFFF">
+              <div style="font-size:15px;font-weight:900;color:#0D1224">${row.vus}<span style="font-size:9px;font-weight:700;color:#94A3B8"> VUs</span></div>
+              <div style="font-size:10px;font-weight:800;color:${row.color};margin-top:3px">${row.label}</div>
+              <div style="font-size:9px;color:#94A3B8;margin-top:1px">~${row.projectedSaturation.toFixed(0)}% load</div>
+              ${row.isTested ? '<div style="font-size:8px;color:#64748B;margin-top:2px;font-weight:700">TESTED</div>' : ''}
+            </div>`).join('')}
+        </div>
+        <div style="font-size:10px;color:#94A3B8;margin-top:8px;line-height:1.5">Estimated from the observed saturation at ${cfg.vus || 0} VUs — an extrapolation, not a guarantee. Always re-test directly at the VU level you plan to rely on before treating it as validated capacity.</div>
+      </div>` : '';
+
     return `
 <!-- SERVER CONFIGURATION -->
 <div class="section-hdr-bar" style="margin-bottom:20px">
@@ -3201,6 +3320,8 @@ ${show('showServerConfig') ? (() => {
       <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:${recColor}">${recIcon} ${rec.title}</div>
       <div style="font-size:12px;color:#374151;margin-top:6px;line-height:1.6">${rec.detail}</div>
     </div>
+    ${rootCauseHtml}
+    ${capacityTableHtml}
   </div>
 </div>`;
 })() : ''}
