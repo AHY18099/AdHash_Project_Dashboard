@@ -334,6 +334,29 @@ function buildCapacityTable(serverCfg, testedMetrics, testCfg) {
             else if (testedErrPct > 1 || (testedP95 && testedP95 > testCfg.p95Threshold)) { verdict = 'RISK'; verdictColor = '#D97706'; }
         }
 
+        // Error-rate projection: same documented, saturation-driven model as P95 —
+        // a real baseline error rate (whatever this run actually measured, even 0%)
+        // is projected upward as saturation climbs past the comfortable band, since
+        // retries/timeouts/connection resets climb sharply once a server is
+        // overloaded. This is explicitly an estimate (marked "(est.)" in the report),
+        // never claimed as measured — only the TESTED row's errorRatePct is a real
+        // measurement. Baseline of 0% still projects forward (an undersaturated
+        // clean run can still degrade at high concurrency), so a 0%-error test
+        // doesn't wrongly imply 0% forever.
+        let projectedErrPct = null;
+        if (testedErrPct !== null) {
+            if (isTested) {
+                projectedErrPct = testedErrPct;
+            } else {
+                const saturationRatio = cpuPercentRaw / 100;
+                const baseline = Math.max(testedErrPct, 0.1); // floor so a 0%-error tested run still has something to project from
+                const errDegradeMultiplier = saturationRatio <= 0.7 ? 1
+                    : saturationRatio <= 1 ? 1 + (saturationRatio - 0.7) * 10
+                    : 4 + (saturationRatio - 1) * 15; // uncapped — climbs steeply past 100% modeled saturation
+                projectedErrPct = Math.min(100, baseline * errDegradeMultiplier);
+            }
+        }
+
         return {
             vus: v,
             isTested,
@@ -350,9 +373,10 @@ function buildCapacityTable(serverCfg, testedMetrics, testCfg) {
             ramNA: !hasRamData,
             p95: beyondModelRange ? null : projectedP95,
             p95Raw: projectedP95,
-            p95NA: projectedP95 === null,
-            errorRatePct: isTested ? testedErrPct : null,
-            errorRateNA: isTested ? testedErrPct === null : true,
+            p95NA: beyondModelRange || projectedP95 === null,
+            errorRatePct: beyondModelRange ? null : projectedErrPct,
+            errorRatePctRaw: projectedErrPct,
+            errorRateNA: beyondModelRange || projectedErrPct === null,
             verdict, verdictColor,
         };
     });
@@ -630,14 +654,81 @@ function buildScalingRecommendationPath(serverCfg, targetVus) {
     };
 }
 
+// ── Recommended Server Configuration by Scale — one card per major VU tier ──
+// (1000 / 5000 / 10000 / 10000+), rendered in the same visual style as the
+// current-config card. Only produces a card for a tier where the CURRENT
+// server config's capacity-table verdict is RISK/FAIL/REQUIRES RE-TEST at that
+// VU level — a tier the current config already comfortably PASSes gets no
+// card (nothing to recommend). Entirely derived from INSTANCE_TIER_TABLE, the
+// same reference data buildScalingRecommendationPath uses, so the two never
+// disagree on what instance a given VU level needs.
+const RECOMMENDED_CONFIG_TIERS = [1000, 5000, 10000];
+
+function _recommendedInstanceForTarget(targetVus) {
+    const sortedTiers = [...INSTANCE_TIER_TABLE].sort((a, b) => a.vcpu - b.vcpu);
+    const fit = sortedTiers.find(t => t.comfortableMaxVUs >= targetVus);
+    if (fit) return { ...fit, nodes: 1 };
+    // Beyond the largest single-node tier: recommend N nodes of the largest tier
+    // behind a load balancer — same horizontal-scale-out logic as
+    // buildScalingRecommendationPath's fallback step.
+    const largest = sortedTiers[sortedTiers.length - 1];
+    const nodesNeeded = Math.ceil(targetVus / largest.comfortableMaxVUs);
+    return { ...largest, nodes: nodesNeeded };
+}
+
+function buildRecommendedConfigsByTier(serverCfg, capacityTable) {
+    if (!serverCfg?.vcpu || !(capacityTable || []).length) return [];
+
+    const results = [];
+    for (const targetVus of RECOMMENDED_CONFIG_TIERS) {
+        const row = capacityTable.find(r => r.vus === targetVus);
+        // No card when the current config already handles this tier comfortably —
+        // there's nothing to recommend changing.
+        if (row && row.verdict === 'PASS') continue;
+
+        const rec = _recommendedInstanceForTarget(targetVus);
+        results.push({
+            targetVus,
+            label: `${targetVus.toLocaleString()} VUs`,
+            currentVerdict: row ? row.verdict : null,
+            instanceType: rec.instanceType,
+            vcpu: rec.vcpu,
+            ramGb: rec.ramGb,
+            nodes: rec.nodes,
+            tier: rec.tier,
+            use: rec.use,
+            estMaxConnections: rec.estMaxConnections,
+        });
+    }
+
+    // "10,000+" — beyond the highest required tier, always show a horizontal-
+    // scale-out recommendation as an explicit "and beyond" card, since capacity
+    // needs at this range are open-ended rather than a single fixed target.
+    const beyond = _recommendedInstanceForTarget(10000 * 2); // conceptual "well beyond 10,000" target
+    results.push({
+        targetVus: null,
+        label: '10,000+ VUs',
+        currentVerdict: null,
+        instanceType: beyond.instanceType,
+        vcpu: beyond.vcpu,
+        ramGb: beyond.ramGb,
+        nodes: Math.max(beyond.nodes, 2),
+        tier: beyond.tier,
+        use: 'Horizontal auto-scaling group',
+        estMaxConnections: beyond.estMaxConnections,
+    });
+
+    return results;
+}
+
 function computeServerRecommendation(serverCfg, metrics, testCfg) {
     if (!serverCfg) {
-        return { level: 'unknown', title: 'No server configuration on file', detail: 'Add this environment’s server specs in the Server Config tab to get a sizing recommendation.', rootCauses: [], capacityTable: [], scalingPath: null, configExplanation: null, onboardingRecommendation: null };
+        return { level: 'unknown', title: 'No server configuration on file', detail: 'Add this environment’s server specs in the Server Config tab to get a sizing recommendation.', rootCauses: [], capacityTable: [], scalingPath: null, configExplanation: null, onboardingRecommendation: null, recommendedConfigsByTier: [] };
     }
     const vcpu   = serverCfg.vcpu   || 0;
     const ramGb  = serverCfg.memoryGb || 0;
     if (!vcpu) {
-        return { level: 'unknown', title: 'Server specs incomplete', detail: 'vCPU count is not set for this environment — fill it in on the Server Config tab to get an accurate sizing recommendation.', rootCauses: [], capacityTable: [], scalingPath: null, configExplanation: null, onboardingRecommendation: null };
+        return { level: 'unknown', title: 'Server specs incomplete', detail: 'vCPU count is not set for this environment — fill it in on the Server Config tab to get an accurate sizing recommendation.', rootCauses: [], capacityTable: [], scalingPath: null, configExplanation: null, onboardingRecommendation: null, recommendedConfigsByTier: [] };
     }
     const vus    = testCfg?.vus || 0;
     const rps    = metrics?.rps || 0;
@@ -662,6 +753,7 @@ function computeServerRecommendation(serverCfg, metrics, testCfg) {
     const scalingPath   = buildScalingRecommendationPath(serverCfg, vus);
     const configExplanation = buildConfigExplanation(serverCfg, capacityTable, vus, metrics, testCfg);
     const onboardingRecommendation = buildOnboardingRecommendation(configExplanation, capacityTable, scalingPath);
+    const recommendedConfigsByTier = buildRecommendedConfigsByTier(serverCfg, capacityTable);
 
     if (overCapacity || (latencyBreached && highError)) {
         const nextTier = vcpu <= 2 ? 't3.large (2 vCPU → upgrade to 2/8GB or 4 vCPU)' : vcpu <= 4 ? 't3.xlarge (4 vCPU / 16GB)' : 't3.2xlarge (8 vCPU / 32GB) or move to a load-balanced multi-instance setup';
@@ -669,7 +761,7 @@ function computeServerRecommendation(serverCfg, metrics, testCfg) {
             level: 'upgrade',
             title: `Upgrade recommended — current instance is under-provisioned for ${vus} VUs`,
             detail: `At ${vus} concurrent VUs (~${rps} RPS) against a ${vcpu}-vCPU/${ramGb}GB instance, estimated CPU saturation is ~${saturationPct.toFixed(0)}%. Observed P95 latency (${p95}ms) ${latencyBreached ? `exceeded the ${p95Thr}ms threshold` : 'was within threshold'} and error rate was ${errPct.toFixed(2)}%. Consider upgrading to ${nextTier}, or scale horizontally behind a load balancer if traffic is expected to grow further.`,
-            rootCauses, capacityTable, scalingPath, configExplanation, onboardingRecommendation,
+            rootCauses, capacityTable, scalingPath, configExplanation, onboardingRecommendation, recommendedConfigsByTier,
         };
     }
     if (nearCapacity || latencyBreached || errPct > 1) {
@@ -677,14 +769,14 @@ function computeServerRecommendation(serverCfg, metrics, testCfg) {
             level: 'watch',
             title: 'Monitor — instance is approaching its comfortable capacity',
             detail: `Estimated CPU saturation ~${saturationPct.toFixed(0)}% at ${vus} VUs on a ${vcpu}-vCPU/${ramGb}GB instance. P95 latency was ${p95}ms (threshold ${p95Thr}ms) with a ${errPct.toFixed(2)}% error rate. Current sizing is adequate for this test, but re-test at higher VU counts before assuming headroom for production peak traffic.`,
-            rootCauses, capacityTable, scalingPath, configExplanation, onboardingRecommendation,
+            rootCauses, capacityTable, scalingPath, configExplanation, onboardingRecommendation, recommendedConfigsByTier,
         };
     }
     return {
         level: 'ok',
         title: 'Current instance sizing is adequate',
         detail: `At ${vus} VUs (~${rps} RPS), estimated CPU saturation is only ~${saturationPct.toFixed(0)}% of the ${vcpu}-vCPU/${ramGb}GB instance's comfortable capacity. P95 latency (${p95}ms) was within the ${p95Thr}ms threshold and the error rate (${errPct.toFixed(2)}%) was low. No sizing change needed for this load profile.`,
-        rootCauses, capacityTable, scalingPath, configExplanation, onboardingRecommendation,
+        rootCauses, capacityTable, scalingPath, configExplanation, onboardingRecommendation, recommendedConfigsByTier,
     };
 }
 
@@ -3838,6 +3930,10 @@ ${show('showServerConfig') ? (() => {
               const p95Cell = row.beyondModelRange
                   ? `<span style="color:#94A3B8;font-style:italic">Severe overload expected — not load-tested</span>`
                   : `${row.p95NA ? 'N/A' : row.p95 + 'ms'}${!row.isTested && !row.p95NA ? ' <span style="font-size:8px;color:#94A3B8">(est.)</span>' : ''}`;
+              const errCell = row.beyondModelRange
+                  ? `<span style="color:#94A3B8;font-style:italic">N/A</span>`
+                  : row.errorRateNA ? 'N/A'
+                  : `<span style="color:${row.errorRatePct > 5 ? '#DC2626' : row.errorRatePct > 1 ? '#D97706' : '#334155'}">${row.errorRatePct.toFixed(2)}%</span>${!row.isTested ? ' <span style="font-size:8px;color:#94A3B8">(est.)</span>' : ''}`;
               return `
             <tr style="border-bottom:1px solid ${row.isTested ? '#CBD5E1' : '#F1F5F9'};background:${row.isTested ? '#F8FAFC' : row.beyondModelRange ? '#FAFAFA' : '#FFFFFF'};border-left:3px ${row.isTested ? 'solid #334155' : 'dashed #CBD5E1'}">
               <td style="padding:8px;font-weight:800;color:#0D1224">${row.vus.toLocaleString()}</td>
@@ -3847,14 +3943,14 @@ ${show('showServerConfig') ? (() => {
               <td style="padding:8px;text-align:center;font-size:${row.beyondModelRange ? '9.5px' : '11.5px'}">${cpuCell}</td>
               <td style="padding:8px;text-align:center;color:#94A3B8">${row.ramNA ? 'N/A' : fmtPct(row.ramPercent)}</td>
               <td style="padding:8px;text-align:center;color:#334155;font-size:${row.beyondModelRange ? '9.5px' : '11.5px'}">${p95Cell}</td>
-              <td style="padding:8px;text-align:center;color:#334155">${row.errorRateNA ? 'N/A' : row.errorRatePct.toFixed(2) + '%'}</td>
+              <td style="padding:8px;text-align:center;color:#334155">${errCell}</td>
               <td style="padding:8px;text-align:center"><span style="font-size:9.5px;font-weight:800;color:${row.verdictColor}">${row.verdict}</span></td>
             </tr>`;
             }).join('')}
           </tbody>
         </table>
         </div>
-        <div style="font-size:9px;color:#94A3B8;margin-top:6px">RAM shown as N/A: no RAM-utilization monitoring is wired into this test runner — RAM is never estimated or fabricated. P95 marked "(est.)" is a projection from a documented linear-with-saturation model, not a measurement. Rows marked "Beyond model range" are more than ${CAPACITY_VERDICT_THRESHOLDS.retestBeyondMultipleOfTestedVus}× the tested VU count — far enough past validated data that a numeric estimate would be misleading; expect severe overload/service collapse, not a specific latency figure.</div>
+        <div style="font-size:9px;color:#94A3B8;margin-top:6px">RAM shown as N/A: no RAM-utilization monitoring is wired into this test runner — RAM is never estimated or fabricated. P95 and Error Rate marked "(est.)" are projections from a documented saturation-driven model, not measurements — only the TESTED row is a real measurement. Rows marked "Beyond model range" are far enough past validated data that a numeric estimate would be misleading; expect severe overload/service collapse, not a specific figure.</div>
       </div>` : '';
 
     // ── Scaling Recommendation Path ──
@@ -3884,6 +3980,34 @@ ${show('showServerConfig') ? (() => {
         <strong>Disclaimer:</strong> Capacity values above the highest load-tested level are projections, not validated production capacity. Extrapolation is not a guarantee. Actual capacity may be limited by database connections, network throughput, disk I/O, file descriptors, external dependencies, connection pools, or other application/infrastructure bottlenecks before CPU reaches its estimated limit. Re-test at each scaling tier before treating the result as validated capacity.
       </div>` : '';
 
+    // ── Recommended Server Configuration by Scale — one card per VU tier where
+    // the CURRENT config is insufficient, same tile style as the current-config
+    // card above so the two are visually comparable at a glance. ──
+    const recTierCardHtml = (t) => `
+      <div style="border:1px solid #E5E7EB;border-radius:12px;padding:16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:800;color:#0D1224">For ${t.label}</span>
+          ${t.currentVerdict ? `<span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:10px;background:#FEF2F2;color:#991B1B;border:1px solid #FECACA">Current config: ${t.currentVerdict}</span>` : ''}
+          <span style="margin-left:auto;font-size:10px;font-weight:700;color:#2563EB">${t.tier}${t.nodes > 1 ? ` · ${t.nodes} nodes` : ''}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px">
+          ${specTile('Instance Type', t.instanceType, '🖥️')}
+          ${specTile('vCPU', t.nodes > 1 ? `${t.vcpu} × ${t.nodes}` : t.vcpu, '⚙️')}
+          ${specTile('Memory', `${t.ramGb} GB${t.nodes > 1 ? ` × ${t.nodes}` : ''}`, '🧠')}
+          ${specTile('Est. Max Connections', (t.estMaxConnections * t.nodes).toLocaleString(), '🔌')}
+          ${specTile('Topology', t.nodes > 1 ? `${t.nodes}× behind LB` : 'Single instance', '🏗️')}
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:#64748B">${t.use}</div>
+      </div>`;
+
+    const recommendedConfigsHtml = (rec.recommendedConfigsByTier || []).length ? `
+      <div style="margin-top:14px">
+        <div style="font-size:11px;font-weight:800;color:#0D1224;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">🧭 Recommended Server Configuration by Scale</div>
+        <div style="font-size:11px;color:#64748B;margin-bottom:10px">If you need to support this many concurrent users, this is the instance sizing to provision and re-test against — not the server you were just tested on.</div>
+        ${rec.recommendedConfigsByTier.map(recTierCardHtml).join('')}
+        <div style="font-size:9px;color:#94A3B8;margin-top:2px">Derived from the same instance-tier reference table as the Scaling Recommendation Path below. Always re-test at the target VU level after provisioning — this is a sizing starting point, not a validated result.</div>
+      </div>` : '';
+
     return `
 <!-- SERVER CONFIGURATION -->
 <div class="section-hdr-bar" style="margin-bottom:20px">
@@ -3904,6 +4028,7 @@ ${show('showServerConfig') ? (() => {
     ${rootCauseHtml}
     ${capacityTableHtml}
     ${capacityDisclaimerHtml}
+    ${recommendedConfigsHtml}
     ${scalingPathHtml}
   </div>
 </div>`;

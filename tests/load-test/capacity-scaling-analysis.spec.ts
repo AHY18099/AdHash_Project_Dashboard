@@ -73,12 +73,25 @@ test.describe('Capacity table — extended VU levels + tested/projected distinct
     expect(tested.errorRatePct).toBeCloseTo(5, 1); // 100/2000 = 5%
   });
 
-  test('projected rows never claim a measured error rate (errorRateNA is true for every non-tested row)', () => {
+  // Updated: projected rows now show an ESTIMATED error rate (marked "(est.)" in
+  // the report, same treatment as the P95 column) rather than N/A — a prior
+  // version of this engine left the Error Rate column blank for every projected
+  // row, which was itself a bug (see error-rate-and-recommended-tiers.spec.ts).
+  // Rows genuinely beyond the model's sane extrapolation range still show N/A.
+  test('projected rows (within model range) get an ESTIMATED error rate, not a measured one — only beyond-model-range rows are N/A', () => {
     const serverCfg = { vcpu: 2, memoryGb: 4, instanceType: 't3.medium' };
     const metrics = { totalReqs: 1000, okReqs: 990, errReqs: 10, statusCodes: { '200': 990, '500': 10 }, p95: 1000, rps: 20 };
     const rec = computeServerRecommendation(serverCfg, metrics, { vus: 50, p95Threshold: 3000 });
 
-    for (const row of rec.capacityTable.filter((r: any) => !r.isTested)) {
+    const projectedInRange = rec.capacityTable.filter((r: any) => !r.isTested && !r.beyondModelRange);
+    expect(projectedInRange.length).toBeGreaterThan(0);
+    for (const row of projectedInRange) {
+      expect(row.errorRateNA).toBe(false);
+      expect(typeof row.errorRatePct).toBe('number');
+    }
+
+    const beyondRange = rec.capacityTable.filter((r: any) => r.beyondModelRange);
+    for (const row of beyondRange) {
       expect(row.errorRateNA).toBe(true);
       expect(row.errorRatePct).toBeNull();
     }
