@@ -945,7 +945,9 @@
             "sessionInfo": "AD8T5IurUSCLqscWe6H4QjbA9HR605VMOpbvrWuDFu6K-XKxnZQXoL0i7VxqOWixp-FIa7AYRiGvo1j-ZwMeay-hvTsomVCoxFGWTupfcazujFS_jn7cQZryTV_Tgaw2jDoT6luWuvIA_mf9xLD0DhjNMG3T4JgJ7A",
             "code": "123456"
           },
-          "expectedStatus": 200
+          "expectedStatus": 200,
+          "skipInCi": true,
+          "skipInCiReason": "Skipped in CI: Firebase session info is stale (DEVELOPMENT_MODE_MISMATCH)"
         },
         {
           "name": "AiSignPro Participant Login",
