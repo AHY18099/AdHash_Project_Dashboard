@@ -21,10 +21,12 @@
         }
       ],
       "domains": [
-        "www.ddphub.ai"
+        "www.ddphub.ai",
+        "twfnwlccyudfgqjmmdva.supabase.co"
       ],
       "sslCerts": [
-        "www.ddphub.ai"
+        "www.ddphub.ai",
+        "twfnwlccyudfgqjmmdva.supabase.co"
       ],
       "apis": [
         {
@@ -681,7 +683,7 @@
         {
           "name": "AutoChecker",
           "playStore": "com.autochecker",
-          "appStore": null
+          "appStore": ""
         }
       ],
       "servers": [
@@ -694,6 +696,12 @@
         {
           "name": "AutoChecker - Manual Search",
           "url": "http://20.15.121.70:3000/",
+          "type": "service",
+          "expectedStatus": 200
+        },
+        {
+          "name": "AutoChecker - PartSouq",
+          "url": "http://20.62.109.239:3000/",
           "type": "service",
           "expectedStatus": 200
         },
@@ -719,6 +727,12 @@
           "name": "AutoChecker - eBay API",
           "url": "https://ebaydev.autochecker.com/",
           "type": "api",
+          "expectedStatus": 200
+        },
+        {
+          "name": "AutoChecker - Admin Server",
+          "url": "https://20.1.198.58/",
+          "type": "web",
           "expectedStatus": 200
         }
       ],
@@ -945,9 +959,7 @@
             "sessionInfo": "AD8T5IurUSCLqscWe6H4QjbA9HR605VMOpbvrWuDFu6K-XKxnZQXoL0i7VxqOWixp-FIa7AYRiGvo1j-ZwMeay-hvTsomVCoxFGWTupfcazujFS_jn7cQZryTV_Tgaw2jDoT6luWuvIA_mf9xLD0DhjNMG3T4JgJ7A",
             "code": "123456"
           },
-          "expectedStatus": 200,
-          "skipInCi": true,
-          "skipInCiReason": "Skipped in CI: Firebase session info is stale (DEVELOPMENT_MODE_MISMATCH)"
+          "expectedStatus": 200
         },
         {
           "name": "AiSignPro Participant Login",
@@ -1000,11 +1012,11 @@
           "url": "https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key=AIzaSyArKT5Wgkm05nacl3cHo-gT4gbeYSNdUrw",
           "method": "POST",
           "body": {
-            "phoneNumber": "+918888888888",
+            "phoneNumber": "+919999999999",
             "clientType": "CLIENT_TYPE_WEB",
             "captchaResponse": "NO_RECAPTCHA",
             "recaptchaVersion": "RECAPTCHA_ENTERPRISE",
-            "recaptchaToken": "0cAFcWeA5Dry3c5kUBNJ9I1mhBspa6tq9cFgzvyqP-PjlEfKlMeBcIGbI8eskxIVvb3khkxZHtHKy1hhsfTtqOrnLxjR3Hf1ORPjRrHpptSzi6426ISbtfest5ut1pgtoBN4Wbur9OViAno8vifbcnpdaTaXRcpJsxQ5jfh92PUhm65sUFkBvW2Jq5Lsex8qWvQt8XjFouQ8L3fgUhHyk3R8YgG1kHoePw6929gjVmxVdiLQ1M1_dLZJtbe-ei9V6NURJPVdSdYlaIZTewCJp7N3DquSvCCF8Bk1_EjDTEKC-cWhel9DOC5EQBm3WYO0lYDJR8GtZrOIFFF6uk6a3r1OWWWN4q_CwlNCJPvKuDtoLOLNZduzwTe3LWV45wUj4gs6krmRl-dt1ilQF6zmSa9GA_q2QCmb1-KfoVDAJ9AKYsyPvRCXxOLwqFpK7FOq_xktQWLgcNtfr0Y6huh6NsDRQ55L5r2dnuU8S23_Cszr5INR-0gslXvbKZVOIEFCzWVJo1-5eEqNsOfupS-fF33TG8nImRhNVApYWJQHcz-ZXhjUTd7M_D7mTdp1XzQc_L6IKlZ-Zc_8-ZcUUxbhmHSfAUrcVl-x1hhY8y5BvPoZYu1e6rC4pL3z20D5oV5bZ8D3Y2nYYFaQeGaIDD6oB1F295FOtVkmPqqCnXhkHIg9_h66vRkjtBkJCC8m-3Tl2GkXkLLpmMaAy4cmK6VCJqixb-ZVf2IlPmJYRFcveg27RDjcWg6ZmeDXYkRCSCw4FrZLxDJb2X0aRqg-4PNs_WBuPMvgJFjm7LR5LD24p8OX5vz_oOoz_Zn3VMpPFNawJ0Y2ii6A4-nJPxhvrp_waL_gn_BsWMkT0d5a0032LgPbEiyJOazMQOo_RW0HfHou2fm_FFaBLmp6XOsta5IlG_q5MIct1b0D1tiUDa4Vdv-sZxDMu473U0Dyo"
+            "recaptchaToken": "0cAFcWeA7XZPjWBaXlojOpXj2gkJQRQh30DwQHaBvjDO6XzZsqSDE9T88eh_AIOCtnU-5eoua8ZazwlayTjW2gyRnlC0YQ90QZNqIXC5HI1oeWI2RYUN137qWgauLbGk5cu1YiQ1rGEsmiGQZJbb2KW_eYFLX6YLGZ1XhCzpHB7P2u9J-reflep7DzwcQwFYjHOkABa03SBrLQNQl4P1C943eHbmcsQEP1p1ZFO75BBTeC-w48wXRF-4qtWCIyWIJOZYjGaJKkuNOLdGZz4qrjPerqGCu57tbcZeznlaDy-zrgBfqb0qoUVeBqnACYFcC-DmQBd3h5BVaO9-MM-Xw4Ci7m6OaxhhYllMxEQwsC-KuC3zh4uZ3zdWx_g95gVVqYA4l4eBDWISCThqS-biH1nbfr5MaLSs1qf4eozvNrYIa1gGOhLRcUCn2OzgfL6bhocPTryoIDVWWNNJ9L4Bax8FI2t6gbTWUZ_7jn4ALivVqFZwwZR1mgXaY0Psu9QUka-GGOjuzzQ5MpPspyEqinKgldcSnF1J3jfop3gFCFBTIw05iUo_3_eLoIKDbFijsoIQGG5ZSUqgTXHGdiGDXgg-xrnw9HXLwtfRHynZPqyvsKRcvIBWPwZIN1erQo9zFVgonWoVhjiCYJjP1tJi8K1lePrUcSZpR8Fm5uivynVIMd6n5GxKxFHXxSI4LCsNAIONyULHaRoyqiVLZxIx-YRH6xH7Oc1ITahbLExr21kb-XZp2l4ffRPEUkUpGCUuSUdHFbIJf-me0rvXP8pG2NU8UQ5jzV3fwXmmL-IEofsZQFqfnQp8ixMXxsReYCfLoMg4l5BELGV0rItcvUfu58HFxcutcNNBUFH21vzmKYL4spRkaBHQw-dgZ3eHWeJVFCh_gU-luH3lJ97tyQMA3PEkIbiJoxAWWbNvd7rJctzw43m18Fgx3RsoHYVr0qo1kxTsRZQgN-NXcc963SODP5yYrtZ9dUp9n4xvLv_Moq1X2-QaV2pgo7THSyuW9yz2rQjCerfviOFW9b9tH3rMh2iGfzqKbUamGYItRarbOzZ05QI-EL8YNGuk2mQzLK-phtV6O4XYMIlWOZfi3XSGCWPJEe7g4Qj1MwKvDH31J-GyEBcqprUfX7blCDicr3iMO4S73YlbVmkLfLb7_Wg7ZQ4UWxAx5TJnXhvCmXKIMVSpYVPqSLDlczdCgHafQuEz-SR03qlUbUOGLnbH4BN-l0uJeV3PSBE8vynMHzJW1WSpNEKB8_O6sWLNA2IWoFUgXDCHW25yMilvY-Trs7aabwCzAYykzdTkm-QgPgRMYdmzLgjv7h0VMdY7VSeQHGxEugRJP_FuNymm8RBydLh7yZrZum0NUXvP4Z_bJcY9hn5e0pfsiTsMhViO1nQfl4fZ9IaLgenUollVUu4DkLMM9qeNPpEu8QeWwJUAifL9aKHlaXtOdH9W5jLn_GBN2CZQmsxOKjnFqMMt5FVUeeehjCn6cUKUumj6Kk6TA1vigW6LQYudb0bKGHrzJ0DmW_-ybz7esVhRWAOcoeECXHIkjFxen7RiwXK_5OFClGbIOs7MNhlb49zRKfAmP9NjRrLcaBi5RxJz73MJoMdK3S9_n3miXd8qlp5n86wEv2Uzyh3IBz-ZU9NI5QkHDlHZefAVOmdOms99vdP73Q2Dsan38xNenc7xprMkW5X77V2uMaJR7Ix4psfK9iUP0bTSrkr-0dieLqRwm4zMgNR1LRjGd799C9SarQlntP4mgN2Dn-l5JpGa-3EupagQ5F70qwYsiFEJDkH8NW6aVhBK4ckMzwd7lyGB0es9wJ_1eHuJkZhXooM_DcwNHh1-bPMW1PDuhKBhoQw1dlcDmJIGxLjQzJoPS_McGbi2mtw6VOVJ6-ZwsxxyqtFEGREp9-RPA2Iqd2tcUSOv3Jr68j_vp06IwUQHJaiQa30k8v7Q6-eKG7qX8uMqiDdP0zP1CLO8KBbSyiCTlADmi5hlhHP8MeEOXPqd7gHaZp1Yx4IXO79yrahTqElvAqXZS8RyzKB5lx7Ho5sQQDswvfAlROK9TtGNdPMVCh9Jhc1YTjMN8X-v2SwBWsx9roiecoavszXVNHN1Y9HQ9K5NbDvQV8CIvEeUUXVSG0rAT-aGxkzEiJ99DaHfDIvfZ8k1D8I9geSY_jP5mrYpc3XmUccd4JXMdb66MEfBdJnO-opmzLtdYB2YKZsj4pyxXYg20jg4Bt1pFIms31GOWjE9cFauv5uaqmIG-CG6FH9X81pKvebcenVWAfId1CinpBw6Xt49Xt7yVuOCkCxOfc_lI9M2TaroC3aaUWoccC0Eu-F4BnNQ"
           },
           "expectedStatus": 200
         },
@@ -1014,7 +1026,7 @@
           "method": "POST",
           "body": {
             "sessionInfo": "AD8T5IvpkW05qqT6tFrdNTEZHzjD0zT7G42N_9sScmh_gENvTwyafsJ5CnG5dWgyQOUP-BNUXX-9J_dbsTcT5UvIy8uAkmS0bKleujyBojZs1siV0Y3-z0FjzHja9_zvvsecMkqgMFQX_6p2HElULoAimVKqLiUOjA",
-            "code": "987650"
+            "code": "123456"
           },
           "expectedStatus": 200
         },
@@ -1118,17 +1130,13 @@
           "name": "Website",
           "url": "https://zaptrade.ai",
           "method": "GET",
-          "expectedStatus": 200,
-          "skipInCi": true,
-          "skipInCiReason": "Skipped in CI: zaptrade.ai blocks GitHub Actions IPs"
+          "expectedStatus": 200
         },
         {
           "name": "Dashboard",
           "url": "https://algo.zaptrade.ai",
           "method": "GET",
-          "expectedStatus": 200,
-          "skipInCi": true,
-          "skipInCiReason": "Skipped in CI: algo.zaptrade.ai blocks GitHub Actions IPs"
+          "expectedStatus": 200
         }
       ]
     }
