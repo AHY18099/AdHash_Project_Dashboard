@@ -1025,7 +1025,7 @@
           "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyArKT5Wgkm05nacl3cHo-gT4gbeYSNdUrw",
           "method": "POST",
           "body": {
-            "sessionInfo": "AD8T5IvpkW05qqT6tFrdNTEZHzjD0zT7G42N_9sScmh_gENvTwyafsJ5CnG5dWgyQOUP-BNUXX-9J_dbsTcT5UvIy8uAkmS0bKleujyBojZs1siV0Y3-z0FjzHja9_zvvsecMkqgMFQX_6p2HElULoAimVKqLiUOjA",
+            "sessionInfo": "AD8T5IurpjFGYBS2_6q4KkLbO5xno9vNy0-Rrd8vd8wRbRC39ukCK5OocP094E0L2CUxqaVaZJ-C0OueGod9pb4RaqpTvXGl-ZEwPZSl5WK_YmqmIDxI1-PlEsiPgxMo9DJOrq0vZWyd1S29dVW7AWaQq0kSIQb4DA",
             "code": "123456"
           },
           "expectedStatus": 200
