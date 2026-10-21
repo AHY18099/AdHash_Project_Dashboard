@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import axios from 'axios';
+import * as https from 'https';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -59,6 +60,18 @@ function loadServers(): ServerConfig[] {
     });
 }
 
+// Raw-IP HTTPS endpoints can never match a hostname cert (ERR_TLS_CERT_ALTNAME_INVALID);
+// for those we only care that the server answers, so skip cert verification.
+function getHttpsAgent(url: string) {
+  try {
+    const host = new URL(url).hostname;
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+      return new https.Agent({ rejectUnauthorized: false });
+    }
+  } catch { /* fall through */ }
+  return undefined;
+}
+
 const servers = loadServers();
 
 test.describe('Server Health Monitoring', () => {
@@ -73,6 +86,7 @@ test.describe('Server Health Monitoring', () => {
         const response = await axios.get(server.url, {
           timeout: server.timeout || 10000,
           validateStatus: () => true, // Don't throw on any status
+          httpsAgent: getHttpsAgent(server.url),
           maxRedirects: 5
         });
 
@@ -127,7 +141,8 @@ test.describe('Server Health Monitoring', () => {
         try {
           const response = await axios.get(server.url, {
             timeout: server.timeout || 10000,
-            validateStatus: () => true
+            validateStatus: () => true,
+            httpsAgent: getHttpsAgent(server.url)
           });
           const responseTime = Date.now() - startTime;
           return {

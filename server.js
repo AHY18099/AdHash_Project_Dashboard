@@ -1841,7 +1841,8 @@ app.post('/api/run-project/:projectId', async (req, res) => {
             }
 
         const tlsNode = require('tls');
-        const domainList = project.domains || [];
+        // Third-party platform hosts (e.g. Supabase project URLs) are not domains we own; expiry is not checkable
+        const domainList = (project.domains || []).filter(d => !/(^|\.)supabase\.co$/i.test(String(d).trim()));
         addLog(`[${project.name}] ▶ Running Domain check for ${domainList.length} domain(s)…`, 'info');
         projectRunState[projectId].message = `Running Domain check…`;
 
