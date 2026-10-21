@@ -808,7 +808,7 @@
       "sslCerts": [
         "api.aisignpro.com",
         "admin.aisignpro.com",
-        "cpa.aisignpro.com",
+        "dashboard.aisignpro.com",
         "ddp.aisignpro.com"
       ],
       "apis": [
