@@ -21,8 +21,7 @@
         }
       ],
       "domains": [
-        "www.ddphub.ai",
-        "twfnwlccyudfgqjmmdva.supabase.co"
+        "www.ddphub.ai"
       ],
       "sslCerts": [
         "www.ddphub.ai",
@@ -959,6 +958,8 @@
             "sessionInfo": "AD8T5IurUSCLqscWe6H4QjbA9HR605VMOpbvrWuDFu6K-XKxnZQXoL0i7VxqOWixp-FIa7AYRiGvo1j-ZwMeay-hvTsomVCoxFGWTupfcazujFS_jn7cQZryTV_Tgaw2jDoT6luWuvIA_mf9xLD0DhjNMG3T4JgJ7A",
             "code": "123456"
           },
+          "skipInCi": true,
+          "skipInCiReason": "Skipped: stored Firebase sessionInfo is a development-mode session (DEVELOPMENT_MODE_MISMATCH); needs a fresh non-dev session",
           "expectedStatus": 200
         },
         {
