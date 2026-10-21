@@ -3329,6 +3329,7 @@ function loadDomainReportEntries() {
         : [];
 
     const stateEntries = domainDetails
+        .filter((detail) => !/(^|\.)supabase\.co$/i.test(String((detail && (detail.domain || detail.name)) || '').trim()))
         .map((detail) => {
             const normalizedDetail = normalizeDomainDetail(detail);
             const normalizedDomain = normalizeSslHost(normalizedDetail && normalizedDetail.domain);

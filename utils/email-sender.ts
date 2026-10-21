@@ -1339,7 +1339,9 @@ export function buildDashboardRenderModel(rootDir: string): DashboardEmailModel 
     // Domain details come exclusively from the domain suite (godaddy/report.html via run-all-tests).
     // These are domain registrar/WHOIS expiry dates — completely separate from SSL cert expiry.
     // Do NOT merge SSL cert data here; SSL has its own section in the email.
-    const domainDetails = ((state.suites?.domain?.details || []) as DomainDetail[]).map(normalizeDomainDetail);
+    const domainDetails = ((state.suites?.domain?.details || []) as DomainDetail[])
+        .filter((detail) => !/(^|\.)supabase\.co$/i.test(String(detail?.domain || '').trim()))
+        .map(normalizeDomainDetail);
     const apiDetails = dedupeApiResults((state.suites?.api?.details || []) as ApiTestItem[]);
     const baseModuleSections = buildModuleSections(state);
 

@@ -615,7 +615,8 @@ function enrichDomainDetailsWithSsl(domainDetails: DomainDetail[], sslDetails: S
   const detailsByDomain = new Map<string, DomainDetail>();
   const configuredDomains = loadConfiguredDomains();
 
-  dedupeDomainDetails(domainDetails).forEach((detail) => {
+  // Third-party platform hosts (e.g. *.supabase.co) are not domains we own; expiry can't be checked
+  dedupeDomainDetails(domainDetails).filter((detail) => !/(^|\.)supabase\.co$/i.test(normalizeDomainHost(detail.domain))).forEach((detail) => {
     detailsByDomain.set(normalizeDomainHost(detail.domain), {
       ...detail,
       url: detail.url || `https://${normalizeDomainHost(detail.domain)}`,
