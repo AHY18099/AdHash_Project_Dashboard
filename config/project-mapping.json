@@ -847,70 +847,14 @@
           "expectedStatus": 200
         },
         {
-          "name": "AiSignPro DDP Admin Check User",
-          "url": "https://api.aisignpro.com/api/user/userExists",
-          "method": "POST",
-          "body": {
-            "key": "fUjZB3a/IJyX6AyCgxVZ4r+mOOJSBWMIR1JBrMqkophcVRCpKiN7DhiHyWrv+9B2uFx8dgH0honioLEXw6gaKskdJPf9Z3sE2mNzSVEB5Z0="
-          },
-          "expectedStatus": 200
-        },
-        {
-          "name": "AiSignPro DDP Admin OTP",
-          "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik",
-          "method": "POST",
-          "body": {
-            "sessionInfo": "AD8T5IvU7VyodI7-BTy1cG9QWq63xADt4oAho_0Ub319k0jloE5Q1U4tDx67EMJpeWZCxX0cAQKGlt43AFNeDYQKCrr05MDZS990RA-309kaa_IXXtSxpNfIRD_pTk5NdjpnkNgNBBuRZg5Cy4SNXEXJvgtqqouc4Q",
-            "code": "123456"
-          },
-          "expectedStatus": 200
-        },
-        {
-          "name": "AiSignPro DDP Admin Login",
-          "url": "https://api.aisignpro.com/api/user/login",
-          "method": "POST",
-          "body": {
-            "key": "YfSrZl14SyT3q3EpHR7DPHyRC8dnzRVKGYLb8tmtvLxQ6lJS++PAHec1mN6SEerkjIKfdbtivRxj3BctpwgqPeMPKLawS99q7k3kDx8qdEOtYEm/PtDIG+Hxfz1wK61M"
-          },
-          "expectedStatus": 200
-        },
-        {
-          "name": "AiSignPro Accountant Check User",
-          "url": "https://api.aisignpro.com/api/user/userExists",
-          "method": "POST",
-          "body": {
-            "key": "fUjZB3a/IJyX6AyCgxVZ4r+mOOJSBWMIR1JBrMqkopjmpuDLCvhBDDmAX35a/cv+lIQUArLwTq3oPioihA+Eyz4hn8aJ9MG1SdNtuoznGaI="
-          },
-          "expectedStatus": 200
-        },
-        {
-          "name": "AiSignPro Accountant OTP",
-          "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik",
-          "method": "POST",
-          "body": {
-            "sessionInfo": "AD8T5IuATw5ArftpEnSEp1H5WoYhGXT2E5J9NvnpYlKXENs8sNpBYgCFwmSYhwbrbp7ZBKuEzvmXjT65jE_KF7tKzFNUY6oTguUoX7a-bWYXzS3MtQTNOHWSAj3Su5z0Tms_z1L8JqJD2jAMrojJpOP1sKC2iToWpQ",
-            "code": "123456"
-          },
-          "expectedStatus": 200
-        },
-        {
-          "name": "AiSignPro Accountant Login",
-          "url": "https://api.aisignpro.com/api/user/login",
-          "method": "POST",
-          "body": {
-            "key": "4+BIJiBYlIqi7flceFSKm7HC5g8Sfgj9zrwy18U+55zlP44ttmvZBwnTaKUjFiS4AFgFoh7MQBK7ZoTzNHuFKwv+LsRDDRxSf9wTqSZd03MBqz9mGBb3uD0VQpRhtnbf"
-          },
-          "expectedStatus": 200
-        },
-        {
-          "name": "AiSignPro CPA UI",
-          "url": "https://cpa.aisignpro.com/",
+          "name": "AiSignPro Dashboard UI",
+          "url": "https://dashboard.aisignpro.com/",
           "method": "GET",
           "expectedStatus": 200
         },
         {
-          "name": "AiSignPro CPA Check User",
-          "url": "https://api.aisignpro.com/api/user/userExists",
+          "name": "AiSignPro Dashboard Check User",
+          "url": "https://dashboard.aisignpro.com/api/user/userExists",
           "method": "POST",
           "body": {
             "key": "fUjZB3a/IJyX6AyCgxVZ4pop+Mu29uTqwJQ7zpvAo1NFyc7kh7n5T9A7n8UxHr5UDccVDAfHiZwP1AznUSLAdk8M20OTpqPmk8+Ztg7sQUg="
@@ -918,7 +862,7 @@
           "expectedStatus": 200
         },
         {
-          "name": "AiSignPro CPA OTP",
+          "name": "AiSignPro Dashboard OTP",
           "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik",
           "method": "POST",
           "body": {
@@ -928,45 +872,11 @@
           "expectedStatus": 200
         },
         {
-          "name": "AiSignPro CPA Login",
-          "url": "https://api.aisignpro.com/api/user/login",
+          "name": "AiSignPro Dashboard Login",
+          "url": "https://dashboard.aisignpro.com/api/user/login",
           "method": "POST",
           "body": {
             "key": "zWnxj6lfy0D7gDyaQxeKeHisOe40qa4LDTWD8GOqqMsQPHx1QGlrQyMclLK1Udt3VoIVYWbgOympTcy6BoSct3ZdfZeZnGSQmBrgFrNyOUUsqEWS0gTxMGfzTIPQfExO"
-          },
-          "expectedStatus": 200
-        },
-        {
-          "name": "AiSignPro Participant UI",
-          "url": "https://client.aisignpro.com/",
-          "method": "GET",
-          "expectedStatus": 200
-        },
-        {
-          "name": "AiSignPro Participant Check User",
-          "url": "https://api.aisignpro.com/api/user/userExists",
-          "method": "POST",
-          "body": {
-            "key": "fUjZB3a/IJyX6AyCgxVZ4ptoOU69xEJf2qVsBQ7VAYAdP8ENeeaWWo48LSri6l0JuNeUW8Q/Ih0osGhb3r99lnzG3ix9JGzE8qvlQA+0hUs="
-          },
-          "expectedStatus": 200
-        },
-        {
-          "name": "AiSignPro Participant OTP",
-          "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=AIzaSyBAf4PM4HeNcO0uuByCUWwZFIYMYHfwUik",
-          "method": "POST",
-          "body": {
-            "sessionInfo": "AD8T5IurUSCLqscWe6H4QjbA9HR605VMOpbvrWuDFu6K-XKxnZQXoL0i7VxqOWixp-FIa7AYRiGvo1j-ZwMeay-hvTsomVCoxFGWTupfcazujFS_jn7cQZryTV_Tgaw2jDoT6luWuvIA_mf9xLD0DhjNMG3T4JgJ7A",
-            "code": "123456"
-          },
-          "expectedStatus": 200
-        },
-        {
-          "name": "AiSignPro Participant Login",
-          "url": "https://api.aisignpro.com/api/user/login",
-          "method": "POST",
-          "body": {
-            "key": "Rvy06w8KodBbMGFiqM6pSf7DEqBcLV5Bh4w8qs7JYvibfkz/30fvl5qIlc2kP/gs3Msl7u08McNuW+7bwHlmCSNwpPrTEcwZ5IlZAtV1PuQb5rop2gbZNuLXEZXqhtdJ"
           },
           "expectedStatus": 200
         }
