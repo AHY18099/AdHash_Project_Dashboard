@@ -3,7 +3,7 @@ name: Enterprise QA Dashboard
 on:
   workflow_dispatch:
   # Cron removed — exact-time triggering handled by Railway Express server
-  # via GitHub API workflow_dispatch at 8:00 AM and 4:00 PM IST precisely
+  # via GitHub API workflow_dispatch at 8:00 AM and 3:00 PM IST precisely
 
 jobs:
   qa-enterprise:

@@ -6884,7 +6884,7 @@ async function migrateWfDocsToGitHub() {
         setInterval(() => runBackupIfNeeded().catch(e => console.warn('[backup]', e.message)), 24 * 60 * 60 * 1000);
     } catch (e) { console.warn('[backup] Could not schedule backup:', e.message); }
 
-    // ── Exact-time GitHub Actions trigger (8:00 AM IST + 4:00 PM IST) ──
+    // ── Exact-time GitHub Actions trigger (8:00 AM IST + 3:00 PM IST) ──
     // Polls every minute. Fires workflow_dispatch when UTC time matches a target.
     // Polling survives Railway redeploys — no one-shot setTimeout that resets.
     (function _scheduleGHWorkflow() {
@@ -6892,8 +6892,8 @@ async function migrateWfDocsToGitHub() {
         const GH_OWNER     = 'AHY18099';
         const GH_REPO      = 'AdHash_Project_Dashboard';
         const GH_WORKFLOW  = 'enterprise-qa-dashboard.yml';
-        // IST target times in UTC: 8:00 AM IST = 02:30 UTC, 4:00 PM IST = 10:30 UTC
-        const UTC_TARGETS  = [{ h: 2, m: 30 }, { h: 10, m: 30 }];
+        // IST target times in UTC: 8:00 AM IST = 02:30 UTC, 3:00 PM IST = 09:30 UTC
+        const UTC_TARGETS  = [{ h: 2, m: 30 }, { h: 9, m: 30 }];
 
         if (!GITHUB_TOKEN) {
             console.warn('[gh-trigger] GITHUB_TOKEN not set — exact-time trigger disabled');
