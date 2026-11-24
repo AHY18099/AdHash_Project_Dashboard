@@ -1059,6 +1059,34 @@
           "expectedStatus": 200
         }
       ]
+    },
+    {
+      "id": "zapmeet",
+      "name": "Zap Meet",
+      "color": "#3b82f6",
+      "apps": [],
+      "servers": [
+        {
+          "name": "Zap Meet - Web",
+          "url": "https://www.zapmeet.ai/",
+          "type": "web",
+          "expectedStatus": 200
+        }
+      ],
+      "domains": [
+        "zapmeet.ai"
+      ],
+      "sslCerts": [
+        "zapmeet.ai"
+      ],
+      "apis": [
+        {
+          "name": "ZapMeet Website",
+          "url": "https://www.zapmeet.ai/",
+          "method": "GET",
+          "expectedStatus": 200
+        }
+      ]
     }
   ]
 }
